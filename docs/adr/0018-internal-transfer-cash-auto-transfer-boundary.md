@@ -1,8 +1,14 @@
-# Internal transfer cash auto-transfer requires same program and unchanged rules
+---
+id: ADR-0018
+title: "Internal transfer cash auto-transfer requires same program and unchanged rules"
+status: accepted
+date: 2026-07-06
+owner: "Academic + Finance"
+last_verified: 2026-07-25
+scope: architecture-decision
+---
 
-**Status:** Accepted
-**Date:** 2026-07-06
-**Owner:** Academic + Finance
+# Internal transfer cash auto-transfer requires same program and unchanged rules
 
 **Implementation priority:** Parked for a separate internal-transfer settlement
 workflow. This ADR must not expand or block FIN-REV-020 defer settlement.

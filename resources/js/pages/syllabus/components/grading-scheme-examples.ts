@@ -1,5 +1,5 @@
-// Worked Metropolia examples (S-007) sourced from
-// docs/features/academic/Grading_Schemes_Metropolia.md. Applying one seeds BOTH
+// Worked Metropolia examples documented in
+// docs/features/academic/grading.md. Applying one seeds both
 // the Assessment Components (single source of truth) and the grading scheme, so
 // staff start from a real, runnable rule rather than a blank form.
 

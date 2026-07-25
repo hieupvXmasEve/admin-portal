@@ -1,3 +1,11 @@
+---
+title: Local Markdown Issue Tracker
+status: active
+owner: Platform Team
+last_verified: 2026-07-25
+scope: scratch-issue-tracking
+---
+
 # Issue tracker: Local Markdown
 
 Issues and PRDs for this repo live as markdown files in `.scratch/`.

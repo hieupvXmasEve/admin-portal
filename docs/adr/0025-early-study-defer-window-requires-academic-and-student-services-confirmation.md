@@ -1,8 +1,14 @@
-# Early-study defer window requires Academic and Student Services confirmation
+---
+id: ADR-0025
+title: "Early-study defer window requires Academic and Student Services confirmation"
+status: accepted
+date: 2026-07-06
+owner: "Academic + Finance + Student Services"
+last_verified: 2026-07-25
+scope: architecture-decision
+---
 
-**Status:** Accepted
-**Date:** 2026-07-06
-**Owner:** Academic + Finance + Student Services
+# Early-study defer window requires Academic and Student Services confirmation
 
 ## Context
 

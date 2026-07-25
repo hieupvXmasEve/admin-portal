@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Decision <-> Student roster (ADR-0008).
+     * Decision <-> Student roster (ADR-0048).
      *
      * One decision covers many students; the roster is also what makes a purely
      * informational decision representable (a student attached with no transition).

@@ -12,8 +12,8 @@ return new class extends Migration
      * Run the migrations.
      *
      * Creates the per-campus, per-type_key storage backing the dynamic email
-     * template feature (history/dynamic-email-templates/phase-1-contract.md).
-     * Replaces the hard-coded HTML in app/Modules/Notification/EmailContent/Types/*.
+     * template contract documented in docs/features/email/template-contract.md.
+     * Replaces hard-coded HTML in app/Modules/Notification/EmailContent/Types/*.
      */
     public function up(): void
     {

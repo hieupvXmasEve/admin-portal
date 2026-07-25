@@ -1,59 +1,64 @@
 ---
-paths: '**/*.php'
+title: Cross-Module Contract Rules
+status: active
+owner: Platform Team
+last_verified: 2026-07-25
+scope: engineering-rules
+applies_to:
+  - app/Modules
+  - app/Shared/Contracts
 ---
 
-# Contract Rules (Shared/Contracts)
+# Cross-Module Contract Rules
 
-## 1. Golden Rule
+Whenever one module needs data or behavior owned by another module, it uses an
+explicit contract. Contracts are the legal boundary of the modular monolith.
 
-**Whenever Module A needs data or behavior from Module B -> You MUST use a Contract.**
+## When a contract is required
 
-- No exceptions.
-- Contracts act as the "legal boundary" of the Modular Monolith.
+- Reading another module's data.
+- Checking state owned by another module.
+- Invoking stable business behavior such as GPA, graduation, tuition, or
+  balance decisions.
+- Returning an aggregate whose inputs span modules.
+- Serving core domain data to an API or external integration.
+- Establishing a seam that may later become a service boundary.
 
-## 2. Mandatory Use Cases
+Use domain events for already-committed facts and explicit projections for
+purpose-built cross-context read models. Do not replace a direct dependency
+with an equally direct import of another module's concrete class.
 
-1.  **Reading Data from Another Module**:
-    - ❌ `AcademicRecord::where('student_id', $id)->avg('grade_points')` inside Finance module.
-    - ✅ `$this->academicReader->getStudentGpa($studentId)`
-2.  **Critical / Stable Business Logic**:
-    - GPA, Graduation, Tuition, Wallet Balance.
-    - Logic that will exist long-term should be behind a contract to decouple from Schema/Models.
-3.  **Checking "State" Across Modules**:
-    - "Has student passed?", "Has tuition been paid?"
-4.  **Aggregated Data**:
-    - Summaries requiring data from multiple tables/sources.
-5.  **External Integrations (API/Mobile)**:
-    - API Controllers must NOT query the DB directly for core data. They must go through a Contract.
-6.  **Potential Future Service Split**:
-    - If code might be split into a separate service later -> Use Contract NOW.
+## Interface rules
 
-## 3. What Contracts CANNOT Do
+- Interfaces live in `app/Shared/Contracts/{Domain}`.
+- The owner module provides the implementation and binds it in its service
+  provider.
+- Consumers depend only on the interface.
+- Contracts accept and return primitives, enums, immutable DTOs, or explicit
+  result objects.
+- Contracts do not accept or return Eloquent models or collections of models.
+- A multi-field result uses a named DTO rather than a generic array.
+- Contract operations express domain intent, not storage queries.
 
-- 🚫 Return Eloquent Models.
-- 🚫 Accept Eloquent Models as parameters.
-- 🚫 Return Collections of Models.
-- **Why?** To prevents leakage of the internal database structure.
+Contract names use a descriptive noun and capability, such as
+`StudentAcademicReader`, `WalletBalanceProvider`, or
+`SurveyCompletionChecker`. Avoid vague `*Service` names and interface prefixes.
 
-## 4. Implementation Rules
+## Ownership safeguards
 
-- **Location**: `app/Shared/Contracts/{Domain}/`.
-- **Implementation**: Resides in the **Module Owner**.
-- **Binding**: Bind in the Module's Service Provider.
-- **Forbidden**: Other modules must NOT `new` or `import` the concrete implementation class.
+- Each table remains owned by one module.
+- Consumers do not join or query the owner's tables.
+- Consumers never instantiate or import the concrete implementation.
+- Shared Kernel identity references do not grant access to the referenced
+  context's internals.
+- Academic and Finance exchange source-neutral contracts, events, or
+  projections; they never share money or lifecycle models. See ADR-0026.
 
-## 5. DTOs (Data Transfer Objects)
+## Review checklist
 
-- If a Contract returns multiple fields, use a DTO.
-- ❌ Do not return generic `array`.
-- ✅ Return `StudentAcademicSummaryDTO`.
-
-## 6. Review Checklist
-
-Before merging, ask:
-
-- [ ] Does this module read another module's table?
-- [ ] Does it import another module's Model?
-- [ ] Is this "long-term" business logic?
-- [ ] Will this be used by API/Mobile?
-      **If YES to any -> MUST USE CONTRACT.**
+- Does the change read, import, or join another module's internal data?
+- Does it ask another module to make a business decision?
+- Does the public shape leak a model, schema, or mutable collection?
+- Is the implementation registered by the owner and resolved through the
+  interface?
+- Is the contract named around domain intent and stable enough for consumers?

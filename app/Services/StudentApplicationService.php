@@ -27,7 +27,7 @@ use RuntimeException;
  * Drives the accountable Application lifecycle: a `pending` Application is either
  * Approved (one atomic step that creates the enrolled Student) or Rejected.
  *
- * Approve replaces the old convert/batch-convert flow (ADR-0001).
+ * Approve replaces the old convert/batch-convert flow (ADR-0042).
  */
 class StudentApplicationService
 {
@@ -46,7 +46,7 @@ class StudentApplicationService
      * Progression commands, then record the Admissions transition and actor.
      *
      * Any failure rolls the whole transaction back — never a half-created Student
-     * (ADR-0001). Exceptions propagate so callers can surface a clean failure.
+     * (ADR-0042). Exceptions propagate so callers can surface a clean failure.
      *
      * @param  array{admission_date?: string, expected_graduation_date?: string|null}  $options
      *

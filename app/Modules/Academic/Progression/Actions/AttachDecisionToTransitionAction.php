@@ -12,7 +12,7 @@ use InvalidArgumentException;
 
 /**
  * Backfill an authorizing Decision onto an already-recorded lifecycle transition
- * (ADR-0008).
+ * (ADR-0048).
  *
  * A requires-decision transition can be recorded first and the signed quyết định
  * entered later; this action attaches that Decision to the transition — in either

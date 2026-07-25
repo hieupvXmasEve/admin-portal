@@ -74,7 +74,7 @@ it('attaches a decision onto a progression event (optional — progression needs
         'created_by_user_id' => $this->user->id,
     ]);
 
-    // A progression event never requires a decision (ADR-0008, revised), so it
+    // A progression event never requires a decision (ADR-0048, revised), so it
     // never appears in the missing-decision report — but a decision may still be
     // attached for the record, and that covers the student on the roster.
     expect((new GetMissingDecisionReportQuery)->handle([], $this->campus->id)->total())->toBe(0);

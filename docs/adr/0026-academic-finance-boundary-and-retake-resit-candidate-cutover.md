@@ -1,7 +1,15 @@
-# Academic/Finance boundary, source-agnostic Finance intake, and the retake/resit debit cutover
+---
+id: ADR-0026
+title: "Academic/Finance boundary, source-agnostic Finance intake, and the retake/resit debit cutover"
+status: accepted
+supersedes: earlier candidate-centric draft
+last_updated: "2026-07-15 (Academic source contracts restored for retake/resit/EGC)"
+owner: Platform Team
+last_verified: 2026-07-25
+scope: architecture-decision
+---
 
-**Status:** accepted (supersedes the earlier candidate-centric draft of this ADR)
-**Last updated:** 2026-07-15 (Academic source contracts restored for retake/resit/EGC)
+# Academic/Finance boundary, source-agnostic Finance intake, and the retake/resit debit cutover
 
 Swinx stays a Laravel modular monolith, but Academic and Finance are separate bounded contexts that must be able to change independently: a business change on one side must not force a schema or code change on the other. `Student` is a Shared Kernel identity reference only (see **Student Identity** in `CONTEXT.md`). Academic owns the **Academic Student Lifecycle**; Finance owns all money — charges, credits, discounts, invoices, payments, DNG, settlement, review, and audit.
 

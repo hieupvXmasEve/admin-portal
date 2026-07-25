@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Authorizing-decision reference on progression events (ADR-0008).
+     * Authorizing-decision reference on progression events (ADR-0048).
      *
      * Records authorization provenance ("this transition was authorized by that
      * decision") for progression-stream transitions (placement / course-stage

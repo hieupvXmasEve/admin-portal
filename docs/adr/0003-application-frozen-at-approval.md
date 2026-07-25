@@ -1,3 +1,12 @@
+---
+id: ADR-0003
+title: "Application data is frozen at approval"
+status: accepted
+owner: Platform Team
+last_verified: 2026-07-25
+scope: architecture-decision
+---
+
 # Application data is frozen at approval
 
 While an Application is `pending`, it is fully mutable — the CRM ingestion API upserts (overwrites) any field, including the single English-test result. At **Approve**, the final state is snapshotted into the Student and the Application is **frozen**: subsequent CRM updates to an `approved`/`rejected` Application are rejected with `409 Conflict`.

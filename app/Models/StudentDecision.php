@@ -50,7 +50,7 @@ class StudentDecision extends Model
     }
 
     /**
-     * The students this decision covers (its roster, ADR-0008).
+     * The students this decision covers (its roster, ADR-0048).
      *
      * One decision covers many students; a purely informational decision is a
      * roster with no authorized event. This is the source of truth for coverage,
@@ -71,7 +71,7 @@ class StudentDecision extends Model
      *
      * Idempotent (syncWithoutDetaching). Called whenever this decision authorizes
      * a transition for a student so the roster stays consistent with the events
-     * it authorizes (ADR-0008).
+     * it authorizes (ADR-0048).
      */
     public function cover(int ...$studentIds): void
     {

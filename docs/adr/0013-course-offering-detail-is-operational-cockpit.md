@@ -1,3 +1,12 @@
+---
+id: ADR-0013
+title: "Course Offering Detail is the operational cockpit"
+status: accepted
+owner: Platform Team
+last_verified: 2026-07-25
+scope: architecture-decision
+---
+
 # Course Offering Detail is the operational cockpit
 
 **Context.** Course-offering management is currently split across the Course Offering detail page, Course Statistics pages, the Attendance pages, Canvas administration, and several web-backed API routes — roughly 44 distinct entry points touch a single `CourseOffering`. Staff-facing actions such as roster changes, sessions, attendance, scores, completion, surveys, and Canvas-linked constraints appear as separate flows even though they all operate on one `CourseOffering`.

@@ -25,7 +25,7 @@ class AcademicPlacementController extends Controller
      * Retired standalone EGC Placement & Progression page.
      *
      * EGC placement and progression are now managed in place on the Hub's
-     * Lifecycle tab (ADR-0009); this route redirects there so old bookmarks
+     * Lifecycle tab (ADR-0049); this route redirects there so old bookmarks
      * keep working.
      */
     public function show(Student $student): RedirectResponse

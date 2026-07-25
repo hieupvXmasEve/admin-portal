@@ -28,7 +28,7 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 // EGC placement/progression controls apply only to students currently in the
-// pre-uni GC stage (PRD user story 25 / ADR-0009).
+// pre-uni GC stage (PRD user story 25 / ADR-0049).
 const isEgcStudent = computed(() => props.student.status === 'intake_pre_uni_gc');
 
 const missingDecisionCount = computed(() => props.timeline.filter((row) => row.missing_decision).length);
@@ -50,9 +50,7 @@ const openAttachDecision = (row: LifecycleTimelineRow) => {
                     <Activity class="h-5 w-5" />
                     Lifecycle
                 </h2>
-                <p class="text-muted-foreground text-sm">
-                    One chronological timeline of status actions and EGC progression, with authorizing decisions inline.
-                </p>
+                <p class="text-muted-foreground text-sm">One chronological timeline of status actions and EGC progression, with authorizing decisions inline.</p>
             </div>
             <RecordActionDialog v-if="canChangeStatus" :student="student" :options="options.action" />
         </div>
@@ -78,11 +76,6 @@ const openAttachDecision = (row: LifecycleTimelineRow) => {
             </div>
         </div>
 
-        <AttachDecisionDialog
-            v-model:open="attachOpen"
-            :student="student"
-            :transition="attachTarget"
-            :decisions="options.decisions"
-        />
+        <AttachDecisionDialog v-model:open="attachOpen" :student="student" :transition="attachTarget" :decisions="options.decisions" />
     </div>
 </template>

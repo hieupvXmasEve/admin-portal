@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Backfill the Decision <-> Student roster (student_decision_student) from the
- * existing student_action_logs.decision_id links (ADR-0008).
+ * existing student_action_logs.decision_id links (ADR-0048).
  *
  * The original action-log links are left untouched; this only ensures each
  * already-linked student is also present on the decision's coverage roster.

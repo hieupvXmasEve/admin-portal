@@ -9,7 +9,7 @@ return new class extends Migration
 {
     /**
      * Backfill the Decision <-> Student roster from existing
-     * student_action_logs.decision_id links (ADR-0008).
+     * student_action_logs.decision_id links (ADR-0048).
      *
      * The action-log links stay intact (they remain the source of truth for which
      * transition each decision authorized); this only ensures every already-linked

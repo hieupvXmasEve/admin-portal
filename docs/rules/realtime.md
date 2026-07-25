@@ -1,38 +1,58 @@
 ---
-paths: '**/*.{php,vue,js,ts}'
+title: Realtime and Notification Rules
+status: active
+owner: Platform Team
+last_verified: 2026-07-25
+scope: engineering-rules
+applies_to:
+  - app/Events
+  - app/Modules/Notification
+  - resources/js
+  - routes/channels.php
 ---
 
-# Realtime Notification Rules
+# Realtime and Notification Rules
 
-## 1. Core Principles
+Laravel broadcasting is the application boundary. Ably, Pusher, Reverb, and
+other providers are transport choices; business behavior must not depend on a
+provider SDK.
 
-- **Laravel Broadcasting**: The SINGLE source of truth.
-- **Transport Independence**: Ably, Pusher, Reverb are just transport layers. Business logic MUST NOT depend on them.
-- **Switchable**: Changing providers should only require `.env` changes.
+## Backend broadcasting
 
-## 2. Backend Rules (Laravel)
+- Generic broadcast events use the existing `app/Events` owner; domain
+  notification behavior remains in `app/Modules/Notification`.
+- Broadcast events implement `ShouldBroadcast` and should be queued.
+- Name channels by resource and scope, for example `users.{userId}`. Do not put
+  vendor or UI names in channel contracts.
+- Authorize private channels in `routes/channels.php`; authorization remains
+  backend-owned.
+- Keep payloads explicit, minimal, campus-scoped, and safe for the authorized
+  recipient.
+- Provider changes should be configuration-only.
 
-- **Events**: Must implement `ShouldBroadcast`.
-- **Location**: `app/Events`.
-- **Channel Naming**: `{resource}.{scope_identifier}` (e.g., `users.{userId}`).
-    - ❌ No vendor prefixes.
-    - ❌ No UI-based naming.
-- **Authorization**: `routes/channels.php`. Must be backend-only logic.
-- **Queues**: Broadcast events SHOULD be queued.
+## Frontend subscriptions
 
-## 3. Frontend Rules (Vue 3 / Inertia)
+- Subscribe through Laravel Echo.
+- Do not import Ably, Pusher, or another vendor SDK in feature code.
+- Centralize Echo initialization and use private channels for user-scoped data.
+- Unsubscribe or stop listeners when the owning component lifecycle ends.
 
-- **Laravel Echo**: MANDATORY.
-- **Forbidden**: Importing vendor SDKs (Ably, Pusher) directly.
-- **Initialization**: Must be abstracted (e.g., `createEcho()` factory).
-- **Syntax**: `Echo.private('...').listen('EventName', ...)`
+## Notification V2 delivery
 
-## 4. Environment Variables
+- Persist notification events to `notification_event_outbox` before processing.
+- Resolve recipients to `recipient_user_id` before persistence.
+- Preserve the same `campus_id` across event, message, and delivery records.
+- Dispatch through `notifications:process-outbox`; never bypass the outbox by
+  writing delivery records directly.
+- New behavior uses the V2 notification tables; do not add a legacy
+  `notifications` backfill.
 
-- **Broadcaster Selection**: `BROADCAST_CONNECTION=ably|reverb|log`
-- **Frontend Config**: `VITE_BROADCASTER`, `VITE_BROADCAST_KEY`, `VITE_SOCKET_HOST`.
-- **Forbidden**: Vendor-specific keys like `VITE_ABLY_KEY` in code (map them in config).
+## Configuration and migration safety
 
-## 5. Migration Safety
-
-- **Rule**: Code must support migrating from SaaS (Ably) to Self-Hosted (Reverb) without rewriting Backend/Frontend logic.
+- Select the backend through `BROADCAST_CONNECTION`.
+- Expose normalized frontend configuration such as `VITE_BROADCASTER`,
+  `VITE_BROADCAST_KEY`, and `VITE_SOCKET_HOST`.
+- Do not reference vendor-specific environment variable names in feature code;
+  map them in configuration.
+- A move between hosted and self-hosted transports must not require rewriting
+  backend events or frontend subscriptions.

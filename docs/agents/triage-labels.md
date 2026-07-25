@@ -1,3 +1,11 @@
+---
+title: Local Issue Triage Labels
+status: active
+owner: Platform Team
+last_verified: 2026-07-25
+scope: scratch-issue-triage
+---
+
 # Triage Labels
 
 The skills speak in terms of five canonical triage roles. This file maps those roles to the actual label strings used in this repo's issue tracker. Because this repo uses a local-markdown tracker, the "label" is recorded as a `Status:` line in each issue file.

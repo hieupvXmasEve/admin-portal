@@ -1,77 +1,59 @@
-# Portal Repos
+---
+title: Portal Repository Workflow
+status: canonical
+owner: Platform Team
+last_verified: 2026-07-25
+scope: cross-repository-portals
+---
 
-Last updated: 2026-05-31
-Owner: Platform Team
-Status: Active workflow baseline
+# Portal Repository Workflow
 
-## Purpose
+Swinx exposes student and lecturer APIs consumed by separate Nuxt repositories
+under `FE/`. Those directories are ignored by Swinx and keep independent Git
+history.
 
-Swinx exposes student and lecturer API surfaces that are consumed by separate
-Nuxt portal repositories kept under `FE/` for local multi-repo work. These
-portal repositories are intentionally ignored by the Swinx git repository and
-must remain independently versioned.
+## Repository map
 
-## Repo Map
+| Surface | Local repository | Backend base | Canonical contract |
+| --- | --- | --- | --- |
+| Student | `FE/student-nuxt` | `/api/v1/student` | `docs/api/student/` |
+| Lecturer | `FE/lecturer-nuxt` | `/api/v1/lecturer` | `docs/api/lecturer/` |
 
-| Surface | Local path | Backend base | Backend route files | Frontend API base |
-| --- | --- | --- | --- | --- |
-| Student portal | `FE/student-nuxt` | `/api/v1/student` | `routes/api/v1/student.php`, `app/Modules/Identity/routes/api.php` | `NUXT_PUBLIC_API_BASE` |
-| Lecturer portal | `FE/lecturer-nuxt` | `/api/v1/lecturer` | `routes/api/v1/lecturer.php`, `app/Modules/Identity/routes/api.php` | `NUXT_PUBLIC_API_BASE` |
+Identity/context routes may also live in
+`app/Modules/Identity/routes/api.php`.
 
-## Trigger Rules
+## Impact declaration
 
-Treat portal impact as explicit story metadata:
+Every change to a portal-consumed contract records:
 
 ```text
 Portal impact: none | student | lecturer | both
 ```
 
-Use `student` when changing:
+Student impact includes student routes, auth/context, resources, requests,
+response envelopes, docs, or shared notification behavior.
 
-- `routes/api/v1/student.php`
-- student auth/context routes in `app/Modules/Identity/routes/api.php`
-- controllers/resources/requests/actions that shape `/api/v1/student/*`
-- docs under `docs/api/student/`
+Lecturer impact includes lecturer routes, auth/context, resources, requests,
+response envelopes, docs, or shared notification behavior.
 
-Use `lecturer` when changing:
+## Required workflow
 
-- `routes/api/v1/lecturer.php`
-- lecturer auth/me/check-science routes in `app/Modules/Identity/routes/api.php`
-- controllers/resources/requests/actions that shape `/api/v1/lecturer/*`
-- docs under `docs/api/lecturer/`
+1. Run `./scripts/portal-status.sh` before portal or portal-facing API edits.
+2. Inspect the exact backend route/controller/request/resource and matching
+   portal endpoint/type consumer.
+3. Update the canonical backend API contract.
+4. Update only the affected nested portal.
+5. Keep Swinx and portal Git states separate.
+6. Run targeted backend validation.
+7. Run the affected portal's lint, typecheck, and build.
+8. Report backend and portal changes separately.
 
-Use `both` when a shared identity, notification, realtime, envelope, auth,
-or CORS change affects both surfaces.
+Do not stage nested portal files from Swinx. Preserve unrelated dirty changes
+inside each repository.
 
-## Required Workflow
+## Portal validation
 
-When portal impact is not `none`:
-
-1. Run `./scripts/portal-status.sh` before edits to see nested repo state.
-2. Inspect only the affected backend route/controller/resource/request/action
-   and the matching FE composable, store, page, and `shared/types` files.
-3. Update backend API docs in `docs/api/student/` or `docs/api/lecturer/`.
-4. Update the affected portal code in the matching nested repo.
-5. Run targeted backend validation and portal validation.
-6. Record Swinx changes and portal changes separately in the final summary.
-
-Do not move backend API logic into the portal repos. Do not commit or stage
-portal files from the Swinx repository. If a portal repo has unrelated dirty
-changes, work around them and do not revert them.
-
-## Validation Commands
-
-Backend commands must use the Docker wrapper:
-
-```bash
-./scripts/dev.sh artisan route:list
-./scripts/dev.sh test
-./scripts/dev.sh artisan pint
-```
-
-Run narrower backend checks when the touched area has a targeted test.
-
-Student portal checks:
+Student:
 
 ```bash
 cd FE/student-nuxt
@@ -80,7 +62,7 @@ pnpm typecheck
 pnpm build
 ```
 
-Lecturer portal checks:
+Lecturer:
 
 ```bash
 cd FE/lecturer-nuxt
@@ -89,35 +71,17 @@ pnpm typecheck
 pnpm build
 ```
 
-If a command cannot be run because dependencies, env, or services are missing,
-state that explicitly and record the gap in the story evidence.
+If environment or dependencies prevent a check, report the exact gap.
 
-## Current Contract Posture
+## Contract posture
 
-The portals currently use `$api` wrappers and handwritten TypeScript types.
-OpenAPI/generated clients are not yet the enforced contract. Until generated
-clients exist, contract safety comes from:
+Portal clients currently use API wrappers and handwritten TypeScript contracts.
+Until generated OpenAPI clients are adopted, safety depends on:
 
-- backend API docs for the touched surface,
-- matching portal `shared/types` updates,
-- portal `pnpm typecheck`,
-- targeted backend feature tests for request/response behavior.
+- canonical Markdown API contracts;
+- matching portal types/composables/stores;
+- targeted backend request/response tests;
+- portal typecheck and build.
 
-## Token Control
-
-Do not scan all of `FE/` by default. Start from the changed API path and search
-for exact endpoint fragments or type names inside the matching portal repo:
-
-```bash
-rg -n "'/finance|/finance|Finance" FE/student-nuxt/app FE/student-nuxt/shared FE/student-nuxt/docs
-rg -n "'/courses|/courses|Course" FE/lecturer-nuxt/app FE/lecturer-nuxt/shared FE/lecturer-nuxt/docs
-```
-
-Only broaden the search when the first pass does not reveal the consumer.
-
-## Unresolved Questions
-
-- Should Swinx introduce OpenAPI specs and generated Nuxt clients for student
-  and lecturer surfaces?
-- Should portal validation be wrapped by Swinx helper scripts once CI is
-  restored?
+Search only the affected portal first. Broaden scope only when endpoint or type
+consumers cannot be found.

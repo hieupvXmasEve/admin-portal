@@ -1,8 +1,14 @@
-# Curriculum changes use academic equivalence, not money proration
+---
+id: ADR-0024
+title: "Curriculum changes use academic equivalence, not money proration"
+status: accepted
+date: 2026-07-06
+owner: "Academic + Finance"
+last_verified: 2026-07-25
+scope: architecture-decision
+---
 
-**Status:** Accepted
-**Date:** 2026-07-06
-**Owner:** Academic + Finance
+# Curriculum changes use academic equivalence, not money proration
 
 ## Context
 

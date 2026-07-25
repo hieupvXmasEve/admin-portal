@@ -17,8 +17,8 @@ use Inertia\Response;
 /**
  * Admin Inertia controller for editing per-campus notification email templates.
  *
- * Authorization: NotificationTemplatePolicy (B3) — super_admin only.
- * No delete or create — edit-only per CONTEXT.md D4.
+ * Authorization: NotificationTemplatePolicy.
+ * The canonical template catalog is edit-only: no create or delete.
  */
 class NotificationTemplateController extends Controller
 {
@@ -129,8 +129,8 @@ class NotificationTemplateController extends Controller
      * flash message. Uses the same FormRequest as the JSON API endpoint so
      * authorization, variable allow-list, and Purifier wiring stay shared.
      *
-     * Inertia v3 flash via Inertia::flash() per CLAUDE.md Inertia v3 rules —
-     * NOT the legacy ->with('success', ...).
+     * Inertia v3 flash uses Inertia::flash(), not the removed legacy
+     * ->with('success', ...) pattern.
      */
     public function update(
         UpdateNotificationTemplateRequest $request,

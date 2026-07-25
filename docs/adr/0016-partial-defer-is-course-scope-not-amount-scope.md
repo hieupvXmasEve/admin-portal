@@ -1,8 +1,14 @@
-# Partial defer is course scope, not amount scope
+---
+id: ADR-0016
+title: "Partial defer is course scope, not amount scope"
+status: accepted
+date: 2026-07-06
+owner: "Academic + Finance"
+last_verified: 2026-07-25
+scope: architecture-decision
+---
 
-**Status:** Accepted
-**Date:** 2026-07-06
-**Owner:** Academic + Finance
+# Partial defer is course scope, not amount scope
 
 **Context.** Earlier Finance defer notes and code used `PARTIAL` as if it were a
 money policy: preserve or consume part of an already-paid amount. That model is

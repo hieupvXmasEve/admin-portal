@@ -16,7 +16,7 @@ use Illuminate\Database\Migrations\Migration;
  * migration just walks existing campuses and delegates to the provisioner.
  *
  * Idempotent via firstOrCreate on the unique (campus_id, type_key) key.
- * See history/dynamic-email-templates/phase-1-contract.md - Story S1.4.
+ * See docs/features/email/template-contract.md.
  */
 return new class extends Migration
 {

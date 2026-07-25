@@ -1,8 +1,14 @@
-# Return-study uses current pricing by default
+---
+id: ADR-0021
+title: "Return-study uses current pricing by default"
+status: accepted
+date: 2026-07-06
+owner: "Academic + Finance"
+last_verified: 2026-07-25
+scope: architecture-decision
+---
 
-**Status:** Accepted
-**Date:** 2026-07-06
-**Owner:** Academic + Finance
+# Return-study uses current pricing by default
 
 ## Context
 

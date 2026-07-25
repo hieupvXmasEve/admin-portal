@@ -17,7 +17,7 @@ class AiToolCall extends Model
     public const CHANNEL_CHAT = 'chat';
 
     /**
-     * Controlled MCP server channel (ADR-0006/0009) — standalone rows, no chat run.
+     * Controlled MCP server channel (ADR-0008/0009) — standalone rows, no chat run.
      */
     public const CHANNEL_MCP = 'mcp';
 

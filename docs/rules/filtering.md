@@ -1,40 +1,41 @@
 ---
-paths: '**/*.{php,vue,js,ts}'
+title: Filtering, Sorting, and Pagination Rules
+status: active
+owner: Frontend Team
+last_verified: 2026-07-25
+scope: engineering-rules
+applies_to:
+  - "**/*.php"
+  - "**/*.vue"
+  - "**/*.ts"
 ---
 
-# useDataTable + Laravel Rules
+# Filtering, Sorting, and Pagination Rules
 
-This guide standardizes how list pages use the `useDataTable` composable together with Laravel controllers. Follow it whenever you implement or update a paginated index that needs filters, sorting, and pagination.
+`useDataTable` is the only approved composable for server-filtered, sorted, or
+paginated list pages. Do not add or extend `useInertiaFilters`,
+`useServerTableQuery`, `useFilters`, or page-local navigation glue. When a list
+page is materially edited, migrate its legacy filtering as part of that change;
+a strictly isolated one-line fix may remain unchanged.
 
-> ## 🔴 MANDATORY (read first — applies to humans and AI agents)
->
-> **`useDataTable` is the ONLY approved composable for filter / sort / pagination
-> list pages. ALWAYS use it when writing new code or editing existing code.**
->
-> - **New code:** MUST use `useDataTable`. Never introduce a new
->   `useInertiaFilters` or `useServerTableQuery` usage — they are legacy.
-> - **Editing existing code:** if the page still uses `useInertiaFilters` /
->   `useServerTableQuery`, migrate it to `useDataTable` as part of the change.
->   The only exception is a strictly isolated one-line bug fix on a frozen legacy
->   page where migrating is out of scope — never *extend* the legacy composable.
-> - `useInertiaFilters` (≈26 pages) and `useServerTableQuery` (≈9 pages) are
->   **legacy/frozen**. `useDataTable` replaces both (see
->   `resources/js/composables/useDataTable.ts`).
->
-> AI agents: treat any new or edited `*.vue` list/filter/pagination page that
-> imports `useInertiaFilters` or `useServerTableQuery` as a defect to fix.
+The executable frontend contract is
+`resources/js/composables/useDataTable.ts`. Shared filter components live in
+`resources/js/components/filters/`.
 
-> **Reference:** `docs/useDataTable-examples.md` for full composable usage, validation, and dependent filter patterns.
+## Define one filter contract
 
-## 1. Decide the Contract First
+Use the same snake_case keys in:
 
-- **Inventory the filters** (search text, selects, booleans, date ranges, sort, pagination) and write a TypeScript interface that includes them all.
-- **Define defaults** for every field that should not pollute the query string (e.g., `status: ''`, `per_page: 15`).
-- **Name consistency matters**: use the same filter keys everywhere — TypeScript interface, composable `initialFilters`, Laravel validation, query builder, and Inertia response payload.
+- the TypeScript filter interface;
+- Inertia `filters` props;
+- `initialFilters` and `defaultValues`;
+- the Laravel FormRequest;
+- the Query or query builder;
+- the response and query string.
 
-## 2. Frontend Pattern (Vue + useDataTable)
-
-### 1. Props + interface
+Whitelist sortable fields and directions. Define defaults for values that
+should disappear from the URL, including `per_page`, empty selects, and null
+sort state.
 
 ```ts
 interface StudentFilters {
@@ -49,188 +50,123 @@ interface StudentFilters {
 const props = defineProps<{
     students: PaginatedResponse<Student>;
     filters?: Partial<StudentFilters>;
-    campuses: Campus[];
 }>();
 ```
 
-### 2. Initialize `useDataTable`
+## Initialize `useDataTable`
 
 ```ts
-import { useDataTable } from '@/composables/useDataTable';
-
 const {
-    state, setFilter, apply, setPage, setPerPage, setSort, clearAllFilters,
-    hasActiveFilters, isLoading, currentPage, totalPages, isFirstPage, isLastPage,
+    state,
+    setFilter,
+    apply,
+    setPage,
+    setPerPage,
+    setSort,
+    clearAllFilters,
+    hasActiveFilters,
+    isLoading,
+    currentSort,
+    currentDirection,
 } = useDataTable<StudentFilters>({
     baseUrl: route('academic.students.index'),
     initialFilters: {
-        search:    props.filters?.search    ?? '',
-        status:    props.filters?.status    ?? '',
+        search: props.filters?.search ?? '',
+        status: props.filters?.status ?? '',
         campus_id: props.filters?.campus_id ?? '',
-        sort:      props.filters?.sort      ?? null,
+        sort: typeof props.filters?.sort === 'string'
+            ? props.filters.sort
+            : null,
         direction: props.filters?.direction ?? null,
-        per_page:  props.filters?.per_page  ?? 15,
+        per_page: props.filters?.per_page ?? 15,
     },
     defaultValues: {
-        status:    '',
+        status: '',
         campus_id: '',
-        per_page:  15,
+        sort: null,
         direction: null,
+        per_page: 15,
     },
     only: ['students', 'filters'],
     debounce: 300,
-    // Per-field overrides (optional)
     fieldDebounce: { search: 400 },
     immediateFields: ['status', 'campus_id'],
 });
 ```
 
-- Use `defaultValues` for anything that should disappear from the URL when unchanged.
-- Use `fieldDebounce` to give text inputs a longer delay than select inputs.
-- Use `immediateFields` for selects/checkboxes that should navigate instantly.
+- Use `setFilter()` for normal input updates.
+- Use `apply()` for an explicit Apply button or immediate navigation.
+- Use `setSort()`, `setPage()`, and `setPerPage()` rather than mutating URL
+  state directly.
+- Show a clear action only when `hasActiveFilters` and call
+  `clearAllFilters()`.
+- Use the composable's loading and current-sort state in the template.
+- Use named routes for `baseUrl`.
 
-### 3. Bind UI components
+Optional validation and dependent-filter APIs may be used when the executable
+composable supports the requirement. Do not fetch dependent options through
+raw `fetch` or Axios; use the project API wrapper and named routes.
 
-- **Text search:** `@update:model-value="setFilter('search', $event)"`
-- **Select filters:** `@update:model-value="setFilter('status', $event)"`
-- **Sort:** `setSort(field, direction)` — toggles asc/desc
-- **Pagination:** `setPage(n)`, `setPerPage(n)`
-- **Clear:** show button when `hasActiveFilters`, call `clearAllFilters()`
-- **Loading state:** `:disabled="isLoading"` on inputs; show spinner when `isLoading`
+## PHP empty-array guard
 
-### 4. Apply button pattern (manual mode)
-
-For pages with an explicit "Apply" button, call `apply()` instead of relying on debounced `setFilter`:
-
-```ts
-// Collect filter changes in local state, then:
-const handleApply = () => {
-    apply({ search: localSearch.value, status: localStatus.value });
-};
-```
-
-### 5. Validation (optional)
+An empty PHP filter array serializes to a JavaScript array. On an array,
+`filters.sort` is the native `Array.prototype.sort` function and is truthy.
+Always guard the server sort prop:
 
 ```ts
-const { addValidationRule } = useDataTable({ ... });
-
-addValidationRule('search', {
-    validate: (value) => value && value.length < 2 ? 'Minimum 2 characters' : null,
-    message: 'Search too short',
-});
+sort: typeof props.filters?.sort === 'string' ? props.filters.sort : null
 ```
 
-### 6. Dependent filters (optional)
+Template components receive `currentSort` and `currentDirection` from
+`useDataTable`, not an unguarded `filters.sort`.
 
-```ts
-const { addDependency } = useDataTable({ ... });
+## Shared filter UI
 
-addDependency('program_id', {
-    dependsOn: ['campus_id'],
-    resolve: async ([campusId]) => {
-        if (!campusId) return null;
-        const res = await fetch(`/api/campuses/${campusId}/programs`);
-        const data = await res.json();
-        return data[0]?.id ?? null;
-    },
-});
-```
+Prefer the existing primitives in `resources/js/components/filters/`:
 
-## 3. Backend Pattern (Laravel Controller)
+- `FilterPanel.vue` for layout and clear behavior;
+- `FilterSearchInput.vue` for debounced text;
+- `FilterSelect.vue` for enums and related keys;
+- `FilterDateRange.vue` for date boundaries.
 
-### 1. Validate the request
+Select options use non-empty string values. Convert numeric IDs with
+`String(id)` and use a sentinel such as `all` for a visible reset option.
 
-```php
-$validated = $request->validate([
-    'search'    => 'nullable|string|max:255',
-    'status'    => 'nullable|string|in:active,inactive,graduated',
-    'campus_id' => 'nullable|integer|exists:campuses,id',
-    'sort'      => 'nullable|string|in:name,student_code,status,created_at',
-    'direction' => 'nullable|string|in:asc,desc',
-    'per_page'  => 'nullable|integer|min:5|max:100',
-]);
-```
+## Backend contract
 
-- Keep validation keys in lock-step with the TypeScript interface.
-- Guard sort columns and per-page ranges so malicious values never reach the query.
+Use a FormRequest to validate the complete filter shape:
 
-### 2. Build the query incrementally
+- nullable search and select fields;
+- existing related IDs scoped as required;
+- allowed sort fields and `asc`/`desc`;
+- bounded integer `per_page`;
+- well-formed dates and coherent ranges.
 
-```php
-$query = Student::query()->forCampus($campusId);
+Apply filters incrementally in an owning Query class or focused query builder.
+Keep controllers thin. Sort only by a server whitelist and always provide a
+stable fallback order.
 
-if (!empty($validated['search'])) {
-    $query->where(fn($q) => $q
-        ->where('full_name', 'like', "%{$validated['search']}%")
-        ->orWhere('student_code', 'like', "%{$validated['search']}%")
-    );
-}
-
-if (!empty($validated['status'])) {
-    $query->where('status', $validated['status']);
-}
-
-if (!empty($validated['campus_id'])) {
-    $query->where('campus_id', $validated['campus_id']);
-}
-
-$sortColumn    = $validated['sort']      ?? 'created_at';
-$sortDirection = $validated['direction'] ?? 'desc';
-$query->orderBy($sortColumn, $sortDirection)->orderBy('id', 'desc');
-
-$perPage  = $validated['per_page'] ?? 15;
-$students = $query->paginate($perPage)->withQueryString();
-```
-
-- Start from a scoped base query.
-- Apply each filter only when the validated value is present.
-- Always add a deterministic tiebreaker (`orderBy('id', 'desc')`).
-
-### 3. Return filters back to Inertia
+Return the sanitized filters and paginator through Inertia:
 
 ```php
 return Inertia::render('Academic/Students/Index', [
-    'students' => StudentResource::collection($students),
-    'filters'  => [
-        'search'    => $validated['search']    ?? null,
-        'status'    => $validated['status']    ?? null,
-        'campus_id' => $validated['campus_id'] ?? null,
-        'sort'      => $validated['sort']      ?? null,
-        'direction' => $validated['direction'] ?? null,
-        'per_page'  => $validated['per_page']  ?? null,
-    ],
-    'campuses' => CampusResource::collection(Campus::all()),
+    'students' => $query->handle($filters)->withQueryString(),
+    'filters' => (object) $filters,
 ]);
 ```
 
-- Use `null` values so Vue can reapply fallback defaults without polluting URLs.
-- Pass supporting lookup data (select options, counts) alongside the list.
+Casting an empty filter payload to an object prevents the PHP-array
+serialization trap. Use `withQueryString()` so pagination retains active
+filters. Restrict partial reloads with the composable's `only` list.
 
-### 4. Paginate with `withQueryString()`
+## Review checklist
 
-Always chain `->withQueryString()` on the paginator so page links preserve the current filter state.
-
-## 4. Implementation Checklist
-
-**Controller**
-- [ ] Validate every filter key (type, enum values, integer ranges for sort/per_page)
-- [ ] Apply filters conditionally — skip when value is null/empty
-- [ ] Return `filters` object + any supporting lookup data
-- [ ] Chain `withQueryString()` on paginator
-
-**Vue Page**
-- [ ] Declare TypeScript interface for filters
-- [ ] Pass normalized values to `useDataTable` with `defaultValues`, `only`, `debounce`
-- [ ] Wire UI components to `setFilter`, `setSort`, `setPage`, `setPerPage`, `clearAllFilters`
-- [ ] Disable inputs and show loading state via `isLoading`
-- [ ] Show clear button only when `hasActiveFilters`
-
-## 5. Tips & Gotchas
-
-- Default select values as `''` (empty string) in `defaultValues` so they disappear from the URL — not `'all'`.
-- Use `immediateFields` for selects/checkboxes; text search should always be debounced (300–500ms).
-- Keep `only` scoped to the resources and filters that actually change to reduce payload size.
-- For numeric inputs (min/max capacity) that shouldn't fire on every keystroke, combine `fieldDebounce` with a longer delay.
-- `clearAllFilters()` resets all filters to empty/null and triggers navigation immediately.
-
-Following these rules ensures every new index page behaves consistently, keeps URLs tidy, and stays in sync with Laravel validation and query logic.
+- One filter interface and one set of keys are used end-to-end.
+- Validation, sort whitelist, defaults, and maximum page size are explicit.
+- `useDataTable` owns navigation; no legacy composable or raw URL glue remains.
+- Sort props use the `typeof` guard and empty backend filters serialize as an
+  object.
+- Pagination retains query parameters.
+- Loading, empty, error, clear, and selection states use shared UI patterns.
+- Targeted tests cover defaults, filters, invalid input, sorting, pagination,
+  and empty data as applicable.

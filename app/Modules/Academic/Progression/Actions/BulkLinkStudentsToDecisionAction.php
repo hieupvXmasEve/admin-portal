@@ -61,7 +61,7 @@ final class BulkLinkStudentsToDecisionAction
                 ->when($campusId, fn ($query) => $query->whereHas('student', fn ($studentQuery) => $studentQuery->where('campus_id', $campusId)))
                 ->update(['decision_id' => $decision->id]);
 
-            // Keep the coverage roster in step with the links just made (ADR-0008):
+            // Keep the coverage roster in step with the links just made (ADR-0048):
             // one decision covers the many students it now authorizes.
             $linkedStudentIds = StudentActionLog::query()
                 ->whereKey($actionLogIds)

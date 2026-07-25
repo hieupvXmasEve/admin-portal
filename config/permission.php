@@ -454,8 +454,8 @@ return [
             'edit_notification_email_template' => 'edit_notification_email_template',
             'preview_notification_email_template' => 'preview_notification_email_template',
             'test_send_notification_email_template' => 'test_send_notification_email_template',
-            // No create/delete — per CONTEXT.md D4 the template set is fixed
-            // (rows seeded from NotificationTemplateTypeKey enum × campuses).
+            // No create/delete: the canonical template set is provisioned from
+            // NotificationTemplateTypeKey for each campus.
         ],
     ],
 

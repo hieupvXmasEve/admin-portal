@@ -1,8 +1,14 @@
-# 0014 — Post-completion grade changes flow only through Recalculate
+---
+id: ADR-0014
+title: "Post-completion grade changes flow only through Recalculate"
+status: accepted
+date: 2026-07-03
+owner: "Academic / Course Offering Cockpit"
+last_verified: 2026-07-25
+scope: architecture-decision
+---
 
-**Status:** Accepted
-**Date:** 2026-07-03
-**Owner:** Academic / Course Offering Cockpit
+# Post-completion grade changes flow only through Recalculate
 
 ## Context
 

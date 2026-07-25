@@ -13,7 +13,7 @@ use App\Modules\AI\Support\Tools\EntitySearchResult;
 use App\Modules\AI\Support\Tools\QueryMetricsResult;
 
 /**
- * Writes one standalone audit row per Controlled MCP server tool call (ADR-0006/0009).
+ * Writes one standalone audit row per Controlled MCP server tool call (ADR-0008/0009).
  *
  * Unlike {@see AiAuditRecorder::recordToolCall()}, which requires
  * a non-null agent trace and is the chat channel's recorder, this recorder persists an

@@ -1,3 +1,12 @@
+---
+id: ADR-0005
+title: "Program / Intake are matched by canonical code, not by name"
+status: accepted
+owner: Platform Team
+last_verified: 2026-07-25
+scope: architecture-decision
+---
+
 # Program / Intake are matched by canonical code, not by name
 
 An Application's admission intent — campus, **Intended Program**, and **Intake** — must resolve unambiguously to the real `Program`, `Semester`, and `CurriculumVersion` a Student is created under on Approve, or admission produces the wrong record. We make the inbound values **canonical codes that Swinx owns** and validate them at the boundary, instead of accepting free-text labels and translating them later.

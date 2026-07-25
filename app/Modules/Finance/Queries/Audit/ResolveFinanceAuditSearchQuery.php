@@ -14,7 +14,7 @@ use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 /**
  * Deterministic, campus-scoped resolver for the audit workspace universal search.
  *
- * Precedence (locked in design.md):
+ * Search precedence is an executable product contract:
  *   1. Explicit prefixes payment:/invoice:/dng:/charge: (always win)
  *   2. Exact student_invoices.invoice_number
  *   3. DNG ids: item_id, then dng_payment_id, then dng_transaction_id

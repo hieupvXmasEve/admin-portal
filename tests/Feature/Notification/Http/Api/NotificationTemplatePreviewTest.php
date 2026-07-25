@@ -142,7 +142,7 @@ it('preview rendered_html is byte-equal to direct transient model render and esc
         'body_html' => '<p>Hello {{student_name}}</p>',
     ]);
     $xssResult = $xssTransient->render($tainted);
-    // Critical-patterns.md: must contain escaped chars, never raw markup
+    // Template contract: rendered variables must be escaped, never raw markup.
     expect($xssResult['html'])->toContain('&lt;script&gt;');
     expect($xssResult['html'])->not->toContain('<script>alert');
 });

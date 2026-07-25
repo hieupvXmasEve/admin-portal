@@ -43,7 +43,7 @@ enum AcademicProgressionEventType: string
 
     /**
      * Whether a progression transition of this type needs an authorizing
-     * Decision (ADR-0008, revised).
+     * Decision (ADR-0048, revised).
      *
      * No EGC progression event requires a Decision. The requirement for the
      * enrolment transitions lives on the status actions instead — NE enrolment
@@ -51,7 +51,7 @@ enum AcademicProgressionEventType: string
      * (see {@see StudentActionType::requiresDecision()}). Placement
      * Initialized and Course Stage Changed are a secondary record of those same
      * transitions, so flagging them too would double-count; English-level changes
-     * and IELTS records never needed one. See the revision note in ADR-0008.
+     * and IELTS records never needed one. See the revision note in ADR-0048.
      */
     public function requiresDecision(): bool
     {

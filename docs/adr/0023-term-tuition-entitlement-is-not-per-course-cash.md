@@ -1,8 +1,14 @@
-# Term tuition entitlement is not per-course cash
+---
+id: ADR-0023
+title: "Term tuition entitlement is not per-course cash"
+status: accepted
+date: 2026-07-06
+owner: "Academic + Finance"
+last_verified: 2026-07-25
+scope: architecture-decision
+---
 
-**Status:** Accepted
-**Date:** 2026-07-06
-**Owner:** Academic + Finance
+# Term tuition entitlement is not per-course cash
 
 ## Context
 

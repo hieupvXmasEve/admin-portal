@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Schema;
  * Records who revoked a mistaken approval and when. Revoke tears the created
  * Student/User/roles down within a safe window and returns the Application to
  * `pending`; these columns make "who revoked, and when" a first-class fact
- * (full transition history still lives in the activity log — ADR-0001/0002).
+ * (full transition history still lives in the activity log — ADR-0042/0002).
  */
 return new class extends Migration
 {

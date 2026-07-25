@@ -1,8 +1,14 @@
-# Forfeit defer closes the original obligation without unpaid penalty debt
+---
+id: ADR-0019
+title: "Forfeit defer closes the original obligation without unpaid penalty debt"
+status: accepted
+date: 2026-07-06
+owner: "Academic + Finance"
+last_verified: 2026-07-25
+scope: architecture-decision
+---
 
-**Status:** Accepted
-**Date:** 2026-07-06
-**Owner:** Academic + Finance
+# Forfeit defer closes the original obligation without unpaid penalty debt
 
 ## Context
 

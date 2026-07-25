@@ -82,16 +82,16 @@ const submitUpload = (): void => {
                 <Languages class="h-4 w-4" />
                 EGC English level & IELTS
             </CardTitle>
-            <CardDescription> English-level history and IELTS certificates sit here, out of the main timeline (ADR-0009). </CardDescription>
+            <CardDescription> English-level history and IELTS certificates sit here, out of the main timeline (ADR-0049). </CardDescription>
         </CardHeader>
         <CardContent class="space-y-5">
             <div class="flex flex-wrap gap-6">
                 <div>
-                    <p class="text-muted-foreground text-xs uppercase tracking-wide">Starting level</p>
+                    <p class="text-muted-foreground text-xs tracking-wide uppercase">Starting level</p>
                     <p class="text-lg font-semibold">{{ egc.starting_level ?? '—' }}</p>
                 </div>
                 <div>
-                    <p class="text-muted-foreground text-xs uppercase tracking-wide">Current level</p>
+                    <p class="text-muted-foreground text-xs tracking-wide uppercase">Current level</p>
                     <p class="text-lg font-semibold">{{ egc.current_level ?? '—' }}</p>
                 </div>
             </div>
@@ -106,9 +106,7 @@ const submitUpload = (): void => {
                     <li v-for="row in egc.history" :key="row.id" class="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
                         <div>
                             <span class="font-medium">{{ row.label }}</span>
-                            <span v-if="row.from_english_level !== null && row.to_english_level !== null" class="text-muted-foreground ml-2">
-                                L{{ row.from_english_level }} → L{{ row.to_english_level }}
-                            </span>
+                            <span v-if="row.from_english_level !== null && row.to_english_level !== null" class="text-muted-foreground ml-2"> L{{ row.from_english_level }} → L{{ row.to_english_level }} </span>
                         </div>
                         <span class="text-muted-foreground">{{ formatDate(row.occurred_at) }}</span>
                     </li>
@@ -128,24 +126,11 @@ const submitUpload = (): void => {
                             </Badge>
                         </div>
                         <div class="flex items-center gap-3">
-                            <a
-                                v-if="cert.upload_record"
-                                :href="cert.upload_record.url"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                class="text-primary inline-flex items-center gap-1 hover:underline"
-                            >
+                            <a v-if="cert.upload_record" :href="cert.upload_record.url" target="_blank" rel="noopener noreferrer" class="text-primary inline-flex items-center gap-1 hover:underline">
                                 <FileText class="h-3.5 w-3.5" />
                                 View scan
                             </a>
-                            <Button
-                                v-else-if="canChangeStatus"
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                class="h-7 gap-1 px-2"
-                                @click="openUpload(cert)"
-                            >
+                            <Button v-else-if="canChangeStatus" type="button" variant="outline" size="sm" class="h-7 gap-1 px-2" @click="openUpload(cert)">
                                 <Upload class="h-3.5 w-3.5" />
                                 Upload scan
                             </Button>
@@ -160,19 +145,11 @@ const submitUpload = (): void => {
                     <DialogHeader>
                         <DialogTitle>Upload IELTS scan</DialogTitle>
                         <DialogDescription>
-                            Attach the supporting document for the IELTS certificate<template v-if="selectedCert">
-                                (score {{ selectedCert.overall_score ?? '—' }})</template
-                            >.
+                            Attach the supporting document for the IELTS certificate<template v-if="selectedCert"> (score {{ selectedCert.overall_score ?? '—' }})</template>.
                         </DialogDescription>
                     </DialogHeader>
                     <form class="space-y-4" @submit.prevent="submitUpload">
-                        <FileUpload
-                            v-model="uploadedFiles"
-                            context="ielts_certificate"
-                            :upload-immediately="true"
-                            accept=".pdf,.jpg,.jpeg,.png"
-                            label="Drop the IELTS certificate scan here or click to upload"
-                        />
+                        <FileUpload v-model="uploadedFiles" context="ielts_certificate" :upload-immediately="true" accept=".pdf,.jpg,.jpeg,.png" label="Drop the IELTS certificate scan here or click to upload" />
                         <DialogFooter>
                             <Button type="button" variant="outline" @click="uploadOpen = false">Cancel</Button>
                             <Button type="submit" :disabled="uploadForm.processing || !uploadForm.upload_record_id">Save scan</Button>

@@ -1,58 +1,99 @@
-# Architecture Rules: Modular Monolith
+---
+title: Architecture Rules
+status: active
+owner: Platform Team
+last_verified: 2026-07-25
+scope: engineering-rules
+applies_to:
+  - app/Modules
+  - app/Shared
+  - app/Models
+  - routes
+---
 
-## 1. Core Principles
+# Architecture Rules
 
-- **Modular Monolith**: The system is divided into independent Modules (e.g., Identity, Academic, Finance, Notification) sharing a common data layer.
-- **Independence**: One module must NOT depend directly on the internal logic of another module.
-- **Shared Models**: `app/Models` contains shared Eloquent models (unless a module owns distinct data). **Exception — bounded contexts (ADR-0026):** Academic and Finance do **not** share money/lifecycle Eloquent models. Money models (`FinanceCharge`, `Payment`, `StudentInvoice`, `InvoiceLine`, …) are Finance-owned and move to `App\Modules\Finance\Models`; the only cross-context shared model is `Student` as a Shared Kernel **identity reference**. Cross-context access goes through `app/Shared/Contracts/*`, never a shared money model or an Eloquent join.
-- **Actions over Services**: Business logic is concentrated in **Actions** (Single Use-Case).
-- **Thin Controllers**: Controllers act only as Adapters: receive input, call Action/Query, return response.
+Swinx is a hybrid modular monolith. New domain behavior belongs in
+`app/Modules/{Domain}`; shared legacy services and models remain only where the
+current migration boundary requires them.
 
-## 2. Cross-Module Communication
+## Ownership and boundaries
 
-- **Contract Mandatory**: Whenever Module A needs data or behavior from Module B, it **MUST** use a Contract.
-- **No Direct Eloquent Joins**: Never use `join` between models of different modules.
-- **Module Ownership**: Each DB table has **one owner module**. Others must read via Contract/API.
+- Each table and business invariant has one owning module.
+- Controllers are adapters: validate, authorize, invoke an Action or Query, and
+  return an Inertia or API response.
+- State-changing business use cases belong in `Actions/`; complex read behavior
+  belongs in `Queries/`.
+- Modules must not import another module's internal models, Actions, Queries, or
+  concrete implementations.
+- Cross-module interactions use contracts, domain events, or explicit
+  projections. See [contracts.md](contracts.md) and ADR-0043.
+- Do not use cross-module Eloquent joins.
+- Frontend code renders backend-owned business state; it does not redefine
+  business rules.
 
-## 3. Directory Structure (Backend)
+`Student` is a Shared Kernel identity reference. Academic and Finance are
+separate bounded contexts: Academic owns the academic lifecycle and Finance
+owns money. They do not share money or lifecycle Eloquent models. See ADR-0026.
+
+## Module shape
 
 ```text
 app/Modules/{Domain}/
- ├─ Actions/             # Business Logic (Write/State change)
- ├─ Queries/             # Read Logic (Complex joins/Reports)
- ├─ Http/                # Communication Layer
- │   ├─ Web/             # Stateful (Inertia/Blade)
- │   │   ├─ Admin/       # Controllers for Admin Portal
- │   │   └─ Student/     # Controllers for Student Portal
- │   ├─ Api/             # Stateless (JSON)
- │   │   ├─ Admin/       # APIs for Admin FE
- │   │   ├─ Student/     # APIs for Student Portal
- │   │   └─ Lecturer/    # APIs for Lecturer Portal
- │   └─ Requests/        # Validation by Domain
- │       └─ {Domain}/    # e.g., Identity, Enrollment
- ├─ Policies/            # Authorization rules (Gates/Policies)
- ├─ Providers/           # Module ServiceProvider
- └─ routes/              # routes/web.php, api.php
+├── Actions/
+├── Queries/
+├── Http/
+│   ├── Web/{Actor}/
+│   ├── Api/{Actor}/
+│   └── Requests/{Domain}/
+├── Models/                 # only when this module owns the model
+├── Policies/
+├── Providers/
+└── routes/
+    ├── web.php
+    └── api.php
 ```
 
-## 4. Development Workflow
+Shared cross-module interfaces live in
+`app/Shared/Contracts/{Domain}/`. Shared framework plumbing may remain in
+Laravel's standard directories.
 
-1. **Analyze**: Identify Module and Business Case (Action).
-2. **Database**: Update the **owning module's** model + migration. Use `app/Models` only for a Shared Kernel identity (`Student`) or legacy not-yet-relocated models — never to add a new cross-context shared money/lifecycle model (ADR-0026).
-3. **Backend**:
-    - Create `Action` in `app/Modules/{Module}/Actions`.
-    - Create `FormRequest` for validation.
-    - Create `Controller` as Adapter.
-    - Register `Route`.
-4. **Frontend**:
-    - Create Page component.
-    - Map Route-to-Page 1-1.
+## New work
 
-## 5. Notification Module Rules (Phase 1 Foundation)
+1. Identify the owning domain and the business use case.
+2. Update the owning model and migration; do not create a new shared model to
+   bypass a context boundary.
+3. Add an Action or Query, a FormRequest where input is accepted, and a thin
+   controller.
+4. Register routes in the owning module.
+5. Add a page only when the web flow needs one, keeping the route-to-page
+   mapping explicit.
+6. Add a contract before another module consumes the capability.
 
-- Notification domain logic must stay in `app/Modules/Notification/*`.
-- Domain events must be persisted to outbox first (`notification_event_outbox`) and processed through the outbox pipeline.
-- Canonical notification recipient is `recipient_user_id`; target types like Student/Lecture must resolve to user id before persistence.
-- Campus boundaries are strict: resolve and persist within the same `campus_id` scope only.
-- Phase 1 is clean-slate V2 storage (`notification_event_outbox`, `notification_messages`, `notification_deliveries`) with no legacy `notifications` backfill.
-- Use `notifications:process-outbox` for dispatch operations.
+New business logic, controllers, and routes must not be added to legacy
+top-level locations. See [legacy-migration.md](legacy-migration.md).
+
+## Domain invariants
+
+### Admissions
+
+Admissions approval remains one atomic cross-context orchestration: it converts
+the pending application into the required Identity and Academic records in one
+transactional business outcome. Context ownership and orchestration are defined
+by ADR-0042.
+
+### Notification V2
+
+- Notification domain logic stays in `app/Modules/Notification`.
+- Persist domain events to `notification_event_outbox` before dispatch.
+- Use `recipient_user_id` as the canonical recipient; resolve Student or
+  Lecturer targets before persistence.
+- Keep `campus_id` scope consistent from event through message and delivery.
+- Use `notifications:process-outbox`; do not write deliveries directly.
+- Phase 1 uses the V2 tables without a legacy `notifications` backfill.
+
+### Facilities
+
+Facilities owns room-booking routes and new booking behavior while preserving
+the public route names and URLs. Existing shared legacy operations may remain
+until their next intentional migration. See ADR-0047.

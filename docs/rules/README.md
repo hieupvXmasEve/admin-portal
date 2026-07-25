@@ -1,76 +1,44 @@
-# Rules Index
-
-Last updated: 2026-04-26
-Status: Active — 22 rule files
-
-This folder contains the canonical coding rules for Swinx.
-All AI tools should use these as the authoritative reference — not tool-specific config files.
-
+---
+title: Engineering Rules Index
+status: active
+owner: Platform Team
+last_verified: 2026-07-25
+scope: engineering-rules
+applies_to:
+  - repository
 ---
 
-## Migration & Refactoring Rules (read first if working with legacy code)
+# Engineering Rules Index
 
-| File | When to read | File types |
-|---|---|---|
-| `frozen-zones.md` | **ALWAYS** — defines what is frozen vs greenfield | — |
-| `refactor-playbook.md` | Migrating a feature from legacy to Module | `**/*.php` |
-| `reference-implementations.md` | Copy-ready patterns (Actions, Queries, Controllers, Vue) | `**/*.{php,vue,ts}` |
+This directory is the canonical home for project-specific engineering rules.
+Repository-wide operating and safety instructions remain in `AGENTS.md`;
+architectural rationale remains in `docs/adr/`.
 
-## Backend Rules (PHP / Laravel)
+Read the smallest relevant set before changing code:
 
-| File | When to read | File types |
-|---|---|---|
-| `backend.md` | Creating/modifying controllers, actions, queries | `**/*.php` |
-| `architecture.md` | Creating a new module, cross-module features | — |
-| `naming.md` | Naming any PHP class, method, route, or DB column | `**/*.php` |
-| `contracts.md` | Module A needs data/behavior from Module B | `**/*.php` |
-| `pattern.md` | Step-by-step implementation of a module feature | `**/*.php` |
-| `security.md` | Gates, policies, authorization logic | `**/*.php` |
-| `migration.md` | Moving legacy code from `app/Services/` into modules | `**/*.php` |
-| `testing.md` | Writing Pest tests for filterable index flows | `**/*.php` |
-| `laravel-boost.md` | General Laravel best practices (broad reference) | `**/*.php` |
-
-## Frontend Rules (Vue / TypeScript)
-
-| File | When to read | File types |
-|---|---|---|
-| `frontend.md` | Creating/modifying Vue components or pages | `**/*.{vue,ts}` |
-| `frontend-gotchas.md` | Known pitfalls: PHP-to-JS serialization, macOS case FS | `**/*.{vue,ts}` |
-| `filtering.md` | Building any list/index page with filters + pagination | `**/*.{vue,ts,php}` |
-| `api-interaction.md` | Calling backend APIs from Vue | `**/*.{vue,ts}` |
-| `shadcn_vue_conventions.md` | Using Reka-UI/Shadcn components (Select, Form, etc.) | `**/*.vue` |
-| `toast-patterns.md` | Implementing toast notifications with Inertia flash | `**/*.{vue,ts,php}` |
-
-## Cross-cutting Rules
-
-| File | When to read | File types |
-|---|---|---|
-| `code-style.md` | General coding style baseline (PHP + Vue) | `**/*.{php,vue,ts}` |
-| `realtime.md` | Broadcasting/Echo — transport layer rules | `**/*.{php,vue,ts}` |
-| `realtime_notification.md` | Notification V2 specific broadcasting rules | `**/*.{php,vue,ts}` |
-| `naming.md` | Full naming conventions for all layers | — |
-
-## Reference / Config Files
-
-| File | Purpose |
+| Area | Rule |
 |---|---|
-| `structure.md` | Project directory layout overview (reference) |
-| `tech.md` | Technology stack summary (reference) |
+| Module boundaries and ownership | [architecture.md](architecture.md) |
+| Laravel and PHP implementation | [backend.md](backend.md) |
+| Cross-module interfaces | [contracts.md](contracts.md) |
+| Server-filtered list pages | [filtering.md](filtering.md) |
+| Vue, Inertia, forms, and UI | [frontend.md](frontend.md) |
+| Moving legacy code into modules | [legacy-migration.md](legacy-migration.md) |
+| Names, paths, routes, and contracts | [naming.md](naming.md) |
+| Broadcasting and notifications | [realtime.md](realtime.md) |
+| Authentication and authorization | [security.md](security.md) |
+| Tests and scoped quality gates | [testing.md](testing.md) |
 
----
+## Task routes
 
-## Quick mapping by task
+- New backend use case: `architecture.md`, `backend.md`, `naming.md`.
+- Cross-module read or write: add `contracts.md`.
+- Inertia or Vue work: `frontend.md`.
+- Filtered, sorted, or paginated list: add `filtering.md`.
+- Existing code in a legacy location: add `legacy-migration.md`.
+- Auth-sensitive change: add `security.md`.
+- Broadcast or notification change: add `realtime.md`.
+- Any implementation change: finish with `testing.md`.
 
-| Task | Must read |
-|---|---|
-| **Refactor legacy feature to Module** | `frozen-zones.md`, `refactor-playbook.md`, `reference-implementations.md` |
-| **Check code before commit** | `reference-implementations.md` (Anti-patterns section) |
-| Add new feature to existing module | `frozen-zones.md`, `backend.md`, `pattern.md`, `naming.md` |
-| Create a new module | `architecture.md`, `backend.md`, `naming.md`, `contracts.md` |
-| Add list/index page with filters | `frontend.md`, `frontend-gotchas.md`, `filtering.md`, `backend.md` |
-| Add modal/drawer form | `frontend.md`, `api-interaction.md`, `shadcn_vue_conventions.md`, `toast-patterns.md` |
-| Cross-module data access | `contracts.md`, `architecture.md` |
-| Add auth/permission check | `security.md` |
-| Add real-time notification | `realtime.md`, `realtime_notification.md` |
-| Write tests | `testing.md` |
-| Migrate legacy controller | `frozen-zones.md`, `refactor-playbook.md`, `backend.md` |
+Do not recreate separate rule sources elsewhere. When a rule changes, update
+its canonical file here and link to it.

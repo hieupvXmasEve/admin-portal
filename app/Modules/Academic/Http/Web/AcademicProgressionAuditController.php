@@ -92,7 +92,7 @@ class AcademicProgressionAuditController extends Controller
     }
 
     /**
-     * Show the missing-decision report (ADR-0008).
+     * Show the missing-decision report (ADR-0048).
      *
      * Requires-decision transitions from both lifecycle streams that still lack
      * an authorizing Decision; attaching one removes the row.

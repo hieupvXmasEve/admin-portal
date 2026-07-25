@@ -16,9 +16,8 @@ use Illuminate\Auth\Access\HandlesAuthorization;
  * admins may grant per-action permissions to other roles at runtime
  * to share viewer / editor / tester responsibilities.
  *
- * Decision anchor: CONTEXT.md D7 — originally super_admin only; the
- * permission split keeps the default behavior identical (super_admin
- * holds all four permissions) but unlocks finer-grained delegation.
+ * The permission split keeps the default super-admin behavior while allowing
+ * finer-grained viewer, editor, previewer, and test-sender delegation.
  */
 class NotificationTemplatePolicy
 {

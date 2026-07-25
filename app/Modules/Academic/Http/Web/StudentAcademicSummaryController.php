@@ -245,7 +245,7 @@ class StudentAcademicSummaryController extends Controller
     /**
      * Display the Lifecycle tab: one chronological timeline merged from Student
      * Actions and EGC Academic Progression, with authorizing Decisions inline
-     * and EGC level / IELTS detail in a sub-panel (ADR-0009). Status changes and
+     * and EGC level / IELTS detail in a sub-panel (ADR-0049). Status changes and
      * EGC placement/progression are recorded in place here, so the standalone
      * actions and placement pages redirect into this tab.
      *
@@ -279,7 +279,7 @@ class StudentAcademicSummaryController extends Controller
 
     /**
      * Backfill an authorizing Decision onto an existing lifecycle transition
-     * (ADR-0008). The transition was recordable without a Decision; attaching one
+     * (ADR-0048). The transition was recordable without a Decision; attaching one
      * later clears its missing-decision flag and adds the student to the
      * Decision's coverage roster.
      */

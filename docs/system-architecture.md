@@ -1,371 +1,235 @@
-# System Architecture
+---
+title: Swinx System Architecture
+status: canonical
+owner: Platform Team
+last_verified: 2026-07-25
+scope: architecture
+---
 
-Last updated: 2026-07-24
-Owner: Platform Team
-Status: Current-state architecture map
-Source of truth: route files, middleware, module providers, runtime entrypoints
+# Swinx System Architecture
 
-## 1) Architecture Overview
+## Architecture style
 
-Swinx is a Laravel 13 monolith with Vue 3 + Inertia frontend and mixed web/API surfaces.
-
-High-level flow:
-
-```text
-Client (Web SPA / API)
-  -> Routes + Middleware (web/api groups)
-    -> Controllers
-      -> Module Actions/Queries or Shared Services
-        -> Eloquent Models
-          -> MySQL/MariaDB
-        -> Redis (cache/queue)
-```
-
-## 2) Core Layers
-
-### 2.1 Entry and Routing
-
-- Bootstrap: `bootstrap/app.php`
-- Web routes: `routes/web.php` + `routes/web/*`
-- API root: `routes/api.php`
-- Student API v1: `routes/api/v1/student.php`
-- Lecturer API v1: `routes/api/v1/lecturer.php`
-
-### 2.2 Domain Modules
-
-- Identity: `app/Modules/Identity`
-- Academic: `app/Modules/Academic`
-- Finance: `app/Modules/Finance` (Settlement v2 landed 2026-03-25; DNG gateway integration 2026-03-26; EGC fee-management ops expanded 2026-04-21)
-    - Source-of-truth model:
-        - `payments` — canonical cash receipt ledger
-        - `payment_applications` — line-level cash application (replaces legacy `payment_allocations`)
-        - `invoice_lines` — settlement anchor with status/void lifecycle (active|void, voided_at, void_reason)
-        - `invoice_discounts` — discount headers
-        - `discount_allocations` — line-level discount allocation ledger
-        - `student_invoices` snapshot columns (`subtotal`, `discount_total`, `total_amount`, `paid_amount`) as cache only
-        - multiple `student_invoices` may exist for one student/semester when separate fee streams issue distinct statements; `invoice_number` remains unique, and every invoice line's charge must match the invoice student + semester (`INV-17`)
-        - `dng_payment_requests` — DNG gateway payment request audit
-        - `dng_webhook_events` — DNG webhook event audit for payment confirmation
-    - Services: `SettlementService`, `PaymentService`, `FinanceChargeService`, `DngClient`, `DngPaymentService`, `DngReconciliationService`, `DngWebhookService`, `DngChecksumService`
-    - Actions: `VoidFinanceChargeAction`, `AllocatePaymentAction`, `AutoAllocatePaymentsAction`
-    - EGC tracking/actions:
-        - `SyncEgcBlockResultsAction`
-        - `ApplyEgcRetakeDiscountAction`
-        - `ApplyEgcCarryForwardAction`
-        - `BuildEgcCarryForwardPlanAction`
-        - `GenerateEgcChargesAction`
-    - EGC query/read-model layer:
-        - `ListEgcBlockResultsQuery`
-        - `ListEgcRetakeAdjustmentsQuery`
-        - `ListEgcCarryForwardCandidatesQuery`
-        - `PreviewEgcChargeGenerationQuery`
-    - Support: `StudentChargeTimingResolver` (EGC vs Tuition billing by semester & stage; EGC until `intake_major`)
-    - Web routes: `/finance/payments/create`, `/finance/payments/{student}/dng-data`, `/finance/dng/payment-requests`, `/finance/dng/payment-requests/{dngPaymentRequest}`, `/finance/dng/webhook-events`, `/finance/dng/webhook-events/{dngWebhookEvent}`
-    - API routes: `POST /api/v1/finance/dng/payment-requests` (create), `POST /api/v1/finance/dng/webhook` (receive)
-    - Ops routes: `finance/operations/settlement` (worklist), `finance/operations/dashboard` (metrics)
-    - EGC ops routes:
-        - `finance/egc/block-results`
-        - `finance/egc/retake-adjustments`
-        - `finance/egc/carry-forward`
-        - `finance/egc/generate-charges`
-    - EGC campus scope:
-        - current ops list pages are locked to `session('current_campus_id')`
-        - no campus picker is exposed on the current EGC pages
-    - EGC data truth:
-        - `egc_blocks` tracks per-semester block order, level, result, and retake flag; its Finance evidence resolves through the canonical `FinanceObligation` source triple
-        - `egc_retake_discount_links` binds failed source block -> target charge -> discount header
-        - carry-forward releases unused paid EGC charges back to unapplied balance by voiding unused charges without immediate auto-allocation
-        - retake discounts only target later mapped retake blocks of the same level
-        - canonical EGC block history is retained as the post-backfill data truth; no runtime command reconstructs or repairs historical blocks
-    - DNG workflow: Staff → Payment Create form → Student selection → resolve `campuses.dng_code` → DNG API push (with checksum) → QR display → Webhook inbox capture (`dng_webhook_events`) → Async checksum/business validation → Payment record
-    - Defer/dropout cancellation order: close every linked unpaid DNG request locally as `cancelled`, then void linked charges/lines in the same admin settlement transaction. This lifecycle path does not call the DNG cancellation API; exact linkage may come from installment, request header, charge pivot, or reservation target. Original provider identity remains available so late verified receipts can still enter canonical Payment without reviving collection.
-    - DNG replacement rule: for the same `student + fee_type`, only one unpaid DNG request should stay active; older unpaid requests move to `cancelled` after the replacement push succeeds
-    - Late webhook/reconciliation events preserve cancelled collection state but still capture attributable verified cash into canonical Payment
-    - Admin monitoring workflow: request audit list/detail remain campus-scoped; webhook audit list is cross-campus while webhook detail still validates campus access
-    - Permissions: `create_finance_payments`, `view_finance_dng_payment_requests`, `view_finance_dng_webhook_events`
-    - Legacy `payment_allocations` no longer used in runtime.
-    - Integrity-code evolution: the historical `INV-6` one-invoice-per-semester rule was retired on 2026-07-12 because it conflicts with valid fee-stream invoices. Its code remains reserved for audit-history compatibility; invoice/charge scope mismatches use `INV-17`.
-    - `INV-18` blocks an active invoice line whose parent charge is already void, preventing stale invoice lifecycle metadata from appearing clean.
-- Notification: `app/Modules/Notification` (V2 domain event + outbox architecture)
-    - Actions: `PublishDomainEventAction`, `DispatchOutboxBatchAction`, `PersistIntentAction`, `SendManualNotificationV2Action`, `RetryDeliveryAction`, `RetryOutboxAction`, `HandleOutboxEventAction`
-    - Channels: `EmailChannelAdapter`, `RealtimeChannelAdapter` (contracts: `ChannelAdapter`)
-    - Models: `NotificationDelivery`, `NotificationEventOutbox`, `NotificationMessage`
-    - Queries: `ListMessagesQuery`, `ListOutboxQuery`, `ListDeliveriesQuery`
-    - Support: `EventIntentMapper`, `RecipientResolver`, `NotificationAuditLogger`, `NotificationMetrics`, `PolicyResolver`
-    - Email SMTP resolution: `EmailConfiguration` table is campus-scoped; `getActiveForCampus(?int)` resolves campus-specific config (priority) or falls back to global; `SendSingleEmailJob` threads `campus_id` through the dispatch chain
-- Platform: `app/Modules/Platform` owns global System Configuration storage, cache invalidation, audit evidence, and the `/api/system-config*` boundary. Public reads enumerate only approved configuration keys; staff mutation and file upload require a selected-campus permission context and write one global configuration.
-
-#### Target bounded-context map
-
-The physical Modules above describe current code placement. The accepted target is a modular monolith whose business ownership is divided as follows; a Bounded Context may remain an internal namespace during migration and does not need an immediate top-level Module.
-
-| Bounded Context | Owns |
-|---|---|
-| Identity & Access | Accounts, Account Status, Actors, roles, permissions, and access grants |
-| Institution & Organization | Institution Campuses, departments, and organizational reference data |
-| Student Registry | Student Identity, Student Reference, contact and campus affiliation, Student–Guardian Relationships |
-| Admissions | Applicants, Applications, Applicant Guardians, admission documents, Approve, Reject, and Revoke |
-| Faculty Workforce | Faculty Member employment, contracts, rank, qualifications, pay terms, Teaching Eligibility, and Faculty Access Eligibility |
-| Academic Catalog & Calendar | Programs, Curriculum Versions, Units, syllabi, Academic Periods, and Campus Period Schedules |
-| Course Delivery & Assessment | Course Offerings, rosters, sessions, attendance, assessments, exams, Instructor Assignments, and Course Results |
-| Academic Progression & Lifecycle | Program Enrollments, Study Stages, Transcript Entries, GPA, standing, EGC progression, lifecycle actions, and graduation |
-| Finance | Billing accounts, obligations, charges, invoices, payments, settlement, pricing, and DNG integration mappings |
-| Facilities | Buildings, Rooms, physical capacity, Space Availability, and reservations |
-| Notification | Event intake, templates, message and delivery lifecycle, email, and realtime channels |
-| AI & Reporting | Read-only orchestration through owner readers and Cross-context Read Projections; no source business data |
-
-Student, guardian/parent, and lecturer are Actors or business profiles, not portal-shaped Bounded Contexts. Semester is the current model name for the institution-wide Academic Period, not a separate domain or a campus-specific identity.
-
-Cross-context interaction follows ADR-0043: synchronous contracts for fresh decisions and atomic commands, durable events/outbox for post-commit reactions, and projections for stale-tolerant reporting. Shared Eloquent business models and direct imports of another context's concrete Actions are transitional coupling, not approved integration mechanisms.
-
-#### Domain-boundary migration order
-
-1. Add boundary safety nets: Shared Contracts, neutral references, adapters, and architecture tests. Prioritize Student Reference, Academic Period, faculty access, and Notification publishing seams.
-2. Establish Institution references and extract Academic Catalog & Calendar as the first complete Academic context. Move DNG provider mapping toward Finance and Building/Room ownership toward Facilities without changing public routes or portal contracts.
-3. Establish Student Registry and clean Identity access decisions so other contexts stop reading Student or faculty lifecycle state directly.
-4. Refactor Admissions approval and revocation into atomic orchestration through Registry, Identity, and Progression contracts.
-5. Establish Faculty Workforce while keeping Instructor Assignment and timetable conflicts in Course Delivery & Assessment.
-6. Extract Course Delivery & Assessment around Course Offering, roster, attendance, gradebook, exams, Course Result, and the Facilities availability boundary.
-7. Extract Academic Progression & Lifecycle around Program Enrollment, Transcript Entry, GPA, EGC, Decisions, and lifecycle actions after its upstream result and identity seams are stable.
-8. Build supporting engagement and cross-context reporting projections only when their independent rules justify a boundary; then retire legacy services and adapters slice by slice.
-
-Initial slices preserve table names, routes, and student/lecturer portal contracts. Moving `Student.php`, renaming Semester tables, or creating many empty top-level Modules before boundary tests exist is explicitly not the first step.
-
-### 2.3 Academic Progression and Status Logging
-
-Current academic progression baseline:
-
-- `academic_progression_events` is the semantic audit/event store for academic placement and progression.
-- Student Hub overview, registration, graduation, and academic-summary export reads are owned by Progression Queries. The overview composes Registry profile, Identity guardian access, Institution campus, Finance scholarship, and Delivery evidence through read-only contracts. Delivery supplies versioned V1 registration and course-outcome evidence through `StudentHubRegistrationEvidenceReader` and `StudentHubCourseOutcomeEvidenceReader`; Catalog supplies curriculum requirements through `CurriculumGraduationRequirementsReader`.
-- `TranscriptEntry` is the canonical finalized outcome where it exists. Legacy Course Result evidence remains a read-only compatibility projection until the approval-gated reconciliation and data cutover in issue 24; this slice does not mutate historical records.
-- Event types:
-    - `ENGLISH_LEVEL_CHANGED` — EGC level changes (manual & auto progression after course completion)
-    - `COURSE_STAGE_CHANGED` — stage transitions (e.g., `intake_pre_uni_gc` → `intake_course`)
-- Stage change events trigger `PublishCourseStageChangedNotificationAction` → V2 outbox publication.
-- `student_changes` may still exist for generic field-level audit, but it is not the source of truth for academic level/stage history.
-
-Current EGC to major baseline:
-
-- Student major transition writes `students.status = intake_course`.
-- Transition semester for tuition is stored in `students.intake_major` (active).
-- Deprecated: `students.gc_to_course_transition_semester` (no longer used in settlement v2).
-- Course completion validation uses `MarkCourseOfferingCompletedAction` with attendance + EGC progression rules.
-
-### 2.4 Shared Layer
-
-- `app/Services/*` (large shared business logic)
-- `app/Models/*`
-- shared HTTP middleware/controllers/requests/resources under `app/Http/*`
-
-### 2.5 Frontend
-
-- App entry: `resources/js/app.ts`
-- SSR entry: `resources/js/ssr.ts`
-- pages/components/composables/types under `resources/js/*`
-- current list/filter stack is hybrid (`useInertiaFilters`, legacy `useFilters`/`useTableFilters`, and newer `useServerTableQuery` wrapper)
-- Reusable filter components (`resources/js/components/filters/`):
-    - `FilterPanel.vue` — grid container with configurable columns and clear button
-    - `FilterSearchInput.vue` — debounced search input (300ms default)
-    - `FilterDateRange.vue` — date range picker (2 grid cells)
-    - `FilterSelect.vue` — select dropdown for enum/status filters
-- Finance operations frontend now has two finance-specific ops views aligned to the new settlement model:
-    - `resources/js/pages/Finance/Operations/Settlement.vue`
-    - `resources/js/pages/Finance/Operations/Dashboard.vue` (cards/tables renamed toward gross/discounts/cash applied/outstanding semantics)
-
-## 3) Auth and Middleware Surface Map
-
-### Student API surface
-
-- Main middleware chain: `auth:sanctum`, `api.logging`, `api.actor:student_or_parent`
-- Additional branch: `either:parent.student.access,student.api.auth`
-
-### Lecturer API surface
-
-- Main middleware chain: `auth:sanctum`, `api.actor:lecturer`, `lecturer.api.auth`, `api.logging`
-
-### Parent auth/context surface
-
-- Routes under `/api/v1/student/parent/*`
-- Protected chain: `auth:sanctum`, `api.logging`, `api.actor:parent`
-
-### Known mixed-auth exceptions
-
-- Finance module API routes (`app/Modules/Finance/routes/api.php`) use `web` + `auth` middleware.
-
-## 4) Identity Token Lifecycle (Current)
-
-- Login/refresh actions issue 8-hour tokens.
-- Student, lecturer, and parent refresh endpoints are protected routes.
-- Refresh controller pattern is issue new token then revoke current token.
-
-## 5) Student Action Import Sub-Architecture
-
-Route cluster (`app/Modules/Academic/routes/web.php`):
-
-- import page
-- template download
-- preview import
-- execute import
-
-Flow:
-
-1. Preview parses and validates uploaded rows.
-2. Preview returns token and stores anti-tamper context (hash + optional attachment id).
-3. Execute verifies preview token and anti-tamper data.
-4. Execute writes row-by-row with DB transaction boundaries.
-
-Constraints:
-
-- admission-deferral action type is excluded from import path.
-- append is limited to same student + same type + same period.
-
-### Student Decisions Registry and Link Model
-
-Route cluster (`app/Modules/Academic/routes/web.php`):
-
-- `GET /reports/student-decisions`
-- `GET /reports/student-decisions/{studentDecision}`
-- `POST /reports/student-decisions/{studentDecision}/students/preview`
-- `POST /reports/student-decisions/{studentDecision}/students/bulk-link`
-- `POST /reports/student-decisions/{studentDecision}/students/{actionLog}/unlink`
-- `POST /reports/student-decisions`
-- `PUT /reports/student-decisions/{studentDecision}`
-
-Data and relation baseline:
-
-- Registry table: `student_decisions`
-- Link column: `student_action_logs.decision_id` (nullable FK to `student_decisions.id`, `nullOnDelete`)
-- Model relations:
-    - `StudentDecision::actionLogs()`
-    - `StudentActionLog::decision()`
-
-Query behavior baseline:
-
-- Decision listing computes `linked_actions_count` and `linked_students_count`.
-- Decision index contract supports `search`, `issued_from`, `issued_to`, `per_page`, `page`, `sort`, and `direction`.
-- Decision index sort columns are allowlisted to `decision_number`, `decision_signer`, `issued_at`, and `expires_at` with sanitized defaults (`issued_at` + `desc`).
-- Decision detail view paginates linked student action logs.
-- Decision detail pagination now follows shared server-table keys (`per_page`, `page`) and still accepts legacy aliases (`linked_per_page`, `linked_page`) for compatibility.
-- Decision detail bulk add uses `PreviewStudentDecisionBulkLinkQuery` to normalize pasted student codes, require a selected `action_type`, enforce current-campus matching, show unmatched/skipped rows, and list only unlinked action logs of that selected type as linkable.
-- Decision detail bulk confirm uses `BulkLinkStudentsToDecisionAction` to update eligible same-`action_type` `student_action_logs.decision_id` rows inside a transaction without creating new action logs or overwriting action logs already linked to another decision.
-- Student action list/history/detail queries eager-load linked decision identity fields.
-
-Frontend list workflow baseline:
-
-- `resources/js/pages/Admin/Reports/StudentDecisions/Index.vue` now uses shared server-table primitives.
-- Query/pagination orchestration uses `resources/js/composables/useServerTableQuery.ts`.
-- Shared UI primitives are `resources/js/components/filters/ServerDateRangeFilters.vue` and `resources/js/components/tables/ServerPaginatedDataTable.vue`.
-
-## 6) Notification V2 Foundation (Phase 1)
-
-Code baseline (`app/Modules/Notification/*` + `database/migrations/2026_03_03_120*.php`):
-
-- Domain events are published to `notification_event_outbox` (pending/dispatch lifecycle).
-- Outbox dispatch pipeline is run by `notifications:process-outbox` (`app/Modules/Notification/Console/ProcessNotificationOutboxCommand.php`) and scheduled every minute in `routes/console.php`.
-- Dispatch flow persists `notification_messages` and `notification_deliveries`, then queues per-delivery jobs.
-
-Pipeline flow:
+Swinx is a Laravel 13 modular monolith with a Vue 3 and Inertia v3 staff
+application. Student and lecturer portals consume versioned JSON APIs from
+separate Nuxt repositories.
 
 ```text
-Event -> Intent (EventIntentMapper) -> Policy (PolicyResolver) -> Persist (PersistIntentAction) -> Dispatch (DispatchOutboxBatchAction) -> Track (NotificationDelivery)
+Web/Portal/MCP/Provider
+        |
+Routes + middleware + authorization
+        |
+Thin controllers / MCP boundary
+        |
+Module Actions, Queries, and contracts
+        |
+Eloquent + transactional outbox + provider adapters
+        |
+MySQL + Redis
 ```
 
-DB tables:
+The modular monolith is the deployment boundary. Logical context ownership is
+established before any physical extraction is considered.
 
-- `notification_event_outbox` — outbox pattern for domain events
-- `notification_messages` — canonical recipient notification records
-- `notification_deliveries` — per-channel delivery tracking
+## Runtime entry points
 
-Ops monitoring routes (`routes/web/notifications.php`):
+| Surface | Entry |
+| --- | --- |
+| Laravel bootstrap | `bootstrap/app.php` |
+| Staff web | `routes/web.php` and module web routes |
+| Public API | `routes/api.php` |
+| Student API | `routes/api/v1/student.php` |
+| Lecturer API | `routes/api/v1/lecturer.php` |
+| Identity API | `app/Modules/Identity/routes/api.php` |
+| Frontend | `resources/js/app.ts` |
+| SSR | `resources/js/ssr.ts` |
+| Scheduled work | `routes/console.php` |
 
-- `admin.notifications.ops.outbox` — outbox list with status/date filters
-- `admin.notifications.ops.outbox.detail` — single outbox record detail
-- `admin.notifications.ops.outbox.retry` — retry failed outbox records
-- `admin.notifications.ops.deliveries` — delivery list with channel/status filters
-- `admin.notifications.ops.deliveries.retry` — retry failed deliveries
-- `admin.notifications.ops.messages` — message list with recipient/status filters
+## Module ownership
 
-Frontend ops pages (`resources/js/pages/Admin/Notifications/Ops/`):
+| Module | Owns |
+| --- | --- |
+| `Admissions` | Applications, CRM ingestion, approve/reject/revoke orchestration |
+| `Identity` | Accounts, authentication, actor/access grants, token lifecycle |
+| `StudentRegistry` | Student Identity and Guardian relationships |
+| `Academic` | Catalog/calendar, course delivery, assessment, progression, transcript |
+| `Finance` | Billing accounts, obligations, settlement, invoices, DNG, financial reporting |
+| `Notification` | Message intent, templates, channels, outbox, delivery, retries |
+| `Facilities` | Buildings, rooms, availability, reservations, booking conflicts |
+| `Institution` | Campuses and organizational reference data |
+| `Engagement` | Clubs, events, and related participation |
+| `Upload` | Managed upload/storage boundary |
+| `AI` | Audited tool catalog/dispatch and controlled MCP exposure |
+| `Platform` | Cross-cutting platform-owned capabilities |
 
-- `Outbox.vue`, `OutboxDetail.vue`, `Deliveries.vue`, `Messages.vue`
+Shared legacy code remains under `app/Services/`, `app/Http/`, and
+`app/Models/`. Its presence describes current state, not permission to add new
+business behavior there.
 
-Phase 1 guardrails:
+## Layering
 
-- Strict campus isolation: recipient resolution rejects cross-campus targets (`RecipientResolver` checks campus for User/Student/Lecture targets).
-- Canonical recipient identity is `recipient_user_id` in `notification_messages`; non-user targets are resolved to user ids before message/delivery persist.
-- No legacy backfill in Phase 1: new tables are clean-slate and legacy `notifications` history is not migrated.
-    - Current implementation baseline for new student-facing academic notifications is V2-only. Course completion, EGC completion/progression, EGC program completion, and course-stage transition notifications publish domain events and persist through the Notification V2 outbox pipeline.
-- AI: `app/Modules/AI` (provider settings, audit/evaluation foundation, metric catalog/query-plan validation, query metrics/entity search/student profile-section tool execution, staff copilot chat/SSE runtime)
-    - Provider settings: `ai_provider_settings` stores one encrypted staff-owned provider setting per user with provider/model allowlists, key masking, cost limits, and provider test metadata.
-    - Audit/evaluation/runtime foundation: `ai_conversations`, `ai_messages`, `ai_agent_traces`, `ai_tool_calls`, `ai_provider_usages`, `ai_feedback`, `ai_evaluation_cases`, `ai_evaluation_runs`, `ai_evaluation_results`, `ai_chat_runs`, and `ai_run_events`.
-    - Metric catalog/query-plan foundation: code-defined aggregate MetricCatalog v1, business glossary subset, query-plan DTO/validator, `view_ai_metrics` entry permission, per-metric domain permission checks, and deterministic staff metric evaluation cases.
-    - Query metrics tool MVP: internal `ToolRegistry`/`ToolDispatcher`, read-only `query_metrics` execution, bounded aggregate `QueryMetricsResult`, and MetricCatalog v1 resolvers for Academic status/defer, Finance collection, Fee Monitor, and DNG lifecycle metrics.
-    - Entity catalog/search MVP: code-defined EntityCatalog v1, `search_entities:v1`, `SearchEntitiesTool`, bounded `EntitySearchResult`, scoped opaque entity references, and first accepted entity types `student`, `program`, `semester`, and `course_offering` with `class` as the user-facing course-offering alias.
-    - Student profile-section MVP: code-defined StudentProfileSectionCatalog v1, `get_entity_profile:v1`, `EntityReferenceResolver`, `GetEntityProfileTool`, bounded `EntityProfileResult`, current-campus opaque `entity_ref` validation, and accepted student sections `identity`, `academic_summary`, `enrollments`, `attendance_summary`, `finance_summary`, and `lifecycle_actions` with section-level hidden-section reporting.
-    - Staff copilot: `/ai/copilot` renders `resources/js/pages/AI/StaffCopilot/Index.vue`; `/ai/copilot/messages` accepts a bounded question only and queues a durable assistant run; `/ai/copilot/runs/{run}/events` replays normalized Laravel SSE events, rejects invalid cursors with `invalid_run_event_cursor` before execution, and executes the live/deterministic runner; `/ai/copilot/runs/{run}/cancel` cancels queued active runs with owner/campus checks; `/ai/copilot/runs/{run}/retry` retries failed runs without duplicating the original user message. Active-run props expose `last_event_id` and `replay_cursor`, and the browser reconnects from the latest applied cursor while de-duplicating event ids. Terminal run events persist redacted `audit_evidence` for actor/campus scope, AI access layers, provider/model/runtime metadata, tool/source evidence, safe error reason, final answer linkage, cancellation, duration, and retry linkage. Completed runs still record conversation/user-message/trace/tool-call/provider-usage/assistant-message evidence and return source-cited structured answer props from audited `query_metrics`, explicit `search_entities`, or `get_entity_profile` results.
-    - AI cross-module metric/entity/profile reads use shared contracts (`App\Shared\Contracts\Academic\AiAcademicMetricReader`, `App\Shared\Contracts\Academic\AiAcademicEntitySearchReader`, `App\Shared\Contracts\Academic\AiAcademicStudentProfileReader`, `App\Shared\Contracts\Finance\AiFinanceMetricReader`, `App\Shared\Contracts\Finance\AiFinanceStudentProfileReader`) with owning-module adapters; AI does not own broad Academic/Finance source queries directly.
-    - Support services: `AiRedactor`, `AiAuditRecorder`, `AiProviderUsageRecorder`, `AiEvaluationRunner`, `BusinessGlossary`, `MetricCatalog`, `EntityCatalog`, `StudentProfileSectionCatalog`, `EntityReferenceResolver`, `QueryPlanValidator`, `ToolRegistry`, `ToolDispatcher`, `QueryMetricsTool`, `SearchEntitiesTool`, `GetEntityProfileTool`, `StaffCopilotSseRuntime`, `LiveStaffCopilotAgent`, and fallback-aware `StaffCopilotAgentRunner`.
-    - Current boundary: internal staff chat can use provider-agnostic downstream SSE and a staff-owned live provider setting for structured planning/final synthesis, but data access remains read-only through MetricCatalog v1, EntityCatalog v1, StudentProfileSectionCatalog v1, `query_metrics`, `search_entities`, and `get_entity_profile`; no WebSocket/Reverb/Pusher dependency, MCP exposure, write/action mode, raw profile/source-row exports, or student/lecturer portal behavior.
+### HTTP boundary
 
-## 7) Runtime Scheduled Commands
+- FormRequests parse and validate incoming data.
+- Middleware establishes authentication, actor, permission, and campus context.
+- Controllers orchestrate and translate results into Inertia or `ApiResponse`.
+- Eloquent API Resources shape public JSON contracts.
 
-Scheduled via `routes/console.php` with `onOneServer()` guard:
+### Application layer
 
-| Command                                          | Frequency     | Purpose                                                           |
-| ------------------------------------------------ | ------------- | ----------------------------------------------------------------- |
-| `notifications:process-outbox --limit=100`       | Every 5 min   | Process pending notification outbox events                        |
-| `finance:recover-cancellation-work --limit=100`  | Every minute  | Recover committed cancellation handoffs, operations, and outboxes |
-| `sessions:update-statuses`                       | Every 30 min  | Update class session statuses                                     |
-| `events:process-completions`                     | Hourly        | Process event completions                                         |
-| `events:send-reminders`                          | Daily 00:10   | Send event reminders                                              |
-| `events:process-failed-gold-rewards`             | Daily 02:00   | Retry failed gold rewards                                         |
-| `academic-records:sync`                          | Daily 03:00   | Sync from Canvas                                                  |
-| `attendance:sync-to-academic-records`            | Every 2 hours | Sync attendance                                                   |
-| `academic-records:aggregate-manual`              | Daily 04:00   | Aggregate manual grades                                           |
+- Actions own state changes and business decisions.
+- Queries own complex reads and read models.
+- Multi-write actions use database transactions.
+- Jobs handle retryable asynchronous work after durable intent is recorded.
 
-### Queue Worker Requirements
+### Domain and integration layer
 
-Notification V2 requires active queue worker for delivery jobs:
+- Module-owned models, policies, enums, and support classes express business
+  rules.
+- Provider adapters translate DNG, Canvas, email, realtime, storage, and AI
+  boundaries.
+- Shared contracts expose narrow owned capabilities without leaking models.
 
-```bash
-php artisan queue:work --sleep=1 --tries=3
+## Cross-context communication
+
+Use one of three mechanisms:
+
+1. **Synchronous contract** for an immediate query or atomic state change.
+2. **Domain event + outbox** for post-commit reactions.
+3. **Owned projection/reader** for reporting, dashboards, search, and AI.
+
+Contexts do not import another context's concrete Actions or Eloquent models to
+make business decisions. Projections explain and report state; they do not
+decide hard business gates.
+
+## Identity and authorization
+
+- Sanctum protects student and lecturer APIs.
+- Actor middleware rejects role/context mismatch.
+- Staff web operations require authenticated, permission-aware, campus-scoped
+  context.
+- Service integrations use dedicated credentials and abilities.
+- Guardian relationship is Student Registry data; portal access is an Identity
+  grant.
+- Lecturer employment eligibility and Lecturer access are separate owned facts.
+- MCP maps an authenticated staff user into the same permission and campus
+  enforcement boundary used by internal tools.
+
+## Admissions orchestration
+
+Approval is one atomic business outcome:
+
+```text
+Admissions Application
+  -> Student Registry identity + guardians
+  -> Identity account + access grants
+  -> Academic Program Enrollment
+  -> Application approved
 ```
 
-Queue jobs:
+Admissions owns the transition and calls receiving contexts through command
+contracts. Failure rolls back the transaction. Revoke uses the same boundaries
+and refuses destructive teardown after downstream activity exists.
 
-- `ProcessNotificationOutboxJob` — Process individual outbox events
-- `SendNotificationDeliveryJob` — Deliver via email/realtime channels
+## Academic contexts
 
-Production setup: See `docs/deployment-guide.md` for supervisor configuration.
+Academic decomposes logically into:
 
-## 9) Operational Architecture Status
+- **Catalog & Calendar** — Units, Programs, Curriculum Versions, Academic
+  Periods, and catalog policies.
+- **Course Delivery & Assessment** — Course Offerings, roster, sessions,
+  attendance, grading, and Course Results.
+- **Progression & Lifecycle** — Program Enrollment, Study Stage, Transcript
+  Entries, GPA, standing, lifecycle actions, and formal Decisions.
 
-- Docker assets are maintained in `docker/`.
-- Scripts in `scripts/` still contain path and runtime drift:
-    - multiple scripts reference root compose names (for example `docker-compose.production.yml`) while actual files live under `docker/`
-    - setup/validation flows reference missing helpers (`scripts/docker-compose-dev.sh`, `scripts/test-local.sh`)
-    - deployment scripts are duplicated with overlapping intent (`scripts/prod.sh`, `scripts/deploy.sh`, `scripts/deploy-production.sh`)
-- CI workflow YAML files exist but are disabled.
+Course completion and recalculation synchronously commit accepted Course Result
+DTOs into Transcript Entries in the same transaction. Post-commit notifications
+use the outbox.
 
-## 10) Architecture Risks
+The Metropolia grading scheme pack is intentionally repository-tracked at
+`docs/features/academic/metropolia-grading-schemes.json` and loaded by
+`MetropoliaSchemeCatalog`.
 
-- Hybrid layering (module-domain folders plus a large shared service layer) creates ownership ambiguity.
-- API auth model is not fully uniform across all route groups.
-- Public config endpoints create configuration exposure/tampering risk.
-- CI disabled + script drift increases deployment and regression risk.
-- Notification read history is split between legacy and V2 data until later cutover/backfill phases.
-- Finance dashboard and some finance read models still carry transitional risk while snapshot columns are gradually reconciled and old data is backfilled into `discount_allocations`.
+## Finance source-of-truth model
 
-## 11) Near-Term Decisions Required
+| Concept | Authority |
+| --- | --- |
+| Why money is owed | Finance Obligation |
+| Payer identity for new aggregates | Billing Account |
+| Materialized debit/collection ledger | Finance Charge + Invoice Line |
+| Cash received | Payment |
+| Cash applied | Payment Application |
+| Fee reduction | Discount Allocation |
+| Credit reduction | Credit Application |
+| Collectible amount/state | Settlement Position contract |
+| Provider request/callback evidence | DNG request and webhook records |
 
-1. Standardize API auth model for finance and other mixed groups.
-2. Select canonical deployment workflow and align scripts.
-3. Reactivate CI with minimum required gates.
-4. Define Notification V2 cutover/backfill plan beyond Phase 1 clean-slate tables.
-6. Finish finance settlement cutover for all remaining read models and legacy finance reports.
+Payable Line is the atomic settlement unit. Consumers do not reproduce
+settlement arithmetic or conceal invalid ledger state with clamping. Invalid
+positions fail closed for collection; internal integrity evidence is not exposed
+to students.
 
-## Unresolved Questions
+Installments schedule collection but do not create debt. Preserved cash remains
+distinguishable from new collection. Provider campus identifiers are Finance
+owned rather than Campus identity fields.
 
-- Which API groups are official external contracts vs internal web-support endpoints?
-- Should finance APIs migrate to actor-based Sanctum protection?
-- Should campus-sensitive permission checks rely less on session-only context for API calls?
+## Notifications
+
+Source modules publish durable intent. Notification owns:
+
+- Recipient resolution.
+- Templates and rendered content.
+- Message and delivery persistence.
+- Email/realtime channel adapters.
+- Retry and operational monitoring.
+- Deduplication evidence.
+
+Notification does not decide whether an academic or financial event should
+exist. That decision remains with the source module.
+
+## Provider boundaries
+
+### DNG
+
+Finance creates payment requests, records callbacks before processing, verifies
+integrity/idempotency, reconciles unknown outcomes, and preserves late verified
+cash without reviving cancelled collection state.
+
+### Canvas
+
+Academic owns local Course Offering and syllabus/assessment state. Canvas
+mappings and sync evidence constrain reusable templates and provider-specific
+operations.
+
+### Portals
+
+The Swinx APIs own server contracts. `FE/student-nuxt` and
+`FE/lecturer-nuxt` own portal presentation and handwritten client types. See
+`docs/portal-repos.md`.
+
+### Controlled MCP
+
+The ToolDispatcher remains the read execution boundary. OAuth, authorization,
+campus scope, schemas, limits, redaction, and audit are enforced inside Swinx;
+external agent clients never receive database credentials or unrestricted
+application access.
+
+## Data and infrastructure
+
+- MySQL stores transactional state.
+- Redis supports cache and queues.
+- Queue workers process outbox/provider work.
+- FrankenPHP serves production workloads.
+- Docker Compose defines development, local-production, host-proxy, and full
+  production modes.
+- Snapshots and cached totals are rebuildable; they are not business authority.
+
+## Architecture constraints
+
+- No new business logic in legacy shared services.
+- No cross-context Eloquent joins for decisions.
+- No direct JSON response outside the project API envelope.
+- No provider payload enters domain logic without boundary validation.
+- No public contract change without canonical docs and targeted tests.
+- No runtime dependency on historical plans, reports, or story files.
+- No new bounded context based only on a portal actor or UI menu.

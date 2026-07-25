@@ -1,3 +1,12 @@
+---
+id: ADR-0007
+title: "Student page is a single student-centric operational console"
+status: accepted
+owner: Platform Team
+last_verified: 2026-07-25
+scope: architecture-decision
+---
+
 # Student page is a single student-centric operational console
 
 **Context.** Student academic features were scattered across four unrelated top-level menus, and most per-student tasks existed twice — once as a per-student page (`/students/{id}/actions`, `/students/{id}/placement`) and again as an aggregate report. This confused the single role that actually owns the student lifecycle: Academic Affairs staff (Cán Bộ Đào tạo). Other roles only read a few basic fields.

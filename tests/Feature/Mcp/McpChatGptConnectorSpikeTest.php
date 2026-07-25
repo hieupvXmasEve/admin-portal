@@ -17,14 +17,13 @@ beforeEach(fn () => Cache::flush());
  * Issue 07 — ChatGPT connector spike (go/no-go), driven through the real HTTP boundary.
  *
  * These assertions LOCK the OAuth 2.0 discovery surface a ChatGPT custom MCP connector
- * requires to bootstrap from the bare `/mcp/swinx` URL, so the documented go/no-go
- * (docs/adr/0012) stays reproducible and cannot silently regress. The same surface is
- * what the shipped Claude connector consumes, so this doubles as a Claude-path guard.
+ * requires to bootstrap from the bare `/mcp/swinx` URL. The same surface is
+ * consumed by other supported MCP clients, so this protects the shared connector
+ * contract documented in docs/features/ai/mcp.md.
  *
  * The outcome the spike recorded is TECHNICAL-GO: every requirement below is already
- * satisfied by the pinned laravel/mcp build. ChatGPT is deferred as a committed v1 client
- * on the ADR-0011 data-handling precondition (an OpenAI zero-retention/no-train DPA),
- * NOT on any connector gap — hence there is no code fix to apply, only this lock.
+ * satisfied by the pinned laravel/mcp build. Client enablement remains an
+ * operational/data-handling decision rather than a connector implementation gap.
  */
 it('serves path-suffixed protected-resource metadata (RFC 9728) naming the mcp resource', function () {
     // ChatGPT fetches the resource-suffixed PRM discovered from the 401 WWW-Authenticate
@@ -92,7 +91,8 @@ it('registers a ChatGPT redirect URI as a public PKCE client via dynamic client 
 it('renders consent without rejecting the RFC 8707 resource indicator ChatGPT sends', function () {
     // ChatGPT appends a `resource` parameter (RFC 8707) to the authorize request. Passport
     // must tolerate it (render consent), even though v1 does not audience-bind the token —
-    // the accepted residual recorded in ADR-0012, matching the Claude path.
+    // the accepted residual documented in docs/features/ai/mcp.md, matching
+    // the other supported MCP client paths.
     $user = User::factory()->create();
 
     $client = (new Client)->forceFill([

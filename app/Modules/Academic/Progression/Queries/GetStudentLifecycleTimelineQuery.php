@@ -16,7 +16,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
 /**
- * Unified Lifecycle timeline (ADR-0009).
+ * Unified Lifecycle timeline (ADR-0049).
  *
  * Builds the Lifecycle tab's read contract: a single chronological timeline
  * merged from BOTH lifecycle streams — status actions (`StudentActionLog`) and
@@ -25,7 +25,7 @@ use Illuminate\Support\Collection;
  *
  * Non-status EGC progression (English-level changes, IELTS records) is kept OUT
  * of the main timeline and returned under `egc` as a secondary detail panel,
- * exactly as ADR-0009 prescribes. A future reader should not "fix" the merge by
+ * exactly as ADR-0049 prescribes. A future reader should not "fix" the merge by
  * splitting the tab back into two tables — the merge is the feature.
  */
 final class GetStudentLifecycleTimelineQuery
@@ -188,7 +188,7 @@ final class GetStudentLifecycleTimelineQuery
     }
 
     /**
-     * The EGC secondary detail panel (ADR-0009): English-level / IELTS
+     * The EGC secondary detail panel (ADR-0049): English-level / IELTS
      * progression history kept out of the main timeline, plus the student's
      * level snapshot and IELTS certificate records.
      *

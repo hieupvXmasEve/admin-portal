@@ -66,7 +66,7 @@ it('classifies which transitions require a decision', function () {
         ->and(StudentActionType::STUDENT_MAJOR_ENROLLMENT->requiresDecision())->toBeTrue()
         ->and(StudentActionType::ADMISSION_DEFERRAL->requiresDecision())->toBeFalse()
         ->and(StudentActionType::WAITING_COURSE_OPENING->requiresDecision())->toBeFalse()
-        // EGC progression events never require a Decision (ADR-0008, revised):
+        // EGC progression events never require a Decision (ADR-0048, revised):
         // they are a secondary record of the enrolment transitions, which carry
         // the requirement on the action side instead.
         ->and(AcademicProgressionEventType::PLACEMENT_INITIALIZED->requiresDecision())->toBeFalse()

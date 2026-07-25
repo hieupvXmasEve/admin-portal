@@ -86,7 +86,7 @@ class RecordStudentActionAction
             ]);
 
             // 1.5 If a decision authorized this transition up front, ensure the
-            // decision's coverage roster includes this student (ADR-0008).
+            // decision's coverage roster includes this student (ADR-0048).
             if (! empty($data['decision_id'])) {
                 StudentDecision::find($data['decision_id'])?->cover($student->id);
             }

@@ -48,14 +48,10 @@ interface Props {
 
 const props = defineProps<Props>();
 
-const { filters, clearFilters, handlePaginationNavigate, handlePageSizeChange, updateFieldDebounced } = useTableFilters<MissingDecisionFilters>(
-    studentRoutes.academicProgressionMissingDecisions(),
-    props.filters,
-    ['transitions', 'filters'],
-);
+const { filters, clearFilters, handlePaginationNavigate, handlePageSizeChange, updateFieldDebounced } = useTableFilters<MissingDecisionFilters>(studentRoutes.academicProgressionMissingDecisions(), props.filters, ['transitions', 'filters']);
 
 // One-way deep link into the student's Hub Lifecycle tab, where the authorizing
-// Decision is backfilled onto the transition (ADR-0007, ADR-0008).
+// Decision is backfilled onto the transition (ADR-0007, ADR-0048).
 const goToStudentLifecycle = (studentId: number) => {
     router.visit(studentRoutes.hub.lifecycle(studentId));
 };
@@ -94,8 +90,7 @@ const sourceLabel = (source: MissingDecisionRow['source']): string => (source ==
                 <div>
                     <h3 class="font-semibold text-orange-800 dark:text-orange-200">Backfill Required</h3>
                     <p class="text-sm text-orange-700 dark:text-orange-300">
-                        These transitions were recorded without an authorizing decision. Attach the signed quyết định in the Decisions area to complete the
-                        record — each row disappears once a decision is linked.
+                        These transitions were recorded without an authorizing decision. Attach the signed quyết định in the Decisions area to complete the record — each row disappears once a decision is linked.
                     </p>
                 </div>
             </CardContent>
@@ -114,13 +109,8 @@ const sourceLabel = (source: MissingDecisionRow['source']): string => (source ==
                     <div class="w-full space-y-2 sm:w-64">
                         <Label>Search Student</Label>
                         <div class="relative">
-                            <Search class="text-muted-foreground absolute left-2 top-2.5 h-4 w-4" />
-                            <Input
-                                :model-value="filters.search ?? ''"
-                                @update:model-value="(val) => updateFieldDebounced('search', String(val))"
-                                placeholder="Search by name or ID..."
-                                class="pl-8"
-                            />
+                            <Search class="text-muted-foreground absolute top-2.5 left-2 h-4 w-4" />
+                            <Input :model-value="filters.search ?? ''" @update:model-value="(val) => updateFieldDebounced('search', String(val))" placeholder="Search by name or ID..." class="pl-8" />
                         </div>
                     </div>
 

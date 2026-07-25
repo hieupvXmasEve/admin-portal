@@ -14,7 +14,6 @@ return new class extends Migration
         Schema::create('semesters', function (Blueprint $table) {
             $table->id();
 
-            // Add the required fields from term.md
             $table->string('code'); // Code term: 'SPR2025', 'FALL2025'
             $table->string('name'); // Name term: 'Spring 2025', 'Fall 2025'
             $table->datetime('start_date')->nullable();

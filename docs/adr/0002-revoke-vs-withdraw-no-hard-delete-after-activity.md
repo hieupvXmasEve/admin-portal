@@ -1,3 +1,12 @@
+---
+id: ADR-0002
+title: "Rollback uses two distinct actions: Revoke vs Withdraw"
+status: accepted
+owner: Platform Team
+last_verified: 2026-07-25
+scope: architecture-decision
+---
+
 # Rollback uses two distinct actions: Revoke vs Withdraw
 
 Rolling back an approval is split into two actions with different semantics, because `students` has no soft-deletes and ~41 tables reference `students.id` with `cascadeOnDelete` (finance charges, GPA, scores, wallets, scholarships…). Hard-deleting a Student that has any downstream activity would cascade-destroy academic and financial records.

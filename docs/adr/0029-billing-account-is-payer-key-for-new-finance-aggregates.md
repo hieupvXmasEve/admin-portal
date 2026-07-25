@@ -1,8 +1,14 @@
-# Billing account is the payer key for new Finance aggregates; legacy ledger stays student-keyed
+---
+id: ADR-0029
+title: "Billing account is the payer key for new Finance aggregates; legacy ledger stays student-keyed"
+status: accepted
+date: 2026-07-09
+owner: "Finance"
+last_verified: 2026-07-25
+scope: architecture-decision
+---
 
-**Status:** Accepted
-**Date:** 2026-07-09
-**Owner:** Finance
+# Billing account is the payer key for new Finance aggregates; legacy ledger stays student-keyed
 
 ## Context
 

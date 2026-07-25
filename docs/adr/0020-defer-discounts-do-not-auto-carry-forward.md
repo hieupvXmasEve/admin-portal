@@ -1,8 +1,14 @@
-# Defer does not automatically carry forward discounts or scholarships
+---
+id: ADR-0020
+title: "Defer does not automatically carry forward discounts or scholarships"
+status: accepted
+date: 2026-07-06
+owner: "Academic + Finance"
+last_verified: 2026-07-25
+scope: architecture-decision
+---
 
-**Status:** Accepted
-**Date:** 2026-07-06
-**Owner:** Academic + Finance
+# Defer does not automatically carry forward discounts or scholarships
 
 ## Context
 

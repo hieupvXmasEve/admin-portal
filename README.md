@@ -1,141 +1,105 @@
+---
+title: Swinx
+status: canonical
+owner: Platform Team
+last_verified: 2026-07-25
+scope: repository-onboarding
+---
+
 # Swinx
 
-Swinx is a university operations platform built as a Laravel 13 + Vue 3 + Inertia monolith.
+Swinx is a university operations platform built as a Laravel 13 modular
+monolith with a Vue 3, TypeScript, and Inertia v3 staff application.
 
-Last updated: 2026-04-26  
-Owner: Platform Team  
-Status: Current-state baseline (code-verified)
+## Product surfaces
 
-## Source of Truth
+- Staff/admin web application.
+- Student API under `/api/v1/student`.
+- Lecturer API under `/api/v1/lecturer`.
+- Parent access to authorized student capabilities.
+- Controlled MCP tools for authorized staff.
+- Separate Nuxt student and lecturer portals under ignored `FE/` repositories.
 
-- Canonical project docs: `docs/`
-- Baseline architecture and standards:
-  - `docs/system-architecture.md`
-  - `docs/code-standards.md`
-  - `docs/project-overview-pdr.md`
+## Technology
 
-## Current Baseline (Code-Verified)
+- PHP 8.4, Laravel 13, Sanctum, Pest 4.
+- Vue 3, TypeScript, Inertia v3, Tailwind CSS 4.
+- MySQL 8, Redis, FrankenPHP.
+- Docker-first local and production workflows.
 
-- Backend: Laravel 13 hybrid monolith
-  - modular domains: `app/Modules/*`
-  - shared legacy/business services: `app/Services/*`
-- Frontend: Vue 3 + TypeScript + Inertia (`resources/js/*`)
-- API surfaces:
-  - Student v1: `routes/api/v1/student.php`
-  - Lecturer v1: `routes/api/v1/lecturer.php`
-  - Identity module auth/context routes: `app/Modules/Identity/routes/api.php`
+## Start here
 
-## Entry Points
+AI agents read [AGENTS.md](AGENTS.md) first.
 
-- App bootstrap: `bootstrap/app.php`
+Documentation:
+
+- [Documentation registry](docs/README.md)
+- [Product baseline](docs/project-overview-pdr.md)
+- [System architecture](docs/system-architecture.md)
+- [Design guidelines](docs/design-guidelines.md)
+- [Deployment guide](docs/deployment-guide.md)
+- [Domain glossary](CONTEXT.md)
+
+## Local development
+
+```bash
+cp .env.example .env
+./scripts/dev.sh start
+./scripts/dev.sh composer install
+./scripts/dev.sh npm ci
+./scripts/dev.sh artisan key:generate
+./scripts/dev.sh artisan migrate
+./scripts/dev.sh npm run dev
+```
+
+Application commands run inside Docker:
+
+```bash
+./scripts/dev.sh status
+./scripts/dev.sh logs app
+./scripts/dev.sh artisan <command>
+./scripts/dev.sh composer <command>
+./scripts/dev.sh npm <command>
+./scripts/dev.sh test
+```
+
+See [scripts/README.md](scripts/README.md) for the script inventory and
+[docs/deployment-guide.md](docs/deployment-guide.md) for environment workflows.
+
+## Targeted quality checks
+
+```bash
+./scripts/dev.sh artisan test --compact --filter=<test>
+./scripts/dev.sh composer exec pint -- --dirty --format agent
+./scripts/dev.sh npm exec eslint -- <changed-files>
+./scripts/dev.sh npm exec prettier --check <changed-files>
+./scripts/check-docs.sh
+```
+
+Use the narrowest checks that prove the changed behavior. Broader suites are
+reserved for cross-cutting changes and release validation.
+
+## Main entry points
+
+- Laravel bootstrap: `bootstrap/app.php`
 - Web routes: `routes/web.php`
 - API routes: `routes/api.php`
-- Frontend app entry: `resources/js/app.ts`
-- Frontend SSR entry: `resources/js/ssr.ts`
+- Student API routes: `routes/api/v1/student.php`
+- Lecturer API routes: `routes/api/v1/lecturer.php`
+- Frontend entry: `resources/js/app.ts`
+- SSR entry: `resources/js/ssr.ts`
+- Domain modules: `app/Modules/`
 
-Health endpoints in code:
+Health endpoints:
+
 - `GET /up`
 - `GET /health`
 - `GET /api/health`
 
-## Authentication and API Security (Current State)
+## Contribution boundaries
 
-- Sanctum remains default token auth for student/lecturer API groups.
-- Actor middleware is in use for student/parent/lecturer segmentation:
-  - `api.actor:student_or_parent`
-  - `api.actor:parent`
-  - `api.actor:lecturer`
-- Identity lecturer refresh is in a protected middleware group.
-- Parent refresh endpoint exists and is protected.
-- Token TTL is standardized to 8 hours in current Identity login/refresh actions.
-- Refresh rotation pattern is currently "issue new token, then revoke old token" in controllers.
-
-Known open security drift (not fixed in this update):
-- Finance API auth style differs (`web` + `auth` in `app/Modules/Finance/routes/api.php`) from Sanctum + actor model.
-
-## Student Action Import (Academic Module)
-
-Implemented under `app/Modules/Academic/routes/web.php`:
-- `GET reports/student-actions/import`
-- `GET reports/student-actions/import/template`
-- `POST reports/student-actions/import/preview`
-- `POST reports/student-actions/import/execute`
-
-Verified behavior:
-- Preview/execute anti-tamper check binds user + preview token + file hash + `shared_upload_record_id`.
-- `ADMISSION_DEFERRAL` is excluded from template/import mapping.
-- Append mode only allows same student + same action type + same period.
-- Execute uses per-row DB transaction.
-- Decision fields are persisted on action logs:
-  - `decision_number`
-  - `decision_signed_at`
-  - `decision_signer`
-
-## Local Development
-
-```bash
-composer install
-npm ci
-cp .env.example .env
-./scripts/dev.sh start
-./scripts/dev.sh artisan key:generate
-./scripts/dev.sh artisan migrate
-```
-
-Local note:
-- Backend/app commands are expected to run inside Docker via `./scripts/dev.sh ...`.
-- Prefer `./scripts/dev.sh artisan ...`, `./scripts/dev.sh composer ...`, `./scripts/dev.sh npm ...`, and `./scripts/dev.sh test ...`.
-
-## Common Commands
-
-```bash
-./scripts/dev.sh start
-./scripts/dev.sh status
-./scripts/dev.sh npm run dev
-./scripts/dev.sh npm run build
-./scripts/dev.sh npm run lint
-./scripts/dev.sh npm run format:check
-./scripts/dev.sh npm run type-check
-./scripts/dev.sh test
-```
-
-Migration debt guard:
-
-```bash
-./scripts/dev.sh artisan migration-debt:inventory --check --format=table
-```
-
-Run this before and after migration work. It is read-only and fails when an approved debt baseline, frozen path, or architecture boundary regresses. The JSON form is available with `--format=json`.
-
-## Current Quality Gates Status
-
-- GitHub deploy workflow is active for branch-based Ubuntu host deploys:
-  - `.github/workflows/deploy.yml`
-- GitHub quality workflows are not currently present as CI merge gates.
-- Local checks are available, but CI-enforced merge gates are currently inactive.
-
-## Known Operational Risks
-
-- Script/path drift in `scripts/*` (missing helper scripts and root-vs-`docker/` compose path mismatch).
-- Deployment artifacts still include secrets-exposure risks (hardcoded defaults/credentials and exposed DB ports in production compose files).
-
-## Documentation Index
-
-- `docs/project-overview-pdr.md`
-- `docs/codebase-summary.md`
-- `docs/code-standards.md`
-- `docs/system-architecture.md`
-- `docs/project-roadmap.md`
-- `docs/deployment-guide.md`
-- `docs/design-guidelines.md`
-
-## Contribution Rules
-
-- Keep docs evidence-first: only document what current code verifies.
-- Update docs in the same change window when routes, middleware, contracts, or deploy behavior changes.
-- Keep unresolved decisions explicitly tracked in `Unresolved Questions` sections.
-
-## Unresolved Questions
-
-- Should Finance API routes migrate from `web` + `auth` to Sanctum + actor model?
-- Which deploy script becomes canonical (`scripts/prod.sh`, `scripts/deploy.sh`, or `scripts/deploy-production.sh`)?
+- New business behavior belongs in a domain module.
+- Keep public API contracts and affected portals aligned.
+- Update canonical documentation in the same change window as contract,
+  architecture, authentication, route, or deployment changes.
+- Preserve unrelated worktree and nested-repository changes.

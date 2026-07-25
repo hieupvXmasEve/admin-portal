@@ -22,7 +22,6 @@ use Throwable;
  * App\Modules\Finance\Support\Integrity\FinanceInvariantRegistry so the command
  * and the finance audit workspace cannot drift. A failing invariant SQL is
  * surfaced as ERROR (never swallowed into a clean 0).
- * See docs/features/finance/finance-module-review-2026-06-13.md (Mục 4).
  */
 class AuditFinanceInvariants extends Command
 {

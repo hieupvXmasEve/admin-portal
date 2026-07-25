@@ -548,7 +548,7 @@ export interface StudentHubContext {
     specialization?: { id: number; name: string; code: string } | null;
 }
 
-// ── Lifecycle tab (ADR-0009): unified Student Actions + EGC Progression timeline ──
+// ── Lifecycle tab (ADR-0049): unified Student Actions + EGC Progression timeline ──
 
 /** The authorizing Decision rendered inline on a transition. */
 export interface LifecycleDecision {

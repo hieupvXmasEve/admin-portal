@@ -85,7 +85,7 @@ it('lists requires-decision status actions that lack a decision', function () {
 it('never lists progression transitions (placement / stage change no longer require a decision)', function () {
     $student = missingDecisionStudent($this->campus, $this->program, $this->semester, 'SE700002');
 
-    // ADR-0008 (revised): EGC progression events do not require a Decision, so
+    // ADR-0048 (revised): EGC progression events do not require a Decision, so
     // none of them — including placement and the move into intake_course —
     // appear in the missing-decision report.
     missingDecisionEvent($student, $this->user, $this->semester, AcademicProgressionEventType::PLACEMENT_INITIALIZED);

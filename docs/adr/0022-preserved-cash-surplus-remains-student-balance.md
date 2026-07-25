@@ -1,8 +1,14 @@
-# Preserved cash surplus remains student balance
+---
+id: ADR-0022
+title: "Preserved cash surplus remains student balance"
+status: accepted
+date: 2026-07-06
+owner: "Academic + Finance"
+last_verified: 2026-07-25
+scope: architecture-decision
+---
 
-**Status:** Accepted
-**Date:** 2026-07-06
-**Owner:** Academic + Finance
+# Preserved cash surplus remains student balance
 
 ## Context
 

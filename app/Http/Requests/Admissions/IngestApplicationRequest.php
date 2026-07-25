@@ -21,7 +21,7 @@ use Illuminate\Validation\Rule;
  *
  * Lifecycle is never set by the CRM: `status` and the approve/reject/revoke audit
  * columns are not accepted here — an Application is born `pending` and only staff
- * move it (ADR-0001/0004). The single English-test result is accepted as a nested
+ * move it (ADR-0042/0004). The single English-test result is accepted as a nested
  * `english_test` object and mapped onto the inline columns by the ingestion
  * service, decoupling the CRM contract from Swinx's column names.
  */

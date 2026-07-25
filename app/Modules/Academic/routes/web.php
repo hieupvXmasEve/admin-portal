@@ -286,12 +286,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware('can:view_student_summary')
             ->name('students.academic-summary.graduation');
 
-        // Lifecycle tab: unified Student Actions + EGC Progression timeline (ADR-0009)
+        // Lifecycle tab: unified Student Actions + EGC Progression timeline (ADR-0049)
         Route::get('/lifecycle', [StudentAcademicSummaryController::class, 'lifecycle'])
             ->middleware('can:view_student_summary')
             ->name('students.academic-summary.lifecycle');
 
-        // Backfill an authorizing Decision onto an existing transition (ADR-0008)
+        // Backfill an authorizing Decision onto an existing transition (ADR-0048)
         Route::post('/lifecycle/attach-decision', [StudentAcademicSummaryController::class, 'attachDecision'])
             ->middleware('can:change_student_status')
             ->name('students.academic-summary.lifecycle.attach-decision');

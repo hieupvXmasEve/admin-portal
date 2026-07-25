@@ -25,7 +25,7 @@ class StudentActionController extends Controller
      * Retired standalone Student Actions page.
      *
      * Student Actions are now recorded in place on the Hub's Lifecycle tab
-     * (ADR-0009); this route redirects there so old bookmarks keep working.
+     * (ADR-0049); this route redirects there so old bookmarks keep working.
      */
     public function index(Student $student): RedirectResponse
     {

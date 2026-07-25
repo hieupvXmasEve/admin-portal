@@ -1,8 +1,14 @@
-# Preserve defer creates a return-study obligation settled by preserved cash
+---
+id: ADR-0017
+title: "Preserve defer creates a return-study obligation settled by preserved cash"
+status: accepted
+date: 2026-07-06
+owner: "Academic + Finance"
+last_verified: 2026-07-25
+scope: architecture-decision
+---
 
-**Status:** Accepted
-**Date:** 2026-07-06
-**Owner:** Academic + Finance
+# Preserve defer creates a return-study obligation settled by preserved cash
 
 ## Context
 

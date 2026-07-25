@@ -111,7 +111,7 @@ enum StudentActionType: string
     }
 
     /**
-     * Whether a transition of this type needs an authorizing Decision (ADR-0008).
+     * Whether a transition of this type needs an authorizing Decision (ADR-0048).
      *
      * The requires-decision set lives entirely on the status actions: academic
      * defer, resume, dropout, campus transfer, and the enrolment transitions

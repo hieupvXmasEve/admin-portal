@@ -11,7 +11,7 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Missing-decision report (ADR-0008).
+ * Missing-decision report (ADR-0048).
  *
  * Lists requires-decision transitions — drawn from BOTH lifecycle streams
  * (status actions and EGC progression events) — that still lack an authorizing

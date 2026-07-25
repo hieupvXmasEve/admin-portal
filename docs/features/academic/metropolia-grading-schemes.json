@@ -1,7 +1,7 @@
 {
   "pack": "metropolia",
   "version": 1,
-  "source": "docs/features/academic/Grading_Schemes_Metropolia.md",
+  "source": "docs/features/academic/grading.md",
   "engine": "metropolia_v1",
   "notes": "Each scheme is stored in the executable shape consumed by the metropolia_v1 calculator (App\\Modules\\Academic\\Support\\Grading\\MetropoliaV1Calculator). The calculator reads only `scale` and `components[].{code,gate,conversion}`; `version`, `source_reference`, and per-scheme `notes` are audit metadata that the engine ignores. Component scores are percentages (0-100). Some prose rules are expressed as point-based or weighted-total formulas; where the engine's per-component summation cannot reproduce a formula exactly for every input, the scheme uses a documented affine approximation that is exact for balanced score profiles. Those cases are flagged in each scheme's `notes`.",
   "schemes": {

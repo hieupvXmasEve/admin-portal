@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Channel-aware AI tool-call audit (ADR-0006).
+ * Channel-aware AI tool-call audit (ADR-0008).
  *
  * Makes the conversation/trace foreign keys nullable so a standalone MCP call
  * can be persisted without a chat run, and adds the MCP identity columns:

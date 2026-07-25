@@ -17,9 +17,7 @@ const formatDateTime = (value: string | null): string => {
         return '—';
     }
     const date = new Date(value);
-    return Number.isNaN(date.getTime())
-        ? '—'
-        : date.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
 
 const sourceIcon = (row: LifecycleTimelineRow) => (row.source === 'progression' ? TrendingUp : ArrowRightLeft);
@@ -31,14 +29,9 @@ const sourceIcon = (row: LifecycleTimelineRow) => (row.source === 'progression' 
         <p class="text-muted-foreground mt-3 text-sm">No lifecycle events recorded yet.</p>
     </div>
 
-    <ol v-else class="relative space-y-4 before:absolute before:top-2 before:bottom-2 before:left-[18px] before:w-px before:bg-border">
+    <ol v-else class="before:bg-border relative space-y-4 before:absolute before:top-2 before:bottom-2 before:left-[18px] before:w-px">
         <li v-for="row in timeline" :key="row.id" class="relative flex gap-4">
-            <span
-                :class="[
-                    'relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ring-4 ring-background',
-                    row.missing_decision ? 'bg-amber-100 text-amber-700' : 'bg-primary/10 text-primary',
-                ]"
-            >
+            <span :class="['ring-background relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ring-4', row.missing_decision ? 'bg-amber-100 text-amber-700' : 'bg-primary/10 text-primary']">
                 <component :is="sourceIcon(row)" class="h-4 w-4" />
             </span>
 
@@ -47,12 +40,12 @@ const sourceIcon = (row: LifecycleTimelineRow) => (row.source === 'progression' 
                     <div class="min-w-0">
                         <div class="flex flex-wrap items-center gap-2">
                             <span class="font-semibold">{{ row.label }}</span>
-                            <Badge variant="outline" class="text-[10px] uppercase tracking-wide">{{ row.source }}</Badge>
+                            <Badge variant="outline" class="text-[10px] tracking-wide uppercase">{{ row.source }}</Badge>
                         </div>
                         <p class="text-muted-foreground mt-0.5 text-sm">{{ formatDateTime(row.occurred_at) }}</p>
                     </div>
 
-                    <!-- Authorizing Decision rendered inline on the transition it authorizes (ADR-0008/0009) -->
+                    <!-- Authorizing Decision rendered inline on the transition it authorizes (ADR-0048/0049) -->
                     <div class="flex flex-col items-end gap-1">
                         <Badge v-if="row.decision" class="flex items-center gap-1 bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
                             <CircleCheck class="h-3 w-3" />
@@ -62,13 +55,7 @@ const sourceIcon = (row: LifecycleTimelineRow) => (row.source === 'progression' 
                             <AlertTriangle class="h-3 w-3" />
                             Decision missing
                         </Badge>
-                        <a
-                            v-if="row.decision?.upload_record"
-                            :href="row.decision.upload_record.url"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="text-primary inline-flex items-center gap-1 text-xs hover:underline"
-                        >
+                        <a v-if="row.decision?.upload_record" :href="row.decision.upload_record.url" target="_blank" rel="noopener noreferrer" class="text-primary inline-flex items-center gap-1 text-xs hover:underline">
                             <FileText class="h-3 w-3" />
                             View document
                         </a>
@@ -81,9 +68,7 @@ const sourceIcon = (row: LifecycleTimelineRow) => (row.source === 'progression' 
 
                 <div class="text-muted-foreground mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                     <span v-if="row.actor">By {{ row.actor.name }}</span>
-                    <span v-if="row.detail.previous_status && row.detail.new_status">
-                        {{ row.detail.previous_status }} → {{ row.detail.new_status }}
-                    </span>
+                    <span v-if="row.detail.previous_status && row.detail.new_status"> {{ row.detail.previous_status }} → {{ row.detail.new_status }} </span>
                 </div>
 
                 <div v-if="row.missing_decision && canChangeStatus" class="mt-3">

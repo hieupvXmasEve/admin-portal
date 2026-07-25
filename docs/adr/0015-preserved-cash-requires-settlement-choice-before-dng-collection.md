@@ -1,8 +1,14 @@
-# Preserved cash requires a settlement choice before DNG collection
+---
+id: ADR-0015
+title: "Preserved cash requires a settlement choice before DNG collection"
+status: accepted
+date: 2026-07-06
+owner: "Academic + Finance"
+last_verified: 2026-07-25
+scope: architecture-decision
+---
 
-**Status:** Accepted
-**Date:** 2026-07-06
-**Owner:** Academic + Finance
+# Preserved cash requires a settlement choice before DNG collection
 
 **Context.** A full-scope `PRESERVE` defer releases real paid cash from the
 original deferred obligation and leaves that cash available on the student's

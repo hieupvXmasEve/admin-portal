@@ -67,7 +67,7 @@ class AcademicProgressionEvent extends Model
     }
 
     /**
-     * The decision that authorized this transition, if any (ADR-0008).
+     * The decision that authorized this transition, if any (ADR-0048).
      *
      * Nullable: a requires-decision transition can be recorded first and the
      * decision attached later. Records authorization provenance.

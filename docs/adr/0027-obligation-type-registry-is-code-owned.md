@@ -1,8 +1,14 @@
-# Obligation type registry is code-owned; only pricing rules live in the database
+---
+id: ADR-0027
+title: "Obligation type registry is code-owned; only pricing rules live in the database"
+status: accepted
+date: 2026-07-09
+owner: "Finance"
+last_verified: 2026-07-25
+scope: architecture-decision
+---
 
-**Status:** Accepted
-**Date:** 2026-07-09
-**Owner:** Finance
+# Obligation type registry is code-owned; only pricing rules live in the database
 
 ## Context
 

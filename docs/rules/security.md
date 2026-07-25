@@ -1,54 +1,66 @@
 ---
-paths: '**/*.{php,vue,js,ts}'
+title: Security and Authorization Rules
+status: active
+owner: Platform Team
+last_verified: 2026-07-25
+scope: engineering-rules
+applies_to:
+  - app
+  - routes
+  - config/permission.php
 ---
 
-# Security & Authorization Rules
+# Security and Authorization Rules
 
-## 1. Core Concept
+Authentication establishes identity. A Gate checks a general permission; a
+Policy checks whether that identity may act on a specific record. Campus scope
+and actor context are additional boundaries, not substitutes for authorization.
 
-- **Gate**: Permission-level check. Protects the "Door".
-- **Policy**: Data-level check. Protects the "Record".
-- **Rule**: Do not mix them.
+## Gates and policies
 
-## 2. When to Use What?
+| Scenario | Control |
+|---|---|
+| Route or menu without a resource instance | Gate or permission middleware |
+| Action on a bound resource | Policy |
+| Broad actor/campus context | Middleware |
+| Business precondition after access is granted | Action/domain rule |
 
-| Scenario                | Use        | Reasoning                                                |
-| :---------------------- | :--------- | :------------------------------------------------------- |
-| Route has **NO** `{id}` | **Gate**   | Checking generic permission (e.g. "Can view list?")      |
-| Route **HAS** `{id}`    | **Policy** | Checking specific object (e.g. "Can edit _this_ event?") |
-| Menu / Sidebar          | **Gate**   | UI visibility                                            |
-| Controller              | **Policy** | Controller acts on specific data                         |
+- Gates remain simple permission checks. They do not query domain data, accept
+  models, or make business decisions.
+- Policies may check ownership, campus, record state, and general permissions.
+- Controllers authorize resource actions through the policy mechanism rather
+  than direct `Gate::allows()` calls.
+- UI visibility improves usability but never replaces backend enforcement.
+- Keep permission definitions centralized in `config/permission.php`.
 
-## 3. Implementation Rules
+## API baselines
 
-### 3.1 Gates
+- Student and Lecturer v1 APIs use Sanctum plus their actor middleware chain.
+- Parent access to Student APIs uses the explicit parent-proxy middleware path.
+- Preserve the existing token-refresh rotation contract unless an intentional
+  auth migration changes it with targeted compatibility tests.
+- Server-to-server admissions ingestion uses a dedicated Sanctum service
+  account ability, rate limiting, allowlisting, and audit as described in
+  ADR-0004.
+- Existing Finance API groups that use `web` plus `auth` are documented
+  exceptions; do not silently copy that pattern to new APIs.
 
-- **Purpose**: Check if user has a permission (e.g., `event.create`).
-- **Usage**: Route middleware, Menu checks.
-- **Prohibited**:
-    - Querying the DB.
-    - Accepting a Model.
-    - Complex business logic.
+## Boundary rules
 
-### 3.2 Policies
+- Validate and authorize campus scope at the request boundary and again where a
+  cross-campus operation could be constructed.
+- Never trust a client-provided actor, campus, permission, price, grade, or
+  lifecycle decision without server-side resolution.
+- Credentials and provider secrets never enter logs, flash data, client props,
+  or audit payloads.
+- Validate webhook authenticity before queueing or applying provider state.
+- Use named, revocable abilities for machine access rather than broad user
+  tokens.
 
-- **Purpose**: Check if user can perform action on a _specific_ model instance.
-- **Usage**: Route middleware (`can:` with model), Controller `$this->authorize()`.
-- **Allowed**: Calling Gates, checking business rules, checking ownership.
+## Review checklist
 
-### 3.3 Controllers
-
-- **Rule**: Controllers MUST use `$this->authorize('action', $model)` for actions on specific resources.
-- **Prohibited**: Controllers should NOT call `Gate::allows()` directly for resource actions.
-
-## 4. Workflow
-
-1.  **User Login** -> Resolve Permissions.
-2.  **Route (Middleware)** -> **Gate** checks generic access.
-3.  **Controller** -> **Policy** checks specific object access.
-
-## 5. Review Checklist
-
-- [ ] Does the Route with `{id}` have a Policy check?
-- [ ] Does the Policy check data ownership/state (not just permission)?
-- [ ] Are Gates simple permission checks without DB queries?
+- Is every route protected by the correct authentication and actor middleware?
+- Does a route with a model instance reach a Policy check?
+- Are campus and ownership checks enforced server-side?
+- Are validation and authorization distinct from the business rule?
+- Could the response or audit trail expose secrets or unauthorized fields?

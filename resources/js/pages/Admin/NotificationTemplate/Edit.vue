@@ -63,9 +63,7 @@ const subjectInputRef = ref<HTMLInputElement | null>(null);
  * draft. Reminders for this template type will silently fall back to the
  * standard payment_reminder template until the admin fills these in.
  */
-const isDraft = computed(
-    () => (props.template.subject ?? '').trim() === '' && (props.template.body_html ?? '').trim() === '',
-);
+const isDraft = computed(() => (props.template.subject ?? '').trim() === '' && (props.template.body_html ?? '').trim() === '');
 
 const insertVariableIntoSubject = (variableName: string) => {
     const el = subjectInputRef.value;
@@ -84,8 +82,8 @@ const insertVariableIntoSubject = (variableName: string) => {
 };
 
 const save = () => {
-    // Inertia web PUT (returns back() with Inertia::flash('success', ...) per
-    // CLAUDE.md Inertia v3 rules — NOT the deprecated ->with('success', ...)).
+    // Inertia web PUT returns with Inertia::flash('success', ...) per AGENTS.md,
+    // not the removed legacy ->with('success', ...) pattern.
     // The form helper resets dirty state automatically on 2xx; field errors
     // wire to form.errors via the standard Inertia error bag.
     form.put(route('admin.notification-templates.update', { template: props.template.id }), {
@@ -111,24 +109,16 @@ const save = () => {
                 </p>
             </div>
             <div class="flex items-center gap-2">
-                <TestSendButton
-                    :template="props.template"
-                    :draft="form"
-                    :user-email="page.props.auth.user.email"
-                />
+                <TestSendButton :template="props.template" :draft="form" :user-email="page.props.auth.user.email" />
                 <Button @click="save" :disabled="form.processing" class="min-w-24">
                     {{ form.processing ? 'Saving…' : 'Save' }}
                 </Button>
             </div>
         </div>
 
-        <div
-            v-if="isDraft"
-            class="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800"
-        >
+        <div v-if="isDraft" class="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             <span class="font-semibold">Draft:</span>
-            Template chưa có nội dung. Reminder cho loại này sẽ tạm dùng template mặc định (payment_reminder)
-            cho đến khi bạn điền subject + body và lưu lại.
+            Template chưa có nội dung. Reminder cho loại này sẽ tạm dùng template mặc định (payment_reminder) cho đến khi bạn điền subject + body và lưu lại.
         </div>
 
         <!-- Two-column layout: editor on left, preview on right (stacks on narrow screens) -->
@@ -143,14 +133,7 @@ const save = () => {
                     <CardContent class="space-y-3">
                         <div class="space-y-1">
                             <Label for="subject">Email Subject</Label>
-                            <Input
-                                id="subject"
-                                ref="subjectInputRef"
-                                v-model="form.subject"
-                                type="text"
-                                placeholder="e.g. Payment reminder for {{student_name}}"
-                                :class="form.errors.subject ? 'border-red-500' : ''"
-                            />
+                            <Input id="subject" ref="subjectInputRef" v-model="form.subject" type="text" placeholder="e.g. Payment reminder for {{student_name}}" :class="form.errors.subject ? 'border-red-500' : ''" />
                             <p v-if="form.errors.subject" class="text-sm text-red-600">
                                 {{ form.errors.subject }}
                             </p>
@@ -158,12 +141,12 @@ const save = () => {
 
                         <!-- Variable chips for subject -->
                         <div v-if="commonVariables.length > 0" class="flex flex-wrap items-center gap-1.5">
-                            <span class="text-xs text-gray-500 shrink-0">Insert variable:</span>
+                            <span class="shrink-0 text-xs text-gray-500">Insert variable:</span>
                             <button
                                 v-for="variable in commonVariables"
                                 :key="variable.name"
                                 type="button"
-                                class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-200 transition-colors"
+                                class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-200"
                                 @click="insertVariableIntoSubject(variable.name)"
                             >
                                 {{ variable.description }}
@@ -181,12 +164,7 @@ const save = () => {
                         <p v-if="form.errors.body_html" class="mb-2 text-sm text-red-600">
                             {{ form.errors.body_html }}
                         </p>
-                        <EditorContent
-                            v-model="form.body_html"
-                            email-mode
-                            :common-variables="commonVariables"
-                            min-height="320px"
-                        />
+                        <EditorContent v-model="form.body_html" email-mode :common-variables="commonVariables" min-height="320px" />
                     </CardContent>
                 </Card>
             </div>

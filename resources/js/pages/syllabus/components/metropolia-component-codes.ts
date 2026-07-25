@@ -1,5 +1,5 @@
 // Canonical assessment component codes from
-// docs/features/academic/Grading_Schemes_Metropolia.md. Used as the suggestion
+// docs/features/academic/grading.md. Used as the suggestion
 // list for the Assessment Component "Code" field so staff pick standard codes
 // (custom codes are still allowed via free typing).
 

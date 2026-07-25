@@ -14,8 +14,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * Per-campus, per-type_key email body + subject backing the dynamic
  * notification template feature. One row per (campus_id, type_key) by DB
- * constraint; the admin UI in P2 edits this row in place (no delete, no
- * versioning - see CONTEXT.md D4/D5).
+ * constraint; the admin UI edits this canonical row in place without creating
+ * or deleting template definitions.
  */
 class NotificationEmailTemplate extends AuditableModel
 {
@@ -76,8 +76,8 @@ class NotificationEmailTemplate extends AuditableModel
      * Render the template against the provided variable map.
      *
      * Unknown `{{var}}` placeholders remain in the output verbatim so the
-     * caller can detect them; the FormRequest in P2 rejects unknown vars at
-     * save-time per CONTEXT.md D8.
+     * caller can detect them; the FormRequest rejects unknown variables at
+     * save time.
      *
      * @param  array<string, mixed>  $variables
      * @return array{subject: string, html: string, text: null}

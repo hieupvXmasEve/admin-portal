@@ -1,76 +1,75 @@
-# Naming Conventions
+---
+title: Naming Rules
+status: active
+owner: Platform Team
+last_verified: 2026-07-25
+scope: engineering-rules
+applies_to:
+  - app
+  - resources/js
+  - routes
+  - database
+---
 
-## 1. Backend Naming
+# Naming Rules
 
-### Modules
+## Backend
 
-- **Format**: PascalCase, Singular.
-- **Examples**: `Academic`, `Finance`, `Identity`.
-- **Bad**: `Academics` (plural), `BillingSystem` (too verbose).
+| Element | Convention | Example |
+|---|---|---|
+| Module | singular PascalCase | `Academic`, `Finance` |
+| Model | singular PascalCase | `CourseOffering` |
+| Controller | entity plus `Controller` | `CourseOfferingController` |
+| Action | verb + entity + `Action` | `CreateEventAction` |
+| Query | verb + entity + context + `Query` | `ListAcademicRecordsQuery` |
+| Policy | model + `Policy` | `AcademicRecordPolicy` |
+| FormRequest | intent + `Request` | `StoreRoomRequest` |
+| API Resource | entity + `Resource` | `StudentResource` |
+| Table | plural snake_case | `course_offerings` |
+| Column | snake_case | `first_name` |
 
-### Models
+Web controllers live under `Http/Web/{Actor}` and API controllers under
+`Http/Api/{Actor}`. Use the standard resource methods (`index`, `show`,
+`create`, `store`, `edit`, `update`, `destroy`) when their semantics fit.
 
-- **Format**: PascalCase, Singular.
-- **Examples**: `Student`, `CourseOffering`, `AcademicRecord`.
-- **Bad**: `TblStudent`, `StudentEntity`.
+Action entrypoints use a typed public static `run(...)`; Query entrypoints use a
+typed public `handle(...)`.
 
-### Controllers
+## Frontend
 
-- **Web (Stateful)**: `Http/Web/Admin/{Entity}Controller.php`.
-- **Api (Stateless)**: `Http/Api/Student/{Entity}Controller.php`.
-- **Standard Methods**: `index`, `show`, `create`, `store`, `edit`, `update`, `destroy`.
+| Element | Convention | Example |
+|---|---|---|
+| Page directory | PascalCase | `pages/Academic/Records` |
+| Page | route-aligned PascalCase | `Index.vue`, `Show.vue` |
+| Component | specific PascalCase | `RecordTable.vue` |
+| Composable | `use` + capability | `useDataTable.ts` |
+| Type or interface | PascalCase | `PaginatedResponse` |
+| Store file | camelCase | `userStore.ts` |
 
-### Actions (Business Logic)
+Do not create generic shared component names such as `Table.vue` or `Form.vue`.
+New page paths map explicitly to route/controller structure. Existing
+kebab-case or lowercase page directories are legacy; see
+[legacy-migration.md](legacy-migration.md).
 
-- **Format**: `Verb + [Entity] + Action`.
-- **Examples**:
-    - `CreateEventAction`
-    - `UpdateStudentProfileAction`
-    - `CalculateGpaAction`
-- **Entry Point**: `public static function run(array $data): mixed`
+## Routes and contracts
 
-### Queries (Read-Only)
+- Route names use dot notation: `{module}.{resource}.{action}`.
+- URL segments use kebab-case.
+- Versioned API paths use `/api/v1/{actor}/{resource}`.
+- Prefer named route helpers over literal paths.
+- Contract names describe the noun and capability. Avoid vague `*Service` and
+  `I*` interface names.
 
-- **Format**: `[Verb/Get] + Entity + [Context] + Query`.
-- **Examples**:
-    - `ListAcademicRecordsQuery`
-    - `GetStudentGpaQuery`
-    - `FindEventByCodeQuery`
-- **Entry Point**: `public function handle(...$args): mixed`
+## Stable field names
 
-### Policies
+Do not rename these established contract fields while refactoring:
 
-- **Format**: `{Model}Policy`.
-- **Examples**: `AcademicRecordPolicy`, `EventPolicy`.
+- Student decision/import fields: `decision_number`, `decision_signed_at`,
+  `decision_signer`, `decision_id`, `missing_documents`,
+  `shared_upload_record_id`.
+- Notification V2 fields: `notification_event_outbox.campus_id`,
+  `notification_messages.recipient_user_id`,
+  `notification_messages.campus_id`.
 
-### Routes
-
-- **Web Format**: `{module}.{resource}.{action}` (e.g., `identity.login.show`, `academic.records.index`).
-- **API Format**: `/api/v1/{portal}/{resource}/{action}` (e.g., `/api/v1/student/auth/login`).
-
-## 2. Frontend Naming
-
-### Pages
-
-- **Mapping**: 1-1 with Route/Controller Structure.
-- **Example**: `Academic/Records/Index.vue`.
-
-### Components
-
-- **Format**: PascalCase.
-- **Examples**: `RecordTable.vue`, `EventForm.vue`.
-- **Bad**: `Table.vue`, `Form.vue` (Too generic).
-
-### Composables
-
-- **Format**: `use` prefix + feature name.
-- **Examples**: `useInertiaFilters.ts`, `usePermissions.ts`.
-
-## 3. Contract Naming
-
-- **Format**: `{Noun}{Verb}{Purpose}`.
-- **Examples**:
-    - `StudentAcademicReader` (Reads academic data for a student)
-    - `WalletBalanceProvider` (Provides wallet balance)
-    - `SurveyCompletionChecker` (Checks if survey is complete)
-- **Bad**: `AcademicService` (Vague), `IAcademic` (Interface prefix style).
+Laravel-to-Inertia prop keys remain snake_case, and TypeScript interfaces match
+that casing.

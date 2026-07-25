@@ -416,7 +416,7 @@ class Student extends StudentAuditableModel
     }
 
     /**
-     * Decisions whose coverage roster includes this student (ADR-0008).
+     * Decisions whose coverage roster includes this student (ADR-0048).
      */
     public function decisions(): BelongsToMany
     {

@@ -1,9 +1,15 @@
-# FinanceCharge is a materialized ledger read model, permanently
+---
+id: ADR-0028
+title: "FinanceCharge is a materialized ledger read model, permanently"
+status: accepted
+date: 2026-07-09
+last_updated: "2026-07-11"
+owner: "Finance"
+last_verified: 2026-07-25
+scope: architecture-decision
+---
 
-**Status:** Accepted
-**Date:** 2026-07-09
-**Last updated:** 2026-07-11
-**Owner:** Finance
+# FinanceCharge is a materialized ledger read model, permanently
 
 ## Context
 

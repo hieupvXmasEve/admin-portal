@@ -22,8 +22,8 @@ use Illuminate\Support\Facades\File;
  * multi-invoice group is informational, not proof of duplicate billing.
  *
  * --limit only caps the DETAILED rows collected; the reported totals always
- * reflect the true number of duplicate groups in the dataset.
- * See docs/stories/E-finance-module-review-2026-06/S-003-data-guards-and-constraints/.
+ * reflect the true number of duplicate groups in the dataset. The executable
+ * invariant catalog is FinanceInvariantRegistry.
  */
 class ExportDuplicateFinanceData extends Command
 {

@@ -1,247 +1,99 @@
-# Lecturer Assessment Management API
+---
+title: Lecturer assessments and gradebook API
+description: Assessment structure, grading, imports, exports, reports, and matrix gradebook saves.
+audience:
+    - Lecturer portal developers
+status: current
+owner: Academic Team
+last_verified: 2026-07-25
+scope: lecturer-assessments-gradebook-api
+source_of_truth:
+    - routes/api/v1/lecturer.php
+    - app/Http/Controllers/Api/V1/Lecturer/AssessmentController.php
+    - app/Http/Controllers/Api/V1/Lecturer/AssessmentReportController.php
+    - app/Http/Controllers/Api/V1/Lecturer/GradebookController.php
+---
 
-This document provides TypeScript interface definitions and usage examples for the lecturer assessment management endpoints.
+# Lecturer assessments and gradebook API
 
-## Base Endpoint
-```
-GET /api/v1/lecturer/courses/{courseOfferingId}/assessments
-```
-## TypeScript Interfaces
+Course assessment base:
+`/api/v1/lecturer/courses/{courseOffering}/assessments`
 
-### Main Response Interface
+All routes require the protected lecturer middleware stack and controller-level
+access to the course offering.
 
-```typescript
-interface AssessmentStructureResponse {
-  success: boolean;
-  message: string;
-  data: {
-    components: AssessmentComponent[];
-    total_weight: number;
-    is_complete: boolean;
-    statistics: AssessmentStatistics;
-    course_offering: CourseOfferingInfo;
-  };
-}
+## Assessment structure and direct grading
 
-interface AssessmentComponent {
-  id: number;
-  name: string;
-  type: string;
-  type_name: string;
-  weight: number;
-  is_required_to_sit_final_exam: boolean;
-  details: AssessmentDetail[];
-  grading_statistics: GradingStatistics;
-  submission_counts: SubmissionCounts;
-}
+| Method | Path                                     |
+| ------ | ---------------------------------------- |
+| `GET`  | `/`                                      |
+| `GET`  | `/grade/student/{student}`               |
+| `GET`  | `/grade/component/{assessmentComponent}` |
+| `PUT`  | `/scores/{score}`                        |
+| `POST` | `/scores/bulk-update`                    |
+| `GET`  | `/validate-weights`                      |
 
-interface AssessmentDetail {
-  id: number;
-  name: string;
-  weight: number;
-  grading_statistics: DetailGradingStatistics;
-  submission_counts: DetailSubmissionCounts;
-}
+Single and bulk score bodies are validated by `UpdateGradeRequest` and
+`BulkUpdateGradesRequest`. Supported fields and status values are owned by
+those Form Requests. A final score must contain points or a percentage, and
+points cannot exceed the assessment detail's maximum.
 
-interface GradingStatistics {
-  average_score: number;
-  highest_score: number;
-  lowest_score: number;
-  total_submissions: number;
-  graded_submissions: number;
-  pending_submissions: number;
-}
+Assessment component/detail create, update, and delete methods exist in the
+controller but their routes are commented out. They are not part of the
+current API contract.
 
-interface DetailGradingStatistics {
-  average_score: number;
-  highest_score: number;
-  lowest_score: number;
-  total_graded: number;
-}
+## Grade table, import, and export
 
-interface SubmissionCounts {
-  total: number;
-  submitted: number;
-  graded: number;
-  final: number;
-  late: number;
-  plagiarism_flagged: number;
-}
+| Method | Path                                                   | Notes                                                                             |
+| ------ | ------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| `GET`  | `/details/{assessmentComponentDetail}/grades`          | Pagination, sorting, score/status/date filters from `GradeTableRequest`.          |
+| `GET`  | `/details/{assessmentComponentDetail}/statistics`      | Grade statistics.                                                                 |
+| `POST` | `/details/{assessmentComponentDetail}/bulk-grades`     | Bulk upsert body validated in the controller.                                     |
+| `GET`  | `/details/{assessmentComponentDetail}/export-template` | Spreadsheet download.                                                             |
+| `POST` | `/details/{assessmentComponentDetail}/import-grades`   | Multipart `file`; optional import controls.                                       |
+| `GET`  | `/details/{assessmentComponentDetail}/export`          | `format` defaults to `excel`; supported values are implemented by the controller. |
 
-interface DetailSubmissionCounts {
-  total: number;
-  submitted: number;
-  graded: number;
-  final: number;
-  late: number;
-  plagiarism_flagged: number;
-}
+Imports accept `.xlsx`, `.xls`, or `.csv` files up to 10 MB. Options include
+`update_mode`, `overwrite_existing`, `validate_only`, `skip_errors`,
+`default_status`, and `default_score_status`; defaults are applied by
+`ImportGradesRequest`.
 
-interface AssessmentStatistics {
-  total_components: number;
-  total_details: number;
-  graded_submissions: number;
-  pending_submissions: number;
-}
+## Reports
 
-interface CourseOfferingInfo {
-  id: number;
-  course_code: string;
-  course_title: string;
-  section_code: string;
-}
-```
+| Method | Path                   |
+| ------ | ---------------------- |
+| `GET`  | `/report/overview`     |
+| `GET`  | `/report/grade-matrix` |
+| `GET`  | `/report/statistics`   |
+| `GET`  | `/report/export/excel` |
+| `GET`  | `/report/export/pdf`   |
 
-### Assessment Types
+The export routes return binary downloads. Report filters and options are
+validated by `ExportAssessmentRequest`. The JSON report endpoints retain the
+response shape implemented directly by `AssessmentReportController`.
 
-```typescript
-type AssessmentType = 
-  | 'assignment'
-  | 'quiz' 
-  | 'exam'
-  | 'project'
-  | 'presentation'
-  | 'lab_work'
-  | 'participation'
-  | 'other';
+## Gradebook
 
-type ScoreStatus = 
-  | 'draft'
-  | 'provisional' 
-  | 'final';
+| Method | Path                                                         |
+| ------ | ------------------------------------------------------------ |
+| `GET`  | `/api/v1/lecturer/courses/{courseOffering}/gradebook`        |
+| `POST` | `/api/v1/lecturer/courses/{courseOffering}/gradebook/scores` |
 
-type SubmissionStatus = 
-  | 'not_submitted'
-  | 'submitted' 
-  | 'graded';
-```
-
-## API Usage Examples
-
-## Grade Display (Custom Grading Schemes)
-
-For custom grading schemes (e.g. Metropolia `metropolia_v1`), the grade matrix
-report attaches an optional, display-safe `grade_display` object to each
-`student_grades[]` row, derived from `academic_records.grade_breakdown`. It is
-`null` when a student has no academic record. For default weighted-percentage
-courses, `scheme_engine` is `default_weighted_percentage` and existing fields
-remain authoritative. Prefer `grade_display.final_label` for read-only final
-display; editable per-assessment scores are unaffected.
-
-```json
-"grade_display": {
-  "scheme_engine": "metropolia_v1",
-  "scale": "numeric_0_5",
-  "final_label": "5",
-  "final_numeric": 5,
-  "pass_status": "passed",
-  "components": [
-    {
-      "code": "EXAM",
-      "label": "Exam",
-      "raw_percentage": 88,
-      "converted_grade": 5,
-      "requirement_status": "passed"
-    }
-  ]
-}
-```
-
-- `scale`: `numeric_0_5` | `pass_fail` | `percentage`.
-- `final_numeric`: scheme grade for custom schemes, diagnostic percentage for
-  default; `null` for pass/fail schemes.
-- `pass_status`: `passed` | `failed`.
-
-## HTTP Status Codes
-
-| Status Code | Description |
-|-------------|-------------|
-| `200` | Success - Assessment structure retrieved |
-| `403` | Forbidden - Unauthorized access to course offering |
-| `404` | Not Found - Course offering not found |
-| `422` | Unprocessable Entity - Validation errors |
-| `500` | Internal Server Error - Server processing error |
-
-## Response Examples
-
-### Success Response
+The gradebook response is a matrix containing course context, summary, items,
+and student rows. A save request uses:
 
 ```json
 {
-  "success": true,
-  "message": "Assessment structure retrieved successfully",
-  "data": {
-    "components": [
-      {
-        "id": 1,
-        "name": "Assignment 1",
-        "type": "assignment",
-        "type_name": "Assignment",
-        "weight": 25,
-        "is_required_to_sit_final_exam": false,
-        "details": [
-          {
-            "id": 1,
-            "name": "Written Report",
-            "weight": 15,
-            "grading_statistics": {
-              "average_score": 82.5,
-              "highest_score": 95,
-              "lowest_score": 65,
-              "total_graded": 28
-            },
-            "submission_counts": {
-              "total": 30,
-              "submitted": 30,
-              "graded": 28,
-              "final": 28,
-              "late": 3,
-              "plagiarism_flagged": 1
-            }
-          }
-        ],
-        "grading_statistics": {
-          "average_score": 82.5,
-          "highest_score": 95,
-          "lowest_score": 65,
-          "total_submissions": 30,
-          "graded_submissions": 28,
-          "pending_submissions": 2
-        },
-        "submission_counts": {
-          "total": 30,
-          "submitted": 30,
-          "graded": 28,
-          "final": 28,
-          "late": 3,
-          "plagiarism_flagged": 1
+    "scores": [
+        {
+            "detail_id": 10,
+            "student_id": 20,
+            "points_earned": 85
         }
-      }
-    ],
-    "total_weight": 100,
-    "is_complete": true,
-    "statistics": {
-      "total_components": 4,
-      "total_details": 8,
-      "graded_submissions": 112,
-      "pending_submissions": 8
-    },
-    "course_offering": {
-      "id": 123,
-      "course_code": "COS30043",
-      "course_title": "Interface Design and Development",
-      "section_code": "HD"
-    }
-  }
+    ]
 }
 ```
 
-### Error Response
-
-```json
-{
-  "success": false,
-  "message": "Unauthorized access to course offering",
-  "data": {}
-}
-```
+The save is all-or-nothing. Assessment details must belong to the course
+offering syllabus, students must have an eligible registration, duplicate
+cells are rejected, and points cannot exceed `max_points`.
