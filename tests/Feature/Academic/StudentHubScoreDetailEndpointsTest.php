@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\AcademicRecord;
 use App\Models\AssessmentComponent;
 use App\Models\AssessmentComponentDetail;
 use App\Models\AssessmentComponentDetailScore;
@@ -13,6 +14,8 @@ use App\Models\SyllabusTemplate;
 use App\Models\Unit;
 use App\Models\User;
 use App\Services\PermissionService;
+use App\Shared\Contracts\Academic\StudentHubAssessmentEvidenceReader;
+use App\Shared\Contracts\Academic\StudentHubCourseOutcomeEvidenceReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 use function Pest\Laravel\actingAs;
@@ -59,12 +62,62 @@ it('serves the existing score-detail and lazy-score payloads through Delivery qu
         'graded_at' => now(),
         'instructor_feedback' => 'Good work.',
     ]);
+    AcademicRecord::factory()->create([
+        'student_id' => $student->id,
+        'course_offering_id' => $offering->id,
+        'semester_id' => $semester->id,
+        'unit_id' => $unit->id,
+        'campus_id' => $campus->id,
+        'grade_breakdown' => ['engine' => 'default_weighted_percentage', 'final_grade' => '82'],
+    ]);
+    $customSyllabus = SyllabusTemplate::factory()->create([
+        'grading_scheme' => ['engine' => 'metropolia_v1', 'scale' => '0-5'],
+    ]);
+    $customOffering = CourseOffering::factory()->create([
+        'campus_id' => $campus->id,
+        'semester_id' => $semester->id,
+        'syllabus_template_id' => $customSyllabus->id,
+        'unit_id' => $customSyllabus->unit_id,
+    ]);
+    AcademicRecord::factory()->create([
+        'student_id' => $student->id,
+        'course_offering_id' => $customOffering->id,
+        'semester_id' => $semester->id,
+        'unit_id' => $customSyllabus->unit_id,
+        'campus_id' => $campus->id,
+        'final_letter_grade' => '5',
+        'final_percentage' => 82,
+        'grade_breakdown' => [
+            'engine' => 'metropolia_v1',
+            'scale' => '0-5',
+            'final_grade' => '5',
+            'fg_rounded' => 5,
+            'passed' => true,
+        ],
+    ]);
     $user = User::factory()->create();
     session(['current_campus_id' => $campus->id]);
     app()->singleton('campus', fn () => $campus);
     $permissions = Mockery::mock(PermissionService::class);
     $permissions->shouldReceive('getUserPermissions')->andReturn(['view_student_summary']);
     app()->singleton(PermissionService::class, fn () => $permissions);
+
+    $assessmentEvidence = app(StudentHubAssessmentEvidenceReader::class)->forStudent((int) $student->id);
+    $outcomeEvidence = app(StudentHubCourseOutcomeEvidenceReader::class)->forStudent((int) $student->id);
+
+    expect($assessmentEvidence)->toHaveCount(1)
+        ->and($assessmentEvidence[0]->courseCode)->toBe('DETAIL101')
+        ->and($assessmentEvidence[0]->scores[0]->assessmentName)->toBe('Written Exam')
+        ->and($outcomeEvidence)->toHaveCount(2)
+        ->and(collect($outcomeEvidence)->firstWhere('courseOfferingId', $offering->id)->gradeDisplay)->toBeNull()
+        ->and(collect($outcomeEvidence)->firstWhere('courseOfferingId', $customOffering->id)->gradeDisplay)->toMatchArray([
+            'scheme_engine' => 'metropolia_v1',
+            'scale' => 'numeric_0_5',
+            'final_label' => '5',
+            'final_numeric' => 5,
+            'pass_status' => 'passed',
+            'components' => [],
+        ]);
 
     actingAs($user)
         ->getJson(route('students.academic-summary.score-details', $student).'?course_offering_id='.$offering->id)

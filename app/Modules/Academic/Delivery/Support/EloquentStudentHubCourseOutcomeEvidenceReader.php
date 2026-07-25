@@ -5,20 +5,29 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Delivery\Support;
 
 use App\Models\AcademicRecord;
+use App\Modules\Academic\Support\Grading\Presenters\GradeDisplayPresenter;
 use App\Shared\Contracts\Academic\DTO\StudentHubCourseOutcomeEvidence;
 use App\Shared\Contracts\Academic\StudentHubCourseOutcomeEvidenceReader;
 
 final class EloquentStudentHubCourseOutcomeEvidenceReader implements StudentHubCourseOutcomeEvidenceReader
 {
+    public function __construct(
+        private readonly GradeDisplayPresenter $gradeDisplayPresenter,
+    ) {}
+
     public function forStudent(int $studentId, array $courseOfferingIds = []): array
     {
         return AcademicRecord::query()
             ->where('student_id', $studentId)
             ->when($courseOfferingIds !== [], fn ($query) => $query->whereIn('course_offering_id', $courseOfferingIds))
-            ->with(['unit:id,code,name', 'semester:id,name'])
+            ->with([
+                'courseOffering.syllabusTemplate:id,grading_scheme',
+                'unit:id,code,name',
+                'semester:id,name',
+            ])
             ->orderByDesc('id')
             ->get()
-            ->map(static fn (AcademicRecord $record): StudentHubCourseOutcomeEvidence => new StudentHubCourseOutcomeEvidence(
+            ->map(fn (AcademicRecord $record): StudentHubCourseOutcomeEvidence => new StudentHubCourseOutcomeEvidence(
                 courseResultId: (int) $record->id,
                 courseOfferingId: (int) $record->course_offering_id,
                 unitId: (int) $record->unit_id,
@@ -36,6 +45,9 @@ final class EloquentStudentHubCourseOutcomeEvidenceReader implements StudentHubC
                 unitCode: $record->unit?->code,
                 unitName: $record->unit?->name,
                 semesterName: $record->semester?->name,
+                gradeDisplay: empty($record->courseOffering?->syllabusTemplate?->grading_scheme) || empty($record->grade_breakdown)
+                    ? null
+                    : $this->gradeDisplayPresenter->present($record),
             ))
             ->all();
     }

@@ -85,3 +85,11 @@ Verification: targeted score-detail endpoint and Student Hub ownership tests pas
 - This is groundwork only: the Scores/GPA/Standing controller still uses the legacy service until the Delivery assessment-evidence contract and Progression query are connected in the next slice.
 
 Verification: `CurriculumModuleCompositionReaderTest` passed (1 test, 16 assertions), Pint, `git diff --check`, and `migration-debt:inventory --check` passed. Status remains `ready-for-agent`.
+
+### 2026-07-25 — Delivery assessment-evidence groundwork delivered; issue remains open
+
+- Delivery now exposes per-course assessment evidence through `StudentHubAssessmentEvidenceReader`, including assessment scores, course identity, grading type, stored grading-scheme metadata, and stable score fields required by the Hub Scores page.
+- Existing course-outcome evidence now carries the persisted grade-display payload, so a future Progression Scores query can preserve scheme-grade presentation without importing Delivery persistence.
+- The Scores/GPA/Standing controller is intentionally unchanged until the Progression composition query consumes both approved evidence contracts.
+
+Verification: score-detail endpoint and Hub ownership tests passed (2 tests, 46 assertions), including no-scheme and custom-scheme grade-display compatibility, Pint, `git diff --check`, and `migration-debt:inventory --check` passed. Status remains `ready-for-agent`.

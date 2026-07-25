@@ -20,6 +20,7 @@ use App\Modules\Academic\Delivery\Support\EloquentAcademicSpaceOccupancyReader;
 use App\Modules\Academic\Delivery\Support\EloquentCourseResultProgressionReader;
 use App\Modules\Academic\Delivery\Support\EloquentCourseRosterReader;
 use App\Modules\Academic\Delivery\Support\EloquentLegacyTranscriptOutcomeReader;
+use App\Modules\Academic\Delivery\Support\EloquentStudentHubAssessmentEvidenceReader;
 use App\Modules\Academic\Delivery\Support\EloquentStudentHubCourseOutcomeEvidenceReader;
 use App\Modules\Academic\Delivery\Support\EloquentStudentHubRegistrationEvidenceReader;
 use App\Modules\Academic\Delivery\Support\EloquentStudentLifecycleCourseRegistrationGateway;
@@ -72,6 +73,7 @@ use App\Shared\Contracts\Academic\RetakeRegistrationPaymentSyncer;
 use App\Shared\Contracts\Academic\StudentAcademicHoldReader;
 use App\Shared\Contracts\Academic\StudentAcademicRecordsReader;
 use App\Shared\Contracts\Academic\StudentGpaTrendReader;
+use App\Shared\Contracts\Academic\StudentHubAssessmentEvidenceReader;
 use App\Shared\Contracts\Academic\StudentHubCourseOutcomeEvidenceReader;
 use App\Shared\Contracts\Academic\StudentHubRegistrationEvidenceReader;
 use App\Shared\Contracts\Academic\StudentLifecycleCourseRegistrationGateway;
@@ -119,6 +121,7 @@ class AcademicServiceProvider extends ServiceProvider
             EloquentStudentLifecycleCourseRegistrationGateway::class,
         );
         $this->app->bind(StudentHubRegistrationEvidenceReader::class, EloquentStudentHubRegistrationEvidenceReader::class);
+        $this->app->bind(StudentHubAssessmentEvidenceReader::class, EloquentStudentHubAssessmentEvidenceReader::class);
         $this->app->bind(StudentHubCourseOutcomeEvidenceReader::class, EloquentStudentHubCourseOutcomeEvidenceReader::class);
         $this->app->bind(StudentAcademicRecordsReader::class, GetStudentAcademicRecordsQuery::class);
         $this->app->bind(StudentAcademicHoldReader::class, EloquentStudentAcademicHoldReader::class);

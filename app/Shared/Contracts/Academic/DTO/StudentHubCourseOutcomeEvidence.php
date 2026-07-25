@@ -26,5 +26,7 @@ final readonly class StudentHubCourseOutcomeEvidence
         public ?string $unitCode = null,
         public ?string $unitName = null,
         public ?string $semesterName = null,
+        /** @var array<string, mixed>|null */
+        public ?array $gradeDisplay = null,
     ) {}
 }
