@@ -10,6 +10,7 @@ use App\Modules\Finance\Http\Export\InvoiceExport;
 use App\Modules\Finance\Http\Requests\Lookup\ExportStudentInvoicesRequest;
 use App\Modules\Finance\Http\Requests\Lookup\FilterStudentInvoicesRequest;
 use App\Modules\Finance\Models\DiscountAllocation;
+use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Models\StudentInvoice;
@@ -134,7 +135,9 @@ class BillingInvoiceController extends Controller
                     'settlement_state' => $position?->settlement_state,
                     'issues' => $position === null ? [] : $this->mapIssues($position->issues),
                     'effective_at' => $line->charge?->effective_at?->toIso8601String(),
-                    'source_type' => $line->charge?->source_type,
+                    'source_type' => $line->charge?->charge_type === FinanceCharge::TYPE_MANUAL_FEE
+                        ? 'Manual'
+                        : null,
                     'status' => $line->status,
                 ];
             })

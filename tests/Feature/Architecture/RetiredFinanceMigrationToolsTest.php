@@ -126,3 +126,40 @@ it('does not autoload one-time Finance migration actions', function (): void {
         expect(class_exists($class))->toBeFalse();
     }
 });
+
+it('does not retain migration-only Finance classifiers', function (): void {
+    foreach ([
+        'app/Modules/Finance/Queries/Operations/ClassifyDeferBackfillCandidatesQuery.php',
+        'app/Modules/Finance/Support/DeferBackfillClassification.php',
+        'app/Modules/Finance/Support/ScholarshipCarrierClassification.php',
+        'app/Modules/Finance/Support/ScholarshipCarrierClassifier.php',
+    ] as $path) {
+        expect(file_exists(base_path($path)))->toBeFalse();
+    }
+});
+
+it('keeps supported Finance consumers off retired charge source pointers', function (): void {
+    $files = [
+        'app/Modules/Finance/Actions/Operations/ApplyDeferFinancePolicyAction.php',
+        'app/Modules/Finance/Actions/Operations/FixBillingExceptionAction.php',
+        'app/Modules/Finance/Http/Web/Admin/BillingInvoiceController.php',
+        'app/Modules/Finance/Queries/GetStudentFeeSummaryQuery.php',
+        'app/Modules/Finance/Queries/GetStudentPortalFinanceSummaryQuery.php',
+        'app/Modules/Finance/Services/DeferCaseService.php',
+        'app/Modules/Finance/Services/FinanceChargeService.php',
+        'app/Modules/Finance/Support/BillingExceptionCollector.php',
+        'app/Modules/Finance/Support/ObligationLedgerSettlementReader.php',
+    ];
+    $violations = [];
+
+    foreach ($files as $path) {
+        $contents = file_get_contents(base_path($path)) ?: '';
+        if (preg_match('/where\(\s*[\'"]source_(?:type|id)[\'"]|->source_(?:type|id)\b|with\(\s*\[\s*[\'"]source[\'"]/', $contents) === 1) {
+            $violations[] = $path;
+        }
+    }
+
+    expect($violations)->toBeEmpty(
+        'Supported Finance consumers must correlate through canonical Finance obligation and entitlement identities.',
+    );
+});

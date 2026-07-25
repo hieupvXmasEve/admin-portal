@@ -92,7 +92,7 @@ final class GetStudentPortalFinanceSummaryQuery implements StudentPortalFinanceS
         $charges = FinanceCharge::query()
             ->forStudent($studentId)
             ->forSemester($semesterId)
-            ->with(['source', 'invoiceLines.paymentApplications.payment'])
+            ->with('invoiceLines.paymentApplications.payment')
             ->orderBy('effective_at')
             ->get();
 

@@ -6,36 +6,61 @@ namespace App\Modules\Finance\Support;
 
 use App\Models\DeferCase;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
+use App\Shared\Contracts\Academic\AcademicFinanceChargeSourceGateway;
+use App\Shared\Contracts\Academic\AcademicFinanceSourceKeys;
+use App\Shared\Contracts\Academic\DTO\AcademicBillingRegistrationData;
+use App\Shared\Contracts\Academic\DTO\ProgramEnrollmentSummary;
 use App\Shared\Contracts\Academic\DTO\StudentDeferActionSummary;
 use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use App\Shared\Contracts\Academic\StudentDeferLifecycleReader;
+use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Carbon\CarbonImmutable;
-use Illuminate\Database\Query\Builder;
-use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 
 final class BillingExceptionCollector
 {
     /** @var array<string, Collection<int, StudentDeferActionSummary>> */
     private array $deferActionsWithoutCasesByScope = [];
 
+    /** @var array<string, Collection<int, StudentDeferActionSummary>> */
+    private array $deferActionsByScope = [];
+
+    /** @var array<string, array{term_number: int|null, amount: float|null, chargeable_term_index: int|null}> */
+    private array $tuitionTermDataByStudentSemester = [];
+
+    /** @var array<int, StudentReference> */
+    private array $studentReferencesById = [];
+
     public function __construct(
+        private readonly AcademicFinanceChargeSourceGateway $academicSources,
         private readonly StudentDeferLifecycleReader $deferLifecycle,
-        private readonly BillingExceptionDeferredEnrollmentMatcher $deferredEnrollmentMatcher,
+        private readonly ProgramEnrollmentReader $programEnrollments,
+        private readonly StudentChargeTimingResolver $chargeTiming,
+        private readonly StudentReferenceReader $studentReferences,
+        private readonly ZeroTuitionTermLookup $zeroTuitionTerms,
     ) {}
 
     public function counts(?int $semesterId, ?int $campusId): array
     {
-        return [
-            'missing_charge' => $this->countMissingCharges($semesterId, $campusId),
-            'zero_tuition_waived' => $this->countZeroTuitionWaived($semesterId, $campusId),
-            'deferred_enrolled' => $this->countDeferredEnrolled($semesterId, $campusId),
-            'retake_no_charge' => $this->countRetakeNoCharges($semesterId, $campusId),
-            'defer_no_case' => $this->countDeferNoCases($semesterId, $campusId),
+        $counts = [
+            'missing_charge' => 0,
+            'zero_tuition_waived' => 0,
+            'deferred_enrolled' => 0,
+            'retake_no_charge' => 0,
+            'defer_no_case' => 0,
             'mismatch' => 0,
         ];
+        foreach ($this->classifiedRegistrationChunks($semesterId, $campusId) as $classified) {
+            foreach ($classified as $type => $registrations) {
+                $counts[$type] += $registrations->count();
+            }
+        }
+        $counts['defer_no_case'] = $this->deferActionsWithoutCases($semesterId, $campusId)->count();
+
+        return $counts;
     }
 
     public function paginate(
@@ -46,549 +71,411 @@ final class BillingExceptionCollector
         int $perPage,
         string $path,
     ): LengthAwarePaginator {
-        if ($type === 'missing_charge') {
-            return $this->paginateMissingCharges($semesterId, $campusId, $page, $perPage, $path);
-        }
-
-        if ($type === 'zero_tuition_waived') {
-            return $this->paginateZeroTuitionWaived($semesterId, $campusId, $page, $perPage, $path);
-        }
-
-        if ($type === 'deferred_enrolled') {
-            return $this->paginateDeferredEnrolled($semesterId, $campusId, $page, $perPage, $path);
-        }
-
-        if ($type === 'retake_no_charge') {
-            return $this->paginateRetakeNoCharges($semesterId, $campusId, $page, $perPage, $path);
+        if ($type === 'mismatch') {
+            return $this->paginator(collect(), $page, $perPage, $path);
         }
 
         if ($type === 'defer_no_case') {
-            return $this->paginateDeferNoCases($semesterId, $campusId, $page, $perPage, $path);
+            $rows = $this->deferActionsWithoutCases($semesterId, $campusId)
+                ->map(fn (StudentDeferActionSummary $action): array => $this->mapDeferNoCaseRow($action));
+
+            return $this->paginator($rows, $page, $perPage, $path);
         }
 
-        if ($type === 'mismatch') {
-            return new LengthAwarePaginator(
-                new Collection,
-                0,
-                $perPage,
+        if ($type !== null && in_array($type, [
+            'missing_charge',
+            'zero_tuition_waived',
+            'deferred_enrolled',
+            'retake_no_charge',
+        ], true)) {
+            return $this->paginateRegistrationTypes(
+                $semesterId,
+                $campusId,
+                [$type],
                 $page,
-                ['path' => $path, 'pageName' => 'page'],
+                $perPage,
+                $path,
             );
         }
 
-        return $this->paginateAllTypes($semesterId, $campusId, $page, $perPage, $path);
-    }
-
-    private function countMissingCharges(?int $semesterId, ?int $campusId): int
-    {
-        return (int) $this->missingChargeBaseQuery($semesterId, $campusId)
-            ->distinct()
-            ->count('course_registrations.student_id');
-    }
-
-    private function countZeroTuitionWaived(?int $semesterId, ?int $campusId): int
-    {
-        return (int) $this->zeroTuitionWaivedBaseQuery($semesterId, $campusId)
-            ->distinct()
-            ->count('course_registrations.student_id');
-    }
-
-    private function countDeferredEnrolled(?int $semesterId, ?int $campusId): int
-    {
-        return (int) $this->deferredEnrolledBaseQuery($semesterId, $campusId)
-            ->distinct()
-            ->count('course_registrations.student_id');
-    }
-
-    private function countRetakeNoCharges(?int $semesterId, ?int $campusId): int
-    {
-        return $this->retakeNoChargeBaseQuery($semesterId, $campusId)->count();
-    }
-
-    private function countDeferNoCases(?int $semesterId, ?int $campusId): int
-    {
-        return $this->deferActionsWithoutCases($semesterId, $campusId)->count();
-    }
-
-    private function paginateMissingCharges(
-        ?int $semesterId,
-        ?int $campusId,
-        int $page,
-        int $perPage,
-        string $path,
-    ): LengthAwarePaginator {
-        $paginator = $this->missingChargeListQuery($semesterId, $campusId)
-            ->orderByDesc('course_registrations.created_at')
-            ->orderByDesc('course_registrations.id')
-            ->paginate($perPage, ['*'], 'page', $page)
-            ->withPath($path);
-
-        return $paginator->setCollection(
-            $paginator->getCollection()->map(fn (object $registration) => $this->mapMissingChargeRow($registration, $semesterId))
-        );
-    }
-
-    private function paginateZeroTuitionWaived(
-        ?int $semesterId,
-        ?int $campusId,
-        int $page,
-        int $perPage,
-        string $path,
-    ): LengthAwarePaginator {
-        $paginator = $this->zeroTuitionWaivedListQuery($semesterId, $campusId)
-            ->orderByDesc('course_registrations.created_at')
-            ->orderByDesc('course_registrations.id')
-            ->paginate($perPage, ['*'], 'page', $page)
-            ->withPath($path);
-
-        return $paginator->setCollection(
-            $paginator->getCollection()->map(fn (object $registration) => $this->mapZeroTuitionWaivedRow($registration, $semesterId))
-        );
-    }
-
-    private function paginateDeferredEnrolled(
-        ?int $semesterId,
-        ?int $campusId,
-        int $page,
-        int $perPage,
-        string $path,
-    ): LengthAwarePaginator {
-        $paginator = $this->deferredEnrolledListQuery($semesterId, $campusId)
-            ->orderByDesc('course_registrations.created_at')
-            ->orderByDesc('course_registrations.id')
-            ->paginate($perPage, ['*'], 'page', $page)
-            ->withPath($path);
-
-        return $paginator->setCollection(
-            $paginator->getCollection()->map(fn (object $registration) => $this->mapDeferredEnrolledRow($registration, $semesterId))
-        );
-    }
-
-    private function paginateRetakeNoCharges(
-        ?int $semesterId,
-        ?int $campusId,
-        int $page,
-        int $perPage,
-        string $path,
-    ): LengthAwarePaginator {
-        $paginator = $this->retakeNoChargeBaseQuery($semesterId, $campusId)
-            ->orderByDesc('course_registrations.created_at')
-            ->orderByDesc('course_registrations.id')
-            ->paginate($perPage, ['*'], 'page', $page)
-            ->withPath($path);
-
-        return $paginator->setCollection(
-            $paginator->getCollection()->map(fn (object $registration) => $this->mapRetakeNoChargeRow($registration, $semesterId))
-        );
-    }
-
-    private function paginateDeferNoCases(
-        ?int $semesterId,
-        ?int $campusId,
-        int $page,
-        int $perPage,
-        string $path,
-    ): LengthAwarePaginator {
-        $actions = $this->deferActionsWithoutCases($semesterId, $campusId);
-
-        return new LengthAwarePaginator(
-            $actions->forPage($page, $perPage)
-                ->map(fn (StudentDeferActionSummary $action): array => $this->mapDeferNoCaseRow($action))
-                ->values(),
-            $actions->count(),
-            $perPage,
+        return $this->paginateRegistrationTypes(
+            $semesterId,
+            $campusId,
+            ['missing_charge', 'zero_tuition_waived', 'deferred_enrolled', 'retake_no_charge'],
             $page,
-            ['path' => $path, 'pageName' => 'page'],
+            $perPage,
+            $path,
+            includeDeferNoCase: true,
         );
     }
 
-    private function paginateAllTypes(
-        ?int $semesterId,
-        ?int $campusId,
-        int $page,
-        int $perPage,
-        string $path,
-    ): LengthAwarePaginator {
-        $union = $this->missingChargeUnionQuery($semesterId, $campusId)
-            ->unionAll($this->zeroTuitionWaivedUnionQuery($semesterId, $campusId))
-            ->unionAll($this->deferredEnrolledUnionQuery($semesterId, $campusId))
-            ->unionAll($this->retakeNoChargeUnionQuery($semesterId, $campusId));
+    /**
+     * @return iterable<array<string, Collection<int, AcademicBillingRegistrationData>>>
+     */
+    private function classifiedRegistrationChunks(?int $semesterId, ?int $campusId): iterable
+    {
+        foreach ($this->academicSources->billingExceptionRegistrationChunks($semesterId) as $registrationChunk) {
+            $studentIds = collect($registrationChunk)
+                ->pluck('student_id')
+                ->map(static fn (int|string $id): int => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+            $this->studentReferencesById += $this->studentReferences->findMany($studentIds);
+            $registrations = collect($registrationChunk)
+                ->filter(fn (AcademicBillingRegistrationData $registration): bool => $campusId === null
+                    || $this->studentReference($registration->student_id)?->campusId === $campusId)
+                ->values();
 
-        $deferActions = $this->deferActionsWithoutCases($semesterId, $campusId);
-        $financeTotal = (int) DB::query()->fromSub($union, 'billing_exceptions')->count();
-        $total = $financeTotal + $deferActions->count();
-        $through = $page * $perPage;
+            yield $this->classifyRegistrations($registrations, $semesterId, $campusId);
 
-        $financeRows = DB::query()
-            ->fromSub($union, 'billing_exceptions')
-            ->orderByDesc('created_at')
-            ->orderBy('exception_type')
-            ->orderByDesc('source_id')
-            ->limit($through)
-            ->get()
-            ->each(function (object $row): void {
-                $row->sort_timestamp = $this->createdAtTimestamp($row->created_at ?? null);
-            });
+            foreach ($studentIds as $studentId) {
+                unset($this->studentReferencesById[$studentId]);
+            }
+        }
+    }
 
-        $deferRows = $deferActions->map(fn (StudentDeferActionSummary $action): object => (object) [
-            'exception_type' => 'defer_no_case',
-            'source_id' => $action->id,
-            'created_at' => $action->createdAt,
-            'sort_timestamp' => $this->createdAtTimestamp($action->createdAt),
-        ]);
-
-        $pageRows = $financeRows
-            ->concat($deferRows)
-            ->sortBy([
-                ['sort_timestamp', 'desc'],
-                ['exception_type', 'asc'],
-                ['source_id', 'desc'],
-            ])
-            ->slice(($page - 1) * $perPage, $perPage)
+    /**
+     * @param  Collection<int, AcademicBillingRegistrationData>  $registrations
+     * @return array<string, Collection<int, AcademicBillingRegistrationData>>
+     */
+    private function classifyRegistrations(Collection $registrations, ?int $semesterId, ?int $campusId): array
+    {
+        $eligible = $registrations
+            ->reject(static fn (AcademicBillingRegistrationData $registration): bool => in_array(
+                $registration->registration_status,
+                ['defer', 'dropped', 'withdrawn'],
+                true,
+            ))
             ->values();
 
-        $items = $this->hydrateUnionRows($pageRows, $semesterId, $campusId);
+        $withoutActiveCharge = $this->withoutActiveCharge($eligible);
+        $deferredPairs = $this->deferredEnrollmentPairs($withoutActiveCharge, $semesterId, $campusId);
+        $waivedPairs = collect();
+        if ($this->zeroTuitionTerms->exists()) {
+            $enrollments = $this->programEnrollments->forStudentIds(
+                $withoutActiveCharge->pluck('student_id')->unique()->values()->all(),
+            );
+            $waivedPairs = $withoutActiveCharge
+                ->mapWithKeys(fn (AcademicBillingRegistrationData $registration): array => [
+                    $this->registrationPairKey($registration) => $this->tuitionTermData(
+                        $registration,
+                        $enrollments[$registration->student_id],
+                    )['amount'] === 0.0,
+                ]);
+        }
 
-        return new LengthAwarePaginator(
-            $items,
-            $total,
-            $perPage,
-            $page,
-            ['path' => $path, 'pageName' => 'page'],
-        );
+        $deferred = $withoutActiveCharge
+            ->filter(fn (AcademicBillingRegistrationData $registration): bool => isset(
+                $deferredPairs[$this->registrationPairKey($registration)],
+            ))
+            ->values();
+
+        $nonDeferred = $withoutActiveCharge
+            ->reject(fn (AcademicBillingRegistrationData $registration): bool => isset(
+                $deferredPairs[$this->registrationPairKey($registration)],
+            ))
+            ->values();
+
+        $waived = $nonDeferred
+            ->filter(fn (AcademicBillingRegistrationData $registration): bool => $waivedPairs[
+                $this->registrationPairKey($registration)
+            ] ?? false)
+            ->values();
+
+        $missing = $nonDeferred
+            ->reject(fn (AcademicBillingRegistrationData $registration): bool => $waivedPairs[
+                $this->registrationPairKey($registration)
+            ] ?? false)
+            ->groupBy('student_id')
+            ->map(static fn (Collection $studentRegistrations): AcademicBillingRegistrationData => $studentRegistrations
+                ->sortBy('id')
+                ->first())
+            ->values();
+
+        $waived = $waived
+            ->groupBy('student_id')
+            ->map(static fn (Collection $studentRegistrations): AcademicBillingRegistrationData => $studentRegistrations
+                ->sortBy('id')
+                ->first())
+            ->values();
+
+        $deferred = $deferred
+            ->groupBy('student_id')
+            ->map(static fn (Collection $studentRegistrations): AcademicBillingRegistrationData => $studentRegistrations
+                ->sortBy('id')
+                ->first())
+            ->values();
+
+        $retake = $eligible
+            ->filter(static fn (AcademicBillingRegistrationData $registration): bool => $registration->is_retake)
+            ->values();
+        if ($retake->isNotEmpty()) {
+            $retakeChargeKeys = $this->activeCanonicalRetakeChargeKeys($retake);
+            $retake = $retake
+                ->reject(fn (AcademicBillingRegistrationData $registration): bool => $this->hasCanonicalRetakeCharge(
+                    $registration,
+                    $retakeChargeKeys,
+                ))
+                ->values();
+        }
+
+        return [
+            'missing_charge' => $missing,
+            'zero_tuition_waived' => $waived,
+            'deferred_enrolled' => $deferred,
+            'retake_no_charge' => $retake,
+        ];
     }
 
-    private function hydrateUnionRows(Collection $pageRows, ?int $semesterId, ?int $campusId): Collection
+    /**
+     * @param  Collection<int, AcademicBillingRegistrationData>  $registrations
+     * @return Collection<int, AcademicBillingRegistrationData>
+     */
+    private function withoutActiveCharge(Collection $registrations): Collection
     {
-        if ($pageRows->isEmpty()) {
+        if ($registrations->isEmpty()) {
             return collect();
         }
 
-        $missingIds = $pageRows->where('exception_type', 'missing_charge')->pluck('source_id')->all();
-        $waivedIds = $pageRows->where('exception_type', 'zero_tuition_waived')->pluck('source_id')->all();
-        $deferredIds = $pageRows->where('exception_type', 'deferred_enrolled')->pluck('source_id')->all();
-        $retakeIds = $pageRows->where('exception_type', 'retake_no_charge')->pluck('source_id')->all();
-        $deferIds = $pageRows->where('exception_type', 'defer_no_case')->pluck('source_id')->all();
-
-        $missingById = $missingIds === []
-            ? collect()
-            : $this->registrationRowsById($missingIds)
-                ->keyBy('id');
-
-        $waivedById = $waivedIds === []
-            ? collect()
-            : $this->registrationRowsById($waivedIds)
-                ->keyBy('id');
-
-        $deferredById = $deferredIds === []
-            ? collect()
-            : $this->registrationRowsById($deferredIds)
-                ->keyBy('id');
-
-        $retakeById = $retakeIds === []
-            ? collect()
-            : $this->registrationRowsById($retakeIds)
-                ->keyBy('id');
-
-        $deferById = $this->deferActionsWithoutCases($semesterId, $campusId)
-            ->whereIn('id', $deferIds)
-            ->keyBy('id');
-
-        return $pageRows->map(function (object $row) use ($missingById, $waivedById, $deferredById, $retakeById, $deferById, $semesterId): array {
-            return match ($row->exception_type) {
-                'missing_charge' => $this->mapMissingChargeRow($missingById[$row->source_id], $semesterId),
-                'zero_tuition_waived' => $this->mapZeroTuitionWaivedRow($waivedById[$row->source_id], $semesterId),
-                'deferred_enrolled' => $this->mapDeferredEnrolledRow($deferredById[$row->source_id], $semesterId),
-                'retake_no_charge' => $this->mapRetakeNoChargeRow($retakeById[$row->source_id], $semesterId),
-                'defer_no_case' => $this->mapDeferNoCaseRow($deferById[$row->source_id]),
-                default => throw new \RuntimeException("Unknown billing exception type: {$row->exception_type}"),
-            };
-        })->values();
-    }
-
-    private function missingChargeListQuery(?int $semesterId, ?int $campusId): QueryBuilder
-    {
-        $representativeIds = $this->missingChargeBaseQuery($semesterId, $campusId)
-            ->selectRaw('MIN(course_registrations.id) as id')
-            ->groupBy('course_registrations.student_id');
-
-        return $this->registrationRowsQuery()
-            ->whereIn('course_registrations.id', $representativeIds);
-    }
-
-    private function missingChargeUnionQuery(?int $semesterId, ?int $campusId): Builder
-    {
-        $representativeIds = $this->missingChargeBaseQuery($semesterId, $campusId)
-            ->selectRaw('MIN(course_registrations.id) as id')
-            ->groupBy('course_registrations.student_id');
-
-        return DB::table('course_registrations')
-            ->selectRaw("'missing_charge' as exception_type, course_registrations.id as source_id, course_registrations.created_at")
-            ->whereIn('course_registrations.id', $representativeIds);
-    }
-
-    private function zeroTuitionWaivedListQuery(?int $semesterId, ?int $campusId): QueryBuilder
-    {
-        $representativeIds = $this->zeroTuitionWaivedBaseQuery($semesterId, $campusId)
-            ->selectRaw('MIN(course_registrations.id) as id')
-            ->groupBy('course_registrations.student_id');
-
-        return $this->registrationRowsQuery()
-            ->whereIn('course_registrations.id', $representativeIds);
-    }
-
-    private function zeroTuitionWaivedUnionQuery(?int $semesterId, ?int $campusId): Builder
-    {
-        $representativeIds = $this->zeroTuitionWaivedBaseQuery($semesterId, $campusId)
-            ->selectRaw('MIN(course_registrations.id) as id')
-            ->groupBy('course_registrations.student_id');
-
-        return DB::table('course_registrations')
-            ->selectRaw("'zero_tuition_waived' as exception_type, course_registrations.id as source_id, course_registrations.created_at")
-            ->whereIn('course_registrations.id', $representativeIds);
-    }
-
-    private function deferredEnrolledListQuery(?int $semesterId, ?int $campusId): QueryBuilder
-    {
-        $representativeIds = $this->deferredEnrolledBaseQuery($semesterId, $campusId)
-            ->selectRaw('MIN(course_registrations.id) as id')
-            ->groupBy('course_registrations.student_id');
-
-        return $this->registrationRowsQuery()
-            ->whereIn('course_registrations.id', $representativeIds);
-    }
-
-    private function deferredEnrolledUnionQuery(?int $semesterId, ?int $campusId): Builder
-    {
-        $representativeIds = $this->deferredEnrolledBaseQuery($semesterId, $campusId)
-            ->selectRaw('MIN(course_registrations.id) as id')
-            ->groupBy('course_registrations.student_id');
-
-        return DB::table('course_registrations')
-            ->selectRaw("'deferred_enrolled' as exception_type, course_registrations.id as source_id, course_registrations.created_at")
-            ->whereIn('course_registrations.id', $representativeIds);
-    }
-
-    private function retakeNoChargeUnionQuery(?int $semesterId, ?int $campusId): Builder
-    {
-        return $this->retakeNoChargeBaseQuery($semesterId, $campusId)
-            ->select([
-                DB::raw("'retake_no_charge' as exception_type"),
-                'course_registrations.id as source_id',
-                'course_registrations.created_at',
+        $activeChargePairs = FinanceCharge::query()
+            ->where('status', FinanceCharge::STATUS_ACTIVE)
+            ->whereIn('student_id', $registrations->pluck('student_id')->unique()->all())
+            ->get(['student_id', 'semester_id'])
+            ->mapWithKeys(static fn (FinanceCharge $charge): array => [
+                ((int) $charge->student_id).':'.((int) $charge->semester_id) => true,
             ]);
+
+        return $registrations
+            ->reject(fn (AcademicBillingRegistrationData $registration): bool => isset(
+                $activeChargePairs[$this->registrationPairKey($registration)],
+            ))
+            ->values();
     }
 
-    private function enrolledWithoutActiveChargeBaseQuery(?int $semesterId, ?int $campusId): QueryBuilder
-    {
-        return DB::table('course_registrations')
-            ->when($campusId, fn ($q) => $q
-                ->join('students as billing_exception_students', 'billing_exception_students.id', '=', 'course_registrations.student_id')
-                ->where('billing_exception_students.campus_id', $campusId))
-            ->when($semesterId, fn ($q) => $q->whereExists(function ($courseOffering) use ($semesterId): void {
-                $courseOffering->select(DB::raw(1))
-                    ->from('course_offerings')
-                    ->whereColumn('course_offerings.id', 'course_registrations.course_offering_id')
-                    ->where('course_offerings.semester_id', $semesterId);
-            }))
-            // FIN-REV-020: a deferred original registration is non-billable, so it
-            // must not surface as a missing/zero/deferred enrolled-without-charge exception.
-            ->whereNotIn('registration_status', ['defer', 'dropped', 'withdrawn'])
-            ->whereNotExists(function ($query) use ($semesterId) {
-                $query->select(DB::raw(1))
-                    ->from('finance_charges')
-                    ->whereColumn('finance_charges.student_id', 'course_registrations.student_id')
-                    ->whereColumn('finance_charges.semester_id', 'course_registrations.semester_id')
-                    ->where('finance_charges.status', FinanceCharge::STATUS_ACTIVE);
-                if ($semesterId) {
-                    $query->where('finance_charges.semester_id', $semesterId);
-                }
-            });
+    /**
+     * @param  Collection<int, AcademicBillingRegistrationData>  $registrations
+     * @return array<string, true>
+     */
+    private function deferredEnrollmentPairs(
+        Collection $registrations,
+        ?int $semesterId,
+        ?int $campusId,
+    ): array {
+        if ($registrations->isEmpty()) {
+            return [];
+        }
+
+        $activeActions = $this->deferActions($semesterId, $campusId)
+            ->filter(static fn (StudentDeferActionSummary $action): bool => $action->currentlyDeferred);
+        if ($activeActions->isEmpty()) {
+            return [];
+        }
+
+        $activeStudentIds = $activeActions->pluck('studentId')->unique()->all();
+        $actionPairs = $activeActions
+            ->filter(static fn (StudentDeferActionSummary $action): bool => $action->fromSemesterId !== null)
+            ->mapWithKeys(static fn (StudentDeferActionSummary $action): array => [
+                "{$action->studentId}:{$action->fromSemesterId}" => true,
+            ]);
+
+        $casePairs = DeferCase::query()
+            ->whereIn('student_id', $activeStudentIds)
+            ->whereIn(
+                'semester_id',
+                $registrations->pluck('semester_id')->filter()->unique()->all(),
+            )
+            ->get(['student_id', 'semester_id'])
+            ->mapWithKeys(static fn (DeferCase $case): array => [
+                ((int) $case->student_id).':'.((int) $case->semester_id) => true,
+            ]);
+
+        return $registrations
+            ->filter(static fn (AcademicBillingRegistrationData $registration): bool => in_array(
+                $registration->student_id,
+                $activeStudentIds,
+                true,
+            ))
+            ->filter(fn (AcademicBillingRegistrationData $registration): bool => isset(
+                $actionPairs[$this->registrationPairKey($registration)],
+            ) || isset($casePairs[$this->registrationPairKey($registration)]))
+            ->mapWithKeys(fn (AcademicBillingRegistrationData $registration): array => [
+                $this->registrationPairKey($registration) => true,
+            ])
+            ->all();
     }
 
-    private function missingChargeBaseQuery(?int $semesterId, ?int $campusId): QueryBuilder
+    /**
+     * @param  Collection<int, AcademicBillingRegistrationData>  $registrations
+     * @return Collection<string, true>
+     */
+    private function activeCanonicalRetakeChargeKeys(Collection $registrations): Collection
     {
-        $query = $this->enrolledWithoutActiveChargeBaseQuery($semesterId, $campusId)
-            ->whereNotExists(fn ($query) => BillingExceptionTuitionWaivedMatcher::applyExistsConstraint($query, $semesterId));
+        $legacySourceRefs = $registrations
+            ->map(static fn (AcademicBillingRegistrationData $registration): string => "legacy-course-registration:{$registration->id}")
+            ->all();
+        $academicSourceRefs = $registrations
+            ->flatMap(static fn (AcademicBillingRegistrationData $registration): array => $registration->retake_source_refs)
+            ->unique()
+            ->values()
+            ->all();
 
-        $this->deferredEnrollmentMatcher->applyNonMatchingConstraint($query, $semesterId);
-
-        return $query;
-    }
-
-    private function zeroTuitionWaivedBaseQuery(?int $semesterId, ?int $campusId): QueryBuilder
-    {
-        $query = $this->enrolledWithoutActiveChargeBaseQuery($semesterId, $campusId)
-            ->whereExists(fn ($query) => BillingExceptionTuitionWaivedMatcher::applyExistsConstraint($query, $semesterId));
-
-        $this->deferredEnrollmentMatcher->applyNonMatchingConstraint($query, $semesterId);
-
-        return $query;
-    }
-
-    private function deferredEnrolledBaseQuery(?int $semesterId, ?int $campusId): QueryBuilder
-    {
-        $query = $this->enrolledWithoutActiveChargeBaseQuery($semesterId, $campusId);
-        $this->deferredEnrollmentMatcher->applyMatchingConstraint($query, $semesterId);
-
-        return $query;
-    }
-
-    private function retakeNoChargeBaseQuery(?int $semesterId, ?int $campusId): QueryBuilder
-    {
-        return $this->registrationRowsQuery()
-            ->where('course_registrations.is_retake', true)
-            ->when($campusId, fn ($q) => $q->where('students.campus_id', $campusId))
-            ->when($semesterId, fn ($q) => $q->where('course_offerings.semester_id', $semesterId))
-            // FIN-REV-020: a deferred retake registration is non-billable.
-            ->whereNotIn('registration_status', ['defer', 'dropped', 'withdrawn'])
-            ->whereNotExists(fn ($query) => $this->applyLegacyRetakeChargeExistsConstraint($query, $semesterId))
-            ->whereNotExists(fn ($query) => $this->applyCourseRetakeRegistrationChargeExistsConstraint($query, $semesterId));
-    }
-
-    private function applyLegacyRetakeChargeExistsConstraint(Builder $query, ?int $semesterId): void
-    {
-        $query->select(DB::raw(1))
-            ->from('finance_charges')
-            ->whereColumn('finance_charges.student_id', 'course_registrations.student_id')
-            ->whereColumn('finance_charges.semester_id', 'course_registrations.semester_id')
+        return FinanceObligation::query()
+            ->join('finance_charges', 'finance_charges.finance_obligation_id', '=', 'finance_obligations.id')
             ->where('finance_charges.charge_type', FinanceCharge::TYPE_RETAKE_FEE)
             ->where('finance_charges.status', FinanceCharge::STATUS_ACTIVE)
-            ->where('finance_charges.source_type', 'App\\Models\\CourseRegistration')
-            ->whereColumn('finance_charges.source_id', 'course_registrations.id');
+            ->where(function ($query) use ($legacySourceRefs, $academicSourceRefs): void {
+                $query->where(function ($legacy) use ($legacySourceRefs): void {
+                    $legacy
+                        ->where('finance_obligations.source_system', 'finance')
+                        ->where('finance_obligations.source_kind', 'legacy_course_registration')
+                        ->whereIn('finance_obligations.source_ref', $legacySourceRefs);
+                });
 
-        if ($semesterId) {
-            $query->where('finance_charges.semester_id', $semesterId);
-        }
-    }
-
-    private function applyCourseRetakeRegistrationChargeExistsConstraint(Builder $query, ?int $semesterId): void
-    {
-        $query->select(DB::raw(1))
-            ->from('course_retake_registrations')
-            ->whereColumn('course_retake_registrations.course_registration_id', 'course_registrations.id')
-            ->where('course_retake_registrations.status', '!=', 'cancelled')
-            ->whereExists(function ($chargeQuery) use ($semesterId): void {
-                $chargeQuery->select(DB::raw(1))
-                    ->from('finance_charges')
-                    ->leftJoin('finance_obligations', 'finance_obligations.id', '=', 'finance_charges.finance_obligation_id')
-                    ->where('finance_charges.charge_type', FinanceCharge::TYPE_RETAKE_FEE)
-                    ->where('finance_charges.status', FinanceCharge::STATUS_ACTIVE)
-                    ->where(function ($sourceQuery): void {
-                        $sourceQuery
-                            ->where(function ($canonicalQuery): void {
-                                $canonicalQuery
-                                    ->where('finance_obligations.source_system', 'academic')
-                                    ->where('finance_obligations.source_kind', 'course_retake_registration')
-                                    ->whereRaw("finance_obligations.source_ref = CONCAT('retake:', course_retake_registrations.id)");
-                            })
-                            ->orWhere(function ($legacyQuery): void {
-                                $legacyQuery
-                                    ->where('finance_charges.source_type', 'App\\Models\\CourseRetakeRegistration')
-                                    ->whereColumn('finance_charges.source_id', 'course_retake_registrations.id');
-                            });
+                if ($academicSourceRefs !== []) {
+                    $query->orWhere(function ($academic) use ($academicSourceRefs): void {
+                        $academic
+                            ->where('finance_obligations.source_system', AcademicFinanceSourceKeys::SOURCE_SYSTEM)
+                            ->where('finance_obligations.source_kind', AcademicFinanceSourceKeys::COURSE_RETAKE_REGISTRATION)
+                            ->whereIn('finance_obligations.source_ref', $academicSourceRefs);
                     });
-
-                if ($semesterId) {
-                    $chargeQuery->where('finance_charges.semester_id', $semesterId);
                 }
-            });
-    }
-
-    private function registrationRowsById(array $ids): Collection
-    {
-        return $this->registrationRowsQuery()
-            ->whereIn('course_registrations.id', array_values(array_unique(array_map('intval', $ids))))
-            ->get();
-    }
-
-    private function registrationRowsQuery(): QueryBuilder
-    {
-        return DB::table('course_registrations')
-            ->leftJoin('students', 'students.id', '=', 'course_registrations.student_id')
-            ->leftJoin('course_offerings', 'course_offerings.id', '=', 'course_registrations.course_offering_id')
-            ->leftJoin('units', 'units.id', '=', 'course_offerings.unit_id')
-            ->select([
-                'course_registrations.id',
-                'course_registrations.student_id',
-                'course_registrations.semester_id',
-                'course_registrations.course_offering_id',
-                'course_registrations.registration_status',
-                'course_registrations.is_retake',
-                'course_registrations.created_at',
-                'students.student_id as student_code',
-                'students.full_name as student_name',
-                'students.status as student_status',
-                'students.curriculum_version_id',
-                'students.intake_semester_id',
-                'students.intake_major',
-                'students.campus_id as student_campus_id',
-                'course_offerings.semester_id as offering_semester_id',
-                'units.name as unit_name',
-                'units.code as unit_code',
+            })
+            ->get([
+                'finance_obligations.source_system',
+                'finance_obligations.source_kind',
+                'finance_obligations.source_ref',
+            ])
+            ->mapWithKeys(static fn (FinanceObligation $obligation): array => [
+                self::sourceKey(
+                    (string) $obligation->source_system,
+                    (string) $obligation->source_kind,
+                    (string) $obligation->source_ref,
+                ) => true,
             ]);
     }
 
-    private function mapMissingChargeRow(object $registration, ?int $semesterId): array
+    /** @param Collection<string, true> $activeChargeKeys */
+    private function hasCanonicalRetakeCharge(
+        AcademicBillingRegistrationData $registration,
+        Collection $activeChargeKeys,
+    ): bool {
+        $legacyRegistrationKey = self::sourceKey(
+            'finance',
+            'legacy_course_registration',
+            "legacy-course-registration:{$registration->id}",
+        );
+        if (isset($activeChargeKeys[$legacyRegistrationKey])) {
+            return true;
+        }
+
+        foreach ($registration->retake_source_refs as $sourceRef) {
+            $key = self::sourceKey(
+                AcademicFinanceSourceKeys::SOURCE_SYSTEM,
+                AcademicFinanceSourceKeys::COURSE_RETAKE_REGISTRATION,
+                $sourceRef,
+            );
+            if (isset($activeChargeKeys[$key])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function studentReference(int $studentId): ?StudentReference
     {
-        return [
-            'type' => 'missing_charge',
-            'source_id' => $registration->id,
-            'student_id' => $registration->student_id,
-            'student_code' => $registration->student_code,
-            'student_name' => $registration->student_name,
-            'description' => 'Sinh viên đăng ký học nhưng chưa có phí học kỳ active cần thu',
-            'severity' => 'high',
-            'context' => [
+        return $this->studentReferencesById[$studentId] ?? null;
+    }
+
+    /**
+     * @return array{term_number: int|null, amount: float|null, chargeable_term_index: int|null}
+     */
+    private function tuitionTermData(
+        AcademicBillingRegistrationData $registration,
+        ?ProgramEnrollmentSummary $enrollment = null,
+    ): array {
+        $semesterId = $registration->semester_id ?? $registration->offering_semester_id;
+        if ($semesterId === null) {
+            return ['term_number' => null, 'amount' => null, 'chargeable_term_index' => null];
+        }
+
+        $enrollment ??= $this->programEnrollments->forStudentId($registration->student_id);
+        $key = implode(':', [
+            $enrollment->curriculumVersionId ?? 'none',
+            $enrollment->intakeSemesterId ?? 'none',
+            $enrollment->intakeMajorSemesterId ?? 'none',
+            $semesterId,
+        ]);
+
+        return $this->tuitionTermDataByStudentSemester[$key] ??= $this->chargeTiming->getTuitionTermData(
+            $enrollment,
+            $semesterId,
+        );
+    }
+
+    private function mapRegistrationRow(
+        string $type,
+        AcademicBillingRegistrationData $registration,
+        ?int $semesterId,
+    ): array {
+        return match ($type) {
+            'missing_charge' => $this->mapMissingChargeRow($registration, $semesterId),
+            'zero_tuition_waived' => $this->mapZeroTuitionWaivedRow($registration, $semesterId),
+            'deferred_enrolled' => $this->mapDeferredEnrolledRow($registration, $semesterId),
+            'retake_no_charge' => $this->mapRetakeNoChargeRow($registration, $semesterId),
+            default => throw new \RuntimeException("Unknown billing exception type: {$type}"),
+        };
+    }
+
+    private function mapMissingChargeRow(
+        AcademicBillingRegistrationData $registration,
+        ?int $semesterId,
+    ): array {
+        return $this->baseRegistrationRow(
+            type: 'missing_charge',
+            registration: $registration,
+            description: 'Sinh viên đăng ký học nhưng chưa có phí học kỳ active cần thu',
+            severity: 'high',
+            context: [
                 'course_registration_id' => $registration->id,
                 'semester_id' => $semesterId,
             ],
-            'created_at' => $this->createdAtIso($registration->created_at ?? null),
-            'fixable' => true,
-        ];
+            fixable: true,
+        );
     }
 
-    private function mapZeroTuitionWaivedRow(object $registration, ?int $semesterId): array
-    {
+    private function mapZeroTuitionWaivedRow(
+        AcademicBillingRegistrationData $registration,
+        ?int $semesterId,
+    ): array {
         $resolvedSemesterId = $semesterId ?? $registration->semester_id ?? $registration->offering_semester_id;
-        $termNumber = null;
 
-        if ($registration->student_id && $resolvedSemesterId) {
-            $enrollment = app(ProgramEnrollmentReader::class)
-                ->forStudentId((int) $registration->student_id);
-
-            $termData = app(StudentChargeTimingResolver::class)
-                ->getTuitionTermData($enrollment, (int) $resolvedSemesterId);
-            $termNumber = $termData['term_number'];
-        }
-
-        return [
-            'type' => 'zero_tuition_waived',
-            'source_id' => $registration->id,
-            'student_id' => $registration->student_id,
-            'student_code' => $registration->student_code,
-            'student_name' => $registration->student_name,
-            'description' => 'Tuition plan kỳ này có mức phí 0 — không cần sinh charge',
-            'severity' => 'low',
-            'context' => [
+        return $this->baseRegistrationRow(
+            type: 'zero_tuition_waived',
+            registration: $registration,
+            description: 'Tuition plan kỳ này có mức phí 0 — không cần sinh charge',
+            severity: 'low',
+            context: [
                 'course_registration_id' => $registration->id,
                 'semester_id' => $resolvedSemesterId,
-                'tuition_term_number' => $termNumber,
+                'tuition_term_number' => $this->tuitionTermData($registration)['term_number'],
             ],
-            'created_at' => $this->createdAtIso($registration->created_at ?? null),
-            'fixable' => false,
-        ];
+            fixable: false,
+        );
     }
 
-    private function mapDeferredEnrolledRow(object $registration, ?int $semesterId): array
-    {
+    private function mapDeferredEnrolledRow(
+        AcademicBillingRegistrationData $registration,
+        ?int $semesterId,
+    ): array {
         $resolvedSemesterId = $semesterId ?? $registration->semester_id ?? $registration->offering_semester_id;
-        $deferCase = $resolvedSemesterId
-            ? DeferCase::query()
+        $deferCase = $resolvedSemesterId === null
+            ? null
+            : DeferCase::query()
                 ->where('student_id', $registration->student_id)
                 ->where('semester_id', $resolvedSemesterId)
-                ->first()
-            : null;
+                ->first();
 
         $description = match ($deferCase?->fee_policy) {
             DeferCase::POLICY_FORFEIT => 'Sinh viên đã bảo lưu (forfeit phí) nhưng vẫn giữ đăng ký lớp — không cần sinh phí học kỳ',
@@ -597,42 +484,61 @@ final class BillingExceptionCollector
             default => 'Sinh viên đã bảo lưu học kỳ này nhưng vẫn giữ đăng ký lớp — không cần sinh phí học kỳ',
         };
 
-        return [
-            'type' => 'deferred_enrolled',
-            'source_id' => $registration->id,
-            'student_id' => $registration->student_id,
-            'student_code' => $registration->student_code,
-            'student_name' => $registration->student_name,
-            'description' => $description,
-            'severity' => 'low',
-            'context' => [
+        return $this->baseRegistrationRow(
+            type: 'deferred_enrolled',
+            registration: $registration,
+            description: $description,
+            severity: 'low',
+            context: [
                 'course_registration_id' => $registration->id,
                 'semester_id' => $resolvedSemesterId,
-                'student_status' => $registration->student_status,
+                'student_status' => $this->studentReference($registration->student_id)?->status,
                 'defer_case_id' => $deferCase?->id,
                 'fee_policy' => $deferCase?->fee_policy,
             ],
-            'created_at' => $this->createdAtIso($registration->created_at ?? null),
-            'fixable' => false,
-        ];
+            fixable: false,
+        );
     }
 
-    private function mapRetakeNoChargeRow(object $registration, ?int $semesterId): array
-    {
-        return [
-            'type' => 'retake_no_charge',
-            'source_id' => $registration->id,
-            'student_id' => $registration->student_id,
-            'student_code' => $registration->student_code,
-            'student_name' => $registration->student_name,
-            'description' => 'Sinh viên học lại nhưng chưa có phí retake active',
-            'severity' => 'medium',
-            'context' => [
+    private function mapRetakeNoChargeRow(
+        AcademicBillingRegistrationData $registration,
+        ?int $semesterId,
+    ): array {
+        return $this->baseRegistrationRow(
+            type: 'retake_no_charge',
+            registration: $registration,
+            description: 'Sinh viên học lại nhưng chưa có phí retake active',
+            severity: 'medium',
+            context: [
                 'course_registration_id' => $registration->id,
                 'semester_id' => $semesterId,
             ],
-            'created_at' => $this->createdAtIso($registration->created_at ?? null),
-            'fixable' => true,
+            fixable: true,
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    private function baseRegistrationRow(
+        string $type,
+        AcademicBillingRegistrationData $registration,
+        string $description,
+        string $severity,
+        array $context,
+        bool $fixable,
+    ): array {
+        return [
+            'type' => $type,
+            'source_id' => $registration->id,
+            'student_id' => $registration->student_id,
+            'student_code' => $this->studentReference($registration->student_id)?->studentCode,
+            'student_name' => $this->studentReference($registration->student_id)?->fullName,
+            'description' => $description,
+            'severity' => $severity,
+            'context' => $context,
+            'created_at' => $this->createdAtIso($registration->created_at),
+            'fixable' => $fixable,
         ];
     }
 
@@ -655,13 +561,77 @@ final class BillingExceptionCollector
         ];
     }
 
+    /**
+     * @param  list<string>  $types
+     */
+    private function paginateRegistrationTypes(
+        ?int $semesterId,
+        ?int $campusId,
+        array $types,
+        int $page,
+        int $perPage,
+        string $path,
+        bool $includeDeferNoCase = false,
+    ): LengthAwarePaginator {
+        $through = $page * $perPage;
+        $total = 0;
+        $rows = collect();
+        $compareType = count($types) > 1 || $includeDeferNoCase;
+
+        foreach ($this->classifiedRegistrationChunks($semesterId, $campusId) as $classified) {
+            foreach ($types as $type) {
+                $registrations = $classified[$type];
+                $total += $registrations->count();
+                $rows->push(...$registrations
+                    ->map(fn (AcademicBillingRegistrationData $registration): array => $this->mapRegistrationRow(
+                        $type,
+                        $registration,
+                        $semesterId,
+                    ))
+                    ->all());
+            }
+
+            $rows = $rows
+                ->sort(fn (array $left, array $right): int => $this->compareRows(
+                    $left,
+                    $right,
+                    $compareType,
+                ))
+                ->take($through)
+                ->values();
+        }
+
+        if ($includeDeferNoCase) {
+            $deferRows = $this->deferActionsWithoutCases($semesterId, $campusId)
+                ->map(fn (StudentDeferActionSummary $action): array => $this->mapDeferNoCaseRow($action));
+            $total += $deferRows->count();
+            $rows->push(...$deferRows->all());
+            $rows = $rows
+                ->sort(fn (array $left, array $right): int => $this->compareRows(
+                    $left,
+                    $right,
+                    true,
+                ))
+                ->take($through)
+                ->values();
+        }
+
+        return new LengthAwarePaginator(
+            $rows->forPage($page, $perPage)->values(),
+            $total,
+            $perPage,
+            $page,
+            ['path' => $path, 'pageName' => 'page'],
+        );
+    }
+
     /** @return Collection<int, StudentDeferActionSummary> */
     private function deferActionsWithoutCases(?int $semesterId, ?int $campusId): Collection
     {
-        $scopeKey = ($semesterId ?? 'all').':'.($campusId ?? 'all');
+        $scopeKey = $this->scopeKey($semesterId, $campusId);
 
         return $this->deferActionsWithoutCasesByScope[$scopeKey] ??= (function () use ($semesterId, $campusId): Collection {
-            $actions = collect($this->deferLifecycle->listDeferActions($semesterId, $campusId));
+            $actions = $this->deferActions($semesterId, $campusId);
             if ($actions->isEmpty()) {
                 return collect();
             }
@@ -680,6 +650,67 @@ final class BillingExceptionCollector
                 ))
                 ->values();
         })();
+    }
+
+    /** @return Collection<int, StudentDeferActionSummary> */
+    private function deferActions(?int $semesterId, ?int $campusId): Collection
+    {
+        $scopeKey = $this->scopeKey($semesterId, $campusId);
+
+        return $this->deferActionsByScope[$scopeKey] ??= collect(
+            $this->deferLifecycle->listDeferActions($semesterId, $campusId),
+        );
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $rows
+     */
+    private function paginator(
+        Collection $rows,
+        int $page,
+        int $perPage,
+        string $path,
+    ): LengthAwarePaginator {
+        return new LengthAwarePaginator(
+            $rows->forPage($page, $perPage)->values(),
+            $rows->count(),
+            $perPage,
+            $page,
+            ['path' => $path, 'pageName' => 'page'],
+        );
+    }
+
+    private function compareRows(array $left, array $right, bool $compareType = false): int
+    {
+        $timestampComparison = $this->createdAtTimestamp($right['created_at'] ?? null)
+            <=> $this->createdAtTimestamp($left['created_at'] ?? null);
+        if ($timestampComparison !== 0) {
+            return $timestampComparison;
+        }
+
+        if ($compareType) {
+            $typeComparison = ((string) $left['type']) <=> ((string) $right['type']);
+            if ($typeComparison !== 0) {
+                return $typeComparison;
+            }
+        }
+
+        return ((int) $right['source_id']) <=> ((int) $left['source_id']);
+    }
+
+    private function registrationPairKey(AcademicBillingRegistrationData $registration): string
+    {
+        return "{$registration->student_id}:".((int) $registration->semester_id);
+    }
+
+    private function scopeKey(?int $semesterId, ?int $campusId): string
+    {
+        return ($semesterId ?? 'all').':'.($campusId ?? 'all');
+    }
+
+    private static function sourceKey(string $sourceSystem, string $sourceKind, string $sourceRef): string
+    {
+        return "{$sourceSystem}:{$sourceKind}:{$sourceRef}";
     }
 
     private function createdAtIso(mixed $createdAt): string

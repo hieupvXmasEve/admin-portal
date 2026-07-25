@@ -135,7 +135,7 @@ function mockDngClientPushFail(string $reason = 'DNG HTTP 502'): void
 function mockCampusCodeResolver(string $code = 'TEST'): void
 {
     $mock = Mockery::mock(DngCampusCodeResolver::class);
-    $mock->shouldReceive('requireForStudent')->andReturn($code);
+    $mock->shouldReceive('requireForCampusId')->andReturn($code);
     app()->instance(DngCampusCodeResolver::class, $mock);
 }
 

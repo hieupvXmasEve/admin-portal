@@ -29,7 +29,15 @@ interface StudentReferenceReader
     /**
      * @return list<int>
      */
-    public function idsForCampus(int $campusId): array;
+    public function idsForCampus(?int $campusId): array;
+
+    /**
+     * Streams references ordered by student code without materializing the
+     * complete registry.
+     *
+     * @return iterable<StudentReference>
+     */
+    public function stream(?int $campusId = null): iterable;
 
     /**
      * @return list<int>

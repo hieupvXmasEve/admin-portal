@@ -20,6 +20,12 @@ interface AcademicPeriodReader
 
     public function find(int $academicPeriodId): ?AcademicPeriodReference;
 
+    /**
+     * @param  list<int>  $academicPeriodIds
+     * @return array<int, AcademicPeriodReference>
+     */
+    public function findMany(array $academicPeriodIds): array;
+
     public function countStartingBetween(CarbonImmutable $start, CarbonImmutable $end): int;
 
     /**

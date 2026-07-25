@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Reporting;
 
-use App\Models\Program;
-use App\Models\Semester;
-use App\Models\Student;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Models\PaymentSurplusDisposition;
@@ -19,7 +16,10 @@ use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionAmounts;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionRawEvidence;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionScope;
+use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
+use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -40,6 +40,8 @@ final class ListCollectionProgressQuery
     public function __construct(
         private readonly SettlementPositionReader $settlementPositionReader,
         private readonly CurrentSettlementPositionPresenter $positionPresenter,
+        private readonly StudentReferenceReader $studentReferences,
+        private readonly AcademicPeriodReader $academicPeriods,
     ) {}
 
     /**
@@ -74,16 +76,26 @@ final class ListCollectionProgressQuery
     public function collectRows(int $semesterId, array $filters = [], ?CarbonImmutable $asOf = null): Collection
     {
         $campusId = app()->bound('campus') ? (int) app('campus')->id : null;
-        $invoices = $this->loadInvoices($semesterId, $campusId, $filters, $asOf);
+        $invoices = $this->loadInvoices($semesterId, $filters, $asOf);
+        $studentIds = $invoices->pluck('student_id')->map(static fn (mixed $id): int => (int) $id)->unique()->values()->all();
+        $students = $this->studentReferences->findMany($studentIds);
+        $invoices = $invoices
+            ->filter(fn (StudentInvoice $invoice): bool => isset($students[(int) $invoice->student_id])
+                && ($campusId === null || $students[(int) $invoice->student_id]->campusId === $campusId)
+                && $this->matchesStudentFilters(
+                    $students[(int) $invoice->student_id],
+                    $filters,
+                ))
+            ->values();
         $byStudent = $invoices->groupBy('student_id');
         $unappliedByStudent = $asOf === null
             ? $this->unappliedByStudent($byStudent->keys()->map(fn (mixed $id): int => (int) $id)->all())
             : [];
         $positionsByInvoice = $this->positionsForInvoices($invoices, $filters, $asOf);
 
-        $rows = $byStudent->map(function (Collection $studentInvoices, mixed $studentId) use ($semesterId, $unappliedByStudent, $positionsByInvoice, $asOf): ?array {
-            $student = $studentInvoices->first()?->student;
-            if (! $student instanceof Student) {
+        $rows = $byStudent->map(function (Collection $studentInvoices, mixed $studentId) use ($semesterId, $unappliedByStudent, $positionsByInvoice, $asOf, $students): ?array {
+            $student = $students[(int) $studentId] ?? null;
+            if (! $student instanceof StudentReference) {
                 return null;
             }
 
@@ -110,19 +122,13 @@ final class ListCollectionProgressQuery
      */
     private function loadInvoices(
         int $semesterId,
-        ?int $campusId,
         array $filters,
         ?CarbonImmutable $asOf = null,
     ): Collection {
         return StudentInvoice::query()
-            ->with(['student.program', 'invoiceLines.charge'])
+            ->with(['invoiceLines.charge'])
             ->where('semester_id', $semesterId)
             ->when($asOf === null, fn (Builder $query) => $query->whereNotIn('status', self::NON_BILLABLE_INVOICE_STATUSES))
-            ->when($campusId !== null, fn (Builder $query) => $query->whereHas(
-                'student',
-                fn (Builder $studentQuery) => $studentQuery->where('campus_id', $campusId),
-            ))
-            ->whereHas('student', fn (Builder $studentQuery) => $this->applyStudentAttributeFilters($studentQuery, $filters))
             ->when(
                 ! empty($filters['fee_type']) && $filters['fee_type'] !== 'all',
                 fn (Builder $query) => $query->whereHas(
@@ -185,7 +191,7 @@ final class ListCollectionProgressQuery
      * @return array<string, mixed>
      */
     private function buildRow(
-        Student $student,
+        StudentReference $student,
         Collection $studentInvoices,
         array $positions,
         int $semesterId,
@@ -275,14 +281,14 @@ final class ListCollectionProgressQuery
             'row_key' => 'student-'.$student->id.'-sem-'.$semesterId,
             'student' => [
                 'id' => $student->id,
-                'student_code' => $student->student_id,
-                'full_name' => $student->full_name,
+                'student_code' => $student->studentCode,
+                'full_name' => $student->fullName,
                 'status' => $student->status,
-                'status_label' => $student->status_label,
+                'status_label' => $student->statusLabel,
             ],
-            'program_code' => $student->program?->code,
-            'intake_semester_id' => $student->intake_semester_id,
-            'cohort' => $student->intake,
+            'program_code' => $student->programCode,
+            'intake_semester_id' => $student->intakeSemesterId,
+            'cohort' => $student->cohort,
             'semester_id' => $semesterId,
             'invoice_count' => $studentInvoices->count(),
             'fee_types' => array_keys($feeTypes),
@@ -318,7 +324,7 @@ final class ListCollectionProgressQuery
             'aging_bucket' => $isValid ? Catalog::classifyAging($maxDaysOverdue) : Catalog::BUCKET_NOT_DUE,
             'aging_bucket_label' => $isValid ? Catalog::agingBucketLabel(Catalog::classifyAging($maxDaysOverdue)) : 'Cần kiểm tra',
             'max_days_overdue' => $isValid ? $maxDaysOverdue : null,
-            'is_lifecycle_exception' => LifecycleDueItemPredicate::isLifecycleException($student),
+            'is_lifecycle_exception' => LifecycleDueItemPredicate::isLifecycleExceptionStatus($student->status),
             'drilldowns' => [
                 'student_360_focus' => $focusInvoiceId !== null ? 'invoice:'.$focusInvoiceId : null,
                 'lookup_invoice_id' => $focusInvoiceId,
@@ -478,19 +484,46 @@ final class ListCollectionProgressQuery
         $studentIds = StudentInvoice::query()
             ->where('semester_id', $semesterId)
             ->whereNotIn('status', self::NON_BILLABLE_INVOICE_STATUSES)
-            ->when($campusId !== null, fn (Builder $query) => $query->whereHas('student', fn (Builder $studentQuery) => $studentQuery->where('campus_id', $campusId)))
             ->distinct()
-            ->pluck('student_id');
-        $students = Student::query()->with('program')->whereIn('id', $studentIds)->get();
+            ->pluck('student_id')
+            ->map(static fn (int|string $id): int => (int) $id)
+            ->all();
+        $students = collect($this->studentReferences->findMany($studentIds))
+            ->filter(fn (StudentReference $student): bool => $campusId === null || $student->campusId === $campusId);
+        $intakeIds = $students
+            ->map(fn (StudentReference $student): ?int => $student->intakeSemesterId)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+        $periods = $this->academicPeriods->findMany($intakeIds);
 
         return [
-            'programs' => Program::query()->whereIn('id', $students->pluck('program_id')->filter()->unique())->orderBy('code')->get(['id', 'code', 'name'])->map(fn (Program $program) => ['value' => $program->id, 'label' => $program->code.' — '.$program->name])->values()->all(),
-            'intakes' => Semester::query()->whereIn('id', $students->pluck('intake_semester_id')->filter()->unique())->orderByDesc('start_date')->get(['id', 'name'])->map(fn (Semester $semester) => ['value' => $semester->id, 'label' => $semester->name])->values()->all(),
-            'cohorts' => $students->pluck('intake')->filter()->unique()->sort()->values()->map(fn (int $intake) => ['value' => $intake, 'label' => 'Intake '.$intake])->all(),
+            'programs' => $students
+                ->filter(fn (StudentReference $student): bool => $student->programId !== null)
+                ->unique(fn (StudentReference $student): ?int => $student->programId)
+                ->sortBy(fn (StudentReference $student): string => (string) $student->programCode)
+                ->map(fn (StudentReference $student): array => [
+                    'value' => $student->programId,
+                    'label' => $student->programCode.' — '.$student->programName,
+                ])
+                ->values()
+                ->all(),
+            'intakes' => collect($periods)
+                ->sortByDesc(fn ($period) => $period->start_date)
+                ->map(fn ($period): array => ['value' => $period->id, 'label' => $period->name])
+                ->values()
+                ->all(),
+            'cohorts' => $students->pluck('cohort')->filter()->unique()->sort()->values()->map(fn (int $intake) => ['value' => $intake, 'label' => 'Intake '.$intake])->all(),
             'fee_types' => $this->scopedFeeTypes($semesterId, $campusId)->map(fn (string $type) => ['value' => $type, 'label' => $type])->all(),
             'balance_states' => collect(Catalog::balanceStates())->map(fn (string $label, string $value) => ['value' => $value, 'label' => $label])->values()->all(),
             'aging_buckets' => collect(Catalog::agingBuckets())->map(fn (array $meta, string $value) => ['value' => $value, 'label' => $meta['label']])->values()->all(),
-            'student_statuses' => $students->pluck('status')->filter()->unique()->values()->map(fn (string $status) => ['value' => $status, 'label' => (new Student(['status' => $status]))->status_label])->all(),
+            'student_statuses' => $students
+                ->filter(fn (StudentReference $student): bool => $student->status !== null)
+                ->unique(fn (StudentReference $student): ?string => $student->status)
+                ->map(fn (StudentReference $student): array => ['value' => $student->status, 'label' => $student->statusLabel])
+                ->values()
+                ->all(),
             'semester_id' => $semesterId,
         ];
     }
@@ -498,10 +531,12 @@ final class ListCollectionProgressQuery
     /** @return Collection<int, string> */
     private function scopedFeeTypes(int $semesterId, ?int $campusId): Collection
     {
+        $studentIds = $campusId === null ? [] : $this->studentReferences->idsForCampus($campusId);
+
         return StudentInvoice::query()
             ->where('semester_id', $semesterId)
             ->whereNotIn('status', self::NON_BILLABLE_INVOICE_STATUSES)
-            ->when($campusId !== null, fn (Builder $query) => $query->whereHas('student', fn (Builder $studentQuery) => $studentQuery->where('campus_id', $campusId)))
+            ->when($campusId !== null, fn (Builder $query) => $query->whereIn('student_id', $studentIds))
             ->with('invoiceLines.charge')
             ->get()
             ->flatMap(fn (StudentInvoice $invoice) => $invoice->invoiceLines->map(fn ($line) => $line->charge?->charge_type))
@@ -510,26 +545,34 @@ final class ListCollectionProgressQuery
             ->values();
     }
 
-    /** @param Builder<Student> $query */
-    private function applyStudentAttributeFilters(Builder $query, array $filters): Builder
-    {
-        if (! empty($filters['program_id']) && $filters['program_id'] !== 'all') {
-            $query->where('program_id', (int) $filters['program_id']);
+    /** @param array<string, mixed> $filters */
+    private function matchesStudentFilters(
+        StudentReference $student,
+        array $filters,
+    ): bool {
+        if (! empty($filters['program_id']) && $filters['program_id'] !== 'all'
+            && $student->programId !== (int) $filters['program_id']) {
+            return false;
         }
-        if (! empty($filters['intake_semester_id']) && $filters['intake_semester_id'] !== 'all') {
-            $query->where('intake_semester_id', (int) $filters['intake_semester_id']);
+        if (! empty($filters['intake_semester_id']) && $filters['intake_semester_id'] !== 'all'
+            && $student->intakeSemesterId !== (int) $filters['intake_semester_id']) {
+            return false;
         }
-        if (! empty($filters['cohort']) && $filters['cohort'] !== 'all') {
-            $query->where('intake', (int) $filters['cohort']);
+        if (! empty($filters['cohort']) && $filters['cohort'] !== 'all'
+            && $student->cohort !== (int) $filters['cohort']) {
+            return false;
         }
-        if (! empty($filters['student_status']) && $filters['student_status'] !== 'all') {
-            $query->where('status', (string) $filters['student_status']);
+        if (! empty($filters['student_status']) && $filters['student_status'] !== 'all'
+            && $student->status !== (string) $filters['student_status']) {
+            return false;
         }
         if (! empty($filters['search'])) {
-            $search = (string) $filters['search'];
-            $query->where(fn (Builder $searchQuery) => $searchQuery->where('full_name', 'like', "%{$search}%")->orWhere('student_id', 'like', "%{$search}%"));
+            $search = mb_strtolower((string) $filters['search']);
+            if (! str_contains(mb_strtolower($student->fullName.' '.$student->studentCode), $search)) {
+                return false;
+            }
         }
 
-        return $query;
+        return true;
     }
 }

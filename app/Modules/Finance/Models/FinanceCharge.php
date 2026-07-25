@@ -12,7 +12,6 @@ use App\Modules\Finance\Services\SettlementService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class FinanceCharge extends Model
 {
@@ -101,11 +100,6 @@ class FinanceCharge extends Model
     public function billingCycle(): BelongsTo
     {
         return $this->belongsTo(BillingCycle::class);
-    }
-
-    public function source(): MorphTo
-    {
-        return $this->morphTo();
     }
 
     public function createdBy(): BelongsTo

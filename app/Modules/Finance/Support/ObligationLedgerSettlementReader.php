@@ -8,9 +8,7 @@ use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
-use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
-use App\Modules\Finance\Support\SettlementPosition\SettlementPositionIssue;
 use App\Shared\Contracts\Finance\DTO\ObligationSettlementResult;
 use App\Shared\Contracts\Finance\ObligationSettlementReader;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
@@ -51,38 +49,7 @@ class ObligationLedgerSettlementReader implements ObligationSettlementReader
             );
         }
 
-        // Transitional fallback: legacy retake/resit charges still keyed by morph source.
-        $legacyChargeIds = $this->legacyChargeIds($sourceKind, $sourceRef, $obligationType);
-        if ($legacyChargeIds === []) {
-            return ObligationSettlementResult::missing($sourceSystem, $sourceKind, $sourceRef, $obligationType);
-        }
-
-        $lineIds = InvoiceLine::query()
-            ->whereIn('charge_id', $legacyChargeIds)
-            ->where('status', 'active')
-            ->pluck('id')
-            ->map(static fn (int|string $id): int => (int) $id)
-            ->all();
-
-        if ($lineIds === []) {
-            return ObligationSettlementResult::invalid(
-                $sourceSystem,
-                $sourceKind,
-                $sourceRef,
-                $obligationType,
-                null,
-                [SettlementPositionIssue::MISSING_PAYABLE_LINE],
-            );
-        }
-
-        return $this->settlementFromPosition(
-            sourceSystem: $sourceSystem,
-            sourceKind: $sourceKind,
-            sourceRef: $sourceRef,
-            obligationType: $obligationType,
-            financeObligationId: null,
-            position: $this->settlementPositionReader->forPayableLines($lineIds),
-        );
+        return ObligationSettlementResult::missing($sourceSystem, $sourceKind, $sourceRef, $obligationType);
     }
 
     public function isSettled(
@@ -176,54 +143,7 @@ class ObligationLedgerSettlementReader implements ObligationSettlementReader
                 ->all();
         }
 
-        return $this->legacyChargeIds($sourceKind, $sourceRef, $obligationType);
-    }
-
-    /**
-     * @return list<int>
-     */
-    private function legacyChargeIds(string $sourceKind, string $sourceRef, string $obligationType): array
-    {
-        $sourceType = match ($sourceKind) {
-            'course_retake_registration' => 'App\\Models\\CourseRetakeRegistration',
-            'exam_resit_attempt' => 'App\\Models\\ExamResitAttempt',
-            default => null,
-        };
-
-        if ($sourceType === null) {
-            return [];
-        }
-
-        $sourceId = $this->parseLegacySourceId($sourceKind, $sourceRef);
-        if ($sourceId === null) {
-            return [];
-        }
-
-        return FinanceCharge::query()
-            ->where('source_type', $sourceType)
-            ->where('source_id', $sourceId)
-            ->where('charge_type', $obligationType)
-            ->where('status', FinanceCharge::STATUS_ACTIVE)
-            ->pluck('id')
-            ->map(fn ($id): int => (int) $id)
-            ->all();
-    }
-
-    private function parseLegacySourceId(string $sourceKind, string $sourceRef): ?int
-    {
-        $prefix = match ($sourceKind) {
-            'course_retake_registration' => 'retake:',
-            'exam_resit_attempt' => 'exam-resit:',
-            default => null,
-        };
-
-        if ($prefix === null || ! str_starts_with($sourceRef, $prefix)) {
-            return null;
-        }
-
-        $id = (int) substr($sourceRef, strlen($prefix));
-
-        return $id > 0 ? $id : null;
+        return [];
     }
 
     /**

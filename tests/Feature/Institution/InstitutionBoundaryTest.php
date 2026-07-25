@@ -16,7 +16,9 @@ use App\Modules\Institution\Actions\CreateCampusAction;
 use App\Modules\Institution\Actions\RemoveDepartmentMemberAction;
 use App\Modules\Institution\Actions\UpdateDepartmentMemberAction;
 use App\Shared\Contracts\Institution\CampusReferenceReader;
+use App\Shared\Contracts\Institution\DepartmentReferenceReader;
 use App\Shared\Contracts\Institution\DTO\CampusReference;
+use App\Shared\Contracts\Institution\DTO\DepartmentReference;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
@@ -59,6 +61,21 @@ it('publishes neutral campus references to the Academic lifecycle selection flow
         ->and($options['campuses'])->toBe([
             ['id' => $campus->id, 'name' => 'Hanoi Campus', 'code' => 'HN'],
         ]);
+});
+
+it('resolves a neutral department reference by code', function (): void {
+    $department = Department::factory()->create([
+        'name' => 'Headquarters',
+        'code' => 'HQ',
+        'is_active' => false,
+    ]);
+
+    $reference = app(DepartmentReferenceReader::class)->findByCode('HQ');
+
+    expect($reference)->toBeInstanceOf(DepartmentReference::class)
+        ->and($reference?->id)->toBe($department->id)
+        ->and($reference?->name)->toBe('Headquarters')
+        ->and($reference?->code)->toBe('HQ');
 });
 
 it('creates a campus through the Institution owner action', function (): void {

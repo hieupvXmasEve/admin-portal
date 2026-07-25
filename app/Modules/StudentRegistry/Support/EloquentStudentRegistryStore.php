@@ -131,11 +131,20 @@ final class EloquentStudentRegistryStore implements StudentProfilePersistenceWri
         }
 
         return Student::query()
-            ->with(['program:id,code,name', 'specialization:id,code,name'])
-            ->select($this->referenceColumns())
-            ->whereIn('id', $studentIds)
+            ->leftJoin('programs as registry_programs', 'registry_programs.id', '=', 'students.program_id')
+            ->leftJoin('specializations as registry_specializations', 'registry_specializations.id', '=', 'students.specialization_id')
+            ->select(array_map(static fn (string $column): string => 'students.'.$column, $this->referenceColumns()))
+            ->addSelect([
+                'registry_programs.code as registry_program_code',
+                'registry_programs.name as registry_program_name',
+                'registry_specializations.code as registry_specialization_code',
+                'registry_specializations.name as registry_specialization_name',
+            ])
+            ->whereIn('students.id', $studentIds)
             ->get()
-            ->mapWithKeys(fn (Student $student): array => [(int) $student->id => $this->reference($student)])
+            ->mapWithKeys(fn (Student $student): array => [
+                (int) $student->id => $this->joinedReference($student),
+            ])
             ->all();
     }
 
@@ -163,13 +172,36 @@ final class EloquentStudentRegistryStore implements StudentProfilePersistenceWri
     }
 
     /** @return list<int> */
-    public function idsForCampus(int $campusId): array
+    public function idsForCampus(?int $campusId): array
     {
         return Student::query()
-            ->where('campus_id', $campusId)
+            ->when($campusId !== null, fn ($query) => $query->where('campus_id', $campusId))
             ->pluck('id')
             ->map(static fn (int|string $id): int => (int) $id)
             ->all();
+    }
+
+    /** @return iterable<StudentReference> */
+    public function stream(?int $campusId = null): iterable
+    {
+        $students = Student::query()
+            ->leftJoin('programs as registry_programs', 'registry_programs.id', '=', 'students.program_id')
+            ->leftJoin('specializations as registry_specializations', 'registry_specializations.id', '=', 'students.specialization_id')
+            ->select(array_map(static fn (string $column): string => 'students.'.$column, $this->referenceColumns()))
+            ->addSelect([
+                'registry_programs.code as registry_program_code',
+                'registry_programs.name as registry_program_name',
+                'registry_specializations.code as registry_specialization_code',
+                'registry_specializations.name as registry_specialization_name',
+            ])
+            ->when($campusId !== null, fn ($query) => $query->where('students.campus_id', $campusId))
+            ->orderBy('students.student_id')
+            ->orderBy('students.id')
+            ->lazy(500);
+
+        foreach ($students as $student) {
+            yield $this->joinedReference($student);
+        }
     }
 
     /**
@@ -239,6 +271,35 @@ final class EloquentStudentRegistryStore implements StudentProfilePersistenceWri
             status: $student->status,
             academicStatus: $student->academic_status,
             gcCurrentLevel: $student->gc_current_level === null ? null : (int) $student->gc_current_level,
+            statusLabel: $student->status_label,
+            intakeSemesterId: $student->intake_semester_id === null ? null : (int) $student->intake_semester_id,
+            cohort: $student->intake === null ? null : (int) $student->intake,
+        );
+    }
+
+    private function joinedReference(Student $student): StudentReference
+    {
+        return new StudentReference(
+            id: (int) $student->id,
+            studentCode: (string) $student->student_id,
+            fullName: (string) $student->full_name,
+            campusId: (int) $student->campus_id,
+            email: $student->email === null ? null : (string) $student->email,
+            address: $student->current_address_line ?? $student->address,
+            nationalId: $student->national_id === null ? null : (string) $student->national_id,
+            userId: $student->user_id === null ? null : (int) $student->user_id,
+            programId: $student->program_id === null ? null : (int) $student->program_id,
+            programCode: $student->registry_program_code,
+            programName: $student->registry_program_name,
+            specializationId: $student->specialization_id === null ? null : (int) $student->specialization_id,
+            specializationCode: $student->registry_specialization_code,
+            specializationName: $student->registry_specialization_name,
+            status: $student->status,
+            academicStatus: $student->academic_status,
+            gcCurrentLevel: $student->gc_current_level === null ? null : (int) $student->gc_current_level,
+            statusLabel: $student->status_label,
+            intakeSemesterId: $student->intake_semester_id === null ? null : (int) $student->intake_semester_id,
+            cohort: $student->intake === null ? null : (int) $student->intake,
         );
     }
 
@@ -260,6 +321,8 @@ final class EloquentStudentRegistryStore implements StudentProfilePersistenceWri
             'status',
             'academic_status',
             'gc_current_level',
+            'intake_semester_id',
+            'intake',
         ];
     }
 }

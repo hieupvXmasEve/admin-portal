@@ -7,8 +7,12 @@ namespace App\Modules\Finance\Services;
 use App\Models\DeferCase;
 use App\Models\DeferCaseItem;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
+use App\Modules\Finance\Models\InvoiceLine;
 use App\Shared\Contracts\Academic\StudentDeferLifecycleReader;
 use App\Shared\Contracts\Academic\StudentLifecycleCourseRegistrationGateway;
+use App\Shared\Contracts\Finance\SettlementPositionReader;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -16,9 +20,9 @@ use RuntimeException;
 class DeferCaseService
 {
     public function __construct(
-        protected FinanceChargeService $chargeService,
         private readonly StudentLifecycleCourseRegistrationGateway $courseRegistrations,
         private readonly StudentDeferLifecycleReader $deferLifecycle,
+        private readonly SettlementPositionReader $settlementPositionReader,
     ) {}
 
     /**
@@ -66,7 +70,7 @@ class DeferCaseService
                 $this->itemizeFullScope($deferCase);
             }
 
-            // Process fee policy and create credit charge if applicable
+            // Process the requested preservation policy.
             $this->processFeePolicy($deferCase);
 
             return $deferCase;
@@ -182,13 +186,15 @@ class DeferCaseService
             return 0;
         }
 
-        // Get total active charges for the semester
-        $totalCharges = $this->chargeService->getTotalCharges(
-            $deferCase->student_id,
-            $deferCase->semester_id
-        );
-
         if ($deferCase->scope_type === DeferCase::SCOPE_FULL) {
+            $totalCharges = $this->grossForChargeQuery(
+                FinanceCharge::query()
+                    ->where('student_id', $deferCase->student_id)
+                    ->where('semester_id', $deferCase->semester_id)
+                    ->where('status', FinanceCharge::STATUS_ACTIVE)
+                    ->where('amount', '>', 0),
+            );
+
             // Full semester defer - preserve based on policy percentage
             return $deferCase->fee_policy === DeferCase::POLICY_PRESERVE
                 ? $totalCharges
@@ -208,17 +214,57 @@ class DeferCaseService
      */
     protected function calculateCourseChargesAmount(DeferCase $deferCase): float
     {
-        $courseRegistrationIds = $deferCase->items()->pluck('course_registration_id');
+        $sources = $this->courseRegistrations->financeObligationSources(
+            $deferCase->items()
+                ->pluck('course_registration_id')
+                ->map(static fn (int|string $id): int => (int) $id)
+                ->all(),
+        );
+        if ($sources === []) {
+            return 0.0;
+        }
 
-        // Get charges linked to these course registrations
-        $charges = FinanceCharge::where('student_id', $deferCase->student_id)
-            ->where('semester_id', $deferCase->semester_id)
-            ->where('source_type', 'App\\Models\\CourseRegistration')
-            ->whereIn('source_id', $courseRegistrationIds)
-            ->where('status', FinanceCharge::STATUS_ACTIVE)
-            ->sum('amount');
+        $obligationIds = FinanceObligation::query()
+            ->where(function ($query) use ($sources): void {
+                foreach ($sources as $source) {
+                    $query->orWhere(function ($sourceQuery) use ($source): void {
+                        $sourceQuery
+                            ->where('source_system', $source->source_system)
+                            ->where('source_kind', $source->source_kind)
+                            ->where('source_ref', $source->source_ref)
+                            ->where('obligation_type', $source->obligation_type);
+                    });
+                }
+            })
+            ->pluck('id');
 
-        return (float) $charges;
+        return $this->grossForChargeQuery(
+            FinanceCharge::query()
+                ->where('student_id', $deferCase->student_id)
+                ->where('semester_id', $deferCase->semester_id)
+                ->where('status', FinanceCharge::STATUS_ACTIVE)
+                ->whereIn('finance_obligation_id', $obligationIds),
+        );
+    }
+
+    private function grossForChargeQuery(Builder $charges): float
+    {
+        $lineIds = InvoiceLine::query()
+            ->whereIn('charge_id', $charges->select('id'))
+            ->pluck('id')
+            ->map(static fn (int|string $id): int => (int) $id)
+            ->all();
+
+        if ($lineIds === []) {
+            return 0.0;
+        }
+
+        $position = $this->settlementPositionReader->forPayableLines($lineIds);
+        if (! $position->isValid() || $position->amounts === null) {
+            throw new RuntimeException('Cannot calculate defer preservation from an invalid Settlement Position.');
+        }
+
+        return (float) $position->amounts->gross->amount;
     }
 
     /**
@@ -227,15 +273,7 @@ class DeferCaseService
     public function updateDeferCase(DeferCase $deferCase, array $data): DeferCase
     {
         return DB::transaction(function () use ($deferCase, $data) {
-            // Void existing credit charge if policy changed
             $policyChanged = isset($data['fee_policy']) && $data['fee_policy'] !== $deferCase->fee_policy;
-
-            if ($policyChanged && $deferCase->creditCharge) {
-                $this->chargeService->voidCharge(
-                    $deferCase->creditCharge->id,
-                    'Defer case policy updated'
-                );
-            }
 
             // Update the case
             $deferCase->update([
@@ -265,7 +303,7 @@ class DeferCaseService
     public function getStudentDeferCases(int $studentId): Collection
     {
         return DeferCase::where('student_id', $studentId)
-            ->with(['actionLog', 'semester', 'items.courseRegistration', 'creditCharge'])
+            ->with(['actionLog', 'semester', 'items.courseRegistration'])
             ->orderBy('effective_at', 'desc')
             ->get();
     }
@@ -280,7 +318,6 @@ class DeferCaseService
             'student',
             'semester',
             'items.courseRegistration.courseOffering.unit',
-            'creditCharge',
             'uploadRecord',
             'changedBy',
         ])->findOrFail($deferCaseId);

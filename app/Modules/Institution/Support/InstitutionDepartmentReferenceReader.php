@@ -15,6 +15,11 @@ class InstitutionDepartmentReferenceReader implements DepartmentReferenceReader
         return $this->reference(Department::query()->find($departmentId));
     }
 
+    public function findByCode(string $code): ?DepartmentReference
+    {
+        return $this->reference(Department::query()->where('code', $code)->first());
+    }
+
     public function activeMemberUserIds(int $departmentId): array
     {
         return Department::query()

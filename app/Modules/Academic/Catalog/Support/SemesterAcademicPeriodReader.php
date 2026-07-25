@@ -36,6 +36,19 @@ class SemesterAcademicPeriodReader implements AcademicPeriodReader
         return $this->mapPeriod(Semester::query()->find($academicPeriodId));
     }
 
+    public function findMany(array $academicPeriodIds): array
+    {
+        return Semester::query()
+            ->whereKey(array_values(array_unique($academicPeriodIds)))
+            ->get()
+            ->mapWithKeys(function (Semester $semester): array {
+                $period = $this->mapPeriod($semester);
+
+                return $period === null ? [] : [$period->id => $period];
+            })
+            ->all();
+    }
+
     public function countStartingBetween(CarbonImmutable $start, CarbonImmutable $end): int
     {
         return Semester::query()

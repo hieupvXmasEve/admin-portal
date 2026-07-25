@@ -224,15 +224,6 @@ class FinanceChargeService
             ->where('entitlement_type', FinanceEntitlementType::DeferCredit)
             ->exists();
 
-        if (! $hasCredit) {
-            // Legacy negative-row path (pre wave 7).
-            $hasCredit = FinanceCharge::query()
-                ->where('charge_type', FinanceEntitlementType::DeferCredit)
-                ->where('source_type', FinanceCharge::class)
-                ->where('source_id', $charge->id)
-                ->exists();
-        }
-
         if ($hasCredit) {
             return 'Selected EGC level has already been preserved.';
         }

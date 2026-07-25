@@ -12,6 +12,7 @@ use App\Models\ExamResitAttempt;
 use App\Models\Semester;
 use App\Shared\Contracts\Academic\AcademicFinanceChargeSourceGateway as AcademicFinanceChargeSourceGatewayContract;
 use App\Shared\Contracts\Academic\AcademicFinanceSourceKeys;
+use App\Shared\Contracts\Academic\DTO\AcademicBillingRegistrationData;
 use App\Shared\Contracts\Academic\DTO\AcademicChargeHandoffResult;
 use App\Shared\Contracts\Academic\DTO\AcademicChargeSourceData;
 use App\Shared\Contracts\Academic\DTO\AcademicEgcBlockData;
@@ -21,6 +22,7 @@ use App\Shared\Contracts\Finance\Enums\FinancialEffect;
 use App\Shared\Contracts\Finance\FinanceIntakeContract;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -30,6 +32,96 @@ final class AcademicFinanceChargeSourceGateway implements AcademicFinanceChargeS
     public function __construct(
         private readonly FinanceIntakeContract $intake,
     ) {}
+
+    public function billingExceptionRegistrations(?int $semesterId = null): array
+    {
+        $registrations = $this->billingExceptionRegistrationQuery()
+            ->when($semesterId !== null, fn (QueryBuilder $query) => $query->where(
+                'billing_exception_offerings.semester_id',
+                $semesterId,
+            ))
+            ->orderBy('course_registrations.id')
+            ->get();
+
+        $retakeSourceRefs = $registrations->contains(
+            static fn (object $registration): bool => (bool) $registration->is_retake,
+        )
+            ? $this->retakeSourceRefsByCourseRegistrationIds(
+                $registrations
+                    ->where('is_retake', true)
+                    ->pluck('id')
+                    ->map(static fn (mixed $id): int => (int) $id)
+                    ->all(),
+            )
+            : [];
+
+        return $registrations
+            ->map(fn (object $registration): AcademicBillingRegistrationData => $this->billingRegistrationData(
+                $registration,
+                $retakeSourceRefs[(int) $registration->id] ?? [],
+            ))
+            ->values()
+            ->all();
+    }
+
+    /** @return iterable<list<AcademicBillingRegistrationData>> */
+    public function billingExceptionRegistrationChunks(
+        ?int $semesterId = null,
+        int $studentChunkSize = 250,
+    ): iterable {
+        $registrations = $this->billingExceptionRegistrationQuery()
+            ->when($semesterId !== null, fn (QueryBuilder $query) => $query->where(
+                'billing_exception_offerings.semester_id',
+                $semesterId,
+            ))
+            ->orderBy('course_registrations.student_id')
+            ->orderBy('course_registrations.id')
+            ->lazy(1000);
+        $chunk = collect();
+        $chunkStudentIds = [];
+
+        foreach ($registrations as $registration) {
+            $studentId = (int) $registration->student_id;
+            if (! isset($chunkStudentIds[$studentId]) && count($chunkStudentIds) >= $studentChunkSize) {
+                yield $this->billingRegistrationChunkData($chunk);
+                $chunk = collect();
+                $chunkStudentIds = [];
+            }
+
+            $chunkStudentIds[$studentId] = true;
+            $chunk->push($registration);
+        }
+
+        if ($chunk->isNotEmpty()) {
+            yield $this->billingRegistrationChunkData($chunk);
+        }
+    }
+
+    public function billingExceptionRegistration(
+        int $registrationId,
+        bool $lockForUpdate = false,
+    ): ?AcademicBillingRegistrationData {
+        $query = $this->billingExceptionRegistrationQuery()
+            ->where('course_registrations.id', $registrationId);
+
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
+        }
+
+        $registration = $query->first();
+        if ($registration === null) {
+            return null;
+        }
+
+        $sourceRefs = (bool) $registration->is_retake
+            ? $this->retakeSourceRefsByCourseRegistrationIds([$registrationId])
+            : [];
+
+        return $this->billingRegistrationData(
+            $registration,
+            $sourceRefs[$registrationId] ?? [],
+        );
+    }
 
     public function createRetakeCharge(int $registrationId, int $actorId, ?string $description = null): AcademicChargeHandoffResult
     {
@@ -652,6 +744,107 @@ final class AcademicFinanceChargeSourceGateway implements AcademicFinanceChargeS
             status: (string) $registration->status,
             hq_fee_status: (string) $registration->hq_fee_status,
         );
+    }
+
+    /**
+     * @param  list<int>  $registrationIds
+     * @return array<int, list<string>>
+     */
+    private function retakeSourceRefsByCourseRegistrationIds(array $registrationIds): array
+    {
+        if ($registrationIds === []) {
+            return [];
+        }
+
+        return CourseRetakeRegistration::query()
+            ->whereIn('course_registration_id', $registrationIds)
+            ->where('status', '!=', CourseRetakeRegistration::STATUS_CANCELLED)
+            ->orderBy('id')
+            ->get(['id', 'course_registration_id'])
+            ->groupBy('course_registration_id')
+            ->map(fn (Collection $registrations): array => $registrations
+                ->map(static fn (CourseRetakeRegistration $registration): string => AcademicFinanceSourceKeys::courseRetakeRegistrationRef(
+                    (int) $registration->id,
+                ))
+                ->values()
+                ->all())
+            ->all();
+    }
+
+    /**
+     * @param  list<string>  $retakeSourceRefs
+     */
+    /**
+     * @param  Collection<int, object>  $registrations
+     * @return list<AcademicBillingRegistrationData>
+     */
+    private function billingRegistrationChunkData(Collection $registrations): array
+    {
+        $retakeSourceRefs = $this->retakeSourceRefsByCourseRegistrationIds(
+            $registrations
+                ->where('is_retake', true)
+                ->pluck('id')
+                ->map(static fn (mixed $id): int => (int) $id)
+                ->all(),
+        );
+
+        return $registrations
+            ->map(fn (object $registration): AcademicBillingRegistrationData => $this->billingRegistrationData(
+                $registration,
+                $retakeSourceRefs[(int) $registration->id] ?? [],
+            ))
+            ->values()
+            ->all();
+    }
+
+    private function billingRegistrationData(
+        object $registration,
+        array $retakeSourceRefs,
+    ): AcademicBillingRegistrationData {
+        return new AcademicBillingRegistrationData(
+            id: (int) $registration->id,
+            student_id: (int) $registration->student_id,
+            semester_id: $registration->semester_id === null ? null : (int) $registration->semester_id,
+            course_offering_id: (int) $registration->course_offering_id,
+            registration_status: (string) $registration->registration_status,
+            is_retake: (bool) $registration->is_retake,
+            created_at: $registration->created_at === null ? null : (string) $registration->created_at,
+            offering_semester_id: $registration->offering_semester_id === null
+                ? null
+                : (int) $registration->offering_semester_id,
+            unit_name: $registration->unit_name,
+            unit_code: $registration->unit_code,
+            retake_source_refs: $retakeSourceRefs,
+        );
+    }
+
+    private function billingExceptionRegistrationQuery(): QueryBuilder
+    {
+        return DB::table('course_registrations')
+            ->leftJoin(
+                'course_offerings as billing_exception_offerings',
+                'billing_exception_offerings.id',
+                '=',
+                'course_registrations.course_offering_id',
+            )
+            ->leftJoin(
+                'units as billing_exception_units',
+                'billing_exception_units.id',
+                '=',
+                'billing_exception_offerings.unit_id',
+            )
+            ->select([
+                'course_registrations.id',
+                'course_registrations.student_id',
+                'course_registrations.semester_id',
+                'course_registrations.course_offering_id',
+                'course_registrations.registration_status',
+                'course_registrations.is_retake',
+                'course_registrations.created_at',
+                'billing_exception_offerings.semester_id as offering_semester_id',
+                'billing_exception_units.name as unit_name',
+                'billing_exception_units.code as unit_code',
+            ]);
     }
 
     private function examResitSourceData(ExamResitAttempt $attempt, ?string $dueDate = null): AcademicChargeSourceData

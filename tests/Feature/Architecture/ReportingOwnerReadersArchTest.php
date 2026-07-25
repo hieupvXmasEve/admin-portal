@@ -72,3 +72,15 @@ it('protects report exports and fails closed for missing dashboard campus scope'
         ->toContain("whereHas('student'")
         ->and($dashboardCharts)->toContain('AccessDeniedHttpException');
 });
+
+it('keeps scholarship roster export on the bounded Registry stream', function (): void {
+    $query = file_get_contents(
+        base_path('app/Modules/Finance/Queries/Reporting/ExportStudentScholarshipRosterQuery.php'),
+    ) ?: '';
+
+    expect($query)
+        ->toContain('studentReferences->stream()')
+        ->toContain('->chunk(500)')
+        ->not->toContain('studentReferences->findMany(')
+        ->not->toContain('studentReferences->idsForCampus(');
+});

@@ -10,6 +10,8 @@ interface DepartmentReferenceReader
 {
     public function find(int $departmentId): ?DepartmentReference;
 
+    public function findByCode(string $code): ?DepartmentReference;
+
     /**
      * @return list<int>
      */

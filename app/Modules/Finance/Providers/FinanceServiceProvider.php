@@ -16,6 +16,7 @@ use App\Modules\Finance\Dng\Services\DngClient;
 use App\Modules\Finance\Dng\Services\DngPaymentService;
 use App\Modules\Finance\Dng\Services\DngReconciliationService;
 use App\Modules\Finance\Dng\Services\DngWebhookService;
+use App\Modules\Finance\Models\DngReceiptException;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Observers\StudentBillingAccountObserver;
 use App\Modules\Finance\Policies\DngReceiptExceptionPolicy;
@@ -36,8 +37,7 @@ use App\Modules\Finance\Support\FinanceIntakeRouter;
 use App\Modules\Finance\Support\HubStudentFinanceSummaryReader as ModuleHubStudentFinanceSummaryReader;
 use App\Modules\Finance\Support\ObligationLedgerSettlementReader;
 use App\Modules\Finance\Support\SettlementPosition\CurrentPayableSettlementPositionReader;
-use App\Shared\Contracts\Academic\StudentDeferLifecycleReader;
-use App\Shared\Contracts\Academic\StudentLifecycleCourseRegistrationGateway;
+use App\Modules\Finance\Support\ZeroTuitionTermLookup;
 use App\Shared\Contracts\Finance\AiFinanceMetricReader;
 use App\Shared\Contracts\Finance\AiFinanceStudentProfileReader;
 use App\Shared\Contracts\Finance\BillingAccountRollbackWriter;
@@ -85,19 +85,14 @@ class FinanceServiceProvider extends ServiceProvider
             AttachStudentLifecycleFinanceEvidenceAction::class,
         );
         $this->app->bind(StudentLifecycleFinanceReader::class, StudentLifecycleFinanceQuery::class);
+        $this->app->scoped(ZeroTuitionTermLookup::class);
 
         // Register services as singletons
         $this->app->singleton(FinanceChargeService::class);
         $this->app->singleton(PaymentService::class);
         $this->app->singleton(SettlementService::class);
         $this->app->singleton(InvoiceGenerationService::class);
-        $this->app->singleton(DeferCaseService::class, function ($app) {
-            return new DeferCaseService(
-                $app->make(FinanceChargeService::class),
-                $app->make(StudentLifecycleCourseRegistrationGateway::class),
-                $app->make(StudentDeferLifecycleReader::class),
-            );
-        });
+        $this->app->singleton(DeferCaseService::class);
 
         // DNG payment gateway services
         $this->app->singleton(DngChecksumService::class);

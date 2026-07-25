@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Contracts\Academic;
 
+use App\Shared\Contracts\Academic\DTO\AcademicBillingRegistrationData;
 use App\Shared\Contracts\Academic\DTO\AcademicChargeHandoffResult;
 use App\Shared\Contracts\Academic\DTO\AcademicChargeSourceData;
 use App\Shared\Contracts\Academic\DTO\AcademicEgcBlockData;
@@ -12,6 +13,23 @@ use DateTimeInterface;
 
 interface AcademicFinanceChargeSourceGateway
 {
+    /**
+     * @return list<AcademicBillingRegistrationData>
+     */
+    public function billingExceptionRegistrations(?int $semesterId = null): array;
+
+    /**
+     * Streams registration groups whose students never span two chunks.
+     *
+     * @return iterable<list<AcademicBillingRegistrationData>>
+     */
+    public function billingExceptionRegistrationChunks(?int $semesterId = null, int $studentChunkSize = 250): iterable;
+
+    public function billingExceptionRegistration(
+        int $registrationId,
+        bool $lockForUpdate = false,
+    ): ?AcademicBillingRegistrationData;
+
     public function createRetakeCharge(int $registrationId, int $actorId, ?string $description = null): AcademicChargeHandoffResult;
 
     public function createExamResitCharge(int $attemptId, int $actorId, ?string $dueDate = null): AcademicChargeHandoffResult;

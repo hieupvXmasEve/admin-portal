@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Reporting;
 
-use App\Models\Semester;
-use App\Models\Student;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Dng\Models\DngWebhookEvent;
 use App\Modules\Finance\Support\Reporting\DngLifecycleCatalog as Catalog;
+use App\Shared\Contracts\Academic\AcademicPeriodReader;
+use App\Shared\Contracts\Academic\DTO\AcademicPeriodReference;
+use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -35,6 +37,11 @@ class ListDngLifecycleQuery
      * the truncation is surfaced (and logged) rather than silently dropped.
      */
     private const MAX_SCAN = 2000;
+
+    public function __construct(
+        private readonly StudentReferenceReader $studentReferences,
+        private readonly AcademicPeriodReader $academicPeriods,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $filters
@@ -118,19 +125,34 @@ class ListDngLifecycleQuery
 
         $requests = $this->baseQuery($campusId, $filters)
             ->with([
-                'student:id,student_id,full_name,status,campus_id',
-                'semester:id,name',
                 'chargeLinks:id,dng_payment_request_id,finance_charge_id',
                 'chargeLinks.financeCharge:id,semester_id',
-                'chargeLinks.financeCharge.semester:id,name',
                 'webhookEvents:id,dng_payment_request_id,is_valid_checksum,processing_status,next_retry_at',
             ])
             ->orderByDesc('created_at')
             ->limit(self::MAX_SCAN)
             ->get();
+        $students = $this->studentReferences->findMany(
+            $requests->pluck('student_id')->map(static fn (int|string $id): int => (int) $id)->unique()->values()->all(),
+        );
+        $periodIds = $requests
+            ->pluck('semester_id')
+            ->merge($requests->flatMap(fn (DngPaymentRequest $request) => $request->chargeLinks->pluck('financeCharge.semester_id')))
+            ->filter()
+            ->map(static fn (int|string $id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+        $periods = $this->academicPeriods->findMany($periodIds);
 
         $rows = $requests
-            ->map(fn (DngPaymentRequest $request): ?array => $this->buildRow($request, $selectedSemesterId, $now))
+            ->map(fn (DngPaymentRequest $request): ?array => $this->buildRow(
+                $request,
+                $students[(int) $request->student_id] ?? null,
+                $periods,
+                $selectedSemesterId,
+                $now,
+            ))
             ->filter()
             ->values();
 
@@ -147,7 +169,7 @@ class ListDngLifecycleQuery
     private function baseQuery(int $campusId, array $filters): Builder
     {
         $query = DngPaymentRequest::query()
-            ->whereHas('student', fn (Builder $studentQuery) => $studentQuery->where('campus_id', $campusId))
+            ->whereIn('student_id', $this->studentReferences->idsForCampus($campusId))
             ->when(
                 ! empty($filters['dng_status']) && $filters['dng_status'] !== 'all',
                 fn (Builder $query) => $query->where('status', (string) $filters['dng_status']),
@@ -186,7 +208,7 @@ class ListDngLifecycleQuery
             )
             ->when(
                 ! empty($filters['search']),
-                fn (Builder $query) => $this->applySearch($query, (string) $filters['search']),
+                fn (Builder $query) => $this->applySearch($query, (string) $filters['search'], $campusId),
             );
 
         return $this->applyDerivedStateHints($query, $filters);
@@ -254,26 +276,30 @@ class ListDngLifecycleQuery
      * @param  Builder<DngPaymentRequest>  $query
      * @return Builder<DngPaymentRequest>
      */
-    private function applySearch(Builder $query, string $search): Builder
+    private function applySearch(Builder $query, string $search, int $campusId): Builder
     {
-        return $query->where(function (Builder $inner) use ($search): void {
+        $studentIds = $this->studentReferences->idsMatchingSearch($search, $campusId);
+
+        return $query->where(function (Builder $inner) use ($search, $studentIds): void {
             $inner->where('item_id', 'like', "%{$search}%")
                 ->orWhere('student_code', 'like', "%{$search}%")
                 ->orWhere('dng_payment_id', 'like', "%{$search}%")
                 ->orWhere('dng_transaction_id', 'like', "%{$search}%")
                 ->orWhere('invoice_serial_number', 'like', "%{$search}%")
-                ->orWhereHas('student', fn (Builder $studentQuery) => $studentQuery
-                    ->where('full_name', 'like', "%{$search}%")
-                    ->orWhere('student_id', 'like', "%{$search}%"));
+                ->orWhereIn('student_id', $studentIds);
         });
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function buildRow(DngPaymentRequest $request, ?int $selectedSemesterId, Carbon $now): ?array
-    {
-        $student = $request->student;
+    private function buildRow(
+        DngPaymentRequest $request,
+        ?StudentReference $student,
+        array $periods,
+        ?int $selectedSemesterId,
+        Carbon $now,
+    ): ?array {
         if ($student === null) {
             return null;
         }
@@ -281,7 +307,7 @@ class ListDngLifecycleQuery
         $webhookEvents = $this->webhookEventArray($request->webhookEvents);
         $webhookState = Catalog::deriveWebhookState($webhookEvents);
 
-        $relatedSemesters = $this->relatedSemesters($request);
+        $relatedSemesters = $this->relatedSemesters($request, $periods);
         $relatedIds = array_map(static fn (array $semester) => $semester['id'], $relatedSemesters);
         $semesterState = Catalog::relatedSemesterState($relatedIds);
         $outsideSelected = $selectedSemesterId !== null
@@ -304,10 +330,10 @@ class ListDngLifecycleQuery
             'paid_at' => $request->paid_at?->toIso8601String(),
             'student' => [
                 'id' => $student->id,
-                'student_code' => $student->student_id,
-                'full_name' => $student->full_name,
+                'student_code' => $student->studentCode,
+                'full_name' => $student->fullName,
                 'status' => $student->status,
-                'status_label' => $student->status_label,
+                'status_label' => $student->statusLabel,
             ],
             'fee_type' => $request->fee_type,
             'amount' => round((float) $request->amount, 2),
@@ -396,20 +422,22 @@ class ListDngLifecycleQuery
      *
      * @return list<array{id: int, name: string}>
      */
-    private function relatedSemesters(DngPaymentRequest $request): array
+    private function relatedSemesters(DngPaymentRequest $request, array $periods): array
     {
         $semesters = [];
 
-        $add = static function (?Semester $semester) use (&$semesters): void {
-            if ($semester !== null) {
-                $semesters[$semester->id] = $semester->name;
+        $add = static function (?int $periodId) use (&$semesters, $periods): void {
+            $period = $periodId === null ? null : ($periods[$periodId] ?? null);
+            if ($period instanceof AcademicPeriodReference) {
+                $semesters[$period->id] = $period->name;
             }
         };
 
-        $add($request->semester);
+        $add($request->semester_id === null ? null : (int) $request->semester_id);
 
         foreach ($request->chargeLinks as $link) {
-            $add($link->financeCharge?->semester);
+            $semesterId = $link->financeCharge?->semester_id;
+            $add($semesterId === null ? null : (int) $semesterId);
         }
 
         $result = [];
@@ -495,7 +523,7 @@ class ListDngLifecycleQuery
         }
 
         $feeTypes = DngPaymentRequest::query()
-            ->whereHas('student', fn (Builder $studentQuery) => $studentQuery->where('campus_id', $campusId))
+            ->whereIn('student_id', $this->studentReferences->idsForCampus($campusId))
             ->distinct()
             ->pluck('fee_type')
             ->filter()
@@ -526,11 +554,14 @@ class ListDngLifecycleQuery
     private function relatedSemesterOptions(int $campusId): array
     {
         $base = DngPaymentRequest::query()
-            ->whereHas('student', fn (Builder $studentQuery) => $studentQuery->where('campus_id', $campusId));
+            ->whereIn('student_id', $this->studentReferences->idsForCampus($campusId));
 
         $direct = (clone $base)->whereNotNull('semester_id')->distinct()->pluck('semester_id');
         $linked = DngPaymentRequestCharge::query()
-            ->whereHas('dngPaymentRequest.student', fn (Builder $studentQuery) => $studentQuery->where('campus_id', $campusId))
+            ->whereHas('dngPaymentRequest', fn (Builder $request) => $request->whereIn(
+                'student_id',
+                $this->studentReferences->idsForCampus($campusId),
+            ))
             ->with('financeCharge:id,semester_id')
             ->get(['id', 'finance_charge_id'])
             ->map(fn ($link) => $link->financeCharge?->semester_id)
@@ -538,11 +569,10 @@ class ListDngLifecycleQuery
 
         $ids = collect($direct)->merge($linked)->map(fn ($id) => (int) $id)->unique()->values();
 
-        return Semester::query()
-            ->whereIn('id', $ids)
-            ->orderByDesc('start_date')
-            ->get(['id', 'name'])
-            ->map(fn (Semester $semester) => ['value' => $semester->id, 'label' => $semester->name])
+        return collect($this->academicPeriods->findMany($ids->all()))
+            ->sortByDesc(fn (AcademicPeriodReference $period) => $period->start_date)
+            ->map(fn (AcademicPeriodReference $period): array => ['value' => $period->id, 'label' => $period->name])
+            ->values()
             ->all();
     }
 

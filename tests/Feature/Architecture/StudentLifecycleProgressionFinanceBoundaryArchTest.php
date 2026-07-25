@@ -63,6 +63,7 @@ it('binds narrow Finance lifecycle query and command contracts to Finance implem
 
     $deferService = file_get_contents(base_path('app/Modules/Finance/Services/DeferCaseService.php')) ?: '';
     $billingExceptionCollector = file_get_contents(base_path('app/Modules/Finance/Support/BillingExceptionCollector.php')) ?: '';
+    $fixBillingExceptionAction = file_get_contents(base_path('app/Modules/Finance/Actions/Operations/FixBillingExceptionAction.php')) ?: '';
     $deferredEnrollmentMatcher = file_get_contents(base_path('app/Modules/Finance/Support/BillingExceptionDeferredEnrollmentMatcher.php')) ?: '';
 
     expect($deferService)
@@ -76,6 +77,20 @@ it('binds narrow Finance lifecycle query and command contracts to Finance implem
         ->and($deferredEnrollmentMatcher)
         ->toContain('StudentDeferLifecycleReader')
         ->not->toContain('student_action_logs');
+
+    foreach ([$billingExceptionCollector, $fixBillingExceptionAction] as $billingExceptionSource) {
+        expect($billingExceptionSource)
+            ->toContain('AcademicFinanceChargeSourceGateway')
+            ->not->toContain("DB::table('course_registrations')")
+            ->not->toContain("DB::table('course_offerings')")
+            ->not->toContain("DB::table('course_retake_registrations')")
+            ->not->toContain("DB::table('students')")
+            ->not->toContain("DB::table('units')")
+            ->not->toContain("->where('source_type'")
+            ->not->toContain("->where('source_id'")
+            ->not->toContain('finance_charges.source_type')
+            ->not->toContain('finance_charges.source_id');
+    }
 
     $dueExceptionMapper = file_get_contents(base_path('app/Modules/Finance/Support/LifecycleDueExceptionRowMapper.php')) ?: '';
     $dueExceptionQuery = file_get_contents(base_path('app/Modules/Finance/Queries/Operations/ListLifecycleDueExceptionsQuery.php')) ?: '';

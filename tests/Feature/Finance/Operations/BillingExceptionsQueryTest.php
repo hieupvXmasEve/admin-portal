@@ -23,6 +23,10 @@ use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Queries\Operations\GetBillingExceptionCountsQuery;
 use App\Modules\Finance\Queries\Operations\ListBillingExceptionsQuery;
 use App\Modules\Finance\Support\BillingExceptionIdentifier;
+use App\Shared\Contracts\Academic\AcademicFinanceSourceKeys;
+use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
+use App\Shared\Contracts\Finance\Enums\FinancialEffect;
+use App\Shared\Contracts\Finance\FinanceIntakeContract;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -815,16 +819,8 @@ it('detects retake no charge exceptions per registration source', function () {
         'retake_fee' => 1500000,
     ]);
 
-    FinanceCharge::create([
-        'student_id' => $student->id,
-        'semester_id' => $this->semester->id,
-        'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
-        'amount' => 1500000,
-        'description' => 'Retake',
-        'effective_at' => now(),
-        'status' => FinanceCharge::STATUS_ACTIVE,
-        'source_type' => CourseRegistration::class,
-        'source_id' => $firstRegistration->id,
+    FixBillingExceptionAction::run([
+        'exception_id' => BillingExceptionIdentifier::encode('retake_no_charge', $firstRegistration->id),
     ]);
 
     $list = app(ListBillingExceptionsQuery::class)
@@ -886,19 +882,19 @@ it('does not flag retake registrations when an active charge is linked via Cours
         'enrolled_at' => now(),
     ]);
 
-    $charge = FinanceCharge::create([
-        'student_id' => $student->id,
-        'semester_id' => $this->semester->id,
-        'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
-        'amount' => 3000000,
-        'description' => 'Retake via course retake registration',
-        'effective_at' => now(),
-        'status' => FinanceCharge::STATUS_ACTIVE,
-        'source_type' => CourseRetakeRegistration::class,
-        'source_id' => $retakeRegistration->id,
-    ]);
-
-    $retakeRegistration->update(['finance_charge_id' => $charge->id]);
+    app(FinanceIntakeContract::class)->request(new FinanceIntakeData(
+        source_system: AcademicFinanceSourceKeys::SOURCE_SYSTEM,
+        source_kind: AcademicFinanceSourceKeys::COURSE_RETAKE_REGISTRATION,
+        source_ref: AcademicFinanceSourceKeys::courseRetakeRegistrationRef($retakeRegistration->id),
+        financial_effect: FinancialEffect::Debit,
+        obligation_type: FinanceCharge::TYPE_RETAKE_FEE,
+        facts: [
+            'student_id' => $student->id,
+            'semester_id' => $this->semester->id,
+            'campus_id' => $this->campus->id,
+            'description' => 'Retake via canonical Academic source',
+        ],
+    ));
 
     FinanceCharge::create([
         'student_id' => $student->id,
@@ -920,6 +916,63 @@ it('does not flag retake registrations when an active charge is linked via Cours
 
     expect($counts['retake_no_charge'])->toBe(0)
         ->and($list->total())->toBe(0);
+});
+
+it('does not treat a legacy morph-source charge as canonical retake evidence', function () {
+    $student = Student::factory()
+        ->forCampus($this->campus)
+        ->forProgram($this->program)
+        ->state([
+            'student_id' => 'EXC-LEGACY-RET-01',
+            'intake_semester_id' => $this->semester->id,
+            'intake' => 1,
+            'intake_mode' => 'sequential',
+            'status' => 'intake_course',
+        ])
+        ->create();
+
+    $offering = CourseOffering::factory()->create(['semester_id' => $this->semester->id]);
+    $registration = CourseRegistration::create([
+        'student_id' => $student->id,
+        'course_offering_id' => $offering->id,
+        'semester_id' => $this->semester->id,
+        'registration_status' => 'confirmed',
+        'registration_date' => now(),
+        'registration_method' => 'admin_override',
+        'credit_hours' => 3,
+        'credit_points' => 3,
+        'attempt_number' => 2,
+        'is_retake' => true,
+        'retake_fee' => 1500000,
+    ]);
+
+    $legacyCharge = FinanceCharge::create([
+        'student_id' => $student->id,
+        'semester_id' => $this->semester->id,
+        'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
+        'amount' => 1500000,
+        'description' => 'Legacy morph-source retake charge',
+        'effective_at' => now(),
+        'status' => FinanceCharge::STATUS_ACTIVE,
+        'source_type' => CourseRegistration::class,
+        'source_id' => $registration->id,
+    ]);
+
+    $beforeFix = app(ListBillingExceptionsQuery::class)
+        ->handle($this->semester->id, 'retake_no_charge', 'http://localhost/exceptions');
+
+    $result = FixBillingExceptionAction::run([
+        'exception_id' => BillingExceptionIdentifier::encode('retake_no_charge', $registration->id),
+    ]);
+
+    $afterFix = app(ListBillingExceptionsQuery::class)
+        ->handle($this->semester->id, 'retake_no_charge', 'http://localhost/exceptions');
+    $canonicalCharge = FinanceCharge::query()->findOrFail($result['charge_id']);
+
+    expect($beforeFix->total())->toBe(1)
+        ->and($result['charge_id'])->not->toBe($legacyCharge->id)
+        ->and($canonicalCharge->finance_obligation_id)->not->toBeNull()
+        ->and($afterFix->total())->toBe(0);
 });
 
 it('refuses a retake fix when defer policy skips charge creation', function () {

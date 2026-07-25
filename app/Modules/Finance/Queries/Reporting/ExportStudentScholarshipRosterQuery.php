@@ -4,12 +4,22 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Reporting;
 
+use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
+use App\Shared\Contracts\Institution\CampusReferenceReader;
+use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\LazyCollection;
 
 class ExportStudentScholarshipRosterQuery
 {
+    public function __construct(
+        private readonly StudentReferenceReader $studentReferences,
+        private readonly ProgramEnrollmentReader $programEnrollments,
+        private readonly CampusReferenceReader $campusReferences,
+    ) {}
+
     /**
      * @return list<string>
      */
@@ -39,7 +49,53 @@ class ExportStudentScholarshipRosterQuery
 
     public function cursor(): LazyCollection
     {
-        return $this->buildQuery()->cursor();
+        $campuses = collect($this->campusReferences->all())->keyBy('id');
+
+        return LazyCollection::make(function () use ($campuses): iterable {
+            $studentChunks = LazyCollection::make(
+                fn () => yield from $this->studentReferences->stream(),
+            )->chunk(500);
+
+            foreach ($studentChunks as $students) {
+                $studentIds = $students
+                    ->map(static fn (StudentReference $student): int => $student->id)
+                    ->all();
+                $enrollments = $this->programEnrollments->forStudentIds($studentIds);
+                $awards = $this->buildAwardQuery($studentIds)->get()->groupBy('student_id');
+
+                foreach ($students as $student) {
+                    $studentAwards = $awards->get($student->id, collect([null]));
+                    if ($studentAwards->isEmpty()) {
+                        $studentAwards = collect([null]);
+                    }
+
+                    foreach ($studentAwards as $award) {
+                        $enrollment = $enrollments[$student->id];
+                        $campus = $campuses->get($student->campusId);
+
+                        yield (object) [
+                            'student_code' => $student->studentCode,
+                            'student_name' => $student->fullName,
+                            'student_email' => $student->email,
+                            'campus_name' => $campus?->name,
+                            'program_name' => $enrollment->programName,
+                            'intake' => $student->cohort,
+                            'scholarship_code' => $award?->scholarship_code,
+                            'scholarship_name' => $award?->scholarship_name,
+                            'scholarship_type' => $award?->scholarship_type,
+                            'scholarship_amount' => $award?->scholarship_amount,
+                            'total_amount' => $award?->total_amount,
+                            'total_terms' => $award?->total_terms,
+                            'valid_from' => $award?->valid_from,
+                            'valid_until' => $award?->valid_until,
+                            'scholarship_is_active' => $award?->scholarship_is_active,
+                            'awarded_at' => $award?->awarded_at,
+                            'award_notes' => $award?->award_notes,
+                        ];
+                    }
+                }
+            }
+        });
     }
 
     /**
@@ -69,21 +125,14 @@ class ExportStudentScholarshipRosterQuery
         ];
     }
 
-    private function buildQuery(): Builder
+    /** @param list<int> $studentIds */
+    private function buildAwardQuery(array $studentIds): Builder
     {
-        return DB::table('students as s')
-            ->join('campuses as c', 's.campus_id', '=', 'c.id')
-            ->join('programs as p', 's.program_id', '=', 'p.id')
-            ->leftJoin('student_scholarship_awards as ssa', 'ssa.student_id', '=', 's.id')
+        return DB::table('student_scholarship_awards as ssa')
             ->leftJoin('scholarship_definitions as sd', 'sd.code', '=', 'ssa.scholarship_code')
-            ->whereNull('s.deleted_at')
+            ->whereIn('ssa.student_id', $studentIds)
             ->select([
-                's.student_id as student_code',
-                's.full_name as student_name',
-                's.email as student_email',
-                'c.name as campus_name',
-                'p.name as program_name',
-                's.intake',
+                'ssa.student_id',
                 'ssa.scholarship_code',
                 'sd.name as scholarship_name',
                 'sd.type as scholarship_type',
@@ -95,8 +144,7 @@ class ExportStudentScholarshipRosterQuery
                 'sd.is_active as scholarship_is_active',
                 'ssa.awarded_at',
                 'ssa.notes as award_notes',
-            ])
-            ->orderBy('s.student_id');
+            ]);
     }
 
     private function formatBoolean(mixed $value): ?string

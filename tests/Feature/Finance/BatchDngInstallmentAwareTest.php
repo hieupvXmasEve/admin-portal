@@ -29,7 +29,7 @@ uses(RefreshDatabase::class);
 function batch_mockCampusCodeResolver(string $code = 'TEST'): void
 {
     $mock = Mockery::mock(DngCampusCodeResolver::class);
-    $mock->shouldReceive('requireForStudent')->andReturn($code);
+    $mock->shouldReceive('requireForCampusId')->andReturn($code);
     app()->instance(DngCampusCodeResolver::class, $mock);
 }
 

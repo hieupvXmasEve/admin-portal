@@ -9,6 +9,7 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Queries\Reporting\ListFeeMonitorQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -214,4 +215,16 @@ it('excludes a deferred-enrollment student from missing tuition rows', function 
     $rows = collect($response->original->getData()['page']['props']['fee_monitor']['rows']['data']);
 
     expect($rows->pluck('student.student_code'))->not->toContain('FM-DEFER');
+});
+
+it('keeps institution-wide rows when no campus context is bound', function () {
+    $student = makeBatchHpStudent($this->campus, $this->semester, 'FM-INSTITUTION');
+    seedBatchActiveCharge($student, $this->semester, FinanceCharge::TYPE_TUITION_TERM);
+    app()->forgetInstance('campus');
+    app()->offsetUnset('campus');
+
+    $rows = app(ListFeeMonitorQuery::class)
+        ->collectRows($this->semester->id, ['search' => 'FM-INSTITUTION']);
+
+    expect($rows->pluck('student.student_code'))->toContain('FM-INSTITUTION');
 });

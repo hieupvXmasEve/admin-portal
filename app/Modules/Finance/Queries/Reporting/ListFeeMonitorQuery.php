@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Reporting;
 
-use App\Models\Program;
-use App\Models\Semester;
-use App\Models\Student;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Queries\Egc\PreviewEgcChargeGenerationQuery;
 use App\Modules\Finance\Queries\Major\PreviewMajorChargeGenerationQuery;
@@ -17,7 +14,13 @@ use App\Modules\Finance\Support\SettlementPosition\SettlementPositionIssue;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionScope;
 use App\Modules\Finance\Support\StudentChargeTimingResolver;
 use App\Shared\Contracts\Academic\AcademicFinanceChargeSourceGateway;
+use App\Shared\Contracts\Academic\AcademicPeriodReader;
+use App\Shared\Contracts\Academic\DTO\ProgramEnrollmentSummary;
+use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
+use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
+use App\Shared\Contracts\StudentRegistry\StudentCollectionEligibilityReader;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 
@@ -26,8 +29,11 @@ class ListFeeMonitorQuery
     /** @var array<string, FinanceCharge> */
     private array $chargeIndex = [];
 
-    /** @var array<int, Student> */
+    /** @var array<int, StudentReference> */
     private array $studentIndex = [];
+
+    /** @var array<int, ProgramEnrollmentSummary> */
+    private array $enrollmentIndex = [];
 
     public function __construct(
         private readonly PreviewMajorChargeGenerationQuery $majorPreviewQuery,
@@ -36,6 +42,10 @@ class ListFeeMonitorQuery
         private readonly SettlementPositionReader $settlementPositionReader,
         private readonly CurrentSettlementPositionPresenter $positionPresenter,
         private readonly AcademicFinanceChargeSourceGateway $academicSources,
+        private readonly StudentReferenceReader $studentReferences,
+        private readonly ProgramEnrollmentReader $programEnrollments,
+        private readonly AcademicPeriodReader $academicPeriods,
+        private readonly StudentCollectionEligibilityReader $studentEligibility,
     ) {}
 
     /**
@@ -95,51 +105,40 @@ class ListFeeMonitorQuery
     {
         $campusId = app()->bound('campus') ? app('campus')->id : null;
 
-        $programs = Program::query()
-            ->select(['programs.id', 'programs.code', 'programs.name'])
-            ->whereIn('programs.id', function ($subquery) use ($campusId): void {
-                $subquery->select('program_id')
-                    ->from('students')
-                    ->whereNotNull('program_id')
-                    ->when($campusId !== null, fn ($query) => $query->where('campus_id', $campusId))
-                    ->distinct();
-            })
-            ->orderBy('code')
-            ->get()
-            ->map(fn (Program $program) => [
-                'value' => $program->id,
-                'label' => $program->code.' — '.$program->name,
+        $studentIds = $this->studentReferences->idsForCampus($campusId === null ? null : (int) $campusId);
+        $students = collect($this->studentReferences->findMany($studentIds));
+        $enrollments = collect($this->programEnrollments->forStudentIds($studentIds));
+        $programs = $enrollments
+            ->filter(fn (ProgramEnrollmentSummary $enrollment): bool => $enrollment->programId !== null)
+            ->unique(fn (ProgramEnrollmentSummary $enrollment): ?int => $enrollment->programId)
+            ->sortBy(fn (ProgramEnrollmentSummary $enrollment): string => (string) $enrollment->programCode)
+            ->map(fn (ProgramEnrollmentSummary $enrollment): array => [
+                'value' => $enrollment->programId,
+                'label' => $enrollment->programCode.' — '.$enrollment->programName,
             ])
             ->values()
             ->all();
 
-        $intakes = Student::query()
-            ->select('intake_semester_id')
-            ->whereNotNull('intake_semester_id')
-            ->when($campusId !== null, fn ($query) => $query->where('campus_id', $campusId))
-            ->distinct()
-            ->pluck('intake_semester_id')
+        $intakes = $enrollments
+            ->map(fn (ProgramEnrollmentSummary $enrollment): ?int => $enrollment->intakeSemesterId)
             ->filter()
+            ->unique()
             ->values();
 
-        $intakeSemesters = Semester::query()
-            ->whereIn('id', $intakes)
-            ->orderByDesc('start_date')
-            ->get(['id', 'name', 'code'])
-            ->map(fn (Semester $semester) => [
-                'value' => $semester->id,
-                'label' => $semester->name,
+        $intakeSemesters = collect($this->academicPeriods->findMany($intakes->all()))
+            ->sortByDesc(fn ($period) => $period->start_date)
+            ->map(fn ($period): array => [
+                'value' => $period->id,
+                'label' => $period->name,
             ])
             ->values()
             ->all();
 
-        $cohorts = Student::query()
-            ->select('intake')
-            ->when($campusId !== null, fn ($query) => $query->where('campus_id', $campusId))
-            ->distinct()
-            ->orderBy('intake')
-            ->pluck('intake')
+        $cohorts = $students
+            ->pluck('cohort')
             ->filter(fn ($intake) => $intake !== null)
+            ->unique()
+            ->sort()
             ->map(fn (int $intake) => [
                 'value' => $intake,
                 'label' => 'Intake '.$intake,
@@ -168,7 +167,7 @@ class ListFeeMonitorQuery
             ],
             // intake_major still gets HP monitored in the tuition lane, but is hidden
             // from the status filter per ops request (no intake_major cohort in use yet).
-            'student_statuses' => collect(Student::FINANCIAL_STATUSES)
+            'student_statuses' => collect(['intake_pre_uni_gc', 'intake_course', 'intake_major'])
                 ->reject(fn (string $status) => $status === 'intake_major')
                 ->map(fn (string $status) => [
                     'value' => $status,
@@ -184,15 +183,17 @@ class ListFeeMonitorQuery
     {
         $this->chargeIndex = [];
         $this->studentIndex = [];
+        $this->enrollmentIndex = [];
 
         $charges = FinanceCharge::query()
-            ->with(['student.program', 'invoiceLines'])
+            ->with(['invoiceLines', 'financeObligation'])
             ->where('semester_id', $semesterId)
-            ->when($campusId !== null, fn ($query) => $query->whereHas(
-                'student',
-                fn ($studentQuery) => $studentQuery->where('campus_id', $campusId),
+            ->when($campusId !== null, fn ($query) => $query->whereIn(
+                'student_id',
+                $this->studentReferences->idsForCampus((int) $campusId),
             ))
             ->get();
+        $this->primeStudents($charges->pluck('student_id')->map(static fn (int|string $id): int => (int) $id)->all());
 
         foreach ($charges as $charge) {
             $key = $this->chargeKey((int) $charge->student_id, (string) $charge->charge_type);
@@ -200,10 +201,6 @@ class ListFeeMonitorQuery
 
             if ($existing === null || $this->chargePrecedence($charge) < $this->chargePrecedence($existing)) {
                 $this->chargeIndex[$key] = $charge;
-            }
-
-            if ($charge->student !== null) {
-                $this->studentIndex[(int) $charge->student_id] = $charge->student;
             }
         }
     }
@@ -255,6 +252,7 @@ class ListFeeMonitorQuery
     ): Collection {
         $includeSkipped = $this->shouldIncludeSkippedRows($filters);
         $rows = collect();
+        $this->primeStudents($classifications->pluck('student_id')->map(static fn (int|string $id): int => (int) $id)->all());
 
         foreach ($classifications as $item) {
             $eligibilityStatus = (string) ($item['eligibility_status'] ?? 'ineligible');
@@ -290,13 +288,11 @@ class ListFeeMonitorQuery
      */
     private function rowsFromAdmissionExpectation(int $semesterId, ?int $campusId, array $filters): Collection
     {
-        $students = $this->baseStudentQuery($campusId, $filters)
-            ->where('intake_semester_id', $semesterId)
-            ->whereIn('status', Student::FINANCIAL_STATUSES)
-            ->get();
+        $students = $this->candidateStudents($campusId, $filters)
+            ->filter(fn (StudentReference $student): bool => in_array($student->status, ['intake_pre_uni_gc', 'intake_course', 'intake_major'], true)
+                && ($this->enrollmentIndex[$student->id]->intakeSemesterId ?? null) === $semesterId);
 
-        return $students->map(function (Student $student) use ($semesterId): array {
-            $this->studentIndex[$student->id] = $student;
+        return $students->map(function (StudentReference $student) use ($semesterId): array {
             $charge = $this->resolveChargeForStudent($student->id, FinanceCharge::TYPE_ADMISSION_FEE);
 
             return $this->buildExpectationRow(
@@ -315,26 +311,23 @@ class ListFeeMonitorQuery
      */
     private function rowsFromBhytExpectation(int $semesterId, ?int $campusId, array $filters): Collection
     {
-        $students = $this->baseStudentQuery($campusId, $filters)
-            ->whereIn('status', Student::FINANCIAL_STATUSES)
-            ->where(function ($query) use ($semesterId): void {
-                $query
-                    ->whereHas('courseRegistrations', fn ($registrationQuery) => $registrationQuery
-                        ->where('semester_id', $semesterId)
-                        ->whereNotIn('registration_status', ['defer', 'dropped', 'withdrawn']))
-                    ->orWhereHas('financeCharges', fn ($chargeQuery) => $chargeQuery
-                        ->where('semester_id', $semesterId)
-                        ->where('charge_type', FinanceCharge::TYPE_BHYT));
-            })
-            ->get()
-            ->filter(fn (Student $student): bool => $this->timingResolver->shouldIncludeStudentForChargeGeneration(
-                $student,
-                $semesterId,
-                [FinanceCharge::TYPE_BHYT],
-            ));
+        $registrationIds = $this->academicSources->billingDashboardStudentIds($semesterId);
+        $chargedIds = collect($this->chargeIndex)
+            ->filter(fn (FinanceCharge $charge): bool => $charge->charge_type === FinanceCharge::TYPE_BHYT)
+            ->pluck('student_id')
+            ->map(static fn (int|string $id): int => (int) $id)
+            ->all();
+        $candidateIds = array_values(array_unique([...$registrationIds, ...$chargedIds]));
+        $students = $this->candidateStudents($campusId, $filters)
+            ->filter(fn (StudentReference $student): bool => in_array($student->id, $candidateIds, true)
+                && in_array($student->status, ['intake_pre_uni_gc', 'intake_course', 'intake_major'], true)
+                && $this->timingResolver->shouldIncludeStudentForChargeGeneration(
+                    $this->enrollmentIndex[$student->id],
+                    $semesterId,
+                    [FinanceCharge::TYPE_BHYT],
+                ));
 
-        return $students->map(function (Student $student) use ($semesterId): array {
-            $this->studentIndex[$student->id] = $student;
+        return $students->map(function (StudentReference $student) use ($semesterId): array {
             $charge = $this->resolveChargeForStudent($student->id, FinanceCharge::TYPE_BHYT);
 
             return $this->buildExpectationRow(
@@ -361,7 +354,11 @@ class ListFeeMonitorQuery
         $rows = collect();
 
         foreach ($this->chargeIndex as $charge) {
-            if (! in_array($charge->charge_type, $chargeTypes, true) || $charge->student === null) {
+            if (! in_array($charge->charge_type, $chargeTypes, true)) {
+                continue;
+            }
+            $student = $this->resolveStudent((int) $charge->student_id);
+            if ($student === null) {
                 continue;
             }
 
@@ -372,7 +369,7 @@ class ListFeeMonitorQuery
             };
 
             $row = $this->buildExpectationRow(
-                $charge->student,
+                $student,
                 (string) $source,
                 $charge->charge_type,
                 $semesterId,
@@ -481,7 +478,7 @@ class ListFeeMonitorQuery
     }
 
     private function buildExpectationRow(
-        Student $student,
+        StudentReference $student,
         string $source,
         string $chargeType,
         int $semesterId,
@@ -496,14 +493,14 @@ class ListFeeMonitorQuery
             'row_key' => $student->id.'-'.$source.'-'.$semesterId,
             'student' => [
                 'id' => $student->id,
-                'student_code' => $student->student_id,
-                'full_name' => $student->full_name,
+                'student_code' => $student->studentCode,
+                'full_name' => $student->fullName,
                 'status' => $student->status,
-                'status_label' => $student->status_label,
+                'status_label' => $student->statusLabel,
             ],
-            'program_code' => $student->program?->code,
-            'intake_semester_id' => $student->intake_semester_id,
-            'cohort' => $student->intake,
+            'program_code' => $this->enrollmentIndex[$student->id]->programCode ?? null,
+            'intake_semester_id' => $this->enrollmentIndex[$student->id]->intakeSemesterId ?? null,
+            'cohort' => $student->cohort,
             'expected_source' => $source,
             'expected_fee_type' => $chargeType,
             'expected_fee_type_label' => FeeMonitorExpectedFeeCatalog::sources()[$source]['label'] ?? $chargeType,
@@ -523,8 +520,8 @@ class ListFeeMonitorQuery
             'settlement_issues' => [],
             'settlement_breakdown' => [],
             'finance_charge_id' => $charge?->id,
-            'source_type' => $charge?->source_type,
-            'source_id' => $charge?->source_id,
+            'source_type' => $charge?->financeObligation?->source_kind,
+            'source_id' => null,
             'batch_handoff' => $this->resolveBatchHandoff($source, $generationState),
             'drilldowns' => [
                 'student_360_focus' => $charge !== null ? 'charge:'.$charge->id : null,
@@ -683,18 +680,47 @@ class ListFeeMonitorQuery
         return $this->chargeIndex[$this->chargeKey($studentId, $chargeType)] ?? null;
     }
 
-    private function resolveStudent(int $studentId): ?Student
+    private function resolveStudent(int $studentId): ?StudentReference
     {
         if (isset($this->studentIndex[$studentId])) {
             return $this->studentIndex[$studentId];
         }
 
-        $student = Student::query()->with('program')->find($studentId);
-        if ($student !== null) {
-            $this->studentIndex[$studentId] = $student;
+        $this->primeStudents([$studentId]);
+
+        return $this->studentIndex[$studentId] ?? null;
+    }
+
+    /** @param list<int> $studentIds */
+    private function primeStudents(array $studentIds): void
+    {
+        $missingIds = array_values(array_diff(
+            array_values(array_unique(array_map('intval', $studentIds))),
+            array_keys($this->studentIndex),
+        ));
+        if ($missingIds === []) {
+            return;
         }
 
-        return $student;
+        $references = $this->studentReferences->findMany($missingIds);
+        $this->studentIndex += $references;
+        $this->enrollmentIndex += $this->programEnrollments->forStudentIds(array_keys($references));
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return Collection<int, StudentReference>
+     */
+    private function candidateStudents(?int $campusId, array $filters): Collection
+    {
+        $studentIds = $this->studentReferences->idsForCampus($campusId === null ? null : (int) $campusId);
+        $this->primeStudents($studentIds);
+
+        return collect($studentIds)
+            ->map(fn (int $studentId): ?StudentReference => $this->studentIndex[$studentId] ?? null)
+            ->filter(fn (?StudentReference $student): bool => $student !== null
+                && $this->matchesReferenceFilters($student, $filters))
+            ->values();
     }
 
     /**
@@ -715,90 +741,42 @@ class ListFeeMonitorQuery
         $chargedStudentIds = FinanceCharge::query()
             ->where('semester_id', $semesterId)
             ->where('charge_type', $lane === 'tuition' ? FinanceCharge::TYPE_TUITION_TERM : FinanceCharge::TYPE_EGC_LEVEL_FEE)
-            ->when($campusId !== null, fn ($query) => $query->whereHas(
-                'student',
-                fn ($studentQuery) => $studentQuery->where('campus_id', $campusId),
+            ->when($campusId !== null, fn ($query) => $query->whereIn(
+                'student_id',
+                $this->studentReferences->idsForCampus((int) $campusId),
             ))
-            ->pluck('student_id');
+            ->pluck('student_id')
+            ->map(static fn (int|string $id): int => (int) $id)
+            ->all();
+        $eligibleStudentIds = $this->studentEligibility->eligibleStudentIds(
+            [$lane === 'tuition' ? 'tuition' : 'egc'],
+            $campusId === null ? null : (int) $campusId,
+        );
+        $this->primeStudents(array_values(array_unique([...$chargedStudentIds, ...$eligibleStudentIds])));
 
-        $query = $this->baseStudentQuery($campusId, $filters)
-            ->where('intake_semester_id', '<=', $semesterId);
+        return collect(array_values(array_unique([...$chargedStudentIds, ...$eligibleStudentIds])))
+            ->filter(function (int $studentId) use ($filters, $semesterId, $lane, $chargedStudentIds): bool {
+                $student = $this->studentIndex[$studentId] ?? null;
+                $enrollment = $this->enrollmentIndex[$studentId] ?? null;
+                if ($student === null || $enrollment === null
+                    || ! $this->matchesReferenceFilters($student, $filters)
+                    || $enrollment->intakeSemesterId === null
+                    || $enrollment->intakeSemesterId > $semesterId) {
+                    return false;
+                }
 
-        if ($lane === 'tuition') {
-            $query
-                ->whereIn('status', ['intake_course', 'intake_major'])
-                ->where(function ($scopeQuery) use ($semesterId, $chargedStudentIds): void {
-                    $scopeQuery
-                        ->whereIn('id', $chargedStudentIds)
-                        ->orWhere(function ($dueQuery) use ($semesterId): void {
-                            $dueQuery
-                                ->whereNotNull('intake_major')
-                                ->where('intake_major', '<=', $semesterId);
-                        });
-                });
-        } else {
-            $query
-                ->where('status', 'intake_pre_uni_gc')
-                ->where(function ($scopeQuery) use ($semesterId, $chargedStudentIds): void {
-                    $scopeQuery
-                        ->whereIn('id', $chargedStudentIds)
-                        ->orWhere(function ($dueQuery) use ($semesterId): void {
-                            $dueQuery
-                                ->where(function ($majorQuery) use ($semesterId): void {
-                                    $majorQuery
-                                        ->whereNull('intake_major')
-                                        ->orWhere('intake_major', '>', $semesterId);
-                                });
-                        });
-                });
-        }
+                if ($lane === 'tuition') {
+                    return in_array($student->status, ['intake_course', 'intake_major'], true)
+                        && (in_array($studentId, $chargedStudentIds, true)
+                            || ($enrollment->intakeMajorSemesterId !== null && $enrollment->intakeMajorSemesterId <= $semesterId));
+                }
 
-        return $query->pluck('id');
-    }
-
-    /**
-     * @param  array<string, mixed>  $filters
-     */
-    private function baseStudentQuery(?int $campusId, array $filters)
-    {
-        $query = Student::query()
-            ->with('program')
-            ->when($campusId !== null, fn ($builder) => $builder->where('campus_id', $campusId));
-
-        return $this->applyStudentAttributeFilters($query, $filters);
-    }
-
-    /**
-     * @param  array<string, mixed>  $filters
-     */
-    private function applyStudentAttributeFilters($query, array $filters)
-    {
-        if (! empty($filters['program_id']) && $filters['program_id'] !== 'all') {
-            $query->where('program_id', (int) $filters['program_id']);
-        }
-
-        if (! empty($filters['intake_semester_id']) && $filters['intake_semester_id'] !== 'all') {
-            $query->where('intake_semester_id', (int) $filters['intake_semester_id']);
-        }
-
-        if (! empty($filters['cohort']) && $filters['cohort'] !== 'all') {
-            $query->where('intake', (int) $filters['cohort']);
-        }
-
-        if (! empty($filters['student_status']) && $filters['student_status'] !== 'all') {
-            $query->where('status', (string) $filters['student_status']);
-        }
-
-        if (! empty($filters['search'])) {
-            $search = (string) $filters['search'];
-            $query->where(function ($searchQuery) use ($search): void {
-                $searchQuery
-                    ->where('full_name', 'like', "%{$search}%")
-                    ->orWhere('student_id', 'like', "%{$search}%");
-            });
-        }
-
-        return $query;
+                return $student->status === 'intake_pre_uni_gc'
+                    && (in_array($studentId, $chargedStudentIds, true)
+                        || $enrollment->intakeMajorSemesterId === null
+                        || $enrollment->intakeMajorSemesterId > $semesterId);
+            })
+            ->values();
     }
 
     /**
@@ -871,8 +849,8 @@ class ListFeeMonitorQuery
     private function matchesStudentScopedFilters(array $row, array $filters): bool
     {
         if (! empty($filters['program_id']) && $filters['program_id'] !== 'all') {
-            $student = $this->studentIndex[$row['student']['id']] ?? Student::query()->find($row['student']['id']);
-            if (! $student || (int) $student->program_id !== (int) $filters['program_id']) {
+            $enrollment = $this->enrollmentIndex[$row['student']['id']] ?? null;
+            if ($enrollment?->programId !== (int) $filters['program_id']) {
                 return false;
             }
         }
@@ -906,6 +884,35 @@ class ListFeeMonitorQuery
         return true;
     }
 
+    /** @param array<string, mixed> $filters */
+    private function matchesReferenceFilters(StudentReference $student, array $filters): bool
+    {
+        $enrollment = $this->enrollmentIndex[$student->id] ?? null;
+        if (! empty($filters['program_id']) && $filters['program_id'] !== 'all'
+            && $enrollment?->programId !== (int) $filters['program_id']) {
+            return false;
+        }
+        if (! empty($filters['intake_semester_id']) && $filters['intake_semester_id'] !== 'all'
+            && $enrollment?->intakeSemesterId !== (int) $filters['intake_semester_id']) {
+            return false;
+        }
+        if (! empty($filters['cohort']) && $filters['cohort'] !== 'all'
+            && $student->cohort !== (int) $filters['cohort']) {
+            return false;
+        }
+        if (! empty($filters['student_status']) && $filters['student_status'] !== 'all'
+            && $student->status !== (string) $filters['student_status']) {
+            return false;
+        }
+        if (! empty($filters['search'])) {
+            $search = mb_strtolower((string) $filters['search']);
+
+            return str_contains(mb_strtolower($student->fullName.' '.$student->studentCode), $search);
+        }
+
+        return true;
+    }
+
     private function chargeKey(int $studentId, string $chargeType): string
     {
         return $studentId.'|'.$chargeType;
@@ -918,6 +925,11 @@ class ListFeeMonitorQuery
 
     private static function statusLabelFor(string $status): string
     {
-        return (new Student(['status' => $status]))->status_label;
+        return match ($status) {
+            'intake_pre_uni_gc' => 'Intake Pre-Uni GC',
+            'intake_course' => 'Intake Course',
+            'intake_major' => 'Intake Major',
+            default => 'Unknown',
+        };
     }
 }

@@ -173,9 +173,8 @@ class ApplyDeferFinancePolicyAction
     /**
      * Active positive finance charges for the student in the defer semester.
      *
-     * Excludes this settlement's own FORFEIT adjustment (intake source_ref
-     * defer_forfeit:{case_id}, or legacy source_type=DeferCase rows) so a re-run
-     * treats an already-settled case as a noop.
+     * Excludes this settlement's own FORFEIT adjustment by its canonical intake
+     * identity so a re-run treats an already-settled case as a noop.
      *
      * @return Collection<int, FinanceCharge>
      */
@@ -193,15 +192,9 @@ class ApplyDeferFinancePolicyAction
             ->where('semester_id', $case->semester_id)
             ->where('status', FinanceCharge::STATUS_ACTIVE)
             ->where('amount', '>', 0)
-            ->whereNot(function ($query) use ($case, $forfeitObligationIds) {
-                $query->where(function ($legacy) use ($case) {
-                    $legacy->where('charge_type', FinanceCharge::TYPE_ADJUSTMENT)
-                        ->where('source_type', DeferCase::class)
-                        ->where('source_id', $case->id);
-                })->orWhere(function ($intake) use ($forfeitObligationIds) {
-                    $intake->where('charge_type', FinanceCharge::TYPE_ADJUSTMENT)
-                        ->whereIn('finance_obligation_id', $forfeitObligationIds);
-                });
+            ->where(function ($query) use ($forfeitObligationIds): void {
+                $query->whereNull('finance_obligation_id')
+                    ->orWhereNotIn('finance_obligation_id', $forfeitObligationIds);
             })
             ->orderBy('id')
             ->lockForUpdate()

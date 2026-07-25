@@ -6,11 +6,8 @@ use App\Models\Campus;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
-use App\Modules\Finance\Actions\CancelDngPaymentRequestAction;
 use App\Modules\Finance\Actions\CreateBatchDngFromChargesAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
-use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
-use App\Modules\Finance\Dng\Services\DngPaymentService;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
@@ -92,39 +89,9 @@ function attachEgcInvoiceLine(FinanceCharge $charge, float $amountSnapshot): arr
     return [$invoice, $line];
 }
 
-function makeEgcBatchDngAction(bool $dngFails = false): CreateBatchDngFromChargesAction
+function makeEgcBatchDngAction(): CreateBatchDngFromChargesAction
 {
-    $dngPaymentServiceMock = Mockery::mock(DngPaymentService::class);
-
-    if ($dngFails) {
-        $dngPaymentServiceMock->shouldReceive('createAndPush')
-            ->andThrow(new RuntimeException('DNG API failed'));
-    } else {
-        $dngPaymentServiceMock->shouldReceive('createAndPush')
-            ->andReturnUsing(function (Student $student, array $data) {
-                return DngPaymentRequest::create([
-                    'student_id' => $student->id,
-                    'campus_code' => $data['campus_code'],
-                    'student_code' => $data['student_code'],
-                    'fee_type' => $data['fee_type'],
-                    'item_id' => $data['item_id'],
-                    'amount' => $data['amount'],
-                    'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
-                    'description' => $data['description'] ?? null,
-                    'semester_id' => $data['semester_id'] ?? null,
-                    'due_date' => $data['due_date'] ?? null,
-                ]);
-            });
-    }
-
-    $campusResolverMock = Mockery::mock(DngCampusCodeResolver::class);
-    $campusResolverMock->shouldReceive('requireForStudent')->andReturn('FAUHN');
-
-    return new CreateBatchDngFromChargesAction(
-        $dngPaymentServiceMock,
-        $campusResolverMock,
-        app(CancelDngPaymentRequestAction::class),
-    );
+    return new CreateBatchDngFromChargesAction;
 }
 
 // ─── Debit backfill ─────────────────────────────────────────────────────────
@@ -148,7 +115,6 @@ it('HP fee_type: blocks push when egc_level_fee charge has no finance obligation
     expect($result['created'])->toBe(0)
         ->and($result['failed'])->toBe(1)
         ->and($result['errors'][0])->toContain('missing_finance_obligation')
-        ->and($result['errors'][0])->toContain('backfill-legacy-egc-level-fee-obligations')
         ->and($orphan->fresh()->finance_obligation_id)->toBeNull()
         ->and(DngPaymentRequest::where('student_id', $student->id)->count())->toBe(0)
         ->and(FinanceCharge::where('student_id', $student->id)->where('charge_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)->count())->toBe(1);

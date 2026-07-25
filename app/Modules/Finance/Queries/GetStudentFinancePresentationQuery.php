@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries;
 
-use App\Models\Semester;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\FinanceCharge;
@@ -13,6 +12,8 @@ use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionScope;
 use App\Modules\Finance\Support\StudentFinanceSettlementPositionReader;
+use App\Shared\Contracts\Academic\AcademicPeriodReader;
+use App\Shared\Contracts\Academic\DTO\AcademicPeriodReference;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
 use Illuminate\Support\Collection;
 
@@ -28,6 +29,7 @@ final class GetStudentFinancePresentationQuery
     public function __construct(
         private readonly StudentFinanceSettlementPositionReader $positionReader,
         private readonly SettlementPositionReader $settlementPositionReader,
+        private readonly AcademicPeriodReader $academicPeriods,
     ) {}
 
     /** @return array<string, mixed> */
@@ -59,7 +61,7 @@ final class GetStudentFinancePresentationQuery
                 ->whereIn('status', ['pending', 'pushed_to_dng'])
                 ->get(['amount']);
 
-        $semester = $semesterId === null ? null : Semester::find($semesterId, ['id', 'name']);
+        $semester = $semesterId === null ? null : $this->academicPeriods->find($semesterId);
 
         return [
             'balance' => $balance,
@@ -126,7 +128,7 @@ final class GetStudentFinancePresentationQuery
         $charge = FinanceCharge::query()
             ->where('id', $chargeId)
             ->where('student_id', $studentId)
-            ->with(['semester', 'installments', 'invoiceLines'])
+            ->with(['installments', 'invoiceLines'])
             ->first();
 
         if ($charge === null) {
@@ -159,7 +161,6 @@ final class GetStudentFinancePresentationQuery
             ->where('id', $invoiceId)
             ->where('student_id', $studentId)
             ->with([
-                'semester',
                 'invoiceLines.charge',
                 'invoiceLines.paymentApplications.payment',
                 'discounts',
@@ -170,6 +171,7 @@ final class GetStudentFinancePresentationQuery
             return null;
         }
 
+        $semester = $this->academicPeriods->find((int) $invoice->semester_id);
         $position = $this->settlementPositionReader->forInvoice((int) $invoice->id);
         $valid = $position->isValid() && $position->amounts !== null;
         $linePositions = collect($position->payable_line_breakdown)
@@ -178,9 +180,9 @@ final class GetStudentFinancePresentationQuery
         return [
             'id' => (int) $invoice->id,
             'invoice_number' => (string) $invoice->invoice_number,
-            'semester' => $invoice->semester === null ? null : [
-                'id' => (int) $invoice->semester->id,
-                'name' => (string) $invoice->semester->name,
+            'semester' => $semester === null ? null : [
+                'id' => $semester->id,
+                'name' => $semester->name,
             ],
             ...$this->invoiceAmounts($position),
             'status' => $this->invoiceStatus($invoice, $position),
@@ -241,7 +243,6 @@ final class GetStudentFinancePresentationQuery
         $invoices = StudentInvoice::query()
             ->where('student_id', $studentId)
             ->when($semesterId !== null, fn ($query) => $query->where('semester_id', $semesterId))
-            ->with('semester')
             ->withCount('invoiceLines')
             ->orderByDesc('created_at')
             ->get();
@@ -251,7 +252,20 @@ final class GetStudentFinancePresentationQuery
                 $invoices->map(static fn (StudentInvoice $invoice): SettlementPositionScope => SettlementPositionScope::invoice((int) $invoice->id))->all(),
             );
 
-        return $invoices->values()->map(fn (StudentInvoice $invoice, int $index): array => $this->invoiceRow($invoice, $positions[$index] ?? null));
+        $periods = $this->academicPeriods->findMany(
+            $invoices->pluck('semester_id')
+                ->filter()
+                ->map(static fn (mixed $id): int => (int) $id)
+                ->unique()
+                ->values()
+                ->all(),
+        );
+
+        return $invoices->values()->map(fn (StudentInvoice $invoice, int $index): array => $this->invoiceRow(
+            $invoice,
+            $positions[$index] ?? null,
+            $periods[(int) $invoice->semester_id] ?? null,
+        ));
     }
 
     /** @param array<string, mixed> $position */
@@ -373,14 +387,17 @@ final class GetStudentFinancePresentationQuery
     }
 
     /** @return array<string, mixed> */
-    private function invoiceRow(StudentInvoice $invoice, ?SettlementPosition $position): array
-    {
+    private function invoiceRow(
+        StudentInvoice $invoice,
+        ?SettlementPosition $position,
+        ?AcademicPeriodReference $semester,
+    ): array {
         return [
             'id' => (int) $invoice->id,
             'invoice_number' => (string) $invoice->invoice_number,
-            'semester' => $invoice->semester === null ? null : [
-                'id' => (int) $invoice->semester->id,
-                'name' => (string) $invoice->semester->name,
+            'semester' => $semester === null ? null : [
+                'id' => $semester->id,
+                'name' => $semester->name,
             ],
             ...$this->invoiceAmounts($position),
             'status' => $this->invoiceStatus($invoice, $position),

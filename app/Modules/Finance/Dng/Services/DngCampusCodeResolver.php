@@ -4,25 +4,36 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Dng\Services;
 
-use App\Models\Campus;
 use App\Modules\Finance\Dng\Models\DngCampusMapping;
+use App\Shared\Contracts\Institution\CampusReferenceReader;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 class DngCampusCodeResolver
 {
+    public function __construct(
+        private readonly CampusReferenceReader $campusReferences,
+    ) {}
+
     public function currentCampusCode(): ?string
     {
-        $campus = app()->bound('campus') ? app('campus') : null;
+        $campusId = $this->currentCampusId();
 
-        return $campus instanceof Campus ? $this->mappingCodeForCampus($campus) : null;
+        return $campusId !== null ? $this->mappingCodeForCampusId($campusId) : null;
     }
 
     public function requireCurrentCampusCode(): string
     {
-        $campus = app()->bound('campus') ? app('campus') : null;
+        $campusId = $this->currentCampusId();
+        $dngCode = $campusId !== null ? $this->mappingCodeForCampusId($campusId) : null;
 
-        return $this->requireForCampus($campus instanceof Campus ? $campus : null);
+        if ($dngCode !== null) {
+            return $dngCode;
+        }
+
+        throw ValidationException::withMessages([
+            'campus_code' => 'DNG code is not configured for the selected campus. Configure it in Finance → DNG Campus Mapping before creating or reconciling payment requests.',
+        ]);
     }
 
     public function requireForCampusId(int $campusId): string
@@ -42,22 +53,6 @@ class DngCampusCodeResolver
     }
 
     /**
-     * Transitional adapter for flows not yet migrated to StudentReferenceReader.
-     * New collection paths must use requireForCampusId().
-     */
-    public function requireForStudent(object $student): string
-    {
-        $campusId = isset($student->campus_id) ? (int) $student->campus_id : 0;
-        if ($campusId <= 0) {
-            throw ValidationException::withMessages([
-                'campus_code' => 'DNG code cannot be resolved because the Student campus reference is missing.',
-            ]);
-        }
-
-        return $this->requireForCampusId($campusId);
-    }
-
-    /**
      * @return array<int, string>
      */
     public function allConfiguredCampusCodes(): array
@@ -73,22 +68,22 @@ class DngCampusCodeResolver
             ->all();
     }
 
-    private function requireForCampus(?Campus $campus): string
+    private function currentCampusId(): ?int
     {
-        $dngCode = $campus instanceof Campus ? $this->mappingCodeForCampus($campus) : null;
-        if ($dngCode !== null) {
-            return $dngCode;
+        if (! app()->bound('campus')) {
+            return null;
         }
 
-        throw ValidationException::withMessages([
-            'campus_code' => 'DNG code is not configured for the selected campus. Configure it in Finance → DNG Campus Mapping before creating or reconciling payment requests.',
-        ]);
+        $campus = app('campus');
+        $campusId = is_object($campus) && isset($campus->id) ? (int) $campus->id : 0;
+
+        return $campusId > 0 ? $this->campusReferences->find($campusId)?->id : null;
     }
 
-    private function mappingCodeForCampus(Campus $campus): ?string
+    private function mappingCodeForCampusId(int $campusId): ?string
     {
         $providerCode = DngCampusMapping::query()
-            ->where('campus_id', $campus->id)
+            ->where('campus_id', $campusId)
             ->value('provider_code');
 
         $providerCode = trim((string) $providerCode);

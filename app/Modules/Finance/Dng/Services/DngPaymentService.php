@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Dng\Services;
 
-use App\Models\Department;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Services\PaymentService;
@@ -12,6 +11,7 @@ use App\Modules\Finance\Support\BillingAccountProvisioner;
 use App\Modules\Finance\Support\SettlementMutationGuard;
 use App\Shared\Contracts\DomainEvents\DomainEvent;
 use App\Shared\Contracts\DomainEvents\DomainEventPublisher;
+use App\Shared\Contracts\Institution\DepartmentReferenceReader;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
@@ -26,6 +26,7 @@ class DngPaymentService
         protected ?BillingAccountProvisioner $billingAccountProvisioner = null,
         protected ?SettlementMutationGuard $settlementMutationGuard = null,
         protected ?StudentReferenceReader $studentReferences = null,
+        protected ?DepartmentReferenceReader $departmentReferences = null,
     ) {}
 
     /**
@@ -132,9 +133,9 @@ class DngPaymentService
         Collection $allocations,
     ): void {
         try {
-            $deptId = Department::query()->where('code', 'HQ')->value('id');
+            $department = $this->departmentReferences()->findByCode('HQ');
 
-            if ($deptId === null) {
+            if ($department === null) {
                 Log::warning('DNG allocation notification: HQ department not found', [
                     'dng_payment_request_id' => $request->id,
                 ]);
@@ -168,7 +169,7 @@ class DngPaymentService
                     'type_key' => 'dng_payment_allocated',
                     'channels' => ['realtime'],
                     'recipient_targets' => [
-                        ['type' => 'department', 'id' => $deptId],
+                        ['type' => 'department', 'id' => $department->id],
                     ],
                     'data' => [
                         'title' => $title,
@@ -311,5 +312,10 @@ class DngPaymentService
     private function studentReferences(): StudentReferenceReader
     {
         return $this->studentReferences ?? app(StudentReferenceReader::class);
+    }
+
+    private function departmentReferences(): DepartmentReferenceReader
+    {
+        return $this->departmentReferences ?? app(DepartmentReferenceReader::class);
     }
 }
