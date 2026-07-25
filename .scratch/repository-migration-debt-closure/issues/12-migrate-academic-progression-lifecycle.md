@@ -78,3 +78,10 @@ Verification: targeted Overview and Student Hub ownership tests passed (11 tests
 - The main Scores/GPA/Standing Inertia read model remains outstanding, together with lifecycle/EGC/Decision/Finance ownership. No historical evidence was written or removed.
 
 Verification: targeted score-detail endpoint and Student Hub ownership tests passed (2 tests, 29 assertions), Pint, `git diff --check`, and `migration-debt:inventory --check` passed. Status remains `ready-for-agent`.
+
+### 2026-07-25 — Scores read-boundary groundwork delivered; issue remains open
+
+- Catalog now exposes ordered curriculum-module composition (module identity, module-unit grading type, weight, and order) through the typed `CurriculumModuleCompositionReader` contract. This lets the forthcoming Progression Scores query construct module-score presentation without reaching into Catalog persistence.
+- This is groundwork only: the Scores/GPA/Standing controller still uses the legacy service until the Delivery assessment-evidence contract and Progression query are connected in the next slice.
+
+Verification: `CurriculumModuleCompositionReaderTest` passed (1 test, 16 assertions), Pint, `git diff --check`, and `migration-debt:inventory --check` passed. Status remains `ready-for-agent`.

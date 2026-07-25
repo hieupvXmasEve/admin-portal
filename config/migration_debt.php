@@ -20,6 +20,7 @@ return [
                 'CurriculumUnit',
                 'CurriculumModule',
                 'CurriculumVersion',
+                'Module',
                 'Specialization',
                 'SyllabusTemplate',
             ],
