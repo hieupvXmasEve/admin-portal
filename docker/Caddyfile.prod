@@ -55,6 +55,12 @@
 	respond /health "healthy" 200
 	respond /up "up" 200
 
+	# Serve public Laravel storage without following a symlink outside the document root.
+	handle_path /storage/* {
+		root * /app/storage/app/public
+		file_server
+	}
+
 	@sensitive {
 		path /.env* /.git* /composer.* /package.* /webpack.* /.docker* /Dockerfile* /docker-compose.* /storage/logs/* /storage/framework/*
 	}

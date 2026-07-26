@@ -865,20 +865,15 @@ class FileValidator
     {
         $pixels = $width * $height;
 
-        switch ($mimeType) {
-            case 'image/jpeg':
-                return $pixels * 0.5; // JPEG compression typically achieves 2:1 ratio
-            case 'image/png':
-                return $pixels * 3; // PNG with alpha channel
-            case 'image/gif':
-                return $pixels * 1; // GIF with palette
-            case 'image/webp':
-                return $pixels * 0.3; // WebP has better compression
-            case 'image/bmp':
-                return $pixels * 3; // Uncompressed RGB
-            default:
-                return $pixels * 2; // Conservative estimate
-        }
+        $bytesPerPixel = match ($mimeType) {
+            'image/jpeg' => 0.5,
+            'image/png', 'image/bmp' => 3,
+            'image/gif' => 1,
+            'image/webp' => 0.3,
+            default => 2,
+        };
+
+        return max(1, (int) ceil($pixels * $bytesPerPixel));
     }
 
     /**

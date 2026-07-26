@@ -92,12 +92,12 @@ swinx.test {
 	respond /health "healthy" 200
 	respond /up "up" 200
 	
-	# Laravel storage symlink handling
-	@storage {
-		path /storage/*
+	# Serve public Laravel storage without following a symlink outside the document root.
+	handle_path /storage/* {
+		root * /app/storage/app/public
+		file_server
 	}
-	rewrite @storage /storage{path}
-	
+
 	# Rate limiting disabled for local testing (rate_limit not available in standard FrankenPHP)
 	# @login {
 	#	path /login /auth/* /password/*

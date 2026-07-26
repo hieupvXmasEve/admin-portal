@@ -6,12 +6,24 @@ use App\Models\UploadRecord;
 use App\Models\User;
 use App\Modules\Upload\Policies\UploadRecordPolicy;
 use App\Modules\Upload\Support\ChunkedUploadManager;
+use App\Modules\Upload\Support\FileValidator;
 use App\Modules\Upload\Support\UploadActor;
 use App\Modules\Upload\Support\UploadPlatform;
 use Illuminate\Auth\Access\AuthorizationException;
 
 it('resolves upload, URL, validation, and chunked operations through one platform boundary', function () {
     expect(app(UploadPlatform::class))->toBeInstanceOf(UploadPlatform::class);
+});
+
+it('returns an integer steganography size estimate for compressed images', function (): void {
+    $validator = app(FileValidator::class);
+    $estimate = Closure::bind(
+        fn (): int => $this->estimateImageSize(1, 1, 'image/webp'),
+        $validator,
+        $validator,
+    );
+
+    expect($estimate())->toBe(1);
 });
 
 it('keeps the legacy uploads route prefix and route names', function () {

@@ -30,6 +30,10 @@ php artisan package:discover --ansi
 php artisan migrate --force
 php artisan ziggy:generate || true
 
+if [ -L public/storage ] && [ ! -e public/storage ]; then
+    rm public/storage
+fi
+
 if [ ! -L public/storage ]; then
     php artisan storage:link || true
 fi

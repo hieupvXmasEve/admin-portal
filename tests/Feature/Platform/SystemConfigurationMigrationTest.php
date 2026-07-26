@@ -7,9 +7,11 @@ use App\Models\CampusUserRole;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\RolePermission;
+use App\Models\UploadRecord;
 use App\Models\User;
 use App\Modules\Platform\Actions\UpdateSystemConfigurationAction;
 use App\Modules\Platform\Models\SystemSetting;
+use App\Modules\Platform\Queries\GetSystemBrandingQuery;
 use App\Modules\Platform\Support\SystemConfigurationStore;
 use Database\Seeders\InitialSetup\RoleAndPermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -234,10 +236,18 @@ it('keeps the protected upload API compatible while returning an immutable brand
         ->assertOk()
         ->assertJsonPath('success', true);
 
-    expect($response->json('data.path'))
-        ->toStartWith('/storage/branding/')
-        ->not->toBe('/storage/branding/logo-full.png')
-        ->and(SystemSetting::query()->where('key', 'logo_full_upload_id')->firstOrFail()->value)->not->toBeNull();
+    $path = parse_url($response->json('data.path'), PHP_URL_PATH);
+
+    $upload = UploadRecord::query()->findOrFail(
+        SystemSetting::query()->where('key', 'logo_full_upload_id')->firstOrFail()->value,
+    );
+    $upload->forceFill(['url' => '/storage/branding/legacy-logo.png'])->save();
+
+    expect($path)
+        ->toStartWith('/storage/images/branding/')
+        ->not->toBe('/storage/images/branding/logo-full.png')
+        ->and(app(GetSystemBrandingQuery::class)->handle()['logo_full_url'])
+        ->toContain('/storage/images/branding/');
 });
 
 it('preserves the staff page behind a view permission and its legacy URL', function (): void {
