@@ -3,7 +3,7 @@ id: ADR-0009
 title: "MCP server replaces the Staff Copilot chat UI as Swinx's AI surface"
 status: accepted
 owner: Platform Team
-last_verified: 2026-07-25
+last_verified: 2026-07-26
 scope: architecture-decision
 ---
 
@@ -13,4 +13,10 @@ Swinx will stop building its own Staff Copilot chat UI and instead deliver AI ac
 
 The chat UI and the entire Swinx-side synthesis stack (planner agent, final-answer agent, `laravel/ai` providers, `AiProviderSetting`, and its per-user connected-provider requirement) are frozen in place, not deleted, so the decision is recoverable if MCP clients prove unworkable for non-technical staff. Over MCP the external client's model performs synthesis, so a Swinx-side connected provider is not required. The internal `ToolDispatcher` remains the enforcement boundary per [0008](0008-swinx-tooldispatcher-is-ai-execution-boundary.md), and MCP maps only its read-only tools outward.
 
-Claude is the sole committed v1 client. The ChatGPT connector is technically feasible with the pinned `laravel/mcp` OAuth metadata, but remains deferred until its cloud egress is covered by the data-handling precondition in [0011](0011-mcp-server-is-public-and-accepts-redacted-data-egress.md). Risk accepted: `laravel/mcp` is pinned and wrapped in Swinx `Host`/`Origin`, rate-limit, and authentication middleware. Staff must own a capable approved agent-client account to use the surface.
+Claude, ChatGPT, Codex, and other compatible clients may connect when they
+support the pinned MCP and OAuth contract. Risk accepted: `laravel/mcp` is
+pinned and wrapped in Swinx `Host`/`Origin`, rate-limit, and authentication
+middleware, and permission-gated Swinx data leaves to the selected client's
+cloud as described in
+[0011](0011-mcp-server-is-public-and-accepts-redacted-data-egress.md). Staff must
+own a capable approved agent-client account to use the surface.

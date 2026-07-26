@@ -76,14 +76,6 @@ durable trade-offs; they do not track work or retain superseded history.
 | `features/platform/system-configuration.md` | Global system configuration and branding cutover |
 | `features/upload/storage.md` | Upload and storage operations |
 
-## Local issue tracking
-
-- `docs/agents/issue-tracker.md`
-- `docs/agents/triage-labels.md`
-
-The `.scratch/` tracker is intentionally outside this documentation cleanup and
-will be reviewed separately.
-
 ## Metadata contract
 
 Canonical Markdown starts with YAML frontmatter containing:

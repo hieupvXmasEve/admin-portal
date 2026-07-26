@@ -3,7 +3,7 @@ id: ADR-0011
 title: "Public OAuth-protected MCP server, accepting redacted data egress to client clouds"
 status: accepted
 owner: Platform Team
-last_verified: 2026-07-25
+last_verified: 2026-07-26
 scope: architecture-decision
 ---
 
@@ -13,4 +13,7 @@ The Controlled MCP server is exposed as a publicly reachable, OAuth-protected HT
 
 Mitigations are access control and audit, not network isolation: per-user OAuth, Swinx permission and campus checks, and a per-call `AiToolCall` audit record (with nullable conversation/trace FKs plus `channel`, actor, and client identity). We deliberately add **no egress-side redaction layer** — the payload a client receives is exactly what the staff member is permission-gated to see, and the exposed tool/profile sections already do not surface `national_id`; the existing redactor only scrubs secrets/identifiers from *audit* evidence. The server is a hard read-only surface — no write tools without a separate ADR — and must validate `Host`/`Origin` and rate-limit to resist DNS-rebinding and abuse on the public endpoint.
 
-**Production precondition:** a data-processing agreement with the chosen provider, on zero-retention / no-train terms, must be in place before production exposure. This precondition is met only for Anthropic/Claude in v1, so Claude is the sole committed v1 client. ChatGPT is connector-feasible but deferred because egress to OpenAI's cloud is not covered by such a DPA. Blocking consumer plans is best-effort because a resource server cannot enforce the caller's provider plan tier.
+The product owner accepts external client-cloud egress under the permission,
+campus, allowlist, audit, read-only, origin, and rate-limit controls above.
+Compatible clients, including Claude, ChatGPT, and Codex, may be enabled when
+they satisfy the MCP and OAuth runtime contract.

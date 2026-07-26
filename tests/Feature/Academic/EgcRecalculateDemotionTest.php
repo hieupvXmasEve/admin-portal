@@ -23,9 +23,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
  * later corrected to failing on recalculate must have gc_current_level
  * reverted, with a recorded reversal event — not silently left at a level
  * they no longer qualify for. Also covers the two audit scenarios that were
- * already safe (promotion-on-correction, idempotent re-recalculate), moved
- * here from the throwaway repro at
- * .scratch/course-offering-cockpit/egc-recalc-audit-repro-test.php.
+ * already safe (promotion-on-correction and idempotent re-recalculation).
  */
 uses(RefreshDatabase::class);
 

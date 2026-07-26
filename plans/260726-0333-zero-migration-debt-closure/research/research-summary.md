@@ -66,5 +66,3 @@ last_verified: 2026-07-26
 - `/Users/hunt2412/hieupvdev/project/swinx/docs/rules/legacy-migration.md`
 - `/Users/hunt2412/hieupvdev/project/swinx/docs/rules/contracts.md`
 - `/Users/hunt2412/hieupvdev/project/swinx/docs/deployment-guide.md`
-- `/Users/hunt2412/hieupvdev/project/swinx/.scratch/repository-migration-debt-closure/issues/23-close-repository-migration-debt-inventory.md`
-- `/Users/hunt2412/hieupvdev/project/swinx/.scratch/repository-migration-debt-closure/issues/24-backfill-reconcile-historical-academic-progression-evidence.md`

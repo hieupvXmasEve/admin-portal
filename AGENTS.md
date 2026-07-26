@@ -64,7 +64,6 @@ correct.
 | Tests | `docs/rules/testing.md` |
 | Student/lecturer API | `docs/portal-repos.md`, matching `docs/api/` contract |
 | Deployment/operations | `docs/deployment-guide.md`, relevant feature runbook |
-| Local issue tracking | `docs/agents/issue-tracker.md`, `docs/agents/triage-labels.md` |
 
 Use `docs/README.md` as the canonical documentation registry.
 
@@ -153,7 +152,6 @@ Before changing student- or lecturer-facing contracts:
 - `docs/adr/` contains accepted, currently applicable decisions only.
 - `docs/api/` contains public API contracts.
 - `docs/features/` contains current integration and operations runbooks.
-- `.scratch/` contains active local issues and is reviewed separately.
 - Do not create plans, reports, stories, archives, or duplicate framework docs
   in the repository.
 

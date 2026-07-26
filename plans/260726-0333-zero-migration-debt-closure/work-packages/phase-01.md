@@ -55,12 +55,11 @@ Ordered files:
 6. `app/Modules/Academic/Delivery/Http/Api/Lecturer/StudentController.php`
 7. `app/Modules/Academic/Delivery/Http/Api/Lecturer/TimetableController.php`
 8. `tests/Feature/Architecture/MigrationDebtInventoryTest.php`
-9. `.scratch/repository-migration-debt-closure/issues/24-backfill-reconcile-historical-academic-progression-evidence.md`
 
 Reproduce from the repository root:
 
 ```bash
-for f in app/Support/MigrationDebt/MigrationDebtContract.php app/Support/MigrationDebt/MigrationDebtInventory.php app/Support/MigrationDebt/MigrationDebtGuard.php config/migration_debt.php config/migration_debt_paths.php app/Modules/Academic/Delivery/Http/Api/Lecturer/StudentController.php app/Modules/Academic/Delivery/Http/Api/Lecturer/TimetableController.php tests/Feature/Architecture/MigrationDebtInventoryTest.php .scratch/repository-migration-debt-closure/issues/24-backfill-reconcile-historical-academic-progression-evidence.md; do
+for f in app/Support/MigrationDebt/MigrationDebtContract.php app/Support/MigrationDebt/MigrationDebtInventory.php app/Support/MigrationDebt/MigrationDebtGuard.php config/migration_debt.php config/migration_debt_paths.php app/Modules/Academic/Delivery/Http/Api/Lecturer/StudentController.php app/Modules/Academic/Delivery/Http/Api/Lecturer/TimetableController.php tests/Feature/Architecture/MigrationDebtInventoryTest.php; do
     shasum -a 256 "$f"
 done | shasum -a 256
 ```
@@ -72,7 +71,7 @@ done | shasum -a 256
 | P1-WP1 | Platform / inventory contract | `MigrationDebtContract.php`, `migration_debt.php`, `MigrationDebtInventory.php`, `MigrationDebtGuard.php`, architecture test | Rules 14 → 0 → 14; findings 1,200→0 unassigned→1,200 assigned; guarded counts unchanged | Immutable rule/root/surface/ownership/baseline ceilings; shadow metrics only; exact ownership manifest; targeted tests and guard green |
 | P1-WP2 | Platform / frozen path snapshots | `migration_debt_paths.php` | services 93→-7→86; controllers 95→-19→76; routes 37→-5→32 | Current path set equals approved set; stale/new/duplicate paths fail |
 | P1-WP3 | Academic Delivery / lecturer actor annotations | Lecturer `StudentController.php`, `TimetableController.php` | shared imports 587→-19→568 | PHPDoc uses existing `LecturerTeachingActor`; no runtime/API change; lecturer architecture/API tests pass |
-| P1-WP4 | Academic Progression / consumer evidence | reconciliation query evidence and issue 24 comment | consumers 18→-3→15 | Commit `157e2ea7` explains three removed Finance defer readers; read-only audit remains 810 exceptions/15 consumers |
+| P1-WP4 | Academic Progression / consumer evidence | reconciliation query evidence | consumers 18→-3→15 | Commit `157e2ea7` explains three removed Finance defer readers; read-only audit remains 810 exceptions/15 consumers |
 | P1-WP5 | Platform / execution ledger | this file and Phase 1 plan state | unowned findings → exact package ownership | No production write; every later finding is hydrated into the shared work-package template |
 
 ## Verification commands
