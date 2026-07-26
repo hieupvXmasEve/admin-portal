@@ -73,6 +73,51 @@ it('uses global semester context for course offering list, stats, and module opt
             ->where('moduleOptions.1.label', 'Business Module'));
 });
 
+it('returns statistics scoped to the current campus and requested semester', function (): void {
+    $unit = createIndexUnit('STAT101', 'Statistics');
+    createIndexOffering($this, $unit, $this->activeSemester, [
+        'current_enrollment' => 8,
+        'max_capacity' => 10,
+        'enrollment_status' => 'open',
+    ]);
+    createIndexOffering($this, $unit, $this->oldSemester, [
+        'current_enrollment' => 4,
+        'max_capacity' => 4,
+        'enrollment_status' => 'cancelled',
+        'is_active' => false,
+    ]);
+    CourseOffering::factory()->create([
+        'campus_id' => $this->campus->id,
+        'semester_id' => $this->activeSemester->id,
+        'unit_id' => $unit->id,
+        'current_enrollment' => 2,
+        'max_capacity' => 4,
+        'is_active' => false,
+        'enrollment_status' => 'closed',
+        'deleted_at' => now(),
+    ]);
+    CourseOffering::factory()->create([
+        'campus_id' => Campus::factory()->create()->id,
+        'semester_id' => $this->activeSemester->id,
+        'unit_id' => $unit->id,
+        'current_enrollment' => 20,
+        'max_capacity' => 20,
+    ]);
+
+    actingAs($this->user)
+        ->withSession(['current_campus_id' => $this->campus->id])
+        ->getJson(route(CourseOfferingRoutes::API_STATISTICS, ['semester_id' => $this->activeSemester->id]))
+        ->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.total_offerings', 2)
+        ->assertJsonPath('data.active_offerings', 1)
+        ->assertJsonPath('data.full_offerings', 0)
+        ->assertJsonPath('data.cancelled_offerings', 0)
+        ->assertJsonPath('data.total_enrollment', 10)
+        ->assertJsonPath('data.total_capacity', 14)
+        ->assertJsonPath('data.enrollment_rate', 71.43);
+});
+
 function createIndexUnit(string $code, string $name): Unit
 {
     return Unit::factory()->create([

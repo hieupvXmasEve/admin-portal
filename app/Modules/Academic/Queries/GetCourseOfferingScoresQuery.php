@@ -11,7 +11,7 @@ use App\Services\CourseStatisticsService;
  * Extract assessment scores data for a course offering.
  *
  * Delegates to CourseStatisticsService::getAssessmentScoresGrid(). Backs the
- * Course Offering Cockpit's scores tab (CourseOfferingController@show); the
+ * Course Offering Cockpit's scores tab; the
  * old standalone Course Statistics assessment-scores page that used to call
  * this directly is retired (ADR 0013 phase C) and now only redirects there.
  */

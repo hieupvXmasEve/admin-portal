@@ -9,6 +9,7 @@ use App\Models\FormVersion;
 use App\Models\Semester;
 use App\Models\User;
 use App\Modules\Engagement\Actions\ProvisionCourseSurveyAction;
+use App\Shared\Contracts\Academic\DTO\CourseOfferingSurveyContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 
@@ -36,7 +37,7 @@ it('provisions an active mandatory survey run for a course offering', function (
     ]);
 
     $target = app(ProvisionCourseSurveyAction::class)
-        ->provisionForCourseOffering($courseOffering, $form->id);
+        ->provisionForCourseOffering(surveyContext($courseOffering), $form->id);
 
     expect($target->form_id)->toBe($form->id)
         ->and($target->form_version_id)->toBe($version->id)
@@ -74,11 +75,22 @@ it('rejects duplicate course surveys and forms that are not surveys', function (
 
     $action = app(ProvisionCourseSurveyAction::class);
 
-    expect(fn () => $action->provisionForCourseOffering($courseOffering, $query->id))
+    expect(fn () => $action->provisionForCourseOffering(surveyContext($courseOffering), $query->id))
         ->toThrow(ValidationException::class);
 
-    $action->provisionForCourseOffering($courseOffering, $survey->id);
+    $action->provisionForCourseOffering(surveyContext($courseOffering), $survey->id);
 
-    expect(fn () => $action->provisionForCourseOffering($courseOffering, $survey->id))
+    expect(fn () => $action->provisionForCourseOffering(surveyContext($courseOffering), $survey->id))
         ->toThrow(ValidationException::class);
 });
+
+function surveyContext(CourseOffering $courseOffering): CourseOfferingSurveyContext
+{
+    return new CourseOfferingSurveyContext(
+        courseOfferingId: $courseOffering->id,
+        campusId: $courseOffering->campus_id,
+        semesterId: $courseOffering->semester_id,
+        unitType: null,
+        semesterEndDate: null,
+    );
+}

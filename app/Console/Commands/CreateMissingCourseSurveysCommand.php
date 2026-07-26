@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use App\Models\CourseOffering;
 use App\Modules\Engagement\Actions\ProvisionCourseSurveyAction;
+use App\Shared\Contracts\Academic\CourseOfferingSurveyContextReader;
 use Illuminate\Console\Command;
 
 class CreateMissingCourseSurveysCommand extends Command
@@ -19,7 +20,8 @@ class CreateMissingCourseSurveysCommand extends Command
     protected $description = 'Create surveys for course offerings that do not have surveys yet';
 
     public function __construct(
-        private ProvisionCourseSurveyAction $courseSurveyService
+        private ProvisionCourseSurveyAction $courseSurveyService,
+        private CourseOfferingSurveyContextReader $courseOfferingSurveyContexts,
     ) {
         parent::__construct();
     }
@@ -134,7 +136,9 @@ class CreateMissingCourseSurveysCommand extends Command
 
         foreach ($courseOfferings as $courseOffering) {
             try {
-                $result = $this->courseSurveyService->attachSurveyToCompletedCourse($courseOffering);
+                $result = $this->courseSurveyService->attachSurveyToCompletedCourse(
+                    $this->courseOfferingSurveyContexts->forOffering((int) $courseOffering->id),
+                );
 
                 if ($result) {
                     $stats['created']++;

@@ -9,6 +9,8 @@ use App\Modules\Academic\Delivery\Http\Web\AttendanceController as DeliveryAtten
 use App\Modules\Academic\Delivery\Http\Web\AttendanceReportController as DeliveryAttendanceReportController;
 use App\Modules\Academic\Delivery\Http\Web\BulkUpdateCourseOfferingSessionsController;
 use App\Modules\Academic\Delivery\Http\Web\ClassSessionController as DeliveryClassSessionController;
+use App\Modules\Academic\Delivery\Http\Web\CourseOfferingSplitController;
+use App\Modules\Academic\Delivery\Http\Web\CourseOfferingStatisticsController;
 use App\Modules\Academic\Http\Web\AcademicPlacementController;
 use App\Modules\Academic\Http\Web\AcademicProgressionAuditController;
 use App\Modules\Academic\Http\Web\Admin\CourseOfferingBulkDeletionController;
@@ -191,9 +193,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/{courseOffering}/move-student', [CourseOfferingRosterController::class, 'moveStudent'])
             ->middleware('can:edit_course_offering')
             ->name('course-offerings.move-student');
+
+        Route::get('/{courseOffering}/split', [CourseOfferingSplitController::class, 'show'])
+            ->middleware('can:edit_course_offering')
+            ->name(CourseOfferingRoutes::SPLIT_SHOW);
+
+        Route::post('/{courseOffering}/split', [CourseOfferingSplitController::class, 'perform'])
+            ->middleware('can:edit_course_offering')
+            ->name(CourseOfferingRoutes::SPLIT_PERFORM);
     });
 
     Route::prefix('api/course-offerings')->group(function () {
+        Route::get('/statistics', CourseOfferingStatisticsController::class)
+            ->middleware('can:view_course_offering')
+            ->name(CourseOfferingRoutes::API_STATISTICS);
+
         Route::post('/{courseOffering}/search-students', [CourseOfferingRegistrationController::class, 'search'])
             ->middleware('can:edit_course_offering')
             ->name(CourseOfferingRoutes::API_SEARCH_STUDENTS);

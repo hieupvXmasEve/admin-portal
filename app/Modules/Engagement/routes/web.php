@@ -9,11 +9,16 @@ use App\Modules\Engagement\Http\Web\Admin\QueryController;
 use App\Modules\Engagement\Http\Web\Admin\QueryTicketController;
 use App\Modules\Engagement\Http\Web\Admin\SurveyResultController;
 use App\Modules\Engagement\Http\Web\ClubController;
+use App\Modules\Engagement\Http\Web\CourseOfferingSurveyController;
 use App\Modules\Engagement\Http\Web\EventController;
 use App\Modules\Engagement\Http\Web\EventReportController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified'])->group(function (): void {
+    Route::post('course-offerings/{courseOffering}/survey', CourseOfferingSurveyController::class)
+        ->middleware('can:edit_course_offering')
+        ->name('course-offerings.create-survey');
+
     Route::get('events/{event}/scanner', [EventController::class, 'scanner'])
         ->middleware('can:checkin_event')
         ->name('events.scanner');

@@ -15,6 +15,7 @@ use App\Modules\Academic\Support\AcademicLifecycleEventFactory;
 use App\Modules\Academic\Support\FailureReasonClassifier;
 use App\Modules\Academic\Support\Grading\GradingCalculatorResolver;
 use App\Modules\Engagement\Actions\ProvisionCourseSurveyAction;
+use App\Shared\Contracts\Academic\CourseOfferingSurveyContextReader;
 use App\Shared\Contracts\Academic\DTO\CourseResult;
 use App\Shared\Contracts\Academic\DTO\CourseResultProgressionContext;
 use App\Shared\Contracts\DomainEvents\DomainEventPublisher;
@@ -37,6 +38,7 @@ class CourseCompletionService
 
     public function __construct(
         protected ProvisionCourseSurveyAction $courseSurveyService,
+        protected CourseOfferingSurveyContextReader $courseOfferingSurveyContexts,
         protected DomainEventPublisher $domainEventPublisher,
         protected GradingCalculatorResolver $gradingResolver,
     ) {}
@@ -139,7 +141,9 @@ class CourseCompletionService
 
         // 5. Automatically attach survey to completed course (only if not already attached)
         if (! $recalculate && ! $dryRun) {
-            $this->courseSurveyService->attachSurveyToCompletedCourse($courseOffering);
+            $this->courseSurveyService->attachSurveyToCompletedCourse(
+                $this->courseOfferingSurveyContexts->forOffering((int) $courseOffering->id),
+            );
         }
 
         // 6. Send notifications to students for non-EGC courses

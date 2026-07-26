@@ -67,16 +67,18 @@ it('retires legacy forms and query request surfaces with no supported callers', 
     );
 });
 
-it('delegates the course-offering survey command and active-form query to Engagement', function (): void {
-    $controller = file_get_contents(
-        base_path('app/Http/Controllers/Web/CourseOfferingController.php'),
-    ) ?: '';
+it('owns course-offering survey provision in Engagement through the Academic context contract', function (): void {
+    $controller = file_get_contents(base_path('app/Modules/Engagement/Http/Web/CourseOfferingSurveyController.php')) ?: '';
+    $action = file_get_contents(base_path('app/Modules/Engagement/Actions/ProvisionCourseSurveyAction.php')) ?: '';
 
     expect($controller)
         ->toContain('ProvisionCourseSurveyRequest')
         ->toContain('ProvisionCourseSurveyAction')
-        ->toContain('ListActiveSurveyFormsQuery')
-        ->not->toContain('use App\\Models\\Form;')
-        ->not->toContain('CreateFormTargetAction')
-        ->not->toContain('GenerateStudentAssignmentsAction');
+        ->toContain('CourseOfferingSurveyContextReader')
+        ->not->toContain('App\\Models\\CourseOffering');
+
+    expect($action)
+        ->toContain('CourseOfferingSurveyContext')
+        ->toContain('FormTarget::query()')
+        ->not->toContain('App\\Models\\CourseOffering');
 });

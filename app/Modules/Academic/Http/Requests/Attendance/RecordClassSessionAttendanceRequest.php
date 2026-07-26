@@ -16,7 +16,7 @@ use Illuminate\Validation\Rule;
  * `can:create_course_offering` route middleware — the same ability that
  * gates the standalone AttendanceController::store endpoint. `authorize()`
  * only checks that the route's session/offering/campus actually line up
- * (mirrors CourseOfferingController::show's campus guard), matching the
+ * (mirrors the Course Offering Cockpit campus guard), matching the
  * "controller stays thin" convention rather than checking this in the
  * controller.
  */

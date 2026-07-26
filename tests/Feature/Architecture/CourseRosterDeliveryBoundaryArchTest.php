@@ -5,7 +5,8 @@ declare(strict_types=1);
 it('keeps new routed staff roster writes inside Delivery commands', function (): void {
     $files = [
         base_path('app/Http/Controllers/Web/CourseRegistrationController.php'),
-        base_path('app/Http/Controllers/Web/CourseOfferingController.php'),
+        base_path('app/Modules/Academic/Http/Web/Admin/CourseOfferingRegistrationController.php'),
+        base_path('app/Modules/Academic/Http/Web/Admin/CourseOfferingRosterController.php'),
         base_path('app/Http/Controllers/Web/SemesterEnrollmentController.php'),
     ];
     $violations = [];

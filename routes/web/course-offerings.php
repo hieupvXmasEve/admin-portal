@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Constants\CourseOfferingRoutes;
-use App\Http\Controllers\Web\CourseOfferingController;
 use App\Modules\Academic\Http\Web\Canvas\PreviewCanvasGradeSyncController;
 use App\Modules\Academic\Http\Web\Canvas\SyncCanvasGradeController;
 use App\Modules\Academic\Http\Web\FinalizeCourseOfferingController;
@@ -20,21 +19,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware('can:complete_course_offering')
             ->name(CourseOfferingRoutes::FINALIZE);
 
-        Route::post('/{courseOffering}/survey', [CourseOfferingController::class, 'createSurvey'])
-            ->middleware('can:edit_course_offering')
-            ->name('course-offerings.create-survey');
-
         // ============================================
         // Split & Duplicate Operations
         // ============================================
-        Route::get('/{courseOffering}/split', [CourseOfferingController::class, 'showSplit'])
-            ->middleware('can:edit_course_offering')
-            ->name(CourseOfferingRoutes::SPLIT_SHOW);
-
-        Route::post('/{courseOffering}/split', [CourseOfferingController::class, 'performSplit'])
-            ->middleware('can:edit_course_offering')
-            ->name(CourseOfferingRoutes::SPLIT_PERFORM);
-
         // ============================================
         // Student Registration Management
         // ============================================
@@ -50,10 +37,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // ============================================
         // Bulk Operations & Statistics
         // ============================================
-        Route::get('/statistics', [CourseOfferingController::class, 'statistics'])
-            ->middleware('can:view_course_offering')
-            ->name(CourseOfferingRoutes::API_STATISTICS);
-
         // ============================================
         // Canvas Grade Sync (cockpit Scores tab, issue 10)
         // ============================================

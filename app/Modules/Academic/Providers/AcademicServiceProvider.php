@@ -19,6 +19,7 @@ use App\Modules\Academic\Delivery\Actions\CommitCourseResultsAndTranscriptEntrie
 use App\Modules\Academic\Delivery\Support\DeliveryAssessmentDefinitionWriter;
 use App\Modules\Academic\Delivery\Support\DeliveryInstructorAssignmentWriter;
 use App\Modules\Academic\Delivery\Support\EloquentAcademicSpaceOccupancyReader;
+use App\Modules\Academic\Delivery\Support\EloquentCourseOfferingSurveyContextReader;
 use App\Modules\Academic\Delivery\Support\EloquentCourseResultProgressionReader;
 use App\Modules\Academic\Delivery\Support\EloquentCourseRosterReader;
 use App\Modules\Academic\Delivery\Support\EloquentLegacyTranscriptOutcomeReader;
@@ -27,6 +28,7 @@ use App\Modules\Academic\Delivery\Support\EloquentStudentHubCourseOutcomeEvidenc
 use App\Modules\Academic\Delivery\Support\EloquentStudentHubRegistrationEvidenceReader;
 use App\Modules\Academic\Delivery\Support\EloquentStudentLifecycleCourseRegistrationGateway;
 use App\Modules\Academic\FacultyWorkforce\Support\EloquentActiveLecturerReader;
+use App\Modules\Academic\FacultyWorkforce\Support\EloquentAvailableLecturerReader;
 use App\Modules\Academic\FacultyWorkforce\Support\EloquentLecturerTokenIssuer;
 use App\Modules\Academic\FacultyWorkforce\Support\EloquentTeachingEligibilityReader;
 use App\Modules\Academic\Observers\CourseRegistrationObserver;
@@ -65,6 +67,7 @@ use App\Shared\Contracts\Academic\CampusBuildingCountReader;
 use App\Shared\Contracts\Academic\CourseOfferingAttemptWriter;
 use App\Shared\Contracts\Academic\CourseOfferingCatalogReader;
 use App\Shared\Contracts\Academic\CourseOfferingFinalizer;
+use App\Shared\Contracts\Academic\CourseOfferingSurveyContextReader;
 use App\Shared\Contracts\Academic\CourseResultProgressionReader;
 use App\Shared\Contracts\Academic\CourseResultTranscriptCommitter;
 use App\Shared\Contracts\Academic\CourseResultTranscriptWriter;
@@ -96,6 +99,7 @@ use App\Shared\Contracts\Academic\TeachingEligibilityReader;
 use App\Shared\Contracts\Academic\TranscriptEntryGpaReader;
 use App\Shared\Contracts\Finance\FinanceCancellationCompletionContract;
 use App\Shared\Contracts\Identity\ActiveLecturerReader;
+use App\Shared\Contracts\Identity\AvailableLecturerReader;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
@@ -114,6 +118,7 @@ class AcademicServiceProvider extends ServiceProvider
         $this->app->bind(CurriculumModuleCompositionReader::class, EloquentCurriculumModuleCompositionReader::class);
         $this->app->bind(ProgramReferenceReader::class, EloquentProgramReferenceReader::class);
         $this->app->bind(CourseOfferingFinalizer::class, MarkCourseOfferingCompletedAction::class);
+        $this->app->bind(CourseOfferingSurveyContextReader::class, EloquentCourseOfferingSurveyContextReader::class);
         $this->app->bind(CourseOfferingAttemptWriter::class, EloquentCourseOfferingAttemptWriter::class);
         $this->app->bind(CourseRosterReader::class, EloquentCourseRosterReader::class);
         $this->app->bind(CourseResultTranscriptWriter::class, CommitCourseResultsToTranscriptAction::class);
@@ -122,6 +127,7 @@ class AcademicServiceProvider extends ServiceProvider
         $this->app->bind(TranscriptEntryGpaReader::class, EloquentTranscriptEntryGpaReader::class);
         $this->app->bind(TeachingEligibilityReader::class, EloquentTeachingEligibilityReader::class);
         $this->app->bind(ActiveLecturerReader::class, EloquentActiveLecturerReader::class);
+        $this->app->bind(AvailableLecturerReader::class, EloquentAvailableLecturerReader::class);
         $this->app->bind(LecturerImpersonationTokenIssuer::class, EloquentLecturerTokenIssuer::class);
         $this->app->bind(LegacyTranscriptOutcomeReader::class, EloquentLegacyTranscriptOutcomeReader::class);
         $this->app->bind(InstructorAssignmentWriter::class, DeliveryInstructorAssignmentWriter::class);
