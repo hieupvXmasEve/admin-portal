@@ -2,7 +2,7 @@
 title: Swinx Deployment Guide
 status: canonical
 owner: Platform Team
-last_verified: 2026-07-25
+last_verified: 2026-07-26
 scope: deployment-operations
 ---
 
@@ -162,6 +162,21 @@ Inspect migration debt before and after migration work:
 ```bash
 ./scripts/dev.sh artisan migration-debt:inventory --check --format=table
 ```
+
+## System configuration and branding cutover
+
+Global system configuration is DB-backed and branding is stored through the
+Upload module. Before deploying this cutover, back up MySQL and the configured
+branding storage together. The migration creates deterministic defaults
+and empty branding slots; it intentionally does not import legacy JSON or
+static branding values.
+
+After migration, verify required setting rows, a shared cache store, anonymous
+first-render branding empty states, public API redaction, and a super-admin
+text/branding update. Rebuild or redeploy once to prove database values and
+immutable objects persist. Recovery restores database and branding storage from
+the same point and uses a DB-capable last-known-good image; never roll back to
+file-based configuration code.
 
 ## Health verification
 

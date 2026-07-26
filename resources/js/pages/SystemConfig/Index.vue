@@ -1,424 +1,208 @@
 <script setup lang="ts">
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { useApi } from '@/composables/useApiRequest'
-import { useSystemConfig } from '@/composables/useSystemConfig'
-import type { SystemConfig } from '@/types/systemConfig'
-import { Head } from '@inertiajs/vue3'
-import { Save, Settings, Upload, Image } from 'lucide-vue-next'
-import { computed, reactive, ref, watch } from 'vue'
+import InputError from '@/components/InputError.vue';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Progress } from '@/components/ui/progress';
+import { Textarea } from '@/components/ui/textarea';
+import type { BrandingSlot, SystemConfig, SystemConfigTextUpdate } from '@/types/systemConfig';
+import { Head, useForm } from '@inertiajs/vue3';
+import { ImageOff, Save, Settings, Upload } from 'lucide-vue-next';
+import { computed, onBeforeUnmount, reactive, watch } from 'vue';
 
 interface Props {
-    config: SystemConfig
-    permissions: {
-        can_manage: boolean
-    }
+    config: SystemConfig;
+    permissions: { can_manage: boolean };
 }
 
-const props = defineProps<Props>()
-
-// System config composable for auto-refresh
-const { loadConfig } = useSystemConfig()
-const api = useApi()
-
-// Form state
-const form = reactive<SystemConfig>({
-    app_name: '',
-    logo_full: '',
-    logo_text: '',
-    copyright_text: '',
-    country: ''
-})
-
-const isLoading = ref(false)
-const isSaving = ref(false)
-const saveMessage = ref('')
-const saveMessageType = ref<'success' | 'error'>('success')
-
-// File upload states
-const isUploadingLogoFull = ref(false)
-const isUploadingLogoText = ref(false)
-
-// Cache busting for images
-const imageCacheBuster = ref(Date.now())
-
-// Initialize form with props
-watch(() => props.config, (newConfig) => {
-    Object.assign(form, newConfig)
-}, { immediate: true })
-
-// Check if form has changes
-const hasChanges = computed(() => {
-    return Object.keys(form).some(key => {
-        const formKey = key as keyof SystemConfig
-        return form[formKey] !== props.config[formKey]
-    })
-})
-
-const handleSave = async () => {
-    if (!hasChanges.value) {
-        saveMessage.value = 'No changes to save'
-        saveMessageType.value = 'error'
-        setTimeout(() => {
-            saveMessage.value = ''
-        }, 3000)
-        return
-    }
-
-    try {
-        isSaving.value = true
-        saveMessage.value = ''
-
-        const response = await api.put<SystemConfig>('/api/system-config', form)
-        console.log('%c response.data', 'color: red', response.data.value);
-        if (response.data && response.data.value.success) {
-            saveMessage.value = response.data.value.message || 'Configuration saved successfully'
-            saveMessageType.value = 'success'
-
-            // Refresh the system config globally
-            await loadConfig()
-        } else {
-            throw new Error(response.data?.value.message || 'Failed to save configuration')
-        }
-    } catch (error) {
-        console.error('Failed to save config:', error)
-        saveMessage.value = error instanceof Error ? error.message : 'Failed to save configuration'
-        saveMessageType.value = 'error'
-    } finally {
-        isSaving.value = false
-
-        // Clear message after 5 seconds
-        setTimeout(() => {
-            saveMessage.value = ''
-        }, 5000)
-    }
+interface BrandingAsset {
+    slot: BrandingSlot;
+    label: string;
+    description: string;
+    url_key: keyof Pick<SystemConfig, 'logo_full_url' | 'logo_text_url' | 'favicon_url' | 'apple_touch_icon_url'>;
+    preview_class: string;
 }
 
-const handleReset = () => {
-    Object.assign(form, props.config)
-    saveMessage.value = 'Form reset to original values'
-    saveMessageType.value = 'success'
-    setTimeout(() => {
-        saveMessage.value = ''
-    }, 3000)
-}
+const props = defineProps<Props>();
 
-// File upload handlers
-const handleFileUpload = async (file: File, configKey: string) => {
-    const isLogoFull = configKey === 'logo_full'
-    const uploadingRef = isLogoFull ? isUploadingLogoFull : isUploadingLogoText
+const brandingAssets: BrandingAsset[] = [
+    { slot: 'logo_full', label: 'Full logo', description: 'Use for sign-in and larger brand placements.', url_key: 'logo_full_url', preview_class: 'h-20 w-full' },
+    { slot: 'logo_text', label: 'Compact logo', description: 'Use for compact navigation and small brand placements.', url_key: 'logo_text_url', preview_class: 'h-14 w-40' },
+    { slot: 'favicon', label: 'Favicon', description: 'Use for browser tabs and bookmarks.', url_key: 'favicon_url', preview_class: 'size-12' },
+    { slot: 'apple_touch_icon', label: 'Apple touch icon', description: 'Use when the app is saved to an Apple device home screen.', url_key: 'apple_touch_icon_url', preview_class: 'size-16' },
+];
 
-    try {
-        uploadingRef.value = true
-        saveMessage.value = ''
+const textValues = (config: SystemConfig): SystemConfigTextUpdate => ({
+    app_name: config.app_name,
+    copyright_text: config.copyright_text,
+    country: config.country,
+});
 
-        const formData = new FormData()
-        formData.append('file', file)
-        formData.append('config_key', configKey)
+const textForm = useForm<SystemConfigTextUpdate>(textValues(props.config));
+const uploadForms = {
+    logo_full: useForm({ slot: 'logo_full' as BrandingSlot, file: null as File | null }),
+    logo_text: useForm({ slot: 'logo_text' as BrandingSlot, file: null as File | null }),
+    favicon: useForm({ slot: 'favicon' as BrandingSlot, file: null as File | null }),
+    apple_touch_icon: useForm({ slot: 'apple_touch_icon' as BrandingSlot, file: null as File | null }),
+};
+const inputKeys = reactive<Record<BrandingSlot, number>>({ logo_full: 0, logo_text: 0, favicon: 0, apple_touch_icon: 0 });
+const localPreviews = reactive<Record<BrandingSlot, string | null>>({ logo_full: null, logo_text: null, favicon: null, apple_touch_icon: null });
+const imageFailures = reactive<Record<BrandingSlot, boolean>>({ logo_full: false, logo_text: false, favicon: false, apple_touch_icon: false });
 
-        const response = await fetch('/api/system-config/upload', {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                'X-Requested-With': 'XMLHttpRequest',
-            },
-            credentials: 'include'
-        })
+const canManage = computed(() => props.permissions.can_manage);
+const hasTextChanges = computed(() => textForm.isDirty);
 
-        const result = await response.json()
+watch(
+    () => props.config,
+    (config) => {
+        textForm.defaults(textValues(config));
+        textForm.reset();
+    },
+    { deep: true },
+);
 
-        if (result.success) {
-            saveMessage.value = result.message || 'File uploaded successfully'
-            saveMessageType.value = 'success'
+const currentUrl = (asset: BrandingAsset): string | null => props.config[asset.url_key];
+const previewUrl = (asset: BrandingAsset): string | null => localPreviews[asset.slot] ?? currentUrl(asset);
 
-            // Update cache buster to force image refresh
-            imageCacheBuster.value = Date.now()
+const selectFile = (asset: BrandingAsset, event: Event) => {
+    const file = (event.target as HTMLInputElement).files?.[0] ?? null;
+    const form = uploadForms[asset.slot];
 
-            // Refresh the system config globally to reflect changes
-            await loadConfig()
+    form.clearErrors('file');
+    form.file = file;
+    imageFailures[asset.slot] = false;
 
-            // Force refresh all images on the page by updating their src
-            setTimeout(() => {
-                const images = document.querySelectorAll('img[src*="/storage/branding/"]')
-                images.forEach((img) => {
-                    const htmlImg = img as HTMLImageElement
-                    const src = htmlImg.src.split('?')[0] // Remove existing query params
-                    htmlImg.src = `${src}?t=${imageCacheBuster.value}`
-                })
-            }, 100)
-        } else {
-            throw new Error(result.message || 'Failed to upload file')
-        }
-    } catch (error) {
-        console.error('Failed to upload file:', error)
-        saveMessage.value = error instanceof Error ? error.message : 'Failed to upload file'
-        saveMessageType.value = 'error'
-    } finally {
-        uploadingRef.value = false
-
-        setTimeout(() => {
-            saveMessage.value = ''
-        }, 5000)
+    if (localPreviews[asset.slot]) {
+        URL.revokeObjectURL(localPreviews[asset.slot] as string);
     }
-}
+    localPreviews[asset.slot] = file ? URL.createObjectURL(file) : null;
+};
 
-const handleLogoFullUpload = (event: Event) => {
-    const input = event.target as HTMLInputElement
-    const file = input.files?.[0]
-    if (file) {
-        handleFileUpload(file, 'logo_full')
-    }
-}
+const resetUpload = (slot: BrandingSlot) => {
+    const preview = localPreviews[slot];
+    if (preview) URL.revokeObjectURL(preview);
 
-const handleLogoTextUpload = (event: Event) => {
-    const input = event.target as HTMLInputElement
-    const file = input.files?.[0]
-    if (file) {
-        handleFileUpload(file, 'logo_text')
+    uploadForms[slot].reset();
+    uploadForms[slot].clearErrors();
+    localPreviews[slot] = null;
+    inputKeys[slot] += 1;
+};
+
+const submitText = () => {
+    textForm.put(route('system.config.update'), { preserveScroll: true });
+};
+
+const submitUpload = (slot: BrandingSlot) => {
+    const form = uploadForms[slot];
+    if (!form.file) {
+        form.setError('file', 'Select a PNG, JPEG, or WebP image before uploading.');
+        return;
     }
-}
+
+    form.post(route('system.config.upload'), {
+        forceFormData: true,
+        preserveScroll: true,
+        onSuccess: () => resetUpload(slot),
+    });
+};
+
+onBeforeUnmount(() => {
+    Object.values(localPreviews).forEach((preview) => {
+        if (preview) URL.revokeObjectURL(preview);
+    });
+});
 </script>
 
 <template>
-    <Head title="System Configuration" />
+    <Head title="System configuration" />
 
     <div class="space-y-6 p-6">
-        <div class="flex items-center justify-between">
-            <div>
-                <h1 class="flex items-center gap-2 text-2xl font-bold tracking-tight">
-                    <Settings class="h-6 w-6" />
-                    System Configuration
-                </h1>
-                <p class="text-muted-foreground">
-                    Manage global application settings and branding
-                </p>
-            </div>
-        </div>
-
-        <!-- Save Message -->
-        <div
-            v-if="saveMessage"
-            :class="[
-                'rounded-md border p-4',
-                saveMessageType === 'success'
-                    ? 'border-green-200 bg-green-50 text-green-800'
-                    : 'border-red-200 bg-red-50 text-red-800'
-            ]"
-        >
-            {{ saveMessage }}
+        <div>
+            <h1 class="flex items-center gap-2 text-2xl font-bold tracking-tight">
+                <Settings class="size-6" />
+                System configuration
+            </h1>
+            <p class="text-muted-foreground">Manage the staff application’s public name, legal text, and branding.</p>
         </div>
 
         <Card>
             <CardHeader>
-                <CardTitle>Application Settings</CardTitle>
-                <CardDescription>
-                    Configure basic application information and branding
-                </CardDescription>
+                <CardTitle>Application details</CardTitle>
+                <CardDescription>These values appear across the staff application after you save them.</CardDescription>
             </CardHeader>
-            <CardContent class="space-y-6">
-                <form @submit.prevent="handleSave" class="space-y-6">
-                    <!-- App Name -->
+            <CardContent>
+                <form class="space-y-6" @submit.prevent="submitText">
                     <div class="space-y-2">
-                        <Label for="app_name">Application Name</Label>
-                        <Input
-                            id="app_name"
-                            v-model="form.app_name"
-                            placeholder="Enter application name"
-                            :disabled="isSaving || !props.permissions.can_manage"
-                        />
-                        <p class="text-sm text-muted-foreground">
-                            The main application name displayed throughout the system
-                        </p>
+                        <Label for="app_name">Application name</Label>
+                        <Input id="app_name" v-model="textForm.app_name" :disabled="textForm.processing || !canManage" autocomplete="organization" required />
+                        <InputError :message="textForm.errors.app_name" />
                     </div>
-
-                    <!-- Logo Full Upload -->
                     <div class="space-y-2">
-                        <Label for="logo_full_file">Full Logo Upload</Label>
-                        <div class="flex items-center gap-4">
-                            <div class="flex-1">
-                                <input
-                                    id="logo_full_file"
-                                    type="file"
-                                    accept="image/png,image/jpeg,image/jpg,image/gif,image/svg+xml"
-                                    @change="handleLogoFullUpload"
-                                    :disabled="isUploadingLogoFull || isSaving || !props.permissions.can_manage"
-                                    class="block w-full text-sm text-slate-500
-                                           file:mr-4 file:py-2 file:px-4
-                                           file:rounded-full file:border-0
-                                           file:text-sm file:font-semibold
-                                           file:bg-violet-50 file:text-violet-700
-                                           hover:file:bg-violet-100
-                                           disabled:opacity-50 disabled:cursor-not-allowed"
-                                />
-                            </div>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                :disabled="isUploadingLogoFull || isSaving || !props.permissions.can_manage"
-                                class="min-w-24"
-                            >
-                                <Upload v-if="!isUploadingLogoFull" class="mr-2 h-4 w-4" />
-                                <div v-else class="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
-                                {{ isUploadingLogoFull ? 'Uploading...' : 'Upload' }}
-                            </Button>
-                        </div>
-                        <div class="flex items-center gap-4">
-                            <span class="text-sm text-muted-foreground">Current:</span>
-                            <img
-                                v-if="form.logo_full"
-                                :src="`${form.logo_full}?v=${imageCacheBuster}`"
-                                alt="Full Logo"
-                                class="h-28 w-auto object-contain"
-                                @error="() => {}"
-                            />
-                            <span v-else class="text-sm text-muted-foreground">No logo set</span>
-                        </div>
-                        <p class="text-sm text-muted-foreground">
-                            Upload a new full logo image. Supported formats: PNG, JPG, GIF, SVG (max 2MB)
-                        </p>
+                        <Label for="copyright_text">Copyright text</Label>
+                        <Textarea id="copyright_text" v-model="textForm.copyright_text" :disabled="textForm.processing || !canManage" rows="3" required />
+                        <InputError :message="textForm.errors.copyright_text" />
                     </div>
-
-                    <!-- Logo Text Upload -->
-                    <div class="space-y-2">
-                        <Label for="logo_text_file">Logo SVG Upload</Label>
-                        <div class="flex items-center gap-4">
-                            <div class="flex-1">
-                                <input
-                                    id="logo_text_file"
-                                    type="file"
-                                    accept="image/svg+xml"
-                                    @change="handleLogoTextUpload"
-                                    :disabled="isUploadingLogoText || isSaving || !props.permissions.can_manage"
-                                    class="block w-full text-sm text-slate-500
-                                           file:mr-4 file:py-2 file:px-4
-                                           file:rounded-full file:border-0
-                                           file:text-sm file:font-semibold
-                                           file:bg-violet-50 file:text-violet-700
-                                           hover:file:bg-violet-100
-                                           disabled:opacity-50 disabled:cursor-not-allowed"
-                                />
-                            </div>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                :disabled="isUploadingLogoText || isSaving || !props.permissions.can_manage"
-                                class="min-w-24"
-                            >
-                                <Upload v-if="!isUploadingLogoText" class="mr-2 h-4 w-4" />
-                                <div v-else class="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
-                                {{ isUploadingLogoText ? 'Uploading...' : 'Upload' }}
-                            </Button>
-                        </div>
-                        <div class="flex items-center gap-4">
-                            <span class="text-sm text-muted-foreground">Current:</span>
-                            <img
-                                v-if="form.logo_text"
-                                :src="`${form.logo_text}?v=${imageCacheBuster}`"
-                                alt="Text Logo"
-                                class="h-28 w-auto object-contain"
-                                @error="() => {}"
-                            />
-                            <span v-else class="text-sm text-muted-foreground">No logo set</span>
-                        </div>
-                        <p class="text-sm text-muted-foreground">
-                            Upload a new text logo image. Supported formats: SVG (max 2MB)
-                        </p>
-                    </div>
-
-                    <!-- Copyright Text -->
-                    <div class="space-y-2">
-                        <Label for="copyright_text">Copyright Text</Label>
-                        <Textarea
-                            id="copyright_text"
-                            v-model="form.copyright_text"
-                            placeholder="© 2025 Your Organization. All rights reserved."
-                            :disabled="isSaving || !props.permissions.can_manage"
-                            rows="3"
-                        />
-                        <p class="text-sm text-muted-foreground">
-                            Copyright notice displayed in footers and legal pages
-                        </p>
-                    </div>
-
-                    <!-- Country -->
                     <div class="space-y-2">
                         <Label for="country">Country</Label>
-                        <Input
-                            id="country"
-                            v-model="form.country"
-                            placeholder="Vietnam"
-                            :disabled="isSaving || !props.permissions.can_manage"
-                        />
-                        <p class="text-sm text-muted-foreground">
-                            Country name for localization and display purposes
-                        </p>
+                        <Input id="country" v-model="textForm.country" :disabled="textForm.processing || !canManage" autocomplete="country-name" required />
+                        <InputError :message="textForm.errors.country" />
                     </div>
-
-                    <!-- Actions -->
-                    <div class="flex items-center justify-end gap-4 pt-6 border-t">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            @click="handleReset"
-                            :disabled="isSaving || !hasChanges || !props.permissions.can_manage"
-                        >
-                            Reset
-                        </Button>
-
-                        <Button
-                            type="submit"
-                            :disabled="isSaving || !hasChanges || !props.permissions.can_manage"
-                            class="min-w-24"
-                        >
-                            <Save v-if="!isSaving" class="mr-2 h-4 w-4" />
-                            <div v-else class="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
-                            {{ isSaving ? 'Saving...' : 'Save Changes' }}
+                    <div class="flex flex-wrap justify-end gap-3 border-t pt-6">
+                        <Button type="button" variant="outline" :disabled="textForm.processing || !hasTextChanges || !canManage" @click="textForm.reset()">Reset</Button>
+                        <Button type="submit" :disabled="textForm.processing || !hasTextChanges || !canManage">
+                            <Save class="mr-2 size-4" />
+                            {{ textForm.processing ? 'Saving…' : 'Save changes' }}
                         </Button>
                     </div>
                 </form>
             </CardContent>
         </Card>
 
-        <!-- Current Values Preview -->
         <Card>
             <CardHeader>
-                <CardTitle>Current Configuration Preview</CardTitle>
-                <CardDescription>
-                    Preview of how the current settings appear in the application
-                </CardDescription>
+                <CardTitle>Branding assets</CardTitle>
+                <CardDescription>Upload raster PNG, JPEG, or WebP files. New assets receive immutable URLs, so no cache refresh is required.</CardDescription>
             </CardHeader>
-            <CardContent>
-                <div class="space-y-4">
+            <CardContent class="grid gap-6 lg:grid-cols-2">
+                <section v-for="asset in brandingAssets" :key="asset.slot" class="space-y-4 rounded-lg border p-4" :aria-labelledby="`${asset.slot}-heading`">
                     <div>
-                        <Label class="text-sm font-medium">App Name Display:</Label>
-                        <p class="text-2xl font-bold">{{ form.app_name || 'Not Set' }}</p>
+                        <h2 :id="`${asset.slot}-heading`" class="font-semibold">{{ asset.label }}</h2>
+                        <p class="text-muted-foreground text-sm">{{ asset.description }}</p>
                     </div>
 
-                    <div>
-                        <Label class="text-sm font-medium">Logo Paths:</Label>
-                        <div class="mt-2 space-y-1">
-                            <p class="text-sm"><span class="font-medium">Full:</span> {{ form.logo_full || 'Not Set' }}</p>
-                            <p class="text-sm"><span class="font-medium">Text:</span> {{ form.logo_text || 'Not Set' }}</p>
+                    <div class="bg-muted/40 flex min-h-24 items-center justify-center rounded-md border p-3">
+                        <img v-if="previewUrl(asset) && !imageFailures[asset.slot]" :src="previewUrl(asset) as string" :alt="`${asset.label} preview`" :class="[asset.preview_class, 'object-contain']" @error="imageFailures[asset.slot] = true" />
+                        <div v-else class="text-muted-foreground flex items-center gap-2 text-sm" role="status">
+                            <ImageOff class="size-4" />
+                            {{ imageFailures[asset.slot] ? 'The current asset could not be displayed.' : 'No asset uploaded yet.' }}
                         </div>
                     </div>
 
-                    <div>
-                        <Label class="text-sm font-medium">Copyright Notice:</Label>
-                        <p class="text-sm text-muted-foreground">{{ form.copyright_text || 'Not Set' }}</p>
-                    </div>
-
-                    <div>
-                        <Label class="text-sm font-medium">Country:</Label>
-                        <p class="text-sm">🇻🇳 {{ form.country || 'Not Set' }}</p>
-                    </div>
-                </div>
+                    <form class="space-y-3" @submit.prevent="submitUpload(asset.slot)">
+                        <div class="space-y-2">
+                            <Label :for="`${asset.slot}-file`">Choose {{ asset.label.toLowerCase() }}</Label>
+                            <Input :key="inputKeys[asset.slot]" :id="`${asset.slot}-file`" type="file" accept="image/png,image/jpeg,image/webp" :disabled="uploadForms[asset.slot].processing || !canManage" @change="selectFile(asset, $event)" />
+                            <InputError :message="uploadForms[asset.slot].errors.file" />
+                        </div>
+                        <div v-if="uploadForms[asset.slot].progress" class="space-y-1" aria-live="polite">
+                            <div class="text-muted-foreground flex justify-between text-xs">
+                                <span>Uploading</span><span>{{ uploadForms[asset.slot].progress?.percentage }}%</span>
+                            </div>
+                            <Progress :model-value="uploadForms[asset.slot].progress?.percentage ?? 0" />
+                        </div>
+                        <div class="flex justify-end gap-3">
+                            <Button type="button" variant="outline" :disabled="uploadForms[asset.slot].processing || !uploadForms[asset.slot].file || !canManage" @click="resetUpload(asset.slot)">Clear</Button>
+                            <Button type="submit" :disabled="uploadForms[asset.slot].processing || !uploadForms[asset.slot].file || !canManage">
+                                <Upload class="mr-2 size-4" />
+                                {{ uploadForms[asset.slot].processing ? 'Uploading…' : 'Upload asset' }}
+                            </Button>
+                        </div>
+                    </form>
+                </section>
             </CardContent>
         </Card>
+
+        <p v-if="!canManage" class="text-muted-foreground text-sm" role="status">You do not have permission to update global system configuration.</p>
     </div>
 </template>

@@ -14,6 +14,10 @@ class UploadRecordPolicy
 
     public function view(User $user, UploadRecord $uploadRecord): bool
     {
+        if ($uploadRecord->context === 'branding') {
+            return false;
+        }
+
         return $this->isAdministrator($user)
             || $uploadRecord->user_id === $user->id
             || $this->uploads->isContextPublic($uploadRecord->context);
@@ -21,6 +25,10 @@ class UploadRecordPolicy
 
     public function delete(User $user, UploadRecord $uploadRecord): bool
     {
+        if ($uploadRecord->context === 'branding') {
+            return false;
+        }
+
         return $this->isAdministrator($user) || $uploadRecord->user_id === $user->id;
     }
 

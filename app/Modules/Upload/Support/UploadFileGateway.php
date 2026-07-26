@@ -28,6 +28,20 @@ final class UploadFileGateway implements FileUploadGateway
         return $this->uploadPlatform->getUrl(UploadRecord::query()->findOrFail($uploadId));
     }
 
+    public function availableUrlFor(int $uploadId): ?string
+    {
+        $upload = UploadRecord::query()->find($uploadId);
+
+        return $upload?->fileExists() ? $this->uploadPlatform->getUrl($upload) : null;
+    }
+
+    public function delete(int $uploadId): bool
+    {
+        $upload = UploadRecord::query()->findOrFail($uploadId);
+
+        return $this->uploadPlatform->delete($upload);
+    }
+
     public function linkToQueryReply(int $uploadId, int $ticketId, int $replyId): void
     {
         $uploadRecord = UploadRecord::query()->findOrFail($uploadId);

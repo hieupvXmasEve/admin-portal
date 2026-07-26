@@ -31,7 +31,7 @@ class UploadMultipleRequest extends FormRequest
         return [
             'files' => ['required', 'array', 'min:1', 'max:10'],
             'files.*' => ['required', 'file'],
-            'context' => ['required', 'string', Rule::in(array_keys(config('uploads.contexts')))],
+            'context' => ['required', 'string', Rule::in(array_keys(array_filter(config('uploads.contexts'), static fn (array $config): bool => ! ($config['internal'] ?? false))))],
             'alt_text' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:1000'],
             'expires_at' => ['nullable', 'date', 'after:now'],

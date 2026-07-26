@@ -2,7 +2,7 @@ import '../css/app.css';
 import '../css/tiptap.css';
 
 import { createInertiaApp } from '@inertiajs/vue3';
-import { withInertiaModal, putConfig } from '@inertiaui/modal-vue';
+import { putConfig, withInertiaModal } from '@inertiaui/modal-vue';
 import { createPinia } from 'pinia';
 import { createApp, h } from 'vue';
 import { ZiggyVue } from 'ziggy-js';
@@ -25,10 +25,12 @@ declare module 'vite/client' {
     }
 }
 
-const appName = import.meta.env.VITE_APP_NAME || 'Swinx';
-
 createInertiaApp({
-    title: (title) => `${title} - ${appName}`,
+    title: (title) => {
+        const appName = document.documentElement.dataset.appName;
+
+        return appName && title ? `${title} - ${appName}` : title || appName || '';
+    },
     resolve: (name) => {
         const pages = import.meta.glob('./pages/**/*.vue', { eager: true });
         const page = pages[`./pages/${name}.vue`] as any;

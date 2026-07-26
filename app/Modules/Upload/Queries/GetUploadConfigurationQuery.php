@@ -17,6 +17,10 @@ class GetUploadConfigurationQuery
         foreach ($this->uploads->getAvailableContexts() as $context) {
             $config = $this->uploads->getContextConfiguration($context);
 
+            if ($config['internal'] ?? false) {
+                continue;
+            }
+
             $contexts[$context] = [
                 'max_size' => $config['max_size'],
                 'allowed_types' => $config['allowed_types'],

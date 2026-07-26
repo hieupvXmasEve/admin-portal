@@ -8,11 +8,17 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\RolePermission;
 use App\Models\User;
+use App\Modules\Platform\Actions\UpdateSystemConfigurationAction;
+use App\Modules\Platform\Models\SystemSetting;
+use App\Modules\Platform\Support\SystemConfigurationStore;
+use Database\Seeders\InitialSetup\RoleAndPermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use RuntimeException;
 
 uses(RefreshDatabase::class);
 
@@ -37,18 +43,21 @@ function grantSystemConfigurationPermission(User $user, Campus $campus, string $
     ]);
 }
 
+function grantSystemConfigurationSuperAdmin(User $user, Campus $campus): void
+{
+    $role = Role::query()->where('code', 'super_admin')->firstOrFail();
+
+    CampusUserRole::create([
+        'user_id' => $user->id,
+        'campus_id' => $campus->id,
+        'role_id' => $role->id,
+    ]);
+}
+
 beforeEach(function (): void {
-    Cache::forget('system_config');
+    Cache::flush();
     Storage::fake('local');
-    Storage::put('system_config.json', json_encode([
-        'app_name' => 'Swinx',
-        'logo_full' => '/storage/branding/logo-full.png',
-        'logo_text' => '/storage/branding/logo-text.svg',
-        'copyright_text' => '© Swinx',
-        'country' => 'Việt Nam',
-        'survey_enabled' => true,
-        'private_future_setting' => 'must-not-be-public',
-    ], JSON_THROW_ON_ERROR));
+    Storage::fake('public');
 
     $this->campus = Campus::factory()->create();
     $this->staff = User::factory()->create();
@@ -60,19 +69,48 @@ beforeEach(function (): void {
     ]);
 });
 
-it('enumerates the public branding configuration without exposing arbitrary keys', function (): void {
+it('materializes deterministic typed defaults without reading the legacy JSON file', function (): void {
+    Storage::put('system_config.json', json_encode([
+        'app_name' => 'Legacy value that must not be imported',
+        'survey_enabled' => true,
+    ], JSON_THROW_ON_ERROR));
+
+    $configuration = app(SystemConfigurationStore::class)->all();
+
+    expect($configuration)
+        ->toMatchArray([
+            'app_name' => 'Swinx',
+            'copyright_text' => '© 2026 Asia Vietnam University. All rights reserved.',
+            'country' => 'Việt Nam',
+            'survey_enabled' => false,
+            'default_course_survey' => null,
+            'active_query_forms' => [],
+            'system_booking_start_time' => '07:00',
+            'system_booking_end_time' => '20:00',
+            'allow_student_booking' => true,
+            'student_booking_limit_per_day' => 2,
+            'logo_full_upload_id' => null,
+            'logo_text_upload_id' => null,
+            'favicon_upload_id' => null,
+            'apple_touch_icon_upload_id' => null,
+        ])
+        ->and(SystemSetting::query()->count())->toBe(14);
+});
+
+it('enumerates only code-approved public configuration keys', function (): void {
     $this->getJson(route('api.system-config.index'))
         ->assertOk()
         ->assertJsonPath('success', true)
         ->assertJsonPath('data.app_name', 'Swinx')
-        ->assertJsonPath('data.survey_enabled', true)
-        ->assertJsonMissing(['private_future_setting' => 'must-not-be-public']);
+        ->assertJsonPath('data.survey_enabled', false)
+        ->assertJsonMissing(['data.default_course_survey'])
+        ->assertJsonMissing(['data.logo_full_upload_id']);
 
     $this->getJson(route('api.system-config.show', ['key' => 'app_name']))
         ->assertOk()
         ->assertJsonPath('data.app_name', 'Swinx');
 
-    $this->getJson(route('api.system-config.show', ['key' => 'private_future_setting']))
+    $this->getJson(route('api.system-config.show', ['key' => 'default_course_survey']))
         ->assertNotFound();
 });
 
@@ -93,25 +131,38 @@ it('rejects anonymous and unauthorized system configuration mutations', function
     ])->assertForbidden();
 });
 
-it('lets authorized staff update the global configuration and records audit evidence', function (): void {
+it('rejects a campus-only manager from mutating global configuration', function (): void {
     grantSystemConfigurationPermission($this->staff, $this->campus, 'manage_system_config');
+
+    $this->actingAs($this->staff)
+        ->withHeader('X-CSRF-TOKEN', 'system-configuration-test-token')
+        ->putJson(route('api.system-config.update'), ['app_name' => 'Campus manager change'])
+        ->assertForbidden();
+});
+
+it('lets a system super administrator update typed configuration and records audit evidence', function (): void {
+    $this->seed(RoleAndPermissionSeeder::class);
+    grantSystemConfigurationSuperAdmin($this->staff, $this->campus);
 
     $this->actingAs($this->staff)
         ->withHeader('X-CSRF-TOKEN', 'system-configuration-test-token')
         ->putJson(route('api.system-config.update'), [
             'app_name' => 'Swinx Platform',
             'country' => 'Vietnam',
+            'survey_enabled' => true,
+            'active_query_forms' => [12, 24],
+            'default_course_survey' => null,
         ])
         ->assertOk()
         ->assertJsonPath('success', true)
         ->assertJsonPath('data.app_name', 'Swinx Platform')
-        ->assertJsonPath('data.country', 'Vietnam');
+        ->assertJsonPath('data.country', 'Vietnam')
+        ->assertJsonPath('data.survey_enabled', true)
+        ->assertJsonMissing(['data.active_query_forms']);
 
-    $saved = json_decode(Storage::get('system_config.json'), true, 512, JSON_THROW_ON_ERROR);
-
-    expect($saved)
-        ->toMatchArray(['app_name' => 'Swinx Platform', 'country' => 'Vietnam'])
-        ->and($saved['private_future_setting'])->toBe('must-not-be-public');
+    expect(SystemSetting::query()->where('key', 'app_name')->firstOrFail()->value)->toBe('Swinx Platform')
+        ->and(SystemSetting::query()->where('key', 'survey_enabled')->firstOrFail()->value)->toBeTrue()
+        ->and(SystemSetting::query()->where('key', 'active_query_forms')->firstOrFail()->value)->toBe([12, 24]);
 
     $audit = DB::table('activity_log')
         ->where('description', 'System configuration updated')
@@ -124,18 +175,56 @@ it('lets authorized staff update the global configuration and records audit evid
         ->and(json_decode($audit->properties, true, 512, JSON_THROW_ON_ERROR)['scope'])->toBe('global');
 });
 
-it('allows authorized staff to upload a branding file through the protected legacy endpoint', function (): void {
-    grantSystemConfigurationPermission($this->staff, $this->campus, 'manage_system_config');
-
-    Storage::put('system_config.json', json_encode([
-        'app_name' => 'Swinx',
-        'logo_full' => '/storage/branding/custom-logo.png',
-        'logo_text' => '/storage/branding/logo-text.svg',
-        'copyright_text' => '© Swinx',
-        'country' => 'Việt Nam',
-    ], JSON_THROW_ON_ERROR));
+it('rejects unsupported setting keys instead of silently accepting them', function (): void {
+    $this->seed(RoleAndPermissionSeeder::class);
+    grantSystemConfigurationSuperAdmin($this->staff, $this->campus);
 
     $this->actingAs($this->staff)
+        ->withHeader('X-CSRF-TOKEN', 'system-configuration-test-token')
+        ->putJson(route('api.system-config.update'), [
+            'private_future_setting' => 'must-not-persist',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonPath('errors.0.field', 'configuration');
+
+    expect(SystemSetting::query()->where('key', 'private_future_setting')->exists())->toBeFalse();
+});
+
+it('invalidates the shared snapshot only after its transaction commits', function (): void {
+    $store = app(SystemConfigurationStore::class);
+    $action = app(UpdateSystemConfigurationAction::class);
+
+    expect($store->all()['country'])->toBe('Việt Nam');
+
+    try {
+        DB::transaction(function () use ($action): void {
+            $action->update(['country' => 'Rolled back']);
+
+            throw new RuntimeException('Force rollback.');
+        });
+    } catch (RuntimeException $exception) {
+        expect($exception->getMessage())->toBe('Force rollback.');
+    }
+
+    expect($store->all()['country'])->toBe('Việt Nam');
+
+    $action->update(['country' => 'Vietnam']);
+
+    expect($store->all()['country'])->toBe('Vietnam');
+});
+
+it('fails readiness when a required setting row is missing', function (): void {
+    SystemSetting::query()->where('key', 'allow_student_booking')->delete();
+    Cache::flush();
+
+    app(SystemConfigurationStore::class)->all();
+})->throws(RuntimeException::class, 'required keys are missing: allow_student_booking');
+
+it('keeps the protected upload API compatible while returning an immutable branding URL', function (): void {
+    $this->seed(RoleAndPermissionSeeder::class);
+    grantSystemConfigurationSuperAdmin($this->staff, $this->campus);
+
+    $response = $this->actingAs($this->staff)
         ->withHeader('Accept', 'application/json')
         ->withHeader('X-CSRF-TOKEN', 'system-configuration-test-token')
         ->post(route('api.system-config.upload'), [
@@ -143,18 +232,12 @@ it('allows authorized staff to upload a branding file through the protected lega
             'config_key' => 'logo_full',
         ])
         ->assertOk()
-        ->assertJsonPath('success', true)
-        ->assertJsonPath('data.path', '/storage/branding/custom-logo.png');
+        ->assertJsonPath('success', true);
 
-    Storage::disk('public')->assertExists('branding/custom-logo.png');
-
-    $audit = DB::table('activity_log')
-        ->where('description', 'System configuration file uploaded')
-        ->latest('id')
-        ->first();
-
-    expect($audit)->not->toBeNull()
-        ->and($audit->causer_id)->toBe($this->staff->id);
+    expect($response->json('data.path'))
+        ->toStartWith('/storage/branding/')
+        ->not->toBe('/storage/branding/logo-full.png')
+        ->and(SystemSetting::query()->where('key', 'logo_full_upload_id')->firstOrFail()->value)->not->toBeNull();
 });
 
 it('preserves the staff page behind a view permission and its legacy URL', function (): void {

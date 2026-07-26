@@ -21,5 +21,9 @@ interface FileUploadGateway
 
     public function urlFor(int $uploadId): string;
 
+    public function availableUrlFor(int $uploadId): ?string;
+
+    public function delete(int $uploadId): bool;
+
     public function linkToQueryReply(int $uploadId, int $ticketId, int $replyId): void;
 }

@@ -29,7 +29,7 @@ class ListUploadsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'context' => ['nullable', 'string', Rule::in(array_keys(config('uploads.contexts')))],
+            'context' => ['nullable', 'string', Rule::in(array_keys(array_filter(config('uploads.contexts'), static fn (array $config): bool => ! ($config['internal'] ?? false))))],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
             'search' => ['nullable', 'string', 'max:255'],
         ];

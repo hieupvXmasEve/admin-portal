@@ -16,6 +16,8 @@ class ListUploadsQuery
     {
         $query = UploadRecord::query();
 
+        $query->where('context', '!=', 'branding');
+
         if (! $actor?->hasRole('admin')) {
             $query->where('user_id', $actor?->id);
         }

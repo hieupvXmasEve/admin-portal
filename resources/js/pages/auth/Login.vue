@@ -6,7 +6,7 @@ import { Separator } from '@/components/ui/separator';
 import { useSystemConfig } from '@/composables/useSystemConfig';
 import { AUTH_ROUTE_NAMES } from '@/constants/auth-routes';
 import { Head } from '@inertiajs/vue3';
-import { AlertTriangle } from 'lucide-vue-next';
+import { AlertTriangle, ImageOff } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import { route } from 'ziggy-js';
 
@@ -21,7 +21,8 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 // System configuration
-const { get, getLogoFull } = useSystemConfig();
+const { systemConfig } = useSystemConfig();
+const monogram = computed(() => systemConfig.value.app_name.trim().slice(0, 1).toUpperCase());
 
 const isLoading = ref(false);
 
@@ -49,11 +50,15 @@ const handleGoogleSignIn = async () => {
         <div class="w-full max-w-lg">
             <!-- University Header -->
             <header class="mb-8 text-center">
-                <div class="border-background mx-auto mb-6 flex w-44 items-center justify-center rounded-2xl border-4 shadow-2xl backdrop-blur-sm">
-                    <img :src="getLogoFull" alt="Asia Vietnam University Logo" class="size-full object-contain" />
+                <div class="border-background mx-auto mb-6 flex size-44 items-center justify-center rounded-2xl border-4 shadow-2xl backdrop-blur-sm">
+                    <img v-if="systemConfig.logo_full_url" :src="systemConfig.logo_full_url" :alt="`${systemConfig.app_name} logo`" class="size-full object-contain" />
+                    <div v-else class="text-muted-foreground flex flex-col items-center gap-2 text-sm" role="status">
+                        <ImageOff class="size-6" />
+                        <span class="font-semibold">{{ monogram }}</span>
+                    </div>
                 </div>
                 <div class="space-y-2">
-                    <h1 class="text-foreground text-3xl font-bold tracking-tight">{{ get('app_name', 'Admin portal') }}</h1>
+                    <h1 class="text-foreground text-3xl font-bold tracking-tight">{{ systemConfig.app_name }}</h1>
                     <p class="text-muted-foreground text-sm">Administrator & Staff Access System</p>
                 </div>
             </header>
@@ -115,10 +120,9 @@ const handleGoogleSignIn = async () => {
             <!-- Footer -->
             <footer class="mt-8 space-y-4 text-center">
                 <div class="text-muted-foreground flex items-center justify-center space-x-2 text-sm">
-                    <span role="img" aria-label="Vietnam flag">🇻🇳</span>
-                    <span>{{ get('country', 'Vietnam') }}</span>
+                    <span>{{ systemConfig.country }}</span>
                 </div>
-                <p class="text-muted-foreground text-sm">{{ get('copyright_text', '© 2025 Asia Vietnam University. All rights reserved.') }}</p>
+                <p class="text-muted-foreground text-sm">{{ systemConfig.copyright_text }}</p>
                 <nav class="text-muted-foreground flex justify-center space-x-6 text-xs" aria-label="Legal links">
                     <button type="button" class="hover:text-primary focus:ring-ring transition-colors focus:ring-2 focus:ring-offset-2 focus:outline-none">Privacy Policy</button>
                     <button type="button" class="hover:text-primary focus:ring-ring transition-colors focus:ring-2 focus:ring-offset-2 focus:outline-none">Terms of Service</button>

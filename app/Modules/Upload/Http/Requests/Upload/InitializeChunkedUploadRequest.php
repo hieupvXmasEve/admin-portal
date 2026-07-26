@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Upload\Http\Requests\Upload;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class InitializeChunkedUploadRequest extends FormRequest
 {
@@ -26,8 +27,17 @@ class InitializeChunkedUploadRequest extends FormRequest
         return [
             'filename' => ['required', 'string', 'max:255'],
             'file_size' => ['required', 'integer', 'min:1'],
-            'context' => ['required', 'string', 'max:50'],
+            'context' => ['required', 'string', 'max:50', Rule::in($this->publicContexts())],
             'metadata' => ['sometimes', 'array'],
         ];
+    }
+
+    /** @return list<string> */
+    private function publicContexts(): array
+    {
+        return array_keys(array_filter(
+            config('uploads.contexts'),
+            static fn (array $config): bool => ! ($config['internal'] ?? false),
+        ));
     }
 }

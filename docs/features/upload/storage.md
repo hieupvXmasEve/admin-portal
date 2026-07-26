@@ -3,7 +3,7 @@ title: Upload and Storage Operations
 status: current
 type: runbook
 scope: Upload validation and storage operations
-last_verified: "2026-07-25"
+last_verified: "2026-07-26"
 owner: Upload Module
 audience:
   - platform operators
@@ -46,6 +46,12 @@ context in `config/uploads.php`, then use `UploadPlatform` or the shared
 Public configuration and context endpoints expose the client-safe subset of
 these rules. Authenticated upload, list, delete, and chunk operations apply
 their own throttle and policy checks.
+
+The `branding` context is internal to Platform. It is not a generic Upload API
+context: generic configuration, discovery, upload, list, show, delete, and
+chunk initialization must exclude it. Platform calls `FileUploadGateway`
+directly after its `super_admin` authorization boundary and stores only the
+returned Upload ID in `system_settings`.
 
 ## Storage drivers
 

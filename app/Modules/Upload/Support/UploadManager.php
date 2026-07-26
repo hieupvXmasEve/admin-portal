@@ -109,24 +109,30 @@ class UploadManager
         $metadata = Arr::except($metadata, $associationKeys);
 
         // Create upload record
-        $uploadRecord = UploadRecord::create([
-            'filename' => $filename,
-            'original_name' => $file->getClientOriginalName(),
-            'mime_type' => $file->getMimeType(),
-            'size' => $file->getSize(),
-            'context' => $context,
-            'path' => $storedPath,
-            'disk' => $disk,
-            'url' => $url,
-            'hash' => $this->generateFileHash($file),
-            'user_id' => $userId,
-            'student_id' => $studentId,
-            'response_id' => $associations['response_id'] ?? null,
-            'answer_id' => $associations['answer_id'] ?? null,
-            'ticket_id' => $associations['ticket_id'] ?? null,
-            'reply_id' => $associations['reply_id'] ?? null,
-            'metadata' => $metadata ?: null,
-        ]);
+        try {
+            $uploadRecord = UploadRecord::create([
+                'filename' => $filename,
+                'original_name' => $file->getClientOriginalName(),
+                'mime_type' => $file->getMimeType(),
+                'size' => $file->getSize(),
+                'context' => $context,
+                'path' => $storedPath,
+                'disk' => $disk,
+                'url' => $url,
+                'hash' => $this->generateFileHash($file),
+                'user_id' => $userId,
+                'student_id' => $studentId,
+                'response_id' => $associations['response_id'] ?? null,
+                'answer_id' => $associations['answer_id'] ?? null,
+                'ticket_id' => $associations['ticket_id'] ?? null,
+                'reply_id' => $associations['reply_id'] ?? null,
+                'metadata' => $metadata ?: null,
+            ]);
+        } catch (\Throwable $exception) {
+            Storage::disk($disk)->delete($storedPath);
+
+            throw $exception;
+        }
 
         Log::info('File uploaded successfully', [
             'upload_id' => $uploadRecord->id,
@@ -184,7 +190,9 @@ class UploadManager
     protected function generateFilename(UploadedFile $file, array $config): string
     {
         $originalName = $file->getClientOriginalName();
-        $extension = $file->getClientOriginalExtension();
+        $extension = ($config['canonical_extension'] ?? false)
+            ? $this->validationService->canonicalExtension($file)
+            : $file->getClientOriginalExtension();
 
         if ($this->security['generate_unique_names'] ?? true) {
             // Generate unique filename with timestamp and random string

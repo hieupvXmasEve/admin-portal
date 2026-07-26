@@ -120,12 +120,41 @@ class FileValidator
             $this->validateMimeType($file, $config);
             $this->validateExtension($file, $config);
             $this->validateFileSignature($file);
+            $this->validateImageDimensions($file, $config);
             $this->validateFileName($file);
             $this->scanForMaliciousContent($file);
             $this->performAdvancedSecurityChecks($file);
             $this->scanForViruses($file);
         } finally {
             $this->currentFileConfig = [];
+        }
+    }
+
+    public function canonicalExtension(UploadedFile $file): string
+    {
+        return match ($file->getMimeType()) {
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/webp' => 'webp',
+            default => throw new InvalidArgumentException('The uploaded file type does not have a canonical extension.'),
+        };
+    }
+
+    /** @param array<string, mixed> $config */
+    private function validateImageDimensions(UploadedFile $file, array $config): void
+    {
+        if (! isset($config['max_width'], $config['max_height'], $config['max_pixels'])) {
+            return;
+        }
+
+        $dimensions = @getimagesize($file->getRealPath());
+        if ($dimensions === false) {
+            throw new InvalidArgumentException('The image content could not be decoded.');
+        }
+
+        [$width, $height] = $dimensions;
+        if ($width > $config['max_width'] || $height > $config['max_height'] || ($width * $height) > $config['max_pixels']) {
+            throw new InvalidArgumentException('The image dimensions exceed the branding limits.');
         }
     }
 

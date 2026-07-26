@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" data-theme="{{ $themeName ?? 'green' }}" @class(['dark'=> ($appearance ?? 'system') == 'dark'])>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" data-theme="{{ $themeName ?? 'green' }}" data-app-name="{{ $systemBranding['app_name'] }}" @class(['dark'=> ($appearance ?? 'system') == 'dark'])>
 
 <head>
     <meta charset="utf-8">
@@ -40,11 +40,14 @@
         }
     </style>
 
-    <title inertia>{{ config('app.name', 'Laravel') }}</title>
+    <title inertia>{{ $systemBranding['app_name'] }}</title>
 
-    <link rel="icon" href="/favicon.ico" sizes="any">
-    <!-- <link rel="icon" href="/favicon.svg" type="image/svg+xml"> -->
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    @if ($systemBranding['favicon_url'])
+    <link rel="icon" href="{{ $systemBranding['favicon_url'] }}">
+    @endif
+    @if ($systemBranding['apple_touch_icon_url'])
+    <link rel="apple-touch-icon" href="{{ $systemBranding['apple_touch_icon_url'] }}">
+    @endif
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Modules\Platform\Queries\GetSystemBrandingQuery;
 use App\Services\PermissionService;
 use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use App\Shared\Contracts\Academic\DTO\AcademicPeriodReference;
@@ -51,6 +52,7 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'name' => config('app.name'),
+            'system_config' => fn (): array => app(GetSystemBrandingQuery::class)->handle(),
             'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => function () use ($user, $currentCampusId) {
                 if (! $user) {

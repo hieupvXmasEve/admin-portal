@@ -15,6 +15,8 @@ it('owns system configuration routes in Platform and retires the legacy implemen
         expect($path)->not->toBeFile();
     }
 
+    expect($root.'/storage/app/private/system_config.json')->not->toBeFile();
+
     expect(route('api.system-config.index'))->toContain('/api/system-config')
         ->and(app('router')->getRoutes()->getByName('api.system-config.update')?->getActionName())
         ->toBe('App\\Modules\\Platform\\Http\\Api\\SystemConfigurationController@update')
@@ -38,7 +40,11 @@ it('does not retain supported runtime callers of the retired system configuratio
             }
 
             $contents = file_get_contents($file->getPathname()) ?: '';
-            if (str_contains($contents, 'SystemConfigService') || str_contains($contents, 'SystemConfigController')) {
+            if (
+                str_contains($contents, 'SystemConfigService')
+                || str_contains($contents, 'SystemConfigController')
+                || str_contains($contents, 'system_config.json')
+            ) {
                 $violations[] = $file->getPathname();
             }
         }

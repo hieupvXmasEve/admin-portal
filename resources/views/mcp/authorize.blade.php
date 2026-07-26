@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Authorize connection · Swinx</title>
+    <title>Authorize connection · {{ $systemBranding['app_name'] }}</title>
     <style>
         :root {
             --surface: #ffffff;
@@ -95,15 +95,15 @@
 <body>
     <main class="card">
         <header class="brand">
-            <span class="mark">S</span>
-            <strong>Swinx</strong>
+            <span class="mark">{{ mb_substr($systemBranding['app_name'], 0, 1) }}</span>
+            <strong>{{ $systemBranding['app_name'] }}</strong>
         </header>
         <div class="body">
             <h1>Authorize connection</h1>
             <p class="lead">
                 <strong>{{ $client->name }}</strong>
                 <span class="third-party">Third-party application</span>
-                is requesting access to your Swinx account. It will be able to act on your behalf,
+                is requesting access to your {{ $systemBranding['app_name'] }} account. It will be able to act on your behalf,
                 limited to the data you are already permitted to see.
             </p>
 

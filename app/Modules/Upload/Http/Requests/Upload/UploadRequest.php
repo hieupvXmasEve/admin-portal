@@ -92,7 +92,7 @@ class UploadRequest extends FormRequest
             'context' => [
                 'required',
                 'string',
-                Rule::in(array_keys(config('uploads.contexts'))),
+                Rule::in($this->publicContexts()),
             ],
             'alt_text' => [
                 'nullable',
@@ -136,7 +136,7 @@ class UploadRequest extends FormRequest
             'file.mimetypes' => 'The file MIME type is not allowed for this context.',
             'file.uploaded' => $this->getUploadFailureMessage(),
             'context.required' => 'Upload context is required.',
-            'context.in' => 'Invalid upload context. Allowed contexts: '.implode(', ', array_keys(config('uploads.contexts'))).'.',
+            'context.in' => 'Invalid upload context. Allowed contexts: '.implode(', ', $this->publicContexts()).'.',
             'alt_text.max' => 'Alt text cannot exceed 255 characters.',
             'description.max' => 'Description cannot exceed 1000 characters.',
             'expires_at.date' => 'Expiration date must be a valid date.',
@@ -177,6 +177,15 @@ class UploadRequest extends FormRequest
         if ($this->has('description')) {
             $this->merge(['description' => strip_tags($this->input('description'))]);
         }
+    }
+
+    /** @return list<string> */
+    private function publicContexts(): array
+    {
+        return array_keys(array_filter(
+            config('uploads.contexts'),
+            static fn (array $config): bool => ! ($config['internal'] ?? false),
+        ));
     }
 
     /**

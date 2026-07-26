@@ -4,37 +4,19 @@ declare(strict_types=1);
 
 namespace App\Modules\Platform\Support;
 
+use App\Modules\Platform\Models\SystemSetting;
 use App\Shared\Contracts\Platform\SystemConfigurationReader;
-use Illuminate\Http\UploadedFile;
+use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
-use JsonException;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 final class SystemConfigurationStore implements SystemConfigurationReader
 {
-    private const CACHE_KEY = 'system_config';
+    private const CACHE_KEY = 'platform.system_configuration.snapshot.v1';
 
-    private const CONFIG_FILE = 'system_config.json';
-
-    /** @var list<string> */
-    private const PUBLIC_KEYS = [
-        'app_name',
-        'logo_full',
-        'logo_text',
-        'copyright_text',
-        'country',
-        'survey_enabled',
-    ];
-
-    /** @var array<string, string> */
-    private const UPLOAD_TARGETS = [
-        'logo_full' => '/storage/branding/logo-full.png',
-        'logo_text' => '/storage/branding/logo-text.svg',
-    ];
+    public function __construct(private readonly SystemConfigurationDefinition $definition) {}
 
     /**
      * @return array<string, mixed>
@@ -42,7 +24,7 @@ final class SystemConfigurationStore implements SystemConfigurationReader
     public function all(): array
     {
         /** @var array<string, mixed> $configuration */
-        $configuration = Cache::rememberForever(self::CACHE_KEY, fn (): array => $this->load());
+        $configuration = $this->cache()->rememberForever(self::CACHE_KEY, fn (): array => $this->loadSnapshot());
 
         return $configuration;
     }
@@ -52,7 +34,7 @@ final class SystemConfigurationStore implements SystemConfigurationReader
      */
     public function public(): array
     {
-        return Arr::only($this->all(), self::PUBLIC_KEYS);
+        return Arr::only($this->all(), $this->definition->publicKeys());
     }
 
     public function get(string $key, mixed $default = null): mixed
@@ -62,7 +44,7 @@ final class SystemConfigurationStore implements SystemConfigurationReader
 
     public function publicValue(string $key): mixed
     {
-        if (! in_array($key, self::PUBLIC_KEYS, true)) {
+        if (! in_array($key, $this->definition->publicKeys(), true)) {
             return null;
         }
 
@@ -75,87 +57,72 @@ final class SystemConfigurationStore implements SystemConfigurationReader
      */
     public function update(array $attributes): array
     {
-        $configuration = array_merge($this->all(), $attributes);
+        $attributes = $this->definition->validate($attributes);
+        $this->assertReady();
 
-        try {
-            $encoded = json_encode($configuration, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
-        } catch (JsonException $exception) {
-            throw new RuntimeException('Unable to encode system configuration.', previous: $exception);
+        foreach ($attributes as $key => $value) {
+            $updated = SystemSetting::query()
+                ->where('key', $key)
+                ->update([
+                    'value' => json_encode($value, JSON_THROW_ON_ERROR),
+                    'updated_at' => now(),
+                ]);
+
+            if ($updated !== 1) {
+                throw new RuntimeException("Unable to persist required system configuration key: {$key}");
+            }
         }
 
-        if (! Storage::put(self::CONFIG_FILE, $encoded)) {
-            throw new RuntimeException('Unable to persist system configuration.');
-        }
+        DB::afterCommit(fn (): bool => $this->cache()->forget(self::CACHE_KEY));
 
-        Cache::forget(self::CACHE_KEY);
-
-        return $this->all();
-    }
-
-    /**
-     * @return array{path: string, stored_path: string, cache_bust: int}
-     */
-    public function upload(UploadedFile $file, string $configurationKey): array
-    {
-        $targetPath = $this->get($configurationKey, self::UPLOAD_TARGETS[$configurationKey] ?? null);
-        if (! is_string($targetPath) || ! str_starts_with($targetPath, '/storage/')) {
-            throw new RuntimeException("Invalid configuration key for file upload: {$configurationKey}");
-        }
-
-        $storagePath = Str::after($targetPath, '/storage/');
-        if ($storagePath === '' || str_contains($storagePath, '..')) {
-            throw new RuntimeException("Invalid configuration file path: {$configurationKey}");
-        }
-
-        $directory = dirname($storagePath);
-        $filename = basename($storagePath);
-
-        Storage::disk('public')->makeDirectory($directory);
-
-        $stored = Storage::disk('public')->putFileAs($directory, $file, $filename);
-
-        if ($stored === false) {
-            throw new RuntimeException('Unable to store system configuration file.');
-        }
-
-        return [
-            'path' => $targetPath,
-            'stored_path' => '/storage/'.$stored,
-            'cache_bust' => time(),
-        ];
+        return $this->loadSnapshot();
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function load(): array
+    private function loadSnapshot(): array
     {
-        if (! Storage::exists(self::CONFIG_FILE)) {
-            return $this->defaults();
-        }
+        /** @var array<string, mixed> $configuration */
+        $configuration = SystemSetting::query()
+            ->orderBy('key')
+            ->get()
+            ->mapWithKeys(static fn (SystemSetting $setting): array => [$setting->key => $setting->value])
+            ->all();
 
-        try {
-            $configuration = json_decode(Storage::get(self::CONFIG_FILE), true, 512, JSON_THROW_ON_ERROR);
-        } catch (JsonException $exception) {
-            Log::error('Unable to parse system configuration JSON.', ['exception' => $exception]);
+        $this->assertReady($configuration);
 
-            return $this->defaults();
-        }
-
-        return is_array($configuration) ? $configuration : $this->defaults();
+        return $configuration;
     }
 
     /**
-     * @return array<string, string>
+     * @param  array<string, mixed>|null  $configuration
      */
-    private function defaults(): array
+    private function assertReady(?array $configuration = null): void
     {
-        return [
-            'app_name' => (string) config('app.name'),
-            'logo_full' => self::UPLOAD_TARGETS['logo_full'],
-            'logo_text' => self::UPLOAD_TARGETS['logo_text'],
-            'copyright_text' => '© '.date('Y').' Asia Vietnam University. All rights reserved.',
-            'country' => 'Việt Nam',
-        ];
+        $keys = $configuration === null
+            ? SystemSetting::query()->pluck('key')->all()
+            : array_keys($configuration);
+        $missing = array_values(array_diff($this->definition->requiredKeys(), $keys));
+
+        if ($missing !== []) {
+            throw new RuntimeException(
+                'System configuration is not ready; required keys are missing: '.implode(', ', $missing).'.',
+            );
+        }
+    }
+
+    private function cache(): Repository
+    {
+        $store = (string) config('cache.default');
+        $driver = (string) config("cache.stores.{$store}.driver");
+
+        if (! app()->runningUnitTests() && in_array($driver, ['array', 'file', 'null', 'octane'], true)) {
+            throw new RuntimeException(
+                "System configuration requires a shared cache store; '{$driver}' is not supported.",
+            );
+        }
+
+        return Cache::store($store);
     }
 }

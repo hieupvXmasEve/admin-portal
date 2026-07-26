@@ -144,6 +144,20 @@ return [
             'public' => true,
             'disk' => 'ielts-certificates',
         ],
+        'branding' => [
+            'max_size' => 2048,
+            'allowed_types' => ['image/jpeg', 'image/png', 'image/webp'],
+            'allowed_extensions' => ['jpg', 'jpeg', 'png', 'webp'],
+            'directory' => 'branding',
+            'generate_thumbnails' => false,
+            'public' => true,
+            'disk' => 'images',
+            'internal' => true,
+            'max_width' => 4096,
+            'max_height' => 4096,
+            'max_pixels' => 16000000,
+            'canonical_extension' => true,
+        ],
     ],
 
     /*

@@ -2,7 +2,7 @@
 title: Swinx Documentation Registry
 status: canonical
 owner: Platform Team
-last_verified: 2026-07-25
+last_verified: 2026-07-26
 scope: documentation-registry
 ---
 
@@ -73,6 +73,7 @@ durable trade-offs; they do not track work or retain superseded history.
 | `features/finance/dng.md` | DNG payment-provider integration |
 | `features/logs/audit-logging.md` | Activity and audit logging |
 | `features/notification/operations.md` | Notification delivery and realtime operations |
+| `features/platform/system-configuration.md` | Global system configuration and branding cutover |
 | `features/upload/storage.md` | Upload and storage operations |
 
 ## Local issue tracking

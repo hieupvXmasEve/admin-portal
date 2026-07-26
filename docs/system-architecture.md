@@ -2,7 +2,7 @@
 title: Swinx System Architecture
 status: canonical
 owner: Platform Team
-last_verified: 2026-07-25
+last_verified: 2026-07-26
 scope: architecture
 ---
 
@@ -60,7 +60,7 @@ established before any physical extraction is considered.
 | `Engagement` | Clubs, events, and related participation |
 | `Upload` | Managed upload/storage boundary |
 | `AI` | Audited tool catalog/dispatch and controlled MCP exposure |
-| `Platform` | Cross-cutting platform-owned capabilities |
+| `Platform` | Cross-cutting capabilities, including global DB-backed system configuration and branding projection |
 
 Shared legacy code remains under `app/Services/`, `app/Http/`, and
 `app/Models/`. Its presence describes current state, not permission to add new
@@ -223,6 +223,9 @@ application access.
 - Docker Compose defines development, local-production, host-proxy, and full
   production modes.
 - Snapshots and cached totals are rebuildable; they are not business authority.
+- Global mutable system configuration is Platform-owned MySQL state. Branding
+  objects are Upload-owned immutable files referenced by private Upload IDs;
+  Blade, Inertia, and API read one Platform projection.
 
 ## Architecture constraints
 

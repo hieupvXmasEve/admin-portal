@@ -41,19 +41,36 @@ final class SystemConfigurationController extends Controller
 
     public function update(UpdateSystemConfigurationRequest $request): JsonResponse
     {
+        UpdateSystemConfigurationAction::run($request->validated());
+
         return ApiResponse::success(
-            UpdateSystemConfigurationAction::run($request->validated()),
+            $this->configuration->handle(),
             message: 'System configuration updated successfully',
         );
     }
 
     public function upload(UploadSystemConfigurationFileRequest $request): JsonResponse
     {
+        UploadSystemConfigurationFileAction::run([
+            'file' => $request->file('file'),
+            'slot' => $request->string('slot')->toString(),
+        ]);
+
+        $branding = $this->configuration->handle();
+        $slot = $request->string('slot')->toString();
+        $urlKey = match ($slot) {
+            'logo_full' => 'logo_full_url',
+            'logo_text' => 'logo_text_url',
+            'favicon' => 'favicon_url',
+            'apple_touch_icon' => 'apple_touch_icon_url',
+        };
+
         return ApiResponse::success(
-            UploadSystemConfigurationFileAction::run([
-                'file' => $request->file('file'),
-                'configuration_key' => $request->string('config_key')->toString(),
-            ]),
+            [
+                'path' => $branding[$urlKey],
+                'stored_path' => $branding[$urlKey],
+                'cache_bust' => $branding['branding_version'],
+            ],
             message: 'File uploaded successfully',
         );
     }
