@@ -12,7 +12,9 @@ use App\Modules\StudentRegistry\Support\EloquentStudentGuardianRelationshipReade
 use App\Modules\StudentRegistry\Support\EloquentStudentGuardianRelationshipWriter;
 use App\Modules\StudentRegistry\Support\EloquentStudentIdentityWriter;
 use App\Modules\StudentRegistry\Support\EloquentStudentImpersonationTokenIssuer;
+use App\Modules\StudentRegistry\Support\EloquentStudentPortalContextReader;
 use App\Modules\StudentRegistry\Support\EloquentStudentPortalProfileReader;
+use App\Modules\StudentRegistry\Support\EloquentStudentPortalTokenRefresher;
 use App\Modules\StudentRegistry\Support\EloquentStudentProfileWriter;
 use App\Modules\StudentRegistry\Support\EloquentStudentRegistryStore;
 use App\Shared\Contracts\StudentRegistry\CurriculumStudentSummaryReader;
@@ -21,7 +23,9 @@ use App\Shared\Contracts\StudentRegistry\StudentGuardianRelationshipReader;
 use App\Shared\Contracts\StudentRegistry\StudentGuardianRelationshipWriter;
 use App\Shared\Contracts\StudentRegistry\StudentIdentityWriter;
 use App\Shared\Contracts\StudentRegistry\StudentImpersonationTokenIssuer;
+use App\Shared\Contracts\StudentRegistry\StudentPortalContextReader;
 use App\Shared\Contracts\StudentRegistry\StudentPortalProfileReader;
+use App\Shared\Contracts\StudentRegistry\StudentPortalTokenRefresher;
 use App\Shared\Contracts\StudentRegistry\StudentProfilePersistenceWriter;
 use App\Shared\Contracts\StudentRegistry\StudentProfileReader;
 use App\Shared\Contracts\StudentRegistry\StudentProfileWriter;
@@ -41,6 +45,8 @@ class StudentRegistryServiceProvider extends ServiceProvider
         $this->app->bind(StudentProfilePersistenceWriter::class, EloquentStudentRegistryStore::class);
         $this->app->bind(StudentProfileReader::class, EloquentStudentRegistryStore::class);
         $this->app->bind(StudentPortalProfileReader::class, EloquentStudentPortalProfileReader::class);
+        $this->app->bind(StudentPortalContextReader::class, EloquentStudentPortalContextReader::class);
+        $this->app->bind(StudentPortalTokenRefresher::class, EloquentStudentPortalTokenRefresher::class);
         $this->app->bind(StudentImpersonationTokenIssuer::class, EloquentStudentImpersonationTokenIssuer::class);
         $this->app->bind(StudentGuardianRelationshipReader::class, EloquentStudentGuardianRelationshipReader::class);
     }

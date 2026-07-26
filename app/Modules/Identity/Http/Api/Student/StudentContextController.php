@@ -5,17 +5,16 @@ declare(strict_types=1);
 namespace App\Modules\Identity\Http\Api\Student;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Identity\Queries\GetStudentContextQuery;
 use App\Http\Responses\ApiResponse;
-use Illuminate\Http\Request;
+use App\Shared\Contracts\StudentRegistry\StudentPortalContextReader;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class StudentContextController extends Controller
 {
-    public function index(Request $request, GetStudentContextQuery $query): JsonResponse
+    public function index(Request $request, StudentPortalContextReader $contexts): JsonResponse
     {
-        $student = $request->user();
-        $context = $query->handle($student);
+        $context = $contexts->forStudent((int) $request->user()?->getAuthIdentifier());
 
         return ApiResponse::success($context);
     }

@@ -76,7 +76,7 @@ final class MigrationDebtContract
         'frozen_services' => 85,
         'frozen_controllers' => 67,
         'frozen_routes' => 30,
-        'shared_model_imports' => 567,
+        'shared_model_imports' => 512,
         'cross_context_concrete_imports' => 0,
         'direct_json_responses' => 45,
         'inline_request_validation' => 71,
@@ -91,6 +91,20 @@ final class MigrationDebtContract
 
     /** @var array<string, array<string, list<string>>|list<string>> */
     public const OWNED_SHARED_MODELS = [
+        'Identity' => [
+            'User',
+            'Role',
+            'CampusUserRole',
+            'ParentProfile',
+        ],
+        'Institution' => [
+            'Campus',
+            'Department',
+            'DepartmentMembership',
+        ],
+        'StudentRegistry' => [
+            'Student',
+        ],
         'Academic' => [
             'Catalog' => [
                 'Program',

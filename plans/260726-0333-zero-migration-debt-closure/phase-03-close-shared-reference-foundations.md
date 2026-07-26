@@ -1,6 +1,6 @@
 ---
 title: "Phase 3: Close shared reference foundations"
-status: todo
+status: completed
 priority: P0
 effort: XL
 dependencies: [1]
@@ -16,11 +16,11 @@ owner workflows; add/repair a seam only where a verified consumer gap proves it.
 
 ## Requirements
 
-- [ ] Remove all non-owner User, Student, Campus, Department, and Lecture actor imports.
-- [ ] Shared contracts never accept/return Eloquent models or relationship builders.
-- [ ] Replace Finance's `Student::observe(...)` coupling with an owner event/command seam.
-- [ ] Close residual Identity permission/auth/password/verification/settings/profile HTTP debt.
-- [ ] Preserve `cross_context_concrete_imports=0`.
+- [x] Remove all non-owner User, Student, Campus, Department, and Lecture actor imports.
+- [x] Shared contracts never accept/return Eloquent models or relationship builders.
+- [x] Replace Finance's `Student::observe(...)` coupling with an owner event/command seam.
+- [x] Close residual Identity permission/auth/password/verification/settings/profile HTTP debt.
+- [x] Preserve `cross_context_concrete_imports=0`.
 
 ## File Inventory
 
@@ -72,11 +72,11 @@ owner workflows; add/repair a seam only where a verified consumer gap proves it.
 
 ## Success Criteria
 
-- [ ] Foundation model findings are zero outside their genuine owner allowlist.
-- [ ] Each ownership exemption has owner evidence and no non-owner runtime consumer.
-- [ ] Identity HTTP/access debt and affected lecturer portal checks are closed.
-- [ ] Existing public contract tests and identity/registry architecture tests pass.
-- [ ] All dependent phases have documented, model-free interfaces available.
+- [x] Foundation model findings are zero outside their genuine owner allowlist.
+- [x] Each ownership exemption has owner evidence and no non-owner runtime consumer.
+- [x] Identity HTTP/access debt and affected lecturer portal checks are closed.
+- [x] Existing public contract tests and identity/registry architecture tests pass.
+- [x] All dependent phases have documented, model-free interfaces available.
 
 ## Risks and Security
 

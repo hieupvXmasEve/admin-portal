@@ -12,6 +12,8 @@ use App\Modules\Identity\Support\EloquentLecturerAccessGrantReader;
 use App\Modules\Identity\Support\EloquentLecturerAccessGrantWriter;
 use App\Modules\Identity\Support\EloquentRoleAdministrationStore;
 use App\Modules\Identity\Support\EloquentStudentAccessWriter;
+use App\Modules\Identity\Support\EloquentStudentAccountStatusReader;
+use App\Modules\Identity\Support\EloquentUserDirectoryReader;
 use App\Shared\Contracts\Identity\CampusPermissionReader;
 use App\Shared\Contracts\Identity\GuardianAccessGrantReader;
 use App\Shared\Contracts\Identity\GuardianAccessGrantWriter;
@@ -19,6 +21,8 @@ use App\Shared\Contracts\Identity\LecturerAccessGrantReader;
 use App\Shared\Contracts\Identity\LecturerAccessGrantWriter;
 use App\Shared\Contracts\Identity\RoleAdministrationStore;
 use App\Shared\Contracts\Identity\StudentAccessWriter;
+use App\Shared\Contracts\Identity\StudentAccountStatusReader;
+use App\Shared\Contracts\Identity\UserDirectoryReader;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
@@ -34,6 +38,8 @@ class IdentityServiceProvider extends ServiceProvider
         $this->app->bind(LecturerAccessGrantReader::class, EloquentLecturerAccessGrantReader::class);
         $this->app->bind(LecturerAccessGrantWriter::class, EloquentLecturerAccessGrantWriter::class);
         $this->app->bind(StudentAccessWriter::class, EloquentStudentAccessWriter::class);
+        $this->app->bind(StudentAccountStatusReader::class, EloquentStudentAccountStatusReader::class);
+        $this->app->bind(UserDirectoryReader::class, EloquentUserDirectoryReader::class);
         $this->app->bind(RoleAdministrationStore::class, EloquentRoleAdministrationStore::class);
 
         $this->app->singleton(IdentityContext::class, function ($app) {
