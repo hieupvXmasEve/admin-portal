@@ -2,7 +2,7 @@
 title: Legacy Migration Rules
 status: active
 owner: Platform Team
-last_verified: 2026-07-25
+last_verified: 2026-07-26
 scope: engineering-rules
 applies_to:
   - app/Services
@@ -33,6 +33,25 @@ out:
 
 New code goes to the owning `app/Modules/{Domain}` paths, `useDataTable`, and
 PascalCase page directories described by the other rule files.
+
+## Machine-enforced debt contract
+
+`app/Support/MigrationDebt/MigrationDebtContract.php` is the immutable source
+for migration-debt rules, scan roots, runtime surfaces, shared-model ownership,
+and baseline ceilings. The matching baselines in
+`config/migration_debt.php` must equal those ceilings; when verified debt is
+removed, ratchet both values down in the same change.
+
+For frozen locations, `config/migration_debt_paths.php` must remain the exact
+live path set. Remove stale paths when their debt is retired, and never replace
+them with unrelated paths merely to preserve an aggregate count. Shadow
+occurrence metrics are broader diagnostic evidence only and do not change the
+guarded-count semantics.
+
+Run `./scripts/dev.sh artisan migration-debt:inventory --check` as the
+migration-debt gate. The executable checks and report contract live in
+`app/Support/MigrationDebt/MigrationDebtGuard.php` and
+`app/Support/MigrationDebt/MigrationDebtInventory.php`.
 
 ## Migration sequence
 
