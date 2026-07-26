@@ -44,12 +44,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('api/specializations/bulk-delete', [SpecializationController::class, 'bulkDelete'])
         ->name(SpecializationRoutes::API_BULK_DELETE);
 
-    // API routes for curriculum version operations within specializations
-    Route::delete('api/curriculum-versions/{curriculumVersion}', [SpecializationController::class, 'apiDeleteCurriculumVersion'])
-        ->middleware('can:delete_curriculum_version')
-        ->whereNumber('curriculumVersion')
-        ->name(SpecializationRoutes::API_CURRICULUM_VERSION_DESTROY);
-
+    // API route for curriculum version updates within specializations.
     Route::put('api/curriculum-versions/{curriculumVersion}', [SpecializationController::class, 'apiUpdateCurriculumVersion'])
         ->middleware('can:edit_curriculum_version')
         ->whereNumber('curriculumVersion')

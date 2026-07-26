@@ -16,6 +16,7 @@ use App\Modules\Academic\Catalog\Http\Web\UnitExportController;
 use App\Modules\Academic\Catalog\Http\Web\UnitImportController;
 use Illuminate\Support\Facades\Route;
 
+require __DIR__.'/curriculum.php';
 require __DIR__.'/syllabus.php';
 
 Route::middleware(['auth', 'web'])->group(function (): void {

@@ -1,6 +1,6 @@
 ---
 title: "Phase 4: Migrate Academic catalog and delivery"
-status: todo
+status: in-progress
 priority: P0
 effort: XL
 dependencies: [3]

@@ -107,6 +107,24 @@ it('renders the Catalog-owned curriculum overview summary', function (): void {
             ->where('data.totalUnits', 0));
 });
 
+it('redirects the Curriculum Version show alias to the overview page', function (): void {
+    $this->withoutMiddleware(Authorize::class);
+    $version = CurriculumVersion::factory()->create(['version_code' => 'CAT-SHOW']);
+
+    $this->get(route('curriculum-versions.show', $version))
+        ->assertRedirect(route('curriculum_versions.summary.overview', $version));
+});
+
+it('keeps the canonical Curriculum Version update route behind edit permission', function (): void {
+    $route = app('router')->getRoutes()->getByName('curriculum_versions.update');
+
+    expect($route)->not->toBeNull()
+        ->and($route?->methods())->toContain('PUT')
+        ->and($route?->gatherMiddleware())->toContain('can:edit_curriculum_version')
+        ->not->toContain('can:view_curriculum_version')
+        ->and(app('router')->getRoutes()->getByName('curriculum-versions.update'))->toBeNull();
+});
+
 it('renders student summary data through the Student Registry boundary', function (): void {
     $this->withoutMiddleware(Authorize::class);
     $version = CurriculumVersion::factory()->create();

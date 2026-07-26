@@ -19,8 +19,8 @@ after its reader/writer count and unexplained data exceptions are both zero.
 
 ## Progress
 
-- Phases 1–2 completed and approved: 2/12 phases, 16/95 checklist items (16%).
-- Current phase: none; Phase 3 awaits explicit execution approval.
+- Phases 1–3 completed and approved; Phase 4 is in progress.
+- Current phase: 4 — Migrate Academic catalog and delivery.
 
 ## Goals
 

@@ -11,12 +11,16 @@ use App\Models\RolePermission;
 use App\Models\Unit;
 use App\Models\User;
 use App\Modules\Academic\Catalog\Actions\GenerateUnitImportTemplateAction;
+use App\Modules\Academic\Catalog\Support\UnitSpreadsheetImporter;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 use function Pest\Laravel\actingAs;
 
@@ -127,5 +131,39 @@ it('generates supported Catalog import workbook layouts', function (): void {
         'Instructions',
     ])
         ->and($spreadsheet->getSheetByName('Units')?->getCell('A1')->getValue())->toBe('Code*')
-        ->and($spreadsheet->getSheetByName('Prerequisites')?->getCell('D1')->getValue())->toBe('Condition Type*');
+        ->and($spreadsheet->getSheetByName('Prerequisites')?->getCell('D1')->getValue())->toBe('Condition Type*')
+        ->and($spreadsheet->getSheetByName('Syllabus')?->toArray()[0])->toBe([
+            'Unit Code*', 'Version', 'Description', 'Total Hours', 'Is Active*',
+        ]);
+});
+
+it('rolls back every combined workbook write when an assessment row is invalid', function (): void {
+    $spreadsheet = new Spreadsheet;
+    $units = $spreadsheet->getActiveSheet();
+    $units->setTitle('Units');
+    $units->fromArray(['Code*', 'Name*', 'Credit Points*'], null, 'A1');
+    $units->fromArray(['ROLL101', 'Rollback Unit', 3], null, 'A2');
+
+    $syllabus = $spreadsheet->createSheet();
+    $syllabus->setTitle('Syllabus');
+    $syllabus->fromArray(['Unit Code*', 'Version', 'Description', 'Total Hours', 'Hours Per Session', 'Effective From Semester', 'Is Active*'], null, 'A1');
+    $syllabus->fromArray(['ROLL101', '1.0', 'Rollback template', 30, 3, '', 'TRUE'], null, 'A2');
+
+    $components = $spreadsheet->createSheet();
+    $components->setTitle('Assessment Components');
+    $components->fromArray(['Unit Code*', 'Syllabus Version', 'Component Name*', 'Weight*', 'Type*', 'Required for Final Exam*'], null, 'A1');
+    $components->fromArray(['ROLL101', '1.0', 'Invalid component', 100, 'invalid', 'TRUE'], null, 'A2');
+
+    $directory = storage_path('app/temp/imports');
+    File::ensureDirectoryExists($directory);
+    $path = $directory.'/combined-rollback.xlsx';
+    (new Xlsx($spreadsheet))->save($path);
+
+    $result = app(UnitSpreadsheetImporter::class)->importCombinedUnitsWithSyllabus($path);
+
+    expect($result['success'])->toBeFalse()
+        ->and($result['summary']['total_created'])->toBe(0)
+        ->and($result['summary']['total_errors'])->toBe(1)
+        ->and($result['details']['errors'])->toContain("Assessment Components row 2: Invalid assessment type 'invalid'")
+        ->and(Unit::query()->where('code', 'ROLL101')->exists())->toBeFalse();
 });

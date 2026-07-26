@@ -2,22 +2,24 @@
 
 declare(strict_types=1);
 
-namespace App\Services;
+namespace App\Modules\Academic\Catalog\Support;
 
 use App\Models\EquivalentUnit;
-use App\Models\Semester;
+use App\Models\SyllabusTemplate;
 use App\Models\Unit;
 use App\Models\UnitPrerequisiteCondition;
 use App\Models\UnitPrerequisiteGroup;
+use App\Shared\Contracts\Academic\AssessmentDefinitionWriter;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
-use Maatwebsite\Excel\Facades\Excel;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class UnitExcelImportService
+final class UnitSpreadsheetImporter
 {
+    public function __construct(private readonly AssessmentDefinitionWriter $assessmentDefinitions) {}
+
     private array $importResults = [];
 
     private array $errors = [];
@@ -785,6 +787,8 @@ class UnitExcelImportService
      */
     public function importCombinedUnitsWithSyllabus(string $filePath, array $options = []): array
     {
+        $transactionStarted = false;
+
         try {
             $spreadsheet = IOFactory::load($filePath);
 
@@ -801,6 +805,7 @@ class UnitExcelImportService
             ];
 
             DB::beginTransaction();
+            $transactionStarted = true;
 
             // Step 1: Import Units
             $unitsSheet = $spreadsheet->getSheetByName('Units');
@@ -833,31 +838,40 @@ class UnitExcelImportService
                 }
             }
 
-            // Step 4: Import Syllabus
+            // Step 4: Import Syllabus Templates
             $syllabusSheet = $spreadsheet->getSheetByName('Syllabus');
             if ($syllabusSheet) {
-                $syllabusResult = $this->importSyllabusFromSheet($syllabusSheet, $options);
+                $syllabusResult = $this->importSyllabusTemplatesFromSheet($syllabusSheet, $options);
                 $results['syllabus'] = $syllabusResult['syllabus'];
                 $results['errors'] = array_merge($results['errors'], $syllabusResult['errors']);
                 $results['warnings'] = array_merge($results['warnings'], $syllabusResult['warnings']);
             }
 
-            // Step 5: Import Assessment Components
+            // Steps 5–6: Delivery owns assessment definitions while Catalog owns workbook parsing.
             $assessmentSheet = $spreadsheet->getSheetByName('Assessment Components');
-            if ($assessmentSheet) {
-                $assessmentResult = $this->importAssessmentComponentsFromSheet($assessmentSheet);
+            $detailsSheet = $spreadsheet->getSheetByName('Assessment Details');
+            if ($assessmentSheet || $detailsSheet) {
+                $assessmentResult = $this->importAssessmentDefinitions($assessmentSheet, $detailsSheet);
                 $results['assessment_components'] = $assessmentResult['assessment_components'];
+                $results['assessment_details'] = $assessmentResult['assessment_details'];
                 $results['errors'] = array_merge($results['errors'], $assessmentResult['errors']);
                 $results['warnings'] = array_merge($results['warnings'], $assessmentResult['warnings']);
             }
 
-            // Step 6: Import Assessment Details
-            $detailsSheet = $spreadsheet->getSheetByName('Assessment Details');
-            if ($detailsSheet) {
-                $detailsResult = $this->importAssessmentDetailsFromSheet($detailsSheet);
-                $results['assessment_details'] = $detailsResult['assessment_details'];
-                $results['errors'] = array_merge($results['errors'], $detailsResult['errors']);
-                $results['warnings'] = array_merge($results['warnings'], $detailsResult['warnings']);
+            if ($results['errors'] !== []) {
+                DB::rollBack();
+
+                return [
+                    'success' => false,
+                    'summary' => [
+                        'total_created' => 0,
+                        'total_updated' => 0,
+                        'total_skipped' => 0,
+                        'total_errors' => count($results['errors']),
+                        'total_warnings' => count($results['warnings']),
+                    ],
+                    'details' => $results,
+                ];
             }
 
             // Calculate totals for summary
@@ -884,9 +898,12 @@ class UnitExcelImportService
                 ],
                 'details' => $results,
             ];
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw new \Exception('Combined import failed: '.$e->getMessage());
+        } catch (\Throwable $exception) {
+            if ($transactionStarted && DB::transactionLevel() > 0) {
+                DB::rollBack();
+            }
+
+            throw new \RuntimeException('Combined import failed: '.$exception->getMessage(), 0, $exception);
         }
     }
 
@@ -954,275 +971,162 @@ class UnitExcelImportService
         return $results;
     }
 
-    /**
-     * Import syllabus from the Syllabus sheet
-     */
-    private function importSyllabusFromSheet($worksheet, array $options): array
+    /** Import Syllabus worksheet rows into Catalog-owned syllabus templates. */
+    private function importSyllabusTemplatesFromSheet(Worksheet $worksheet, array $options): array
     {
         $results = ['syllabus' => ['created' => 0, 'updated' => 0, 'skipped' => 0], 'errors' => [], 'warnings' => []];
-
         $rows = $worksheet->toArray();
-        $headers = array_shift($rows); // Remove header row
+        $headers = array_shift($rows);
+        $activeColumn = array_search('Is Active*', array_map(static fn (mixed $header): string => trim((string) $header), $headers), true);
 
         foreach ($rows as $rowIndex => $row) {
             $actualRow = $rowIndex + 2;
-
             if (empty(array_filter($row))) {
                 continue;
             }
 
             try {
-                $unitCode = trim($row[0] ?? '');
-                $version = trim($row[1] ?? '');
-                $description = trim($row[2] ?? '');
-                $totalHours = $row[3] ?? null;
-                $hoursPerSession = $row[4] ?? null;
-                $effectiveSemester = trim($row[5] ?? '');
-                $isActive = strtoupper(trim($row[6] ?? '')) === 'TRUE';
-
-                if (empty($unitCode)) {
+                $unitCode = trim((string) ($row[0] ?? ''));
+                $version = trim((string) ($row[1] ?? ''));
+                if ($unitCode === '') {
                     $results['errors'][] = "Row {$actualRow}: Unit code is required";
 
                     continue;
                 }
 
-                $unit = Unit::where('code', $unitCode)->first();
-                if (! $unit) {
+                $unit = Unit::query()->where('code', $unitCode)->first();
+                if ($unit === null) {
                     $results['errors'][] = "Row {$actualRow}: Unit '{$unitCode}' not found";
 
                     continue;
                 }
 
-                // Find semester if specified
-                $semesterId = null;
-                if (! empty($effectiveSemester)) {
-                    $semester = \App\Models\Semester::where('name', $effectiveSemester)->first();
-                    if ($semester) {
-                        $semesterId = $semester->id;
-                    } else {
-                        $results['warnings'][] = "Row {$actualRow}: Semester '{$effectiveSemester}' not found";
-                    }
-                }
-
-                // Check for existing syllabus
-                $existingSyllabus = \App\Models\Syllabus::where('unit_id', $unit->id)
+                $template = SyllabusTemplate::query()
+                    ->where('unit_id', $unit->getKey())
                     ->where('version', $version)
                     ->first();
+                $attributes = [
+                    'title' => $unit->name,
+                    'version' => $version,
+                    'description' => trim((string) ($row[2] ?? '')),
+                    'total_hours' => $row[3] ?: null,
+                    'is_active' => strtoupper(trim((string) ($row[$activeColumn === false ? 6 : $activeColumn] ?? ''))) === 'TRUE',
+                ];
 
-                if ($existingSyllabus) {
+                if ($template !== null) {
                     if (($options['duplicate_handling'] ?? 'update') === 'skip') {
                         $results['syllabus']['skipped']++;
 
                         continue;
-                    } elseif ($options['duplicate_handling'] === 'error') {
+                    }
+                    if (($options['duplicate_handling'] ?? 'update') === 'error') {
                         $results['errors'][] = "Row {$actualRow}: Syllabus version '{$version}' already exists for unit '{$unitCode}'";
 
                         continue;
-                    } else {
-                        // Update existing syllabus
-                        $existingSyllabus->update([
-                            'description' => $description ?: $existingSyllabus->description,
-                            'total_hours' => $totalHours ?: $existingSyllabus->total_hours,
-                            'hours_per_session' => $hoursPerSession ?: $existingSyllabus->hours_per_session,
-                            'semester_id' => $semesterId ?: $existingSyllabus->semester_id,
-                            'is_active' => $isActive,
-                        ]);
-                        $results['syllabus']['updated']++;
-                    }
-                } else {
-                    // If marking as active, deactivate other syllabus for this unit
-                    if ($isActive) {
-                        \App\Models\Syllabus::where('unit_id', $unit->id)->update(['is_active' => false]);
                     }
 
-                    // Create new syllabus
-                    \App\Models\Syllabus::create([
-                        'unit_id' => $unit->id,
-                        'version' => $version,
-                        'description' => $description,
-                        'total_hours' => $totalHours,
-                        'hours_per_session' => $hoursPerSession,
-                        'semester_id' => $semesterId,
-                        'is_active' => $isActive,
-                    ]);
-                    $results['syllabus']['created']++;
+                    $template->fill(array_filter($attributes, static fn (mixed $value): bool => $value !== null && $value !== ''))->save();
+                    $results['syllabus']['updated']++;
+
+                    continue;
                 }
-            } catch (\Exception $e) {
-                $results['errors'][] = "Row {$actualRow}: ".$e->getMessage();
+
+                SyllabusTemplate::query()->create(['unit_id' => $unit->getKey(), ...$attributes]);
+                $results['syllabus']['created']++;
+            } catch (\Exception $exception) {
+                $results['errors'][] = "Row {$actualRow}: ".$exception->getMessage();
             }
         }
 
         return $results;
     }
 
-    /**
-     * Import assessment components from the Assessment Components sheet
-     */
-    private function importAssessmentComponentsFromSheet($worksheet): array
+    private function importAssessmentDefinitions(?Worksheet $componentSheet, ?Worksheet $detailSheet): array
     {
-        $results = ['assessment_components' => ['created' => 0, 'skipped' => 0], 'errors' => [], 'warnings' => []];
+        $components = [];
+        $details = [];
+        $errors = [];
 
-        $rows = $worksheet->toArray();
-        $headers = array_shift($rows);
-
-        foreach ($rows as $rowIndex => $row) {
-            $actualRow = $rowIndex + 2;
-
-            if (empty(array_filter($row))) {
-                continue;
-            }
-
-            try {
-                $unitCode = trim($row[0] ?? '');
-                $syllabusVersion = trim($row[1] ?? '');
-                $componentName = trim($row[2] ?? '');
-                $weight = $row[3] ?? null;
-                $type = trim($row[4] ?? '');
-                $isRequired = strtoupper(trim($row[5] ?? '')) === 'TRUE';
-
-                if (empty($unitCode) || empty($componentName) || empty($type)) {
-                    $results['errors'][] = "Row {$actualRow}: Unit code, component name, and type are required";
-
+        if ($componentSheet !== null) {
+            $rows = $componentSheet->toArray();
+            array_shift($rows);
+            foreach ($rows as $rowIndex => $row) {
+                $sourceRow = $rowIndex + 2;
+                if (empty(array_filter($row))) {
                     continue;
                 }
 
-                // Find the syllabus
-                $unit = Unit::where('code', $unitCode)->first();
-                if (! $unit) {
-                    $results['errors'][] = "Row {$actualRow}: Unit '{$unitCode}' not found";
-
+                $templateId = $this->syllabusTemplateId($row[0] ?? '', $row[1] ?? '', 'Assessment Components', $sourceRow, $errors);
+                if ($templateId === null) {
                     continue;
                 }
 
-                $syllabus = \App\Models\Syllabus::where('unit_id', $unit->id)
-                    ->where('version', $syllabusVersion)
-                    ->first();
-
-                if (! $syllabus) {
-                    $results['errors'][] = "Row {$actualRow}: Syllabus version '{$syllabusVersion}' not found for unit '{$unitCode}'";
-
-                    continue;
-                }
-
-                // Validate assessment type
-                if (! in_array($type, array_keys(\App\Models\AssessmentComponent::TYPES))) {
-                    $results['errors'][] = "Row {$actualRow}: Invalid assessment type '{$type}'";
-
-                    continue;
-                }
-
-                // Check for existing component
-                $existingComponent = \App\Models\AssessmentComponent::where('syllabus_id', $syllabus->id)
-                    ->where('name', $componentName)
-                    ->first();
-
-                if ($existingComponent) {
-                    $results['assessment_components']['skipped']++;
-                    $results['warnings'][] = "Row {$actualRow}: Assessment component '{$componentName}' already exists";
-
-                    continue;
-                }
-
-                // Create new assessment component
-                \App\Models\AssessmentComponent::create([
-                    'syllabus_id' => $syllabus->id,
-                    'name' => $componentName,
-                    'weight' => $weight,
-                    'type' => $type,
-                    'is_required_to_sit_final_exam' => $isRequired,
-                ]);
-                $results['assessment_components']['created']++;
-            } catch (\Exception $e) {
-                $results['errors'][] = "Row {$actualRow}: ".$e->getMessage();
+                $components[] = [
+                    'source_sheet' => 'Assessment Components',
+                    'source_row' => $sourceRow,
+                    'syllabus_template_id' => $templateId,
+                    'name' => trim((string) ($row[2] ?? '')),
+                    'weight' => $row[3] ?? null,
+                    'type' => trim((string) ($row[4] ?? '')),
+                    'is_required_to_sit_final_exam' => strtoupper(trim((string) ($row[5] ?? ''))) === 'TRUE',
+                ];
             }
         }
+
+        if ($detailSheet !== null) {
+            $rows = $detailSheet->toArray();
+            array_shift($rows);
+            foreach ($rows as $rowIndex => $row) {
+                $sourceRow = $rowIndex + 2;
+                if (empty(array_filter($row))) {
+                    continue;
+                }
+
+                $templateId = $this->syllabusTemplateId($row[0] ?? '', $row[1] ?? '', 'Assessment Details', $sourceRow, $errors);
+                if ($templateId === null) {
+                    continue;
+                }
+
+                $details[] = [
+                    'source_sheet' => 'Assessment Details',
+                    'source_row' => $sourceRow,
+                    'syllabus_template_id' => $templateId,
+                    'component_name' => trim((string) ($row[2] ?? '')),
+                    'name' => trim((string) ($row[3] ?? '')),
+                    'weight' => $row[4] ?? null,
+                ];
+            }
+        }
+
+        $results = $this->assessmentDefinitions->importForSyllabusTemplates($components, $details);
+        $results['errors'] = [...$errors, ...$results['errors']];
 
         return $results;
     }
 
-    /**
-     * Import assessment details from the Assessment Details sheet
-     */
-    private function importAssessmentDetailsFromSheet($worksheet): array
+    /** @param list<string> $errors */
+    private function syllabusTemplateId(mixed $unitCodeValue, mixed $versionValue, string $sheet, int $sourceRow, array &$errors): ?int
     {
-        $results = ['assessment_details' => ['created' => 0, 'skipped' => 0], 'errors' => [], 'warnings' => []];
+        $unitCode = trim((string) $unitCodeValue);
+        $version = trim((string) $versionValue);
+        $unit = Unit::query()->where('code', $unitCode)->first();
+        if ($unit === null) {
+            $errors[] = "{$sheet} row {$sourceRow}: Unit '{$unitCode}' not found";
 
-        $rows = $worksheet->toArray();
-        $headers = array_shift($rows);
-
-        foreach ($rows as $rowIndex => $row) {
-            $actualRow = $rowIndex + 2;
-
-            if (empty(array_filter($row))) {
-                continue;
-            }
-
-            try {
-                $unitCode = trim($row[0] ?? '');
-                $syllabusVersion = trim($row[1] ?? '');
-                $componentName = trim($row[2] ?? '');
-                $detailName = trim($row[3] ?? '');
-                $weight = $row[4] ?? null;
-
-                if (empty($unitCode) || empty($componentName) || empty($detailName)) {
-                    $results['errors'][] = "Row {$actualRow}: Unit code, component name, and detail name are required";
-
-                    continue;
-                }
-
-                // Find the assessment component
-                $unit = Unit::where('code', $unitCode)->first();
-                if (! $unit) {
-                    $results['errors'][] = "Row {$actualRow}: Unit '{$unitCode}' not found";
-
-                    continue;
-                }
-
-                $syllabus = \App\Models\Syllabus::where('unit_id', $unit->id)
-                    ->where('version', $syllabusVersion)
-                    ->first();
-
-                if (! $syllabus) {
-                    $results['errors'][] = "Row {$actualRow}: Syllabus version '{$syllabusVersion}' not found for unit '{$unitCode}'";
-
-                    continue;
-                }
-
-                $component = \App\Models\AssessmentComponent::where('syllabus_id', $syllabus->id)
-                    ->where('name', $componentName)
-                    ->first();
-
-                if (! $component) {
-                    $results['errors'][] = "Row {$actualRow}: Assessment component '{$componentName}' not found";
-
-                    continue;
-                }
-
-                // Check for existing detail
-                $existingDetail = \App\Models\AssessmentComponentDetail::where('assessment_component_id', $component->id)
-                    ->where('name', $detailName)
-                    ->first();
-
-                if ($existingDetail) {
-                    $results['assessment_details']['skipped']++;
-                    $results['warnings'][] = "Row {$actualRow}: Assessment detail '{$detailName}' already exists";
-
-                    continue;
-                }
-
-                // Create new assessment detail
-                \App\Models\AssessmentComponentDetail::create([
-                    'assessment_component_id' => $component->id,
-                    'name' => $detailName,
-                    'weight' => $weight,
-                ]);
-                $results['assessment_details']['created']++;
-            } catch (\Exception $e) {
-                $results['errors'][] = "Row {$actualRow}: ".$e->getMessage();
-            }
+            return null;
         }
 
-        return $results;
+        $template = SyllabusTemplate::query()
+            ->where('unit_id', $unit->getKey())
+            ->where('version', $version)
+            ->first();
+        if ($template === null) {
+            $errors[] = "{$sheet} row {$sourceRow}: Syllabus version '{$version}' not found for unit '{$unitCode}'";
+
+            return null;
+        }
+
+        return $template->getKey();
     }
 
     /**
@@ -1279,7 +1183,7 @@ class UnitExcelImportService
                 }
 
                 // Create or find prerequisite group
-                $group = \App\Models\UnitPrerequisiteGroup::firstOrCreate([
+                $group = UnitPrerequisiteGroup::firstOrCreate([
                     'unit_id' => $unit->id,
                     'logic_operator' => $groupLogic,
                 ], [
@@ -1287,7 +1191,7 @@ class UnitExcelImportService
                 ]);
 
                 // Check for existing condition
-                $existingCondition = \App\Models\UnitPrerequisiteCondition::where('group_id', $group->id)
+                $existingCondition = UnitPrerequisiteCondition::where('group_id', $group->id)
                     ->where('required_unit_id', $requiredUnit->id)
                     ->where('type', $type)
                     ->first();
@@ -1299,7 +1203,7 @@ class UnitExcelImportService
                 }
 
                 // Create prerequisite condition
-                \App\Models\UnitPrerequisiteCondition::create([
+                UnitPrerequisiteCondition::create([
                     'group_id' => $group->id,
                     'type' => $type,
                     'required_unit_id' => $requiredUnit->id,
@@ -1358,7 +1262,7 @@ class UnitExcelImportService
                 }
 
                 // Check for existing equivalent relationship
-                $existingEquivalent = \App\Models\EquivalentUnit::where('unit_id', $unit->id)
+                $existingEquivalent = EquivalentUnit::where('unit_id', $unit->id)
                     ->where('equivalent_unit_id', $equivalentUnit->id)
                     ->first();
 
@@ -1369,7 +1273,7 @@ class UnitExcelImportService
                 }
 
                 // Create equivalent relationship
-                \App\Models\EquivalentUnit::create([
+                EquivalentUnit::create([
                     'unit_id' => $unit->id,
                     'equivalent_unit_id' => $equivalentUnit->id,
                     'reason' => $reason,

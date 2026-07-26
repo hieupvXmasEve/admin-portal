@@ -9,7 +9,6 @@ use App\Http\Requests\SyllabusTemplate\PreviewGradingSchemeRequest;
 use App\Http\Requests\SyllabusTemplate\StoreSyllabusTemplateRequest;
 use App\Http\Requests\SyllabusTemplate\UpdateSyllabusTemplateRequest;
 use App\Http\Responses\ApiResponse;
-use App\Models\AssessmentComponent;
 use App\Models\SyllabusTemplate;
 use App\Models\Unit;
 use App\Modules\Academic\Catalog\Actions\CreateSyllabusTemplateAction;
@@ -18,6 +17,7 @@ use App\Modules\Academic\Catalog\Actions\PreviewSyllabusGradingSchemeAction as C
 use App\Modules\Academic\Catalog\Actions\UpdateSyllabusTemplateAction;
 use App\Modules\Academic\Catalog\Http\Requests\ListSyllabusTemplatesRequest;
 use App\Modules\Academic\Catalog\Queries\ListSyllabusTemplatesQuery;
+use App\Shared\Contracts\Academic\AssessmentDefinitionWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -29,6 +29,8 @@ use Inertia\Response;
  */
 class SyllabusTemplateController extends Controller
 {
+    public function __construct(private readonly AssessmentDefinitionWriter $assessmentDefinitions) {}
+
     public function index(Unit $unit): JsonResponse
     {
         $templates = SyllabusTemplate::query()
@@ -63,7 +65,7 @@ class SyllabusTemplateController extends Controller
     public function pageCreate(): Response
     {
         return Inertia::render('Syllabus/TemplatesCreate', [
-            'assessmentTypes' => AssessmentComponent::TYPES,
+            'assessmentTypes' => $this->assessmentDefinitions->types(),
             'units' => Unit::query()->orderBy('code')->get(['id', 'code', 'name']),
         ]);
     }
@@ -82,7 +84,7 @@ class SyllabusTemplateController extends Controller
         return Inertia::render('Syllabus/TemplatesEdit', [
             'unit' => $syllabusTemplate->unit,
             'syllabusTemplate' => $this->loadTemplate($syllabusTemplate),
-            'assessmentTypes' => AssessmentComponent::TYPES,
+            'assessmentTypes' => $this->assessmentDefinitions->types(),
             'units' => Unit::query()->orderBy('code')->get(['id', 'code', 'name']),
             'can_edit' => true,
         ]);

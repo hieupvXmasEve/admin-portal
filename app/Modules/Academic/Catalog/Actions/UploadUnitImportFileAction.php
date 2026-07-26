@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace App\Modules\Academic\Catalog\Actions;
 
-use App\Services\UnitExcelImportService;
+use App\Modules\Academic\Catalog\Support\UnitSpreadsheetImporter;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class UploadUnitImportFileAction
 {
-    public function __construct(private readonly UnitExcelImportService $imports) {}
+    public function __construct(private readonly UnitSpreadsheetImporter $imports) {}
 
     /**
      * @return array{file_path: string, filename: string, preview: array<string, mixed>}

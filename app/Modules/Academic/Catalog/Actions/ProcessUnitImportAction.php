@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace App\Modules\Academic\Catalog\Actions;
 
-use App\Services\UnitExcelImportService;
+use App\Modules\Academic\Catalog\Support\UnitSpreadsheetImporter;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class ProcessUnitImportAction
 {
-    public function __construct(private readonly UnitExcelImportService $imports) {}
+    public function __construct(private readonly UnitSpreadsheetImporter $imports) {}
 
     /**
      * @param  array{duplicate_handling: 'skip'|'update'|'error', create_prerequisites: bool, create_equivalents: bool}  $options

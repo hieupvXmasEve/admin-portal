@@ -10,8 +10,10 @@ use App\Modules\Academic\Catalog\Actions\GenerateUnitImportTemplateAction;
 use App\Modules\Academic\Catalog\Actions\PreviewUnitImportAction;
 use App\Modules\Academic\Catalog\Actions\ProcessUnitImportAction;
 use App\Modules\Academic\Catalog\Actions\UploadUnitImportFileAction;
+use App\Modules\Academic\Catalog\Http\Requests\PreviewUnitImportRequest;
+use App\Modules\Academic\Catalog\Http\Requests\ProcessUnitImportRequest;
+use App\Modules\Academic\Catalog\Http\Requests\UploadUnitImportRequest;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -35,16 +37,10 @@ class UnitImportController extends Controller
         ]);
     }
 
-    public function uploadFile(Request $request): JsonResponse
+    public function uploadFile(UploadUnitImportRequest $request, UploadUnitImportFileAction $uploadImport): JsonResponse
     {
-        $validated = validator($request->all(), [
-            'file' => ['required', 'file', 'mimes:xlsx,xls', 'max:2048'],
-            'duplicate_handling' => ['nullable', 'in:skip,update,error'],
-        ])->validate();
-
         try {
-            $result = app(UploadUnitImportFileAction::class)
-                ->handle($request->file('file'));
+            $result = $uploadImport->handle($request->file('file'));
 
             return ApiResponse::success($result);
         } catch (\Throwable $exception) {
@@ -54,16 +50,12 @@ class UnitImportController extends Controller
         }
     }
 
-    public function previewImport(Request $request): JsonResponse
+    public function previewImport(PreviewUnitImportRequest $request, PreviewUnitImportAction $previewImport): JsonResponse
     {
-        $validated = validator($request->all(), [
-            'file_path' => ['required', 'string'],
-            'preview_rows' => ['nullable', 'integer', 'min:1', 'max:50'],
-        ])->validate();
+        $validated = $request->validated();
 
         try {
-            $preview = app(PreviewUnitImportAction::class)
-                ->handle($validated['file_path'], $validated['preview_rows'] ?? 10);
+            $preview = $previewImport->handle($validated['file_path'], $validated['preview_rows'] ?? 10);
 
             return ApiResponse::success(['preview' => $preview]);
         } catch (\Throwable $exception) {
@@ -73,17 +65,12 @@ class UnitImportController extends Controller
         }
     }
 
-    public function processImport(Request $request): JsonResponse
+    public function processImport(ProcessUnitImportRequest $request, ProcessUnitImportAction $processImport): JsonResponse
     {
-        $validated = validator($request->all(), [
-            'file_path' => ['required', 'string'],
-            'duplicate_handling' => ['nullable', 'in:skip,update,error'],
-            'create_prerequisites' => ['nullable', 'boolean'],
-            'create_equivalents' => ['nullable', 'boolean'],
-        ])->validate();
+        $validated = $request->validated();
 
         try {
-            $result = app(ProcessUnitImportAction::class)->handle(
+            $result = $processImport->handle(
                 $validated['file_path'],
                 [
                     'duplicate_handling' => $validated['duplicate_handling'] ?? 'update',

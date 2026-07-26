@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services;
+namespace App\Modules\Academic\Catalog\Support;
 
 use App\Models\Unit;
 use Illuminate\Database\Eloquent\Builder;
@@ -13,7 +13,7 @@ use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
-class UnitExcelExportService
+final class UnitSpreadsheetExporter
 {
     public function exportUnitsToExcel(array $filters = []): string
     {
@@ -35,8 +35,8 @@ class UnitExcelExportService
         $spreadsheet->setActiveSheetIndex(0);
 
         // Save to temporary file
-        $fileName = 'units_export_' . now()->format('Y-m-d_H-i-s') . '.xlsx';
-        $filePath = storage_path('app/temp/' . $fileName);
+        $fileName = 'units_export_'.now()->format('Y-m-d_H-i-s').'.xlsx';
+        $filePath = storage_path('app/temp/'.$fileName);
 
         // Ensure temp directory exists
         if (! file_exists(storage_path('app/temp'))) {
@@ -143,7 +143,7 @@ class UnitExcelExportService
         $worksheet->freezePane('A2');
 
         // Add auto-filter
-        $worksheet->setAutoFilter('A1:K' . ($row - 1));
+        $worksheet->setAutoFilter('A1:K'.($row - 1));
     }
 
     /**
@@ -171,15 +171,15 @@ class UnitExcelExportService
                         break;
                     case 'prerequisite':
                         $prefix = '(P)';
-                        $conditionExpressions[] = $prefix . $condition->requiredUnit?->code;
+                        $conditionExpressions[] = $prefix.$condition->requiredUnit?->code;
                         break;
                     case 'co_requisite':
                         $prefix = '(C)';
-                        $conditionExpressions[] = $prefix . $condition->requiredUnit?->code;
+                        $conditionExpressions[] = $prefix.$condition->requiredUnit?->code;
                         break;
                     case 'anti_requisite':
                         $prefix = '(E)';
-                        $conditionExpressions[] = $prefix . $condition->requiredUnit?->code;
+                        $conditionExpressions[] = $prefix.$condition->requiredUnit?->code;
                         break;
                     case 'textual':
                         $conditionExpressions[] = "({$condition->free_text})";
@@ -194,7 +194,7 @@ class UnitExcelExportService
 
             if (! empty($conditionExpressions)) {
                 if (count($conditionExpressions) > 1) {
-                    $groupExpression = '(' . implode(' ' . $group->logic_operator . ' ', $conditionExpressions) . ')';
+                    $groupExpression = '('.implode(' '.$group->logic_operator.' ', $conditionExpressions).')';
                 } else {
                     $groupExpression = $conditionExpressions[0];
                 }
@@ -287,7 +287,7 @@ class UnitExcelExportService
         $worksheet->freezePane('A2');
 
         // Add auto-filter
-        $worksheet->setAutoFilter('A1:K' . ($row - 1));
+        $worksheet->setAutoFilter('A1:K'.($row - 1));
     }
 
     private function createEquivalentsSheet(Spreadsheet $spreadsheet, Collection $units): void
@@ -357,7 +357,7 @@ class UnitExcelExportService
         $worksheet->freezePane('A2');
 
         // Add auto-filter
-        $worksheet->setAutoFilter('A1:I' . ($row - 1));
+        $worksheet->setAutoFilter('A1:I'.($row - 1));
     }
 
     private function createCurriculumMappingSheet(Spreadsheet $spreadsheet, Collection $units): void
@@ -429,7 +429,7 @@ class UnitExcelExportService
         $worksheet->freezePane('A2');
 
         // Add auto-filter
-        $worksheet->setAutoFilter('A1:J' . ($row - 1));
+        $worksheet->setAutoFilter('A1:J'.($row - 1));
     }
 
     private function createStatisticsSheet(Spreadsheet $spreadsheet): void
@@ -498,8 +498,8 @@ class UnitExcelExportService
     {
         if (! empty($filters['search'])) {
             $query->where(function ($q) use ($filters) {
-                $q->where('code', 'like', '%' . $filters['search'] . '%')
-                    ->orWhere('name', 'like', '%' . $filters['search'] . '%');
+                $q->where('code', 'like', '%'.$filters['search'].'%')
+                    ->orWhere('name', 'like', '%'.$filters['search'].'%');
             });
         }
 

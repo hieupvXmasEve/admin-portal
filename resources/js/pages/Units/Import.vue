@@ -3,31 +3,49 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { useApi } from '@/composables/useApiRequest';
 import { Head, router } from '@inertiajs/vue3';
 import { CheckCircle, Download, FileSpreadsheet, Upload, X, XCircle } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import { toast } from 'vue-sonner';
 
+interface SimpleImportResult {
+    summary: {
+        total_rows: number;
+        successful: number;
+        failed: number;
+        skipped: number;
+        processing_time: string;
+    };
+    errors: Array<{
+        row: number;
+        error: string;
+        data: unknown[];
+    }>;
+    warnings: Array<{
+        row: number;
+        message: string;
+    }>;
+}
+
+interface CombinedImportResult {
+    success: boolean;
+    summary: {
+        total_created: number;
+        total_updated: number;
+        total_skipped: number;
+        total_errors: number;
+        total_warnings: number;
+    };
+    details: {
+        errors: string[];
+        warnings: string[];
+    };
+}
+
 interface ImportResult {
     success: boolean;
-    result?: {
-        summary: {
-            total_rows: number;
-            successful: number;
-            failed: number;
-            skipped: number;
-            processing_time: string;
-        };
-        errors: Array<{
-            row: number;
-            error: string;
-            data: any[];
-        }>;
-        warnings: Array<{
-            row: number;
-            message: string;
-        }>;
-    };
+    result?: SimpleImportResult | CombinedImportResult;
     error?: string;
 }
 
@@ -52,6 +70,8 @@ const props = defineProps<{
         combined: string;
     };
 }>();
+
+const api = useApi();
 
 // File upload state
 const selectedFile = ref<File | null>(null);
@@ -78,6 +98,16 @@ const importResult = ref<ImportResult | null>(null);
 // Computed properties
 const canProceedToPreview = computed(() => uploadedFilePath.value && selectedFile.value);
 const canStartImport = computed(() => previewData.value && currentStep.value === 'preview');
+const combinedImportResult = computed<CombinedImportResult | null>(() => {
+    const result = importResult.value?.result;
+
+    return result && 'details' in result ? result : null;
+});
+const simpleImportResult = computed<SimpleImportResult | null>(() => {
+    const result = importResult.value?.result;
+
+    return result && 'errors' in result ? result : null;
+});
 
 // File handling
 const onFileSelect = (event: Event) => {
@@ -140,25 +170,22 @@ const uploadFile = async () => {
     formData.append('duplicate_handling', duplicateHandling.value);
 
     try {
-        const response = await fetch('/units/import/upload', {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-            },
-        });
+        const result = await api.post<{
+            file_path: string;
+            filename: string;
+            preview: PreviewData;
+        }>(route('units.import.upload'), formData);
+        const response = result.data.value;
+        const payload = response?.data;
 
-        const result = await response.json();
-        const payload = result.data ?? result;
-
-        if (result.success) {
+        if (response?.success && payload) {
             uploadedFilePath.value = payload.file_path;
             uploadedFileName.value = payload.filename;
             previewData.value = payload.preview;
             currentStep.value = 'configure';
             toast.success('File uploaded successfully');
         } else {
-            throw new Error(result.message || result.error || 'Upload failed');
+            throw new Error(response?.message || response?.error || 'Upload failed');
         }
     } catch (error) {
         console.error('Upload error:', error);
@@ -182,33 +209,29 @@ const startImport = async () => {
     currentStep.value = 'process';
 
     try {
-        const response = await fetch('/units/import/process', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-            },
-            body: JSON.stringify({
-                file_path: uploadedFilePath.value,
-                duplicate_handling: duplicateHandling.value,
-                create_prerequisites: createPrerequisites.value,
-                create_equivalents: createEquivalents.value,
-            }),
+        const result = await api.post<{
+            result: NonNullable<ImportResult['result']>;
+        }>(route('units.import.process'), {
+            file_path: uploadedFilePath.value,
+            duplicate_handling: duplicateHandling.value,
+            create_prerequisites: createPrerequisites.value,
+            create_equivalents: createEquivalents.value,
         });
-
-        const result = await response.json();
-        const payload = result.data ?? result;
+        const response = result.data.value;
+        const payload = response?.data;
+        const importSucceeded = payload?.result?.success ?? response?.success ?? false;
         importResult.value = {
-            success: result.success,
-            result: payload.result,
-            error: result.message || result.error,
+            success: importSucceeded,
+            result: payload?.result,
+            error: importSucceeded ? undefined : response?.message || response?.error || 'Import validation failed',
         };
 
-        if (result.success) {
+        if (importSucceeded) {
             currentStep.value = 'complete';
             toast.success('Import completed successfully');
         } else {
-            throw new Error(result.message || result.error || 'Import failed');
+            currentStep.value = 'complete';
+            toast.error('Import rejected. No changes were saved.');
         }
     } catch (error) {
         console.error('Import error:', error);
@@ -234,7 +257,7 @@ const resetImport = () => {
 
 const downloadTemplate = (format: string) => {
     const link = document.createElement('a');
-    link.href = `/units/import/template/${format}`;
+    link.href = route('units.import.template', { format });
     link.download = `units_${format}_template.xlsx`;
     document.body.appendChild(link);
     link.click();
@@ -243,7 +266,7 @@ const downloadTemplate = (format: string) => {
 
 const goBackToUnits = () => {
     const search = typeof window !== 'undefined' ? window.location.search : '';
-    router.visit(`/units${search || ''}`);
+    router.visit(`${route('units.index')}${search || ''}`);
 };
 </script>
 
@@ -499,40 +522,75 @@ const goBackToUnits = () => {
                 </CardTitle>
             </CardHeader>
             <CardContent class="space-y-4">
-                <div v-if="importResult.success && importResult.result" class="grid gap-4 md:grid-cols-4">
+                <div v-if="combinedImportResult" class="grid gap-4 md:grid-cols-4">
                     <div class="text-center">
-                        <div class="text-2xl font-bold">{{ importResult.result.summary.total_rows }}</div>
+                        <div class="text-2xl font-bold">{{ combinedImportResult.summary.total_created }}</div>
+                        <div class="text-muted-foreground text-sm">Created</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-green-600">{{ combinedImportResult.summary.total_updated }}</div>
+                        <div class="text-muted-foreground text-sm">Updated</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-red-600">{{ combinedImportResult.summary.total_errors }}</div>
+                        <div class="text-muted-foreground text-sm">Errors</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-yellow-600">{{ combinedImportResult.summary.total_skipped }}</div>
+                        <div class="text-muted-foreground text-sm">Skipped</div>
+                    </div>
+                </div>
+
+                <div v-else-if="simpleImportResult" class="grid gap-4 md:grid-cols-4">
+                    <div class="text-center">
+                        <div class="text-2xl font-bold">{{ simpleImportResult.summary.total_rows }}</div>
                         <div class="text-muted-foreground text-sm">Total Rows</div>
                     </div>
                     <div class="text-center">
-                        <div class="text-2xl font-bold text-green-600">{{ importResult.result.summary.successful }}</div>
+                        <div class="text-2xl font-bold text-green-600">{{ simpleImportResult.summary.successful }}</div>
                         <div class="text-muted-foreground text-sm">Successful</div>
                     </div>
                     <div class="text-center">
-                        <div class="text-2xl font-bold text-red-600">{{ importResult.result.summary.failed }}</div>
+                        <div class="text-2xl font-bold text-red-600">{{ simpleImportResult.summary.failed }}</div>
                         <div class="text-muted-foreground text-sm">Failed</div>
                     </div>
                     <div class="text-center">
-                        <div class="text-2xl font-bold text-yellow-600">{{ importResult.result.summary.skipped }}</div>
+                        <div class="text-2xl font-bold text-yellow-600">{{ simpleImportResult.summary.skipped }}</div>
                         <div class="text-muted-foreground text-sm">Skipped</div>
                     </div>
                 </div>
 
                 <!-- Errors -->
-                <div v-if="importResult.result?.errors && importResult.result.errors.length > 0" class="space-y-2">
+                <div v-if="combinedImportResult && combinedImportResult.details.errors.length > 0" class="space-y-2">
                     <h4 class="font-medium text-red-600">Errors</h4>
                     <div class="max-h-48 space-y-1 overflow-y-auto">
-                        <div v-for="error in importResult.result.errors" :key="error.row" class="rounded border border-red-200 bg-red-50 p-2 text-sm">
+                        <div v-for="error in combinedImportResult.details.errors" :key="error" class="rounded border border-red-200 bg-red-50 p-2 text-sm">
+                            {{ error }}
+                        </div>
+                    </div>
+                </div>
+                <div v-else-if="simpleImportResult && simpleImportResult.errors.length > 0" class="space-y-2">
+                    <h4 class="font-medium text-red-600">Errors</h4>
+                    <div class="max-h-48 space-y-1 overflow-y-auto">
+                        <div v-for="error in simpleImportResult.errors" :key="error.row" class="rounded border border-red-200 bg-red-50 p-2 text-sm">
                             <strong>Row {{ error.row }}:</strong> {{ error.error }}
                         </div>
                     </div>
                 </div>
 
                 <!-- Warnings -->
-                <div v-if="importResult.result?.warnings && importResult.result.warnings.length > 0" class="space-y-2">
+                <div v-if="combinedImportResult && combinedImportResult.details.warnings.length > 0" class="space-y-2">
                     <h4 class="font-medium text-yellow-600">Warnings</h4>
                     <div class="max-h-48 space-y-1 overflow-y-auto">
-                        <div v-for="warning in importResult.result.warnings" :key="warning.row" class="rounded border border-yellow-200 bg-yellow-50 p-2 text-sm">
+                        <div v-for="warning in combinedImportResult.details.warnings" :key="warning" class="rounded border border-yellow-200 bg-yellow-50 p-2 text-sm">
+                            {{ warning }}
+                        </div>
+                    </div>
+                </div>
+                <div v-else-if="simpleImportResult && simpleImportResult.warnings.length > 0" class="space-y-2">
+                    <h4 class="font-medium text-yellow-600">Warnings</h4>
+                    <div class="max-h-48 space-y-1 overflow-y-auto">
+                        <div v-for="warning in simpleImportResult.warnings" :key="warning.row" class="rounded border border-yellow-200 bg-yellow-50 p-2 text-sm">
                             <strong>Row {{ warning.row }}:</strong> {{ warning.message }}
                         </div>
                     </div>

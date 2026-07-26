@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Modules\Academic\Catalog\Actions;
 
-use App\Services\UnitExcelImportService;
+use App\Modules\Academic\Catalog\Support\UnitSpreadsheetImporter;
 use Illuminate\Support\Facades\Storage;
 
 class PreviewUnitImportAction
 {
-    public function __construct(private readonly UnitExcelImportService $imports) {}
+    public function __construct(private readonly UnitSpreadsheetImporter $imports) {}
 
     /** @return array<string, mixed> */
     public function handle(string $path, int $rows): array

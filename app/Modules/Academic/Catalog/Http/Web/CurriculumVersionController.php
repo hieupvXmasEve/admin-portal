@@ -67,6 +67,11 @@ class CurriculumVersionController extends Controller
         return Inertia::render('CurriculumVersions/Create', app(GetCurriculumVersionPageDataQuery::class)->create());
     }
 
+    public function show(CurriculumVersion $curriculumVersion): RedirectResponse
+    {
+        return redirect()->route(CurriculumRoutes::VERSION_SUMMARY_OVERVIEW, $curriculumVersion);
+    }
+
     public function showWithModules(CurriculumVersion $curriculumVersion): Response
     {
         return Inertia::render('CurriculumVersions/Show', app(GetCurriculumVersionPageDataQuery::class)->show($curriculumVersion));

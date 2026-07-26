@@ -52,8 +52,8 @@ final class GenerateUnitImportTemplateAction
 
         if ($format === 'combined') {
             $this->addSheet($spreadsheet->createSheet(), 'Syllabus', [
-                'Unit Code*', 'Version', 'Description', 'Total Hours', 'Hours Per Session', 'Effective From Semester', 'Is Active*',
-            ], [['CS101', 'v1.0', 'Introduction to programming concepts and software development fundamentals', '120', '3', '2024-S1', 'TRUE']]);
+                'Unit Code*', 'Version', 'Description', 'Total Hours', 'Is Active*',
+            ], [['CS101', 'v1.0', 'Introduction to programming concepts and software development fundamentals', '120', 'TRUE']]);
             $this->addSheet($spreadsheet->createSheet(), 'Assessment Components', [
                 'Unit Code*', 'Syllabus Version', 'Component Name*', 'Weight*', 'Type*', 'Required for Final Exam*',
             ], [['CS101', 'v1.0', 'Final Exam', '50', 'exam', 'TRUE']]);

@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace App\Modules\Academic\Catalog\Actions;
 
-use App\Models\AssessmentComponent;
-use App\Models\AssessmentComponentDetail;
 use App\Models\SyllabusTemplate;
+use App\Shared\Contracts\Academic\AssessmentDefinitionWriter;
 use Illuminate\Support\Facades\DB;
 
 class CreateSyllabusTemplateAction
 {
+    public function __construct(private readonly AssessmentDefinitionWriter $assessmentDefinitions) {}
+
     /**
      * @param  array<string, mixed>  $data
      */
@@ -19,42 +20,9 @@ class CreateSyllabusTemplateAction
         return DB::transaction(function () use ($data): SyllabusTemplate {
             $template = SyllabusTemplate::query()->create($data);
 
-            foreach ($data['assessment_components'] ?? [] as $index => $componentData) {
-                if (! is_array($componentData)) {
-                    continue;
-                }
-
-                $component = AssessmentComponent::query()->create([
-                    'syllabus_template_id' => $template->getKey(),
-                    'name' => $componentData['name'] ?? null,
-                    'code' => $componentData['code'] ?? null,
-                    'weight' => $componentData['weight'] ?? 0,
-                    'type' => $componentData['type'] ?? 'other',
-                    'sort_order' => $index,
-                ]);
-
-                $details = $componentData['details'] ?? [];
-                if (is_array($details) && $details !== []) {
-                    foreach ($details as $detailData) {
-                        if (! is_array($detailData)) {
-                            continue;
-                        }
-
-                        AssessmentComponentDetail::query()->create([
-                            'assessment_component_id' => $component->getKey(),
-                            'name' => $detailData['name'] ?? '',
-                            'weight' => $detailData['weight'] ?? null,
-                            'max_points' => 100.00,
-                        ]);
-                    }
-                } else {
-                    AssessmentComponentDetail::query()->create([
-                        'assessment_component_id' => $component->getKey(),
-                        'name' => $component->name,
-                        'weight' => 100.00,
-                        'max_points' => 100.00,
-                    ]);
-                }
+            $components = $data['assessment_components'] ?? [];
+            if (is_array($components)) {
+                $this->assessmentDefinitions->syncForSyllabusTemplate($template->getKey(), $components);
             }
 
             if (! empty($data['is_default'])) {

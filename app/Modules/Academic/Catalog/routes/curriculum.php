@@ -1,14 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Constants\CurriculumRoutes;
+use App\Http\Controllers\Api\ElectiveController;
 use App\Modules\Academic\Catalog\Http\Web\CurriculumVersionController;
 use Illuminate\Support\Facades\Route;
 
-// Web routes for Inertia.js pages
-Route::middleware('auth')->group(function () {
-
-    // Curriculum Versions routes
-    Route::prefix('curriculum-versions')->group(function () {
+Route::middleware('auth')->group(function (): void {
+    Route::prefix('curriculum-versions')->group(function (): void {
         Route::get('/', [CurriculumVersionController::class, 'index'])
             ->middleware('can:view_curriculum_version')
             ->name(CurriculumRoutes::VERSION_INDEX);
@@ -19,7 +19,6 @@ Route::middleware('auth')->group(function () {
             ->middleware('can:create_curriculum_version')
             ->name(CurriculumRoutes::VERSION_STORE);
 
-        // Tab-based detail routes
         Route::get('/{curriculum_version}/overview', [CurriculumVersionController::class, 'summaryOverview'])
             ->middleware('can:view_curriculum_version')
             ->name(CurriculumRoutes::VERSION_SUMMARY_OVERVIEW);
@@ -38,6 +37,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/{curriculum_version}/edit', [CurriculumVersionController::class, 'edit'])
             ->middleware('can:edit_curriculum_version')
             ->name(CurriculumRoutes::VERSION_EDIT);
+
         Route::put('/{curriculum_version}', [CurriculumVersionController::class, 'update'])
             ->middleware('can:edit_curriculum_version')
             ->name(CurriculumRoutes::VERSION_UPDATE);
@@ -47,20 +47,40 @@ Route::middleware('auth')->group(function () {
         Route::post('/{curriculum_version}/duplicate', [CurriculumVersionController::class, 'duplicate'])
             ->middleware('can:create_curriculum_version')
             ->name(CurriculumRoutes::VERSION_DUPLICATE);
-
+        Route::get('/export/excel/filtered', [CurriculumVersionController::class, 'exportFiltered'])
+            ->middleware('can:export_curriculum_version')
+            ->name(CurriculumRoutes::VERSION_EXPORT_FILTERED);
+        Route::get('/{curriculum_version}', [CurriculumVersionController::class, 'show'])
+            ->middleware(['verified', 'can:view_curriculum_version'])
+            ->name('curriculum-versions.show');
     });
-
-    // Global management routes for curriculum versions
-    Route::get('curriculum-versions/export/excel/filtered', [CurriculumVersionController::class, 'exportFiltered'])
-        ->middleware('can:export_curriculum_version')
-        ->name(CurriculumRoutes::VERSION_EXPORT_FILTERED);
-
 });
 
-// API routes for AJAX calls
-Route::middleware(['auth'])->group(function () {
+Route::middleware(['auth', 'verified'])->group(function (): void {
+    Route::get('/curriculum-versions/{curriculumVersion}/electives', [CurriculumVersionController::class, 'electiveManagement'])
+        ->middleware('can:view_curriculum_version')
+        ->name('curriculum_version.electives');
 
-    // Curriculum Versions API routes
+    Route::prefix('api')->name('api.')->group(function (): void {
+        Route::get('/curriculum-versions/{curriculumVersion}/available-electives', [ElectiveController::class, 'getAvailableElectives'])
+            ->middleware('can:view_curriculum_version')
+            ->name('curriculum_version.available-electives');
+        Route::get('/curriculum-versions/{curriculumVersion}/elective-slots', [ElectiveController::class, 'getElectiveSlots'])
+            ->middleware('can:view_curriculum_version')
+            ->name('curriculum_version.elective-slots');
+        Route::put('/curriculum-units/{curriculumUnit}/update-elective', [ElectiveController::class, 'updateElectiveSlot'])
+            ->middleware('can:edit_curriculum_version')
+            ->name('curriculum-units.update-elective');
+        Route::get('/units/{unit}/details', [ElectiveController::class, 'getUnitDetails'])
+            ->middleware('can:view_unit')
+            ->name('units.details');
+        Route::get('/curriculum-units/{curriculumUnit}/recommendations', [ElectiveController::class, 'getElectiveRecommendations'])
+            ->middleware('can:view_curriculum_version')
+            ->name('curriculum-units.recommendations');
+    });
+});
+
+Route::middleware(['auth'])->group(function (): void {
     Route::post('api/curriculum-versions', [CurriculumVersionController::class, 'apiStore'])
         ->name(CurriculumRoutes::API_VERSION_STORE);
     Route::get('api/curriculum-versions/specializations-by-program', [CurriculumVersionController::class, 'getSpecializationsByProgram'])
@@ -74,5 +94,4 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('api/curriculum-versions/{curriculumVersion}', [CurriculumVersionController::class, 'apiDestroy'])
         ->whereNumber('curriculumVersion')
         ->name(CurriculumRoutes::API_VERSION_DESTROY);
-
 });
