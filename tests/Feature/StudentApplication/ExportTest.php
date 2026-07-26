@@ -9,7 +9,7 @@ use App\Models\ApplicationGuardian;
 use App\Models\Campus;
 use App\Models\StudentApplication;
 use App\Models\User;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use App\Shared\Support\Enums\UserType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -24,9 +24,9 @@ beforeEach(function () {
     $this->campus = Campus::factory()->create();
     $this->otherCampus = Campus::factory()->create();
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')->andReturn(['view_student_application']);
-    $this->app->singleton(PermissionService::class, fn () => $permissionService);
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')->andReturn(['view_student_application']);
+    $this->app->singleton(CampusPermissionReader::class, fn () => $permissionService);
 
     $this->app->singleton('campus', fn () => $this->campus);
     session(['current_campus_id' => $this->campus->id]);

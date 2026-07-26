@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Providers;
 
-use App\Models\Student;
 use App\Modules\Finance\Actions\ApplyStudentLifecycleDeferAction;
 use App\Modules\Finance\Actions\AttachStudentLifecycleFinanceEvidenceAction;
 use App\Modules\Finance\Actions\CancelFinanceObligationAction;
@@ -16,9 +15,9 @@ use App\Modules\Finance\Dng\Services\DngClient;
 use App\Modules\Finance\Dng\Services\DngPaymentService;
 use App\Modules\Finance\Dng\Services\DngReconciliationService;
 use App\Modules\Finance\Dng\Services\DngWebhookService;
+use App\Modules\Finance\Listeners\ProvisionBillingAccountForRegisteredStudent;
 use App\Modules\Finance\Models\DngReceiptException;
 use App\Modules\Finance\Models\FinanceCharge;
-use App\Modules\Finance\Observers\StudentBillingAccountObserver;
 use App\Modules\Finance\Policies\DngReceiptExceptionPolicy;
 use App\Modules\Finance\Policies\FinanceChargePolicy;
 use App\Modules\Finance\Queries\GetStudentFeeSummaryQuery;
@@ -55,6 +54,8 @@ use App\Shared\Contracts\Finance\StudentLifecycleFinanceCommand;
 use App\Shared\Contracts\Finance\StudentLifecycleFinanceEvidenceWriter;
 use App\Shared\Contracts\Finance\StudentLifecycleFinanceReader;
 use App\Shared\Contracts\Finance\StudentPortalFinanceSummaryReader;
+use App\Shared\Contracts\StudentRegistry\StudentRegistered;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -118,11 +119,7 @@ class FinanceServiceProvider extends ServiceProvider
             $this->loadRoutesFrom($routesPath.'/api.php');
         }
 
-        // Transitional adapter: Student Registry still owns the backing model
-        // while Finance must preserve eager billing-account provisioning for
-        // pre-existing creation flows. Collection paths resolve identity only
-        // through StudentReferenceReader.
-        Student::observe(StudentBillingAccountObserver::class);
+        Event::listen(StudentRegistered::class, ProvisionBillingAccountForRegisteredStudent::class);
 
         // Explicit registration required: Laravel 13 auto-discovery does not
         // resolve policies in module namespaces (App\Modules\*) automatically.

@@ -25,7 +25,7 @@ class InvigilationDutyQuery
     public function handle(Lecture $lecturer, Carbon $startDate, Carbon $endDate): array
     {
         return ExamRoomSlotInvigilator::query()
-            ->where('lecture_id', $lecturer->id)
+            ->where('lecture_id', $lecturer->lecturerId())
             ->whereHas('roomSlot', fn ($query) => $query
                 ->whereBetween('exam_date', [$startDate->toDateString(), $endDate->toDateString()])
                 ->where('status', '!=', ExamRoomSlot::STATUS_CANCELLED))

@@ -11,7 +11,7 @@ use App\Models\QueryReply;
 use App\Models\QueryTicket;
 use App\Models\UploadRecord;
 use App\Models\User;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use App\Shared\Contracts\Upload\FileUploadGateway;
 use App\Shared\Contracts\Upload\StoredUpload;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -38,11 +38,11 @@ beforeEach(function (): void {
 
 function bindQueryTicketReviewPermissions(array $permissions): void
 {
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')->andReturn($permissions);
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')->andReturn($permissions);
 
-    app()->forgetInstance(PermissionService::class);
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    app()->forgetInstance(CampusPermissionReader::class);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
 }
 
 /**

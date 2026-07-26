@@ -6,7 +6,7 @@ use App\Models\Campus;
 use App\Models\User;
 use App\Modules\Finance\Dng\Models\DngCampusMapping;
 use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 
@@ -24,9 +24,9 @@ beforeEach(function (): void {
 
 function grantDngCampusMappingPermissions(array $permissions): void
 {
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')->andReturn($permissions);
-    app()->instance(PermissionService::class, $permissionService);
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')->andReturn($permissions);
+    app()->instance(CampusPermissionReader::class, $permissionService);
 }
 
 it('resolves DNG codes exclusively from Finance-owned mappings', function (): void {

@@ -10,7 +10,7 @@ use App\Models\User;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Queries\Operations\GetDueItemsSummaryQuery;
 use App\Modules\Finance\Queries\Operations\ListDueItemsQuery;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 use function Pest\Laravel\actingAs;
@@ -63,9 +63,9 @@ beforeEach(function () {
     session(['current_campus_id' => $this->campus->id]);
     app()->singleton('campus', fn () => $this->campus);
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')->andReturn(['view_finance_operations_due_calendar']);
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')->andReturn(['view_finance_operations_due_calendar']);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
 });
 
 it('excludes lifecycle exceptions from due calendar list and summary', function () {

@@ -22,18 +22,18 @@ class LecturerStudentService
     ): LengthAwarePaginator {
         $query = Student::whereHas('courseRegistrations', function ($q) use ($lecturer) {
             $q->whereHas('courseOffering', function ($courseQuery) use ($lecturer) {
-                $courseQuery->where('lecture_id', $lecturer->id)
+                $courseQuery->where('lecture_id', $lecturer->lecturerId())
                     ->where('is_active', true);
             })->where('registration_status', 'enrolled');
         })->with([
             'courseRegistrations' => function ($q) use ($lecturer) {
                 $q->whereHas('courseOffering', function ($courseQuery) use ($lecturer) {
-                    $courseQuery->where('lecture_id', $lecturer->id);
+                    $courseQuery->where('lecture_id', $lecturer->lecturerId());
                 })->with('courseOffering.unit');
             },
             'attendances' => function ($q) use ($lecturer) {
                 $q->whereHas('classSession', function ($sessionQuery) use ($lecturer) {
-                    $sessionQuery->where('lecture_id', $lecturer->id);
+                    $sessionQuery->where('lecture_id', $lecturer->lecturerId());
                 });
             },
         ]);
@@ -53,17 +53,17 @@ class LecturerStudentService
     {
         $student = Student::whereHas('courseRegistrations', function ($q) use ($lecturer) {
             $q->whereHas('courseOffering', function ($courseQuery) use ($lecturer) {
-                $courseQuery->where('lecture_id', $lecturer->id);
+                $courseQuery->where('lecture_id', $lecturer->lecturerId());
             });
         })->with([
             'courseRegistrations' => function ($q) use ($lecturer) {
                 $q->whereHas('courseOffering', function ($courseQuery) use ($lecturer) {
-                    $courseQuery->where('lecture_id', $lecturer->id);
+                    $courseQuery->where('lecture_id', $lecturer->lecturerId());
                 })->with(['courseOffering.unit', 'courseOffering.semester']);
             },
             'attendances' => function ($q) use ($lecturer) {
                 $q->whereHas('classSession', function ($sessionQuery) use ($lecturer) {
-                    $sessionQuery->where('lecture_id', $lecturer->id);
+                    $sessionQuery->where('lecture_id', $lecturer->lecturerId());
                 })->with('classSession.courseOffering.unit');
             },
         ])->where('id', $studentId)->first();
@@ -88,7 +88,7 @@ class LecturerStudentService
      */
     public function getStudentAlerts(Lecture $lecturer, array $filters = []): array
     {
-        $cacheKey = "lecturer-student-alerts:{$lecturer->id}:" . md5(serialize($filters));
+        $cacheKey = "lecturer-student-alerts:{$lecturer->lecturerId()}:".md5(serialize($filters));
 
         return Cache::remember($cacheKey, 300, function () use ($lecturer, $filters) {
             $alerts = [];
@@ -153,7 +153,7 @@ class LecturerStudentService
         // Verify lecturer has access to this student
         $hasAccess = Student::whereHas('courseRegistrations', function ($q) use ($lecturer) {
             $q->whereHas('courseOffering', function ($courseQuery) use ($lecturer) {
-                $courseQuery->where('lecture_id', $lecturer->id);
+                $courseQuery->where('lecture_id', $lecturer->lecturerId());
             });
         })->where('id', $studentId)->exists();
 
@@ -163,7 +163,7 @@ class LecturerStudentService
 
         $note = StudentNote::create([
             'student_id' => $studentId,
-            'lecture_id' => $lecturer->id,
+            'lecture_id' => $lecturer->lecturerId(),
             'course_offering_id' => $noteData['course_offering_id'] ?? null,
             'note_type' => $noteData['note_type'] ?? 'general',
             'title' => $noteData['title'],
@@ -188,7 +188,7 @@ class LecturerStudentService
         array $updateData
     ): array {
         $note = StudentNote::where('id', $noteId)
-            ->where('lecture_id', $lecturer->id)
+            ->where('lecture_id', $lecturer->lecturerId())
             ->first();
 
         if (! $note) {
@@ -209,7 +209,7 @@ class LecturerStudentService
     public function deleteStudentNote(Lecture $lecturer, int $noteId): array
     {
         $note = StudentNote::where('id', $noteId)
-            ->where('lecture_id', $lecturer->id)
+            ->where('lecture_id', $lecturer->lecturerId())
             ->first();
 
         if (! $note) {
@@ -356,7 +356,7 @@ class LecturerStudentService
     protected function getStudentNotes(Student $student, Lecture $lecturer): array
     {
         $notes = StudentNote::where('student_id', $student->id)
-            ->where('lecture_id', $lecturer->id)
+            ->where('lecture_id', $lecturer->lecturerId())
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -392,7 +392,7 @@ class LecturerStudentService
         // For now, return recent attendance records
         $recentAttendances = $student->attendances()
             ->whereHas('classSession', function ($q) use ($lecturer) {
-                $q->where('lecture_id', $lecturer->id);
+                $q->where('lecture_id', $lecturer->lecturerId());
             })
             ->with('classSession.courseOffering.unit')
             ->orderBy('created_at', 'desc')

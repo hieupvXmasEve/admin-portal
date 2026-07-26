@@ -15,7 +15,7 @@ use App\Modules\Academic\Actions\BackfillDecisionStudentRosterAction;
 use App\Modules\Academic\Progression\Actions\BulkLinkStudentsToDecisionAction;
 use App\Modules\Academic\Progression\Actions\RecordStudentActionAction;
 use App\Modules\Academic\Progression\Queries\GetMissingDecisionReportQuery;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia;
@@ -201,9 +201,9 @@ it('renders the missing-decision report page through the gated route', function 
         'changed_by_user_id' => $this->user->id,
     ]);
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')->andReturn(['view_student_action']);
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')->andReturn(['view_student_action']);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
 
     actingAs($this->user)
         ->withSession(['current_campus_id' => $this->campus->id])

@@ -7,7 +7,7 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
 use App\Modules\Finance\Models\FinanceCharge;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 
@@ -34,9 +34,9 @@ beforeEach(function () {
 function nacApiUser(array $permissions = ['view_finance_operations_generate_charges']): User
 {
     $user = User::factory()->create();
-    $mock = Mockery::mock(PermissionService::class);
-    $mock->shouldReceive('getUserPermissions')->andReturn($permissions);
-    app()->singleton(PermissionService::class, fn () => $mock);
+    $mock = Mockery::mock(CampusPermissionReader::class);
+    $mock->shouldReceive('permissionCodesForUserId')->andReturn($permissions);
+    app()->singleton(CampusPermissionReader::class, fn () => $mock);
 
     return $user;
 }

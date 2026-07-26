@@ -34,7 +34,7 @@ use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Models\FinanceObligation;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
 
@@ -282,10 +282,10 @@ beforeEach(function () {
 
     app()->singleton('campus', fn () => $this->campus);
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')
-        ->andReturnUsing(function (User $user, ?int $campusId = null): array {
-            if ($user->id === $this->fullAccessUser->id && $campusId === $this->campus->id) {
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')
+        ->andReturnUsing(function (int $userId, ?int $campusId = null): array {
+            if ($userId === $this->fullAccessUser->id && $campusId === $this->campus->id) {
                 return [
                     'view_ai_metrics',
                     'view_student',
@@ -298,7 +298,7 @@ beforeEach(function () {
                 ];
             }
 
-            if ($user->id === $this->academicOnlyUser->id && $campusId === $this->campus->id) {
+            if ($userId === $this->academicOnlyUser->id && $campusId === $this->campus->id) {
                 return [
                     'view_ai_metrics',
                     'view_student',
@@ -307,15 +307,15 @@ beforeEach(function () {
                 ];
             }
 
-            if ($user->id === $this->aiOnlyUser->id && $campusId === $this->campus->id) {
+            if ($userId === $this->aiOnlyUser->id && $campusId === $this->campus->id) {
                 return ['view_ai_metrics'];
             }
 
             return [];
         });
 
-    app()->forgetInstance(PermissionService::class);
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    app()->forgetInstance(CampusPermissionReader::class);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
 
     $this->entityRefFor = function (?Student $student = null, ?Campus $campus = null): string {
         $student ??= $this->student;

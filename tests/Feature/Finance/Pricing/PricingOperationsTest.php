@@ -9,10 +9,10 @@ use App\Models\User;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\FinancePricingCatalogItem;
-use App\Services\PermissionService;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
 use App\Shared\Contracts\Finance\Enums\FinancialEffect;
 use App\Shared\Contracts\Finance\FinanceIntakeContract;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use RuntimeException;
 
@@ -29,9 +29,9 @@ beforeEach(function (): void {
     app()->singleton('campus', fn () => $this->campus);
 
     $this->grantPricing = function (array $permissions): void {
-        $mock = Mockery::mock(PermissionService::class);
-        $mock->shouldReceive('getUserPermissions')->andReturn($permissions);
-        app()->instance(PermissionService::class, $mock);
+        $mock = Mockery::mock(CampusPermissionReader::class);
+        $mock->shouldReceive('permissionCodesForUserId')->andReturn($permissions);
+        app()->instance(CampusPermissionReader::class, $mock);
     };
 });
 

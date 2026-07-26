@@ -17,7 +17,7 @@ use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Queries\GetStudentBalanceQuery;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
@@ -39,10 +39,10 @@ beforeEach(function () {
     session(['current_campus_id' => $this->campus->id]);
     app()->singleton('campus', fn () => $this->campus);
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')
         ->andReturn(['view_exam_resit', 'create_exam_resit', 'cancel_exam_resit']);
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
 
     DB::table('finance_pricing_catalog_items')->insert([
         'obligation_type' => FinanceCharge::TYPE_EXAM_RESIT_FEE,

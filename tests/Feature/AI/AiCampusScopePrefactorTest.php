@@ -9,7 +9,7 @@ use App\Modules\AI\Support\CampusScopeSnapshot;
 use App\Modules\AI\Support\QueryPlan;
 use App\Modules\AI\Support\QueryPlanValidator;
 use App\Modules\AI\Support\Tools\ToolRegistry;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -25,19 +25,19 @@ beforeEach(function () {
         'is_active' => true,
     ]);
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')
-        ->andReturnUsing(function (User $user, ?int $campusId = null): array {
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')
+        ->andReturnUsing(function (int $userId, ?int $campusId = null): array {
             // Authorized at both campuses so campus enforcement (not permission) is under test.
-            if ($user->id === $this->authorizedUser->id) {
+            if ($userId === $this->authorizedUser->id) {
                 return ['view_ai_metrics', 'view_finance_reporting'];
             }
 
             return [];
         });
 
-    app()->forgetInstance(PermissionService::class);
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    app()->forgetInstance(CampusPermissionReader::class);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
 });
 
 function prefactorPlan(array $filters = []): QueryPlan

@@ -21,6 +21,9 @@ final class SyncUserCampusRolesAction
                 DB::table('campus_user_roles')->insert(array_map(fn (int $roleId): array => ['user_id' => $userId, 'role_id' => $roleId, 'campus_id' => $campusId, 'created_at' => now(), 'updated_at' => now()], $roleIds));
             }
         });
-        ClearUserPermissionCacheAction::run(['user_id' => $userId]);
+        ClearUserPermissionCacheAction::run([
+            'user_id' => $userId,
+            'campus_ids' => [$campusId],
+        ]);
     }
 }

@@ -13,7 +13,7 @@ use App\Models\Role;
 use App\Models\Specialization;
 use App\Models\Student;
 use App\Models\User;
-use App\Shared\Contracts\Academic\StudentLifecycleStatusFilter;
+use App\Shared\Contracts\Academic\StudentDirectoryReader;
 use App\Shared\Contracts\Identity\GuardianAccessGrantReader;
 use App\Shared\Contracts\Identity\GuardianAccessGrantWriter;
 use App\Shared\Contracts\StudentRegistry\DTO\GuardianRelationship;
@@ -36,6 +36,7 @@ class StudentService
     public function __construct(
         private readonly StudentProfileWriter $studentProfileWriter,
         private readonly StudentIdentityWriter $studentIdentityWriter,
+        private readonly StudentDirectoryReader $studentDirectoryReader,
     ) {}
 
     /**
@@ -331,32 +332,16 @@ class StudentService
     }
 
     /**
-     * Get students filtered by campus
+     * Get students filtered by campus.
+     *
+     * @param  array<string, mixed>  $filters
      */
     public function getStudentsByCampus(int $campusId, array $filters = []): LengthAwarePaginator
     {
-        $query = Student::with(['campus', 'program', 'specialization'])
-            ->where('campus_id', $campusId);
-
-        // Apply additional filters
-        if (! empty($filters['search'])) {
-            $search = $filters['search'];
-            $query->where(function ($q) use ($search) {
-                $q->where('full_name', 'like', "%{$search}%")
-                    ->orWhere('student_id', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
-            });
-        }
-
-        if (! empty($filters['status'])) {
-            app(StudentLifecycleStatusFilter::class)->apply($query, [(string) $filters['status']]);
-        }
-
-        if (! empty($filters['program_id'])) {
-            $query->where('program_id', $filters['program_id']);
-        }
-
-        return $query->orderBy('created_at', 'desc')->paginate(15);
+        return $this->studentDirectoryReader->handle([
+            ...$filters,
+            'per_page' => 15,
+        ], $campusId);
     }
 
     /**

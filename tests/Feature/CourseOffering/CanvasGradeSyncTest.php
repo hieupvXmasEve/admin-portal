@@ -19,7 +19,7 @@ use App\Models\Unit;
 use App\Models\User;
 use App\Services\Canvas\CanvasApiService;
 use App\Services\Canvas\CanvasGradeSyncService;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -43,11 +43,11 @@ beforeEach(function () {
     app()->singleton('campus', fn () => $this->campus);
 
     $this->grantPermissions = function (array $permissions): void {
-        $permissionService = Mockery::mock(PermissionService::class);
-        $permissionService->shouldReceive('getUserPermissions')->andReturn($permissions);
+        $permissionService = Mockery::mock(CampusPermissionReader::class);
+        $permissionService->shouldReceive('permissionCodesForUserId')->andReturn($permissions);
 
-        app()->forgetInstance(PermissionService::class);
-        app()->singleton(PermissionService::class, fn () => $permissionService);
+        app()->forgetInstance(CampusPermissionReader::class);
+        app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
     };
 
     ($this->grantPermissions)(['view_course_offering', 'sync_course_grades']);

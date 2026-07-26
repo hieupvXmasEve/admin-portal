@@ -12,6 +12,7 @@ use App\Http\Requests\Api\V1\Lecturer\UpdateSessionRequest;
 use App\Http\Resources\Api\V1\Lecturer\SessionResource;
 use App\Http\Resources\Api\V1\Lecturer\TimetableResource;
 use App\Http\Responses\ApiResponse;
+use App\Models\ClassSession;
 use App\Modules\Academic\Delivery\Support\LecturerTimetableService;
 use App\Shared\Contracts\Identity\LecturerTeachingActor;
 use Carbon\Carbon;
@@ -251,7 +252,8 @@ class TimetableController extends Controller
         $lecturer = $request->user();
 
         try {
-            $session = $lecturer->classSessions()
+            $session = ClassSession::query()
+                ->where('lecture_id', $lecturer->lecturerId())
                 ->with(['courseOffering.unit', 'room'])
                 ->where('id', $sessionId)
                 ->first();

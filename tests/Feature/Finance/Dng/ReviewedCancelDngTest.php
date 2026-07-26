@@ -11,7 +11,7 @@ use App\Models\User;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Models\FinanceCharge;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 use function Pest\Laravel\actingAs;
@@ -22,9 +22,9 @@ if (! function_exists('grantDngCancel')) {
     function grantDngCancel(array $codes): User
     {
         $user = User::factory()->create();
-        $mock = Mockery::mock(PermissionService::class);
-        $mock->shouldReceive('getUserPermissions')->andReturn($codes);
-        app()->singleton(PermissionService::class, fn () => $mock);
+        $mock = Mockery::mock(CampusPermissionReader::class);
+        $mock->shouldReceive('permissionCodesForUserId')->andReturn($codes);
+        app()->singleton(CampusPermissionReader::class, fn () => $mock);
 
         return $user;
     }

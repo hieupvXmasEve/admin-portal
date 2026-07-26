@@ -6,7 +6,7 @@ namespace App\Policies;
 
 use App\Models\StudentApplication;
 use App\Models\User;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 
 /**
  * Campus-scoped authorization for the Application lifecycle.
@@ -14,11 +14,11 @@ use App\Services\PermissionService;
  * A staff member may approve/reject/revoke an Application only when they hold
  * the matching permission *at the Application's campus* — not merely at their
  * currently-selected campus. This mirrors the platform's Campus scoping, which
- * resolves a user's permissions per campus through {@see PermissionService}.
+ * resolves a user's permissions per campus through the Identity contract.
  */
 class StudentApplicationPolicy
 {
-    public function __construct(private PermissionService $permissionService) {}
+    public function __construct(private readonly CampusPermissionReader $permissionReader) {}
 
     public function approve(User $user, StudentApplication $application): bool
     {
@@ -52,7 +52,7 @@ class StudentApplicationPolicy
 
         return in_array(
             $permission,
-            $this->permissionService->getUserPermissions($user, $campusId),
+            $this->permissionReader->permissionCodesForUserId((int) $user->id, $campusId),
             true
         );
     }

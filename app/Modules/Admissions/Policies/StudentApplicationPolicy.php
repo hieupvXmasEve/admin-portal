@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Modules\Admissions\Policies;
 
 use App\Models\StudentApplication;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Contracts\Auth\Authenticatable;
 
 final class StudentApplicationPolicy
 {
-    public function __construct(private readonly PermissionService $permissionService) {}
+    public function __construct(private readonly CampusPermissionReader $permissionReader) {}
 
     public function approve(Authenticatable $user, StudentApplication $application): bool
     {
@@ -31,6 +31,6 @@ final class StudentApplicationPolicy
     {
         $campusId = $application->campus?->id;
 
-        return $campusId !== null && in_array($permission, $this->permissionService->getUserPermissions($user, $campusId), true);
+        return $campusId !== null && in_array($permission, $this->permissionReader->permissionCodesForUserId((int) $user->getAuthIdentifier(), $campusId), true);
     }
 }

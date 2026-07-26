@@ -13,7 +13,7 @@ use App\Modules\AI\Support\QueryPlan;
 use App\Modules\AI\Support\QueryPlanValidator;
 use App\Modules\AI\Support\StaffMetricQuestionDataset;
 use App\Modules\Finance\Queries\Reporting\ListCollectionProgressQuery;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -27,18 +27,18 @@ beforeEach(function () {
     session(['current_campus_id' => $this->campus->id]);
     app()->singleton('campus', fn () => $this->campus);
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')
-        ->andReturnUsing(function (User $user, ?int $campusId = null): array {
-            if ($user->id === $this->authorizedUser->id && $campusId === $this->campus->id) {
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')
+        ->andReturnUsing(function (int $userId, ?int $campusId = null): array {
+            if ($userId === $this->authorizedUser->id && $campusId === $this->campus->id) {
                 return ['view_ai_metrics', 'view_finance_reporting', 'view_academic_report'];
             }
 
             return [];
         });
 
-    app()->forgetInstance(PermissionService::class);
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    app()->forgetInstance(CampusPermissionReader::class);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
 });
 
 it('exposes aggregate metric catalog and glossary without executable database details', function () {

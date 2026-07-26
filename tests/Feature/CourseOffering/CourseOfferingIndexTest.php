@@ -9,7 +9,7 @@ use App\Models\Module;
 use App\Models\Semester;
 use App\Models\Unit;
 use App\Models\User;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 use function Pest\Laravel\actingAs;
@@ -33,11 +33,11 @@ beforeEach(function () {
     session(['current_campus_id' => $this->campus->id]);
     app()->singleton('campus', fn () => $this->campus);
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')->andReturn(['view_course_offering']);
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')->andReturn(['view_course_offering']);
 
-    app()->forgetInstance(PermissionService::class);
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    app()->forgetInstance(CampusPermissionReader::class);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
 });
 
 it('uses global semester context for course offering list, stats, and module options', function () {

@@ -6,7 +6,7 @@ use App\Models\Campus;
 use App\Models\Semester;
 use App\Models\User;
 use App\Modules\Finance\Models\FinanceCharge;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
 
@@ -21,9 +21,9 @@ if (! function_exists('grantFinanceCutover')) {
     function grantFinanceCutover(array $codes): User
     {
         $user = User::factory()->create();
-        $mock = Mockery::mock(PermissionService::class);
-        $mock->shouldReceive('getUserPermissions')->andReturn($codes);
-        app()->instance(PermissionService::class, $mock);
+        $mock = Mockery::mock(CampusPermissionReader::class);
+        $mock->shouldReceive('permissionCodesForUserId')->andReturn($codes);
+        app()->instance(CampusPermissionReader::class, $mock);
 
         return $user;
     }

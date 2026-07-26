@@ -208,6 +208,16 @@ class Lecture extends Authenticatable implements LecturerTeachingActor
         return (int) $this->campus_id;
     }
 
+    public function lecturerId(): int
+    {
+        return (int) $this->id;
+    }
+
+    public function lecturerDisplayName(): string
+    {
+        return $this->full_name;
+    }
+
     public function lecturerUserId(): int
     {
         return (int) $this->user_id;

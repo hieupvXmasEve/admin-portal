@@ -23,7 +23,7 @@ uses(RefreshDatabase::class);
 const AUTHZ_CSRF = 'student-application-authz-csrf';
 
 beforeEach(function () {
-    // Permissions are resolved through the real, campus-scoped PermissionService
+    // Permissions are resolved through the real, campus-scoped CampusPermissionReader
     // here (no mock). It caches per user+campus; RefreshDatabase resets ids each
     // test, so flush to avoid stale cross-test cache hits.
     Cache::flush();

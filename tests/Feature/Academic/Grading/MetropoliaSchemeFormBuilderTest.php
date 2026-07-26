@@ -7,7 +7,7 @@ use App\Models\SyllabusTemplate;
 use App\Models\Unit;
 use App\Models\User;
 use App\Modules\Academic\Support\Grading\GradingSchemeValidator;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 use function Pest\Laravel\actingAs;
@@ -27,11 +27,11 @@ beforeEach(function () {
 
 function s007Grant(array $permissions): void
 {
-    $service = Mockery::mock(PermissionService::class);
-    $service->shouldReceive('getUserPermissions')->andReturn($permissions);
+    $service = Mockery::mock(CampusPermissionReader::class);
+    $service->shouldReceive('permissionCodesForUserId')->andReturn($permissions);
 
-    app()->forgetInstance(PermissionService::class);
-    app()->instance(PermissionService::class, $service);
+    app()->forgetInstance(CampusPermissionReader::class);
+    app()->instance(CampusPermissionReader::class, $service);
 }
 
 function s007ActingAsAdmin()

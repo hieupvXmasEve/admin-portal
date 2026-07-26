@@ -6,7 +6,7 @@ use App\Models\Campus;
 use App\Models\Role;
 use App\Models\User;
 use App\Modules\Notification\Models\NotificationEmailTemplate;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Database\Seeders\InitialSetup\RoleAndPermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -48,7 +48,7 @@ function makeWebSuperAdmin(): User
         'updated_at' => now(),
     ]);
 
-    app(PermissionService::class)->clearUserPermissionsCache($user);
+    app(CampusPermissionReader::class)->forgetPermissionCodesForUserId((int) $user->id);
 
     return $user;
 }

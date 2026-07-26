@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use App\Models\Campus;
 use App\Models\User;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
@@ -76,10 +76,10 @@ beforeEach(function () {
 
     app()->singleton('campus', fn () => $this->campus);
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')
-        ->andReturnUsing(function (User $user): array {
-            if ($user->id === $this->authorizedUser->id) {
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')
+        ->andReturnUsing(function (int $userId): array {
+            if ($userId === $this->authorizedUser->id) {
                 return [
                     'view_ai_provider_settings',
                     'manage_ai_provider_settings',
@@ -90,8 +90,8 @@ beforeEach(function () {
             return [];
         });
 
-    app()->forgetInstance(PermissionService::class);
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    app()->forgetInstance(CampusPermissionReader::class);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
 });
 
 it('renders the current staff AI provider settings without exposing secrets', function () {

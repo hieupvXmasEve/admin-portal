@@ -51,7 +51,7 @@ class GradebookController extends Controller
                 SaveLecturerGradebookScoresAction::run([
                     'course_offering' => $courseOffering,
                     'scores' => $request->gradebookScores($courseOffering),
-                    'lecturer_id' => $lecturer->id,
+                    'lecturer_id' => $lecturer->lecturerId(),
                 ]),
                 [],
                 'Gradebook scores saved successfully'

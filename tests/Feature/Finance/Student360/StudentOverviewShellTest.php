@@ -19,7 +19,7 @@ use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Models\PaymentSurplusDisposition;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\SettlementService;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -32,9 +32,9 @@ if (! function_exists('grantFinanceOverview')) {
     function grantFinanceOverview(array $codes): User
     {
         $user = User::factory()->create();
-        $mock = Mockery::mock(PermissionService::class);
-        $mock->shouldReceive('getUserPermissions')->andReturn($codes);
-        app()->singleton(PermissionService::class, fn () => $mock);
+        $mock = Mockery::mock(CampusPermissionReader::class);
+        $mock->shouldReceive('permissionCodesForUserId')->andReturn($codes);
+        app()->singleton(CampusPermissionReader::class, fn () => $mock);
 
         return $user;
     }

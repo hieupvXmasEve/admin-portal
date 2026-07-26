@@ -13,10 +13,20 @@ final class DeleteRoleAction
     public static function run(array $data): void
     {
         $roleId = $data['role_id'];
-        $userIds = DB::table('campus_user_roles')->where('role_id', $roleId)->pluck('user_id')->all();
+        $userCampusIds = DB::table('campus_user_roles')
+            ->where('role_id', $roleId)
+            ->get(['user_id', 'campus_id'])
+            ->groupBy('user_id')
+            ->map(static fn ($roles): array => $roles
+                ->pluck('campus_id')
+                ->map(static fn (int|string $campusId): int => (int) $campusId)
+                ->all());
         app(RoleAdministrationStore::class)->delete($data);
-        foreach ($userIds as $userId) {
-            ClearUserPermissionCacheAction::run(['user_id' => (int) $userId]);
+        foreach ($userCampusIds as $userId => $campusIds) {
+            ClearUserPermissionCacheAction::run([
+                'user_id' => (int) $userId,
+                'campus_ids' => $campusIds,
+            ]);
         }
     }
 }

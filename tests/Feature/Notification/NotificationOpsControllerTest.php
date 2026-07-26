@@ -14,7 +14,7 @@ use App\Modules\Notification\Enums\NotificationOutboxStatus;
 use App\Modules\Notification\Models\NotificationDelivery;
 use App\Modules\Notification\Models\NotificationEventOutbox;
 use App\Modules\Notification\Models\NotificationMessage;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -36,17 +36,17 @@ beforeEach(function () {
 
     app()->singleton('campus', fn () => $this->campus);
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')
-        ->andReturnUsing(function ($user, $campusId) {
-            if ($user->id === $this->authorizedUser->id) {
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')
+        ->andReturnUsing(function (int $userId, ?int $campusId) {
+            if ($userId === $this->authorizedUser->id) {
                 return ['view_any_notification'];
             }
 
             return [];
         });
 
-    $this->app->singleton(PermissionService::class, fn () => $permissionService);
+    $this->app->singleton(CampusPermissionReader::class, fn () => $permissionService);
 });
 
 describe('GET /admin/notifications/ops/outbox', function () {

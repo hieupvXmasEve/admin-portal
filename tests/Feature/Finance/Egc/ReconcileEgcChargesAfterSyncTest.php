@@ -25,7 +25,7 @@ use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Queries\Egc\ListEgcRetakeAdjustmentsQuery;
 use App\Modules\Finance\Services\SettlementService;
 use App\Modules\Finance\Support\EgcBlockFinanceResolver;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 use function Pest\Laravel\actingAs;
@@ -162,9 +162,9 @@ function payReconcileLine(Student $student, InvoiceLine $line, int $amount): voi
 function grantEgcReconcilePermissions(array $codes): User
 {
     $user = User::factory()->create();
-    $mock = Mockery::mock(PermissionService::class);
-    $mock->shouldReceive('getUserPermissions')->andReturn($codes);
-    app()->instance(PermissionService::class, $mock);
+    $mock = Mockery::mock(CampusPermissionReader::class);
+    $mock->shouldReceive('permissionCodesForUserId')->andReturn($codes);
+    app()->instance(CampusPermissionReader::class, $mock);
 
     return $user;
 }

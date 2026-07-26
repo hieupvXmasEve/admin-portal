@@ -13,9 +13,9 @@ use App\Models\User;
 use App\Modules\Academic\Progression\Actions\RecordStudentActionAction;
 use App\Modules\Academic\Progression\Exceptions\InvalidProgressionState;
 use App\Modules\Academic\Progression\Models\ProgramEnrollment;
-use App\Services\PermissionService;
 use App\Shared\Contracts\Finance\DTO\StudentLifecycleDeferData;
 use App\Shared\Contracts\Finance\StudentLifecycleFinanceCommand;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia;
 
@@ -50,9 +50,9 @@ beforeEach(function () {
 
 function grantHubLifecyclePermissions(array $permissions): void
 {
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')->andReturn($permissions);
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')->andReturn($permissions);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
 }
 
 it('renders the Lifecycle tab with the merged timeline and egc sub-panel', function () {

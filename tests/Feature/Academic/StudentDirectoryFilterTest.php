@@ -9,7 +9,7 @@ use App\Models\Semester;
 use App\Models\Specialization;
 use App\Models\Student;
 use App\Models\User;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 use function Pest\Laravel\actingAs;
@@ -25,11 +25,11 @@ beforeEach(function () {
     session(['current_campus_id' => $this->campus->id]);
     app()->singleton('campus', fn () => $this->campus);
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')
         ->andReturn(['view_student']);
 
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
 });
 
 it('returns selected student codes in the Inertia filter contract', function () {

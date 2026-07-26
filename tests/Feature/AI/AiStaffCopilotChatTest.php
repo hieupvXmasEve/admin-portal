@@ -14,9 +14,9 @@ use App\Modules\AI\Models\AiMessage;
 use App\Modules\AI\Models\AiProviderSetting;
 use App\Modules\AI\Models\AiRunEvent;
 use App\Modules\AI\Models\AiToolCall;
-use App\Services\PermissionService;
 use App\Shared\Contracts\Academic\AiAcademicMetricReader;
 use App\Shared\Contracts\Finance\AiFinanceMetricReader;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery\MockInterface;
 
@@ -39,18 +39,18 @@ beforeEach(function () {
 
     app()->singleton('campus', fn () => $this->campus);
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')
-        ->andReturnUsing(function (User $user, ?int $campusId = null): array {
-            if ($user->id === $this->authorizedUser->id && $campusId === $this->campus->id) {
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')
+        ->andReturnUsing(function (int $userId, ?int $campusId = null): array {
+            if ($userId === $this->authorizedUser->id && $campusId === $this->campus->id) {
                 return ['view_ai_metrics', 'view_finance_reporting', 'view_academic_report'];
             }
 
             return [];
         });
 
-    app()->forgetInstance(PermissionService::class);
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    app()->forgetInstance(CampusPermissionReader::class);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
 });
 
 it('renders the staff copilot page with prompt and tool capabilities', function () {

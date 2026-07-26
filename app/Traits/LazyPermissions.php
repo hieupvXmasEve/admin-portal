@@ -2,7 +2,7 @@
 
 namespace App\Traits;
 
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 
 trait LazyPermissions
 {
@@ -20,10 +20,10 @@ trait LazyPermissions
 
         if (! isset($this->loadedPermissions[$cacheKey])) {
             if (! $this->permissionService) {
-                $this->permissionService = app(PermissionService::class);
+                $this->permissionService = app(CampusPermissionReader::class);
             }
 
-            $this->loadedPermissions[$cacheKey] = $this->permissionService->getUserPermissions($this, $campusId);
+            $this->loadedPermissions[$cacheKey] = $this->permissionService->permissionCodesForUserId((int) $this->id, $campusId);
         }
 
         return in_array($permission, $this->loadedPermissions[$cacheKey]);

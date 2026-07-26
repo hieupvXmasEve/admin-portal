@@ -1,11 +1,22 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Modules\Identity\Http\Web\Admin\CampusSelectionController;
 use App\Modules\Identity\Http\Web\Admin\LoginController;
 use App\Modules\Identity\Http\Web\Admin\RoleController;
 use App\Modules\Identity\Http\Web\Admin\SocialAuthController;
 use App\Modules\Identity\Http\Web\Admin\UserController;
+use App\Modules\Identity\Http\Web\Auth\ConfirmablePasswordController;
+use App\Modules\Identity\Http\Web\Auth\EmailVerificationNotificationController;
+use App\Modules\Identity\Http\Web\Auth\EmailVerificationPromptController;
+use App\Modules\Identity\Http\Web\Auth\NewPasswordController;
+use App\Modules\Identity\Http\Web\Auth\PasswordResetLinkController;
+use App\Modules\Identity\Http\Web\Auth\VerifyEmailController;
+use App\Modules\Identity\Http\Web\Settings\PasswordController;
+use App\Modules\Identity\Http\Web\Settings\ProfileController;
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
 Route::middleware('web')->group(function () {
     // Guest routes
@@ -15,6 +26,11 @@ Route::middleware('web')->group(function () {
 
         Route::get('login', [LoginController::class, 'create'])->name('login');
         Route::post('login', [LoginController::class, 'store']);
+
+        Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])->name('password.request');
+        Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])->name('password.email');
+        Route::get('reset-password/{token}', [NewPasswordController::class, 'create'])->name('password.reset');
+        Route::post('reset-password', [NewPasswordController::class, 'store'])->name('password.store');
     });
 
     // Auth routes
@@ -43,5 +59,23 @@ Route::middleware('web')->group(function () {
         Route::delete('roles/{role}', [RoleController::class, 'destroy'])->name('roles.destroy')->middleware('can:delete_role');
 
         Route::post('logout', [LoginController::class, 'destroy'])->name('logout');
+
+        Route::get('verify-email', EmailVerificationPromptController::class)->name('verification.notice');
+        Route::get('verify-email/{id}/{hash}', VerifyEmailController::class)
+            ->middleware(['signed', 'throttle:6,1'])
+            ->name('verification.verify');
+        Route::post('email/verification-notification', [EmailVerificationNotificationController::class, 'store'])
+            ->middleware('throttle:6,1')
+            ->name('verification.send');
+        Route::get('confirm-password', [ConfirmablePasswordController::class, 'show'])->name('password.confirm');
+        Route::post('confirm-password', [ConfirmablePasswordController::class, 'store']);
+
+        Route::redirect('settings', '/settings/profile');
+        Route::get('settings/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+        Route::patch('settings/profile', [ProfileController::class, 'update'])->name('profile.update');
+        Route::delete('settings/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+        Route::get('settings/password', [PasswordController::class, 'edit'])->name('password.edit');
+        Route::put('settings/password', [PasswordController::class, 'update'])->name('password.update');
+        Route::get('settings/appearance', fn () => Inertia::render('Settings/Appearance'))->name('appearance');
     });
 });

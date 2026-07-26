@@ -10,7 +10,7 @@ use App\Models\Student;
 use App\Models\User;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Models\BillingAccount;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 use function Pest\Laravel\actingAs;
@@ -30,11 +30,11 @@ beforeEach(function () {
     session(['current_campus_id' => $this->campus->id]);
     app()->singleton('campus', fn () => $this->campus);
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')
         ->andReturn(['view_finance_dng_payment_requests', 'create_finance_payments', 'resolve_finance_dng_receipt_exceptions']);
 
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
 });
 
 function createDngPaymentRequestForStatus(object $context, string $status, ?Campus $campus = null): DngPaymentRequest

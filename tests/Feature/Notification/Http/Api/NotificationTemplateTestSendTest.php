@@ -8,7 +8,7 @@ use App\Models\User;
 use App\Modules\Notification\Jobs\DispatchSingleOutboxEventJob;
 use App\Modules\Notification\Models\NotificationEmailTemplate;
 use App\Modules\Notification\Models\NotificationEventOutbox;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Database\Seeders\InitialSetup\RoleAndPermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
@@ -50,7 +50,7 @@ function makeTestSendSuperAdmin(): User
         'updated_at' => now(),
     ]);
 
-    app(PermissionService::class)->clearUserPermissionsCache($user);
+    app(CampusPermissionReader::class)->forgetPermissionCodesForUserId((int) $user->id);
     RateLimiter::clear('notification-template-test-send:'.$user->id);
 
     return $user;

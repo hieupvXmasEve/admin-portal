@@ -9,7 +9,7 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
 use App\Modules\Finance\Models\FinanceCharge;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -32,11 +32,11 @@ it('shows charges scoped to the selected student', function () {
 
     app()->singleton('campus', fn () => $campus);
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')
         ->andReturnUsing(fn ($user, $campusId) => $user->id === $authorizedUser->id ? ['view_finance_charges'] : []);
 
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
 
     $student = Student::factory()
         ->forCampus($campus)

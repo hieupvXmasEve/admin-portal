@@ -21,7 +21,7 @@ use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\InvoiceGenerationService;
 use App\Modules\Finance\Services\SettlementService;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -50,10 +50,10 @@ beforeEach(function () {
     session(['current_campus_id' => $this->campus->id]);
     app()->singleton('campus', fn () => $this->campus);
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')
         ->andReturn(['create_finance_charges', 'void_finance_charges', 'view_finance_charges']);
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
 });
 
 function createCompletedPayment(Student $student, float $amount): Payment

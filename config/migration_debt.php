@@ -45,7 +45,7 @@ return [
             'reason' => 'Existing service-led runtime paths remain during vertical cutover.',
             'canonical_replacement' => 'Owning module Actions, Queries, or permanent domain support.',
             'retirement_condition' => 'All supported callers are cut over and behavior evidence passes.',
-            'baseline' => 86,
+            'baseline' => 85,
             'mode' => 'max',
         ],
         'frozen_controllers' => [
@@ -53,7 +53,7 @@ return [
             'reason' => 'Existing top-level controllers preserve public web/API contracts during migration.',
             'canonical_replacement' => 'Thin controller under the owning module HTTP boundary.',
             'retirement_condition' => 'Route ownership and all supported callers move to the module controller.',
-            'baseline' => 76,
+            'baseline' => 67,
             'mode' => 'max',
         ],
         'frozen_routes' => [
@@ -61,7 +61,7 @@ return [
             'reason' => 'Existing split route files still serve supported URLs and route names.',
             'canonical_replacement' => 'Owning module routes with a compatibility-preserving mount.',
             'retirement_condition' => 'No supported caller depends on the legacy file and route evidence is green.',
-            'baseline' => 32,
+            'baseline' => 30,
             'mode' => 'max',
         ],
         'shared_model_imports' => [
@@ -69,7 +69,7 @@ return [
             'reason' => 'Module consumers still use transitional shared Eloquent models.',
             'canonical_replacement' => 'Shared Contract, neutral reference, Domain Event, or Read Projection.',
             'retirement_condition' => 'The consumer is cut over and the shared-model read is removed.',
-            'baseline' => 568,
+            'baseline' => 567,
             'mode' => 'max',
         ],
         'cross_context_concrete_imports' => [
@@ -93,7 +93,7 @@ return [
             'reason' => 'Legacy controllers still validate inline during staged extraction.',
             'canonical_replacement' => 'A typed FormRequest owned by the endpoint context.',
             'retirement_condition' => 'The controller delegates validation to the FormRequest.',
-            'baseline' => 77,
+            'baseline' => 71,
             'mode' => 'max',
         ],
         'missing_strict_types' => [
@@ -101,7 +101,7 @@ return [
             'reason' => 'Older application and route PHP files predate the strict-types standard.',
             'canonical_replacement' => 'declare(strict_types=1) at the top of every application PHP file.',
             'retirement_condition' => 'The file is migrated or receives strict types with behavior unchanged.',
-            'baseline' => 178,
+            'baseline' => 165,
             'mode' => 'max',
         ],
         'missing_route_strict_types' => [
@@ -109,7 +109,7 @@ return [
             'reason' => 'Older split route files predate the strict-types standard.',
             'canonical_replacement' => 'declare(strict_types=1) at the top of every application route PHP file.',
             'retirement_condition' => 'The route file is migrated or receives strict types with route behavior unchanged.',
-            'baseline' => 22,
+            'baseline' => 20,
             'mode' => 'max',
         ],
         'legacy_filter_stacks' => [

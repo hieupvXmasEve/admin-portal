@@ -73,15 +73,15 @@ final class MigrationDebtContract
 
     /** @var array<string, int> */
     public const BASELINE_CEILINGS = [
-        'frozen_services' => 86,
-        'frozen_controllers' => 76,
-        'frozen_routes' => 32,
-        'shared_model_imports' => 568,
+        'frozen_services' => 85,
+        'frozen_controllers' => 67,
+        'frozen_routes' => 30,
+        'shared_model_imports' => 567,
         'cross_context_concrete_imports' => 0,
         'direct_json_responses' => 45,
-        'inline_request_validation' => 77,
-        'missing_strict_types' => 178,
-        'missing_route_strict_types' => 22,
+        'inline_request_validation' => 71,
+        'missing_strict_types' => 165,
+        'missing_route_strict_types' => 20,
         'legacy_filter_stacks' => 25,
         'literal_frontend_urls' => 61,
         'legacy_page_directories' => 0,

@@ -13,8 +13,9 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
 use App\Models\User;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 
 use function Pest\Laravel\actingAs;
 
@@ -33,10 +34,10 @@ beforeEach(function () {
     session(['current_campus_id' => $this->campus->id]);
     app()->singleton('campus', fn () => $this->campus);
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')
         ->andReturn(['view_exam_resit', 'manage_exam_schedule', 'schedule_exam_resit', 'complete_exam_resit']);
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
 });
 
 function examSchedSlot(int $capacity = 30): ExamRoomSlot
@@ -63,7 +64,7 @@ function examSchedSession(ExamRoomSlot $slot, Unit $unit, int $expected = 5): Ex
     ]);
 }
 
-function examSchedPost(string $route, array|int $params, array $body): \Illuminate\Testing\TestResponse
+function examSchedPost(string $route, array|int $params, array $body): TestResponse
 {
     return actingAs(test()->user)
         ->withSession(['current_campus_id' => test()->campus->id, '_token' => 'test-token'])

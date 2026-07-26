@@ -6,10 +6,11 @@ namespace App\Modules\Academic\Queries;
 
 use App\Models\Student;
 use App\Modules\Academic\Progression\Queries\FilterStudentsByProgramEnrollmentStatus;
+use App\Shared\Contracts\Academic\StudentDirectoryReader;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 
-class ListStudentsQuery
+class ListStudentsQuery implements StudentDirectoryReader
 {
     /**
      * @param  array<string, mixed>  $filters

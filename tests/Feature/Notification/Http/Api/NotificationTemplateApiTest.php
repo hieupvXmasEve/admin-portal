@@ -7,7 +7,7 @@ use App\Models\Campus;
 use App\Models\Role;
 use App\Models\User;
 use App\Modules\Notification\Models\NotificationEmailTemplate;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Database\Seeders\InitialSetup\RoleAndPermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -26,7 +26,7 @@ beforeEach(function () {
 
     // API admin routes use ['web', 'auth'] middleware. The web stack includes:
     //  - CheckCampusSelected (redirects to campus selection when no campus in session)
-    //  - HandleInertiaRequests (calls PermissionService + app('campus'))
+    //  - HandleInertiaRequests (calls CampusPermissionReader + app('campus'))
     // Seed the campus singleton and session so campus-redirect is bypassed.
     $campus = Campus::factory()->create();
     $this->app->singleton('campus', fn () => $campus);
@@ -60,7 +60,7 @@ function makeApiSuperAdmin(): User
         'updated_at' => now(),
     ]);
 
-    app(PermissionService::class)->clearUserPermissionsCache($user);
+    app(CampusPermissionReader::class)->forgetPermissionCodesForUserId((int) $user->id);
 
     return $user;
 }

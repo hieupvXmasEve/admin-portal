@@ -17,7 +17,7 @@ use App\Modules\Notification\Models\NotificationEmailTemplate;
 use App\Modules\Notification\Models\NotificationEventOutbox;
 use App\Modules\Notification\Models\NotificationMessage;
 use App\Modules\Notification\Support\SmtpEmailTransport;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Database\Seeders\InitialSetup\RoleAndPermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -42,11 +42,11 @@ beforeEach(function () {
         'current_campus_id' => $campus->id,
     ]);
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')->andReturn([
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')->andReturn([
         'test_send_notification_email_template',
     ]);
-    $this->app->singleton(PermissionService::class, fn () => $permissionService);
+    $this->app->singleton(CampusPermissionReader::class, fn () => $permissionService);
 
     RateLimiter::clear('notification-template-test-send');
 });
@@ -264,9 +264,9 @@ it('test-send emits outbox event and delivery pipeline carries pre-rendered draf
 it('non-super-admin receives 403 on test-send outbox path', function () {
     $this->seed(RoleAndPermissionSeeder::class);
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')->andReturn([]);
-    $this->app->instance(PermissionService::class, $permissionService);
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')->andReturn([]);
+    $this->app->instance(CampusPermissionReader::class, $permissionService);
 
     $user = User::factory()->create();
     $template = makeOutboxEmitTemplate(Campus::factory()->create());

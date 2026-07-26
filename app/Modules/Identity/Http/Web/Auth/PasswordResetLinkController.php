@@ -1,8 +1,11 @@
 <?php
 
-namespace App\Http\Controllers\Web\Auth;
+declare(strict_types=1);
+
+namespace App\Modules\Identity\Http\Web\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Identity\Http\Requests\Identity\PasswordResetLinkRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
@@ -27,14 +30,10 @@ class PasswordResetLinkController extends Controller
      *
      * @throws ValidationException
      */
-    public function store(Request $request): RedirectResponse
+    public function store(PasswordResetLinkRequest $request): RedirectResponse
     {
-        $request->validate([
-            'email' => 'required|email',
-        ]);
-
         Password::sendResetLink(
-            $request->only('email')
+            $request->validated()
         );
 
         return back()->with('status', __('A reset link will be sent if the account exists.'));

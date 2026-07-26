@@ -8,7 +8,7 @@ use App\Models\Campus;
 use App\Models\StudentApplication;
 use App\Models\User;
 use App\Services\ApplicationDocumentTypeSyncService;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use App\Shared\Support\Enums\UserType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -27,9 +27,9 @@ beforeEach(function () {
     $campus = Campus::factory()->create();
     $this->campus = $campus;
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')->andReturn(DOC_PERMISSIONS);
-    $this->app->singleton(PermissionService::class, fn () => $permissionService);
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')->andReturn(DOC_PERMISSIONS);
+    $this->app->singleton(CampusPermissionReader::class, fn () => $permissionService);
 
     $this->app->singleton('campus', fn () => $campus);
     session(['current_campus_id' => $campus->id]);

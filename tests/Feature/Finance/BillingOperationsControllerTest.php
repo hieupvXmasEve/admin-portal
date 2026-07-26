@@ -15,7 +15,7 @@ use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Models\StudentInvoice;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -38,11 +38,11 @@ it('shows all invoice statuses and finance totals for a student row on the billi
 
     app()->singleton('campus', fn () => $campus);
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')
         ->andReturnUsing(fn ($user, $campusId) => $user->id === $authorizedUser->id ? ['view_finance_operations_dashboard'] : []);
 
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
 
     $student = Student::factory()
         ->forCampus($campus)
@@ -191,11 +191,11 @@ it('keeps a student row when any semester invoice matches the selected status fi
 
     app()->singleton('campus', fn () => $campus);
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')
         ->andReturnUsing(fn ($user, $campusId) => $user->id === $authorizedUser->id ? ['view_finance_operations_dashboard'] : []);
 
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
 
     $student = Student::factory()
         ->forCampus($campus)
@@ -312,10 +312,10 @@ it('sorts dashboard students globally by gross billed before pagination', functi
     session(['current_campus_id' => $campus->id]);
     app()->singleton('campus', fn () => $campus);
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')
         ->andReturnUsing(fn ($user, $campusId) => $user->id === $authorizedUser->id ? ['view_finance_operations_dashboard'] : []);
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
 
     $studentA = Student::factory()->forCampus($campus)->forProgram($program)->state([
         'student_id' => 'AUH-A',

@@ -13,8 +13,8 @@ use App\Models\User;
 use App\Modules\Academic\Progression\Models\ProgramEnrollment;
 use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\FinanceCharge;
-use App\Services\PermissionService;
 use App\Shared\Contracts\Academic\ProgramEnrollmentWriter;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use App\Shared\Contracts\Identity\GuardianAccessGrantWriter;
 use App\Shared\Contracts\Identity\StudentAccessWriter;
 use App\Shared\Support\Enums\UserType;
@@ -30,7 +30,7 @@ const SA_CSRF = 'student-application-test-csrf';
 /**
  * The lifecycle permissions a staff member needs for the staff seam. Approve and
  * reject are gated by the campus-scoped StudentApplicationPolicy (slice 03), so
- * the mocked PermissionService grants those codes here; campus-scoping itself is
+ * the mocked CampusPermissionReader grants those codes here; campus-scoping itself is
  * exercised against the real service in AuthorizationTest.
  */
 const SA_PERMISSIONS = [
@@ -53,10 +53,10 @@ beforeEach(function () {
     $this->campus = $campus;
 
     // HandleInertiaRequests::share() and the permission Gate both resolve
-    // PermissionService — return the lifecycle permissions for any user.
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')->andReturn(SA_PERMISSIONS);
-    $this->app->singleton(PermissionService::class, fn () => $permissionService);
+    // CampusPermissionReader — return the lifecycle permissions for any user.
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')->andReturn(SA_PERMISSIONS);
+    $this->app->singleton(CampusPermissionReader::class, fn () => $permissionService);
 
     $this->app->singleton('campus', fn () => $campus);
     session([

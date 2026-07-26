@@ -12,6 +12,7 @@ use App\Modules\Identity\Actions\LecturerGoogleLoginAction;
 use App\Modules\Identity\Actions\LecturerLoginAction;
 use App\Modules\Identity\Actions\LecturerLogoutAction;
 use App\Modules\Identity\Actions\LecturerRefreshTokenAction;
+use App\Modules\Identity\Http\Requests\Identity\CheckScienceRequest;
 use App\Modules\Identity\Http\Requests\Identity\GoogleLoginRequest;
 use App\Modules\Identity\Http\Requests\Identity\LecturerLoginRequest;
 use App\Modules\Identity\Http\Requests\Identity\LecturerRefreshRequest;
@@ -172,17 +173,12 @@ class LecturerAuthController extends Controller
     /**
      * Check if lecturer is Science
      */
-    public function checkScience(Request $request): JsonResponse
+    public function checkScience(CheckScienceRequest $request): JsonResponse
     {
-        $request->validate([
-            'email' => 'required|email',
-            'employee_id' => 'required|string',
-        ]);
-
         try {
             $data = CheckScienceStatusAction::run(
-                $request->input('email'),
-                $request->input('employee_id')
+                $request->validated('email'),
+                $request->validated('employee_id')
             );
 
             return ApiResponse::success(

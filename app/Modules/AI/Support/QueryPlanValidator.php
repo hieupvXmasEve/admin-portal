@@ -6,15 +6,15 @@ namespace App\Modules\AI\Support;
 
 use App\Models\Campus;
 use App\Models\User;
-use App\Services\PermissionService;
 use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use App\Shared\Contracts\Academic\DTO\AcademicPeriodReference;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 
 class QueryPlanValidator
 {
     public function __construct(
         private readonly MetricCatalog $catalog,
-        private readonly PermissionService $permissionService,
+        private readonly CampusPermissionReader $permissionReader,
         private readonly AcademicPeriodReader $academicPeriods,
     ) {}
 
@@ -53,7 +53,7 @@ class QueryPlanValidator
         $domainPermission = isset($metric['required_domain_permission'])
             ? (string) $metric['required_domain_permission']
             : null;
-        $permissions = $this->permissionService->getUserPermissions($actor, $campusId);
+        $permissions = $this->permissionReader->permissionCodesForUserId((int) $actor->id, $campusId);
 
         if (! in_array($permission, $permissions, true)) {
             return $this->deny($plan, 'denied', $campusScopeSnapshot, 'forbidden_by_permission', $metric, [

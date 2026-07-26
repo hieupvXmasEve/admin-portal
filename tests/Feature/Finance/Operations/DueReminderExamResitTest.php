@@ -12,7 +12,7 @@ use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Queries\Operations\ListDueItemsQuery;
 use App\Modules\Finance\Queries\Operations\ListExamResitHandoffQuery;
 use App\Modules\Notification\Models\NotificationEmailTemplate;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 use function Pest\Laravel\actingAs;
@@ -177,9 +177,9 @@ it('does not touch the attempt timestamp when the row is skipped for missing ema
 });
 
 it('renders the Due Reminders page with PTL rows and the handoff list', function () {
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')->andReturn(['view_finance_operations_due_calendar']);
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')->andReturn(['view_finance_operations_due_calendar']);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
 
     $student = dueExamStudent($this, 'PTL004');
     $attempt = makeApprovedExamResitAttempt($student, $this->campus, $this->semester);

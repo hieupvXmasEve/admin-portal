@@ -40,13 +40,13 @@ class DashboardController extends Controller
             Log::info('Dashboard request details', [
                 'semester_id' => $semesterId,
                 'active_semester_found' => $currentPeriod !== null,
-                'lecturer_id' => $lecturer->id,
+                'lecturer_id' => $lecturer->lecturerId(),
             ]);
 
             // Handle case when no active semester exists and no semester_id provided
             if (! $semesterId) {
                 Log::warning('No active semester found and no semester_id provided for lecturer dashboard', [
-                    'lecturer_id' => $lecturer->id,
+                    'lecturer_id' => $lecturer->lecturerId(),
                 ]);
 
                 return ApiResponse::success(
@@ -71,7 +71,7 @@ class DashboardController extends Controller
         } catch (\Exception $e) {
             Log::error('Dashboard data retrieval failed', [
                 'error' => $e->getMessage(),
-                'lecturer_id' => $lecturer->id,
+                'lecturer_id' => $lecturer->lecturerId(),
                 'stack_trace' => $e->getTraceAsString(),
             ]);
 
@@ -95,7 +95,7 @@ class DashboardController extends Controller
             if (! $semester) {
                 Log::info('No semester found for teaching summary', [
                     'requested_semester_id' => $semesterId,
-                    'lecturer_id' => $lecturer->id,
+                    'lecturer_id' => $lecturer->lecturerId(),
                 ]);
 
                 return ApiResponse::success(
@@ -113,7 +113,7 @@ class DashboardController extends Controller
         } catch (\Exception $e) {
             Log::error('Teaching summary retrieval failed', [
                 'error' => $e->getMessage(),
-                'lecturer_id' => $lecturer->id,
+                'lecturer_id' => $lecturer->lecturerId(),
             ]);
 
             return ApiResponse::serverError('Failed to retrieve teaching summary');
@@ -136,7 +136,7 @@ class DashboardController extends Controller
             if (! $semester) {
                 Log::info('No semester found for attendance overview', [
                     'requested_semester_id' => $semesterId,
-                    'lecturer_id' => $lecturer->id,
+                    'lecturer_id' => $lecturer->lecturerId(),
                 ]);
 
                 return ApiResponse::success(
@@ -154,7 +154,7 @@ class DashboardController extends Controller
         } catch (\Exception $e) {
             Log::error('Attendance overview retrieval failed', [
                 'error' => $e->getMessage(),
-                'lecturer_id' => $lecturer->id,
+                'lecturer_id' => $lecturer->lecturerId(),
             ]);
 
             return ApiResponse::serverError('Failed to retrieve attendance overview');
@@ -177,7 +177,7 @@ class DashboardController extends Controller
             if (! $semester) {
                 Log::info('No semester found for student alerts', [
                     'requested_semester_id' => $semesterId,
-                    'lecturer_id' => $lecturer->id,
+                    'lecturer_id' => $lecturer->lecturerId(),
                 ]);
 
                 return ApiResponse::success(
@@ -195,7 +195,7 @@ class DashboardController extends Controller
         } catch (\Exception $e) {
             Log::error('Student alerts retrieval failed', [
                 'error' => $e->getMessage(),
-                'lecturer_id' => $lecturer->id,
+                'lecturer_id' => $lecturer->lecturerId(),
             ]);
 
             return ApiResponse::serverError('Failed to retrieve student alerts');

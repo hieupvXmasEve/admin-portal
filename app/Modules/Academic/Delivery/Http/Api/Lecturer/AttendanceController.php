@@ -36,7 +36,7 @@ class AttendanceController extends Controller
 
         try {
             $filters = $request->validated();
-            $sessions = $query->handle('sessions', $lecturer->id, $filters, (int) ($filters['per_page'] ?? 15));
+            $sessions = $query->handle('sessions', $lecturer->lecturerId(), $filters, (int) ($filters['per_page'] ?? 15));
 
             return ApiResponse::paginated(
                 $sessions->through(fn ($session) => new AttendanceSessionResource($session)),
@@ -56,7 +56,7 @@ class AttendanceController extends Controller
         $lecturer = $request->user();
 
         try {
-            $sessions = $query->handle('sessions', $lecturer->id, ['attendance_status' => 'unmarked'], 20);
+            $sessions = $query->handle('sessions', $lecturer->lecturerId(), ['attendance_status' => 'unmarked'], 20);
 
             return ApiResponse::success(
                 AttendanceSessionResource::collection($sessions->items()),
@@ -76,7 +76,7 @@ class AttendanceController extends Controller
         /** @var Lecture $lecturer */
         $lecturer = $request->user();
         try {
-            $attendanceData = $query->handle('session', $lecturer->id, $sessionId);
+            $attendanceData = $query->handle('session', $lecturer->lecturerId(), $sessionId);
 
             // Log::debug('attendanceData', ['attendanceData' => $attendanceData]);
             if (! $attendanceData) {
@@ -106,7 +106,7 @@ class AttendanceController extends Controller
         try {
             $result = MarkLecturerAttendanceAction::run([
                 ...$request->validated(),
-                'lecturer_id' => $lecturer->id,
+                'lecturer_id' => $lecturer->lecturerId(),
                 'session_id' => $sessionId,
             ]);
 
@@ -145,7 +145,7 @@ class AttendanceController extends Controller
             return ApiResponse::success(
                 BulkMarkLecturerAttendanceAction::run([
                     ...$request->validated(),
-                    'lecturer_id' => $lecturer->id,
+                    'lecturer_id' => $lecturer->lecturerId(),
                 ]),
                 [],
                 'Bulk attendance marking completed'
@@ -164,7 +164,7 @@ class AttendanceController extends Controller
         $lecturer = $request->user();
 
         try {
-            $analytics = $query->handle('analytics', $lecturer->id, $courseOfferingId, $request->validated());
+            $analytics = $query->handle('analytics', $lecturer->lecturerId(), $courseOfferingId, $request->validated());
 
             return ApiResponse::success(
                 $analytics,
@@ -189,7 +189,7 @@ class AttendanceController extends Controller
         $lecturer = $request->user();
 
         try {
-            $alerts = $query->handle('alerts', $lecturer->id, $request->validated());
+            $alerts = $query->handle('alerts', $lecturer->lecturerId(), $request->validated());
 
             return ApiResponse::success(
                 $alerts,
@@ -212,7 +212,7 @@ class AttendanceController extends Controller
         try {
             $format = $request->validated('format', 'csv');
 
-            $exportData = $query->handle('export', $lecturer->id, $courseOfferingId, $format, $lecturer->full_name);
+            $exportData = $query->handle('export', $lecturer->lecturerId(), $courseOfferingId, $format, $lecturer->lecturerDisplayName());
 
             return ApiResponse::success(
                 $exportData,
@@ -237,7 +237,7 @@ class AttendanceController extends Controller
         $lecturer = $request->user();
 
         try {
-            $result = GenerateLecturerAttendanceRecordsAction::run(['lecturer_id' => $lecturer->id, 'session_id' => $session]);
+            $result = GenerateLecturerAttendanceRecordsAction::run(['lecturer_id' => $lecturer->lecturerId(), 'session_id' => $session]);
 
             return ApiResponse::success(
                 $result,
@@ -263,7 +263,7 @@ class AttendanceController extends Controller
 
         try {
             return ApiResponse::success(
-                $query->handle($lecturer->id, $request->validated()),
+                $query->handle($lecturer->lecturerId(), $request->validated()),
                 [],
                 'Attendance summary retrieved successfully'
             );

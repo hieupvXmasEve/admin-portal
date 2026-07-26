@@ -10,11 +10,11 @@ use App\Modules\Finance\Actions\CreateManualFeeDebitAction;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
-use App\Services\PermissionService;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
 use App\Shared\Contracts\Finance\Enums\FinancialEffect;
 use App\Shared\Contracts\Finance\Exceptions\InvalidFinanceIntakePayload;
 use App\Shared\Contracts\Finance\FinanceIntakeContract;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -36,12 +36,12 @@ beforeEach(function (): void {
     session(['current_campus_id' => $this->campus->id, '_token' => 'manual-fee-csrf']);
     app()->singleton('campus', fn () => $this->campus);
 
-    $mock = Mockery::mock(PermissionService::class);
-    $mock->shouldReceive('getUserPermissions')->andReturn([
+    $mock = Mockery::mock(CampusPermissionReader::class);
+    $mock->shouldReceive('permissionCodesForUserId')->andReturn([
         'create_finance_charges',
         'view_finance_charges',
     ]);
-    app()->instance(PermissionService::class, $mock);
+    app()->instance(CampusPermissionReader::class, $mock);
 
     // Catalog rule for retake — used by pricing-rule failure test.
     DB::table('finance_pricing_catalog_items')->insert([

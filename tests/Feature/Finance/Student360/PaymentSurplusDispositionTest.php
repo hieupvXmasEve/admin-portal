@@ -11,7 +11,7 @@ use App\Models\User;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\PaymentSurplusDisposition;
 use App\Modules\Finance\Queries\Student360\GetStudentFinancePaymentHistoryQuery;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -21,9 +21,9 @@ uses(RefreshDatabase::class);
 function surplusDispositionUser(array $permissions): User
 {
     $user = User::factory()->create();
-    $mock = Mockery::mock(PermissionService::class);
-    $mock->shouldReceive('getUserPermissions')->andReturn($permissions);
-    app()->singleton(PermissionService::class, fn () => $mock);
+    $mock = Mockery::mock(CampusPermissionReader::class);
+    $mock->shouldReceive('permissionCodesForUserId')->andReturn($permissions);
+    app()->singleton(CampusPermissionReader::class, fn () => $mock);
 
     return $user;
 }

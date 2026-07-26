@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Http\Middleware;
 
 use App\Modules\Platform\Queries\GetSystemBrandingQuery;
-use App\Services\PermissionService;
 use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use App\Shared\Contracts\Academic\DTO\AcademicPeriodReference;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use App\Support\SemesterContextResolver;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
@@ -59,11 +59,11 @@ class HandleInertiaRequests extends Middleware
                     return null;
                 }
 
-                $permissionService = app(PermissionService::class);
+                $permissionReader = app(CampusPermissionReader::class);
 
                 return [
                     'user' => $user->only('id', 'name', 'email'),
-                    'permissions' => $permissionService->getUserPermissions($user, $currentCampusId),
+                    'permissions' => $permissionReader->permissionCodesForUserId((int) $user->id, $currentCampusId),
                     'current_campus_id' => $currentCampusId,
                     'current_campus' => $currentCampusId ? app('campus') : null,
                 ];
@@ -73,7 +73,7 @@ class HandleInertiaRequests extends Middleware
                     return null;
                 }
 
-                $permissions = app(PermissionService::class)->getUserPermissions($user, $currentCampusId);
+                $permissions = app(CampusPermissionReader::class)->permissionCodesForUserId((int) $user->id, $currentCampusId);
                 $semesterContextPerms = [
                     'view_finance_student_overview',
                     'view_finance_audit_workspace',

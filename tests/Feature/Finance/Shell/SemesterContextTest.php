@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Models\Campus;
 use App\Models\Semester;
 use App\Models\User;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use App\Support\SemesterContextResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -17,9 +17,9 @@ if (! function_exists('grantFinanceShell')) {
     function grantFinanceShell(array $codes): User
     {
         $user = User::factory()->create();
-        $mock = Mockery::mock(PermissionService::class);
-        $mock->shouldReceive('getUserPermissions')->andReturn($codes);
-        app()->singleton(PermissionService::class, fn () => $mock);
+        $mock = Mockery::mock(CampusPermissionReader::class);
+        $mock->shouldReceive('permissionCodesForUserId')->andReturn($codes);
+        app()->singleton(CampusPermissionReader::class, fn () => $mock);
 
         return $user;
     }

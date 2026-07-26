@@ -12,8 +12,8 @@ use App\Modules\AI\Models\AiMessage;
 use App\Modules\AI\Models\AiRunEvent;
 use App\Modules\AI\Models\AiToolCall;
 use App\Modules\AI\Support\StaffCopilotSseRuntime;
-use App\Services\PermissionService;
 use App\Shared\Contracts\Finance\AiFinanceMetricReader;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery\MockInterface;
 
@@ -37,11 +37,11 @@ beforeEach(function () {
 
     app()->singleton('campus', fn () => $this->campus);
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')
-        ->andReturnUsing(function (User $user, ?int $campusId = null): array {
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')
+        ->andReturnUsing(function (int $userId, ?int $campusId = null): array {
             if (
-                in_array($user->id, [$this->authorizedUser->id, $this->authorizedPeer->id], true)
+                in_array($userId, [$this->authorizedUser->id, $this->authorizedPeer->id], true)
                 && $campusId === $this->campus->id
             ) {
                 return ['view_ai_metrics', 'view_finance_reporting', 'view_academic_report'];
@@ -50,8 +50,8 @@ beforeEach(function () {
             return [];
         });
 
-    app()->forgetInstance(PermissionService::class);
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    app()->forgetInstance(CampusPermissionReader::class);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
 });
 
 it('queues a durable staff copilot run with placeholder state before provider execution', function () {
@@ -336,18 +336,18 @@ it('rejects an invalid cursor with a stable safe error response before executing
 });
 
 it('records permission-denied terminal evidence without executing source reads', function () {
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')
-        ->andReturnUsing(function (User $user, ?int $campusId = null): array {
-            if ($user->id === $this->authorizedUser->id && $campusId === $this->campus->id) {
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')
+        ->andReturnUsing(function (int $userId, ?int $campusId = null): array {
+            if ($userId === $this->authorizedUser->id && $campusId === $this->campus->id) {
                 return ['view_ai_metrics'];
             }
 
             return [];
         });
 
-    app()->forgetInstance(PermissionService::class);
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    app()->forgetInstance(CampusPermissionReader::class);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
 
     $this->actingAs($this->authorizedUser)
         ->withHeader('X-CSRF-TOKEN', 'ai-sse-runtime-test-token')
@@ -441,11 +441,11 @@ it('does not recover a staff copilot active run from the wrong campus scope', fu
 
     $run = AiChatRun::query()->firstOrFail();
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')
-        ->andReturnUsing(function (User $user, ?int $campusId = null) use ($otherCampus): array {
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')
+        ->andReturnUsing(function (int $userId, ?int $campusId = null) use ($otherCampus): array {
             if (
-                $user->id === $this->authorizedUser->id
+                $userId === $this->authorizedUser->id
                 && in_array($campusId, [$this->campus->id, $otherCampus->id], true)
             ) {
                 return ['view_ai_metrics', 'view_finance_reporting', 'view_academic_report'];
@@ -454,8 +454,8 @@ it('does not recover a staff copilot active run from the wrong campus scope', fu
             return [];
         });
 
-    app()->forgetInstance(PermissionService::class);
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    app()->forgetInstance(CampusPermissionReader::class);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
     app()->forgetInstance('campus');
     app()->singleton('campus', fn () => $otherCampus);
 
@@ -899,11 +899,11 @@ it('denies retry to another staff user, wrong-campus session, and staff without 
         ->post(route('ai.copilot.runs.retry', $run))
         ->assertForbidden();
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')
-        ->andReturnUsing(function (User $user, ?int $campusId = null) use ($otherCampus): array {
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')
+        ->andReturnUsing(function (int $userId, ?int $campusId = null) use ($otherCampus): array {
             if (
-                $user->id === $this->authorizedUser->id
+                $userId === $this->authorizedUser->id
                 && in_array($campusId, [$this->campus->id, $otherCampus->id], true)
             ) {
                 return ['view_ai_metrics', 'view_finance_reporting', 'view_academic_report'];
@@ -912,8 +912,8 @@ it('denies retry to another staff user, wrong-campus session, and staff without 
             return [];
         });
 
-    app()->forgetInstance(PermissionService::class);
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    app()->forgetInstance(CampusPermissionReader::class);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
     app()->forgetInstance('campus');
     app()->singleton('campus', fn () => $otherCampus);
 

@@ -15,7 +15,7 @@ use App\Models\Unit;
 use App\Models\User;
 use App\Modules\Academic\Progression\Models\TranscriptEntry;
 use App\Modules\Academic\Progression\Queries\GetStudentGraduationProgressQuery;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 use function Pest\Laravel\actingAs;
@@ -299,9 +299,9 @@ function actAsGraduationUser(array $permissions): User
     session(['current_campus_id' => $campus->id]);
     app()->singleton('campus', fn () => $campus);
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')->andReturn($permissions);
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')->andReturn($permissions);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
 
     return $user;
 }

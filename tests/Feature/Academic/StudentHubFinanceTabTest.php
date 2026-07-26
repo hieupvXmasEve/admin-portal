@@ -8,7 +8,7 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentWallet;
 use App\Models\User;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 use function Pest\Laravel\actingAs;
@@ -54,9 +54,9 @@ function actAsFinanceTabUser(array $permissions): User
     session(['current_campus_id' => $campus->id]);
     app()->singleton('campus', fn () => $campus);
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')->andReturn($permissions);
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')->andReturn($permissions);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
 
     return $user;
 }

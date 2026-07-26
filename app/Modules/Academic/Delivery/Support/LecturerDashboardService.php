@@ -21,12 +21,12 @@ class LecturerDashboardService
     public function getDashboardData(Lecture $lecturer, ?int $semesterId = null): array
     {
         $semester = $semesterId ? Semester::find($semesterId) : $this->currentSemester();
-        $cacheKey = "lecturer-dashboard:{$lecturer->id}:{$semester?->id}";
+        $cacheKey = "lecturer-dashboard:{$lecturer->lecturerId()}:{$semester?->id}";
 
         // If no semester is found, return empty data structure
         if (! $semester) {
             Log::info('No semester found for lecturer dashboard', [
-                'lecturer_id' => $lecturer->id,
+                'lecturer_id' => $lecturer->lecturerId(),
                 'requested_semester_id' => $semesterId,
             ]);
 
@@ -73,7 +73,7 @@ class LecturerDashboardService
         // If no semester provided, return empty structure
         if (! $semester) {
             Log::info('No semester provided for teaching summary', [
-                'lecturer_id' => $lecturer->id,
+                'lecturer_id' => $lecturer->lecturerId(),
             ]);
 
             return $this->getEmptyTeachingSummary();
@@ -82,9 +82,9 @@ class LecturerDashboardService
         // Use class session based logic instead of direct course offering relationship
         $query = CourseOffering::query()
             ->whereHas('classSessions', function ($sessionQuery) use ($lecturer) {
-                $sessionQuery->where('lecture_id', $lecturer->id);
+                $sessionQuery->where('lecture_id', $lecturer->lecturerId());
             })
-            ->where('campus_id', $lecturer->campus_id)
+            ->where('campus_id', $lecturer->lecturerCampusId())
             ->where('is_active', true)
             ->where('semester_id', $semester->id);
 
@@ -92,7 +92,7 @@ class LecturerDashboardService
             'unit',
             'classRosterRegistrations',
             'classSessions' => function ($q) use ($lecturer) {
-                $q->where('lecture_id', $lecturer->id);
+                $q->where('lecture_id', $lecturer->lecturerId());
             },
         ])->get();
         Log::info('$courseOfferings', [
@@ -137,13 +137,14 @@ class LecturerDashboardService
         // If no semester provided, return empty structure
         if (! $semester) {
             Log::info('No semester provided for attendance overview', [
-                'lecturer_id' => $lecturer->id,
+                'lecturer_id' => $lecturer->lecturerId(),
             ]);
 
             return $this->getEmptyAttendanceOverview();
         }
 
-        $sessionsQuery = $lecturer->classSessions()
+        $sessionsQuery = ClassSession::query()
+            ->where('lecture_id', $lecturer->lecturerId())
             ->with(['courseOffering.unit', 'courseOffering.classRosterRegistrations', 'attendances'])
             ->whereHas('courseOffering', function ($query) use ($semester) {
                 $query->where('semester_id', $semester->id);
@@ -195,7 +196,7 @@ class LecturerDashboardService
         // If no semester provided, return empty structure
         if (! $semester) {
             Log::info('No semester provided for student alerts', [
-                'lecturer_id' => $lecturer->id,
+                'lecturer_id' => $lecturer->lecturerId(),
             ]);
 
             return $this->getEmptyStudentAlerts();
@@ -226,7 +227,8 @@ class LecturerDashboardService
         $now = now();
         $today = $now->toDateString();
 
-        $sessions = $lecturer->classSessions()
+        $sessions = ClassSession::query()
+            ->where('lecture_id', $lecturer->lecturerId())
             ->with(['courseOffering.unit', 'courseOffering.classRosterRegistrations', 'room'])
             ->where(function ($query) use ($today) {
                 $query->where('session_date', '>', $today) // Future dates
@@ -270,7 +272,8 @@ class LecturerDashboardService
     {
         // This would typically come from an activity log table
         // For now, we'll use recent sessions and attendance marking
-        $recentSessions = $lecturer->classSessions()
+        $recentSessions = ClassSession::query()
+            ->where('lecture_id', $lecturer->lecturerId())
             ->with(['courseOffering.unit', 'courseOffering.classRosterRegistrations', 'attendances'])
             ->where('session_date', '>=', now()->subDays(7))
             ->where('status', 'completed')
@@ -295,7 +298,8 @@ class LecturerDashboardService
      */
     protected function getSessionsRequiringAttention(Lecture $lecturer, ?Semester $semester): array
     {
-        $query = $lecturer->classSessions()
+        $query = ClassSession::query()
+            ->where('lecture_id', $lecturer->lecturerId())
             ->with(['courseOffering.unit', 'courseOffering.classRosterRegistrations', 'attendances'])
             ->where('session_date', '<', now()->subHours(2))
             ->where('status', 'completed');

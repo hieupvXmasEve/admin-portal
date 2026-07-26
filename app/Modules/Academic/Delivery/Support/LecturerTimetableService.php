@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Delivery\Support;
 
 use App\Models\ClassSession;
+use App\Models\CourseOffering;
 use App\Models\Room;
+use App\Shared\Contracts\Identity\LecturerTeachingActor as Lecture;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use App\Shared\Contracts\Identity\LecturerTeachingActor as Lecture;
 
 class LecturerTimetableService
 {
@@ -35,7 +36,7 @@ class LecturerTimetableService
 
         $view = $filters['view'] ?? 'week'; // week, month, day
 
-        $cacheKey = "lecturer-timetable:{$lecturer->id}:{$startDate->format('Y-m-d')}:{$endDate->format('Y-m-d')}:{$view}";
+        $cacheKey = "lecturer-timetable:{$lecturer->lecturerId()}:{$startDate->format('Y-m-d')}:{$endDate->format('Y-m-d')}:{$view}";
 
         // return Cache::remember($cacheKey, 300, function () use ($lecturer, $startDate, $endDate, $view) {
         $sessions = $this->getSessionsInPeriod($lecturer, $startDate, $endDate);
@@ -70,11 +71,12 @@ class LecturerTimetableService
             ? Carbon::parse($filters['end'])
             : now()->endOfMonth();
 
-        $cacheKey = "lecturer-schedule:{$lecturer->id}:{$startDate->format('Y-m-d')}:{$endDate->format('Y-m-d')}";
+        $cacheKey = "lecturer-schedule:{$lecturer->lecturerId()}:{$startDate->format('Y-m-d')}:{$endDate->format('Y-m-d')}";
 
         // return Cache::remember($cacheKey, 300, function () use ($lecturer, $startDate, $endDate, $filters) {
         // Get sessions in the specified period
-        $query = $lecturer->classSessions()
+        $query = ClassSession::query()
+            ->where('lecture_id', $lecturer->lecturerId())
             ->with(['courseOffering.unit', 'courseOffering.classRosterRegistrations', 'room.building', 'attendances'])
             ->whereBetween('session_date', [$startDate, $endDate]);
 
@@ -118,7 +120,8 @@ class LecturerTimetableService
     ): array {
         $endDate = now()->addDays($days);
 
-        $sessions = $lecturer->classSessions()
+        $sessions = ClassSession::query()
+            ->where('lecture_id', $lecturer->lecturerId())
             ->with(['courseOffering.unit', 'courseOffering.classRosterRegistrations', 'room', 'attendances'])
             ->where('session_date', '>=', now())
             ->where('session_date', '<=', $endDate)
@@ -142,7 +145,8 @@ class LecturerTimetableService
     ): array {
         return DB::transaction(function () use ($lecturer, $sessionData) {
             // Validate lecturer has access to the course
-            $courseOffering = $lecturer->courseOfferings()
+            $courseOffering = CourseOffering::query()
+                ->where('lecture_id', $lecturer->lecturerId())
                 ->where('id', $sessionData['course_offering_id'])
                 ->first();
 
@@ -166,7 +170,7 @@ class LecturerTimetableService
             // Create the session
             $session = ClassSession::create([
                 'course_offering_id' => $sessionData['course_offering_id'],
-                'lecture_id' => $lecturer->id,
+                'lecture_id' => $lecturer->lecturerId(),
                 'session_title' => $sessionData['session_title'],
                 'session_description' => $sessionData['session_description'] ?? null,
                 'session_date' => $sessionData['session_date'],
@@ -206,7 +210,8 @@ class LecturerTimetableService
         array $updateData
     ): array {
         return DB::transaction(function () use ($lecturer, $sessionId, $updateData) {
-            $session = $lecturer->classSessions()
+            $session = ClassSession::query()
+                ->where('lecture_id', $lecturer->lecturerId())
                 ->where('id', $sessionId)
                 ->first();
 
@@ -264,7 +269,8 @@ class LecturerTimetableService
         ?string $reason = null
     ): array {
         return DB::transaction(function () use ($lecturer, $sessionId, $reason) {
-            $session = $lecturer->classSessions()
+            $session = ClassSession::query()
+                ->where('lecture_id', $lecturer->lecturerId())
                 ->where('id', $sessionId)
                 ->first();
 
@@ -351,7 +357,8 @@ class LecturerTimetableService
         Carbon $startDate,
         Carbon $endDate
     ): Collection {
-        return $lecturer->classSessions()
+        return ClassSession::query()
+            ->where('lecture_id', $lecturer->lecturerId())
             ->with(['courseOffering.unit', 'courseOffering.classRosterRegistrations', 'room', 'attendances'])
             ->whereBetween('session_date', [$startDate, $endDate])
             ->orderBy('session_date')
@@ -510,7 +517,8 @@ class LecturerTimetableService
         $conflicts = [];
 
         // Check lecturer conflicts
-        $lecturerConflicts = $lecturer->classSessions()
+        $lecturerConflicts = ClassSession::query()
+            ->where('lecture_id', $lecturer->lecturerId())
             ->where('session_date', $date)
             ->where('status', '!=', 'cancelled')
             ->when($excludeSessionId, function ($query, $excludeSessionId) {
@@ -727,8 +735,8 @@ class LecturerTimetableService
      */
     protected function clearTimetableCaches(Lecture $lecturer): void
     {
-        Cache::forget("lecturer-dashboard:{$lecturer->id}:*");
-        Cache::tags(['lecturer-schedule', "lecturer-{$lecturer->id}"])->flush();
+        Cache::forget("lecturer-dashboard:{$lecturer->lecturerId()}:*");
+        Cache::tags(['lecturer-schedule', "lecturer-{$lecturer->lecturerId()}"])->flush();
         // Clear other relevant caches
     }
 }

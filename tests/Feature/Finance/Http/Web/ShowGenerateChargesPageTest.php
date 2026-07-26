@@ -6,7 +6,7 @@ use App\Models\Campus;
 use App\Models\Semester;
 use App\Models\User;
 use App\Modules\Finance\Enums\NonAcademicChargeTypeEnum;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -19,12 +19,12 @@ function makeGenerateChargesUser(Campus $campus): User
 {
     $user = User::factory()->create();
 
-    $mock = Mockery::mock(PermissionService::class);
-    $mock->shouldReceive('getUserPermissions')
+    $mock = Mockery::mock(CampusPermissionReader::class);
+    $mock->shouldReceive('permissionCodesForUserId')
         ->andReturn(['view_finance_operations_generate_charges']);
-    app()->instance(PermissionService::class, $mock);
+    app()->instance(CampusPermissionReader::class, $mock);
 
-    // PermissionServiceProvider Gate check reads session('current_campus_id').
+    // CampusPermissionReaderProvider Gate check reads session('current_campus_id').
     session(['current_campus_id' => $campus->id]);
 
     return $user;
@@ -35,9 +35,9 @@ function makeGenerateChargesUser(Campus $campus): User
 // ---------------------------------------------------------------------------
 
 it('renders Finance/Operations/GenerateCharges with feeTypes semesters and currentCampus props', function () {
-    $campus   = Campus::factory()->create(['name' => 'Test Campus']);
+    $campus = Campus::factory()->create(['name' => 'Test Campus']);
     $semester = Semester::factory()->active()->create(['name' => 'HK1 2025']);
-    $user     = makeGenerateChargesUser($campus);
+    $user = makeGenerateChargesUser($campus);
 
     app()->singleton('campus', fn () => $campus);
 
@@ -80,9 +80,9 @@ it('passes feeTypes entries with value and label keys', function () {
 // ---------------------------------------------------------------------------
 
 it('passes all semesters in the prop', function () {
-    $campus   = Campus::factory()->create();
+    $campus = Campus::factory()->create();
     $semester = Semester::factory()->active()->create(['name' => 'HK2 2025']);
-    $user     = makeGenerateChargesUser($campus);
+    $user = makeGenerateChargesUser($campus);
 
     app()->singleton('campus', fn () => $campus);
 
@@ -115,7 +115,7 @@ it('redirects unauthenticated users to login', function () {
 
 it('downloads the non-academic charges CSV template as a file attachment', function () {
     $campus = Campus::factory()->create();
-    $user   = makeGenerateChargesUser($campus);
+    $user = makeGenerateChargesUser($campus);
 
     app()->singleton('campus', fn () => $campus);
 

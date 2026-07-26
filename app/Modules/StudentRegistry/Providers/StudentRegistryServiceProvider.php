@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\StudentRegistry\Providers;
 
+use App\Models\Student;
+use App\Modules\StudentRegistry\Observers\PublishStudentRegistered;
 use App\Modules\StudentRegistry\Support\EloquentCurriculumStudentSummaryReader;
 use App\Modules\StudentRegistry\Support\EloquentStudentCollectionEligibilityReader;
 use App\Modules\StudentRegistry\Support\EloquentStudentGuardianRelationshipReader;
@@ -41,5 +43,10 @@ class StudentRegistryServiceProvider extends ServiceProvider
         $this->app->bind(StudentPortalProfileReader::class, EloquentStudentPortalProfileReader::class);
         $this->app->bind(StudentImpersonationTokenIssuer::class, EloquentStudentImpersonationTokenIssuer::class);
         $this->app->bind(StudentGuardianRelationshipReader::class, EloquentStudentGuardianRelationshipReader::class);
+    }
+
+    public function boot(): void
+    {
+        Student::observe(PublishStudentRegistered::class);
     }
 }

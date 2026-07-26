@@ -117,21 +117,21 @@ it('rejects a simulated increase in an approved debt baseline', function (): voi
 });
 
 it('rejects configured baseline drift in either direction', function (): void {
-    config()->set('migration_debt.allowlists.shared_model_imports.baseline', 569);
+    config()->set('migration_debt.allowlists.shared_model_imports.baseline', 568);
 
     $increased = app(MigrationDebtGuard::class)->evaluate();
 
-    config()->set('migration_debt.allowlists.shared_model_imports.baseline', 567);
+    config()->set('migration_debt.allowlists.shared_model_imports.baseline', 566);
 
     $decreasedWithoutPairedCeiling = app(MigrationDebtGuard::class)->evaluate();
 
     expect($increased['passed'])->toBeFalse()
         ->and($increased['errors'])->toContain(
-            "Debt rule 'shared_model_imports' baseline 569 must equal canonical ceiling 568.",
+            "Debt rule 'shared_model_imports' baseline 568 must equal canonical ceiling 567.",
         )
         ->and($decreasedWithoutPairedCeiling['passed'])->toBeFalse()
         ->and($decreasedWithoutPairedCeiling['errors'])->toContain(
-            "Debt rule 'shared_model_imports' baseline 567 must equal canonical ceiling 568.",
+            "Debt rule 'shared_model_imports' baseline 566 must equal canonical ceiling 567.",
         );
 });
 

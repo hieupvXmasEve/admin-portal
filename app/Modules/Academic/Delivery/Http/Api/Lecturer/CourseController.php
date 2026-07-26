@@ -154,7 +154,7 @@ class CourseController extends Controller
         $lecturer = $request->user();
 
         try {
-            $sessions = $this->sessionAttendance->handle($lecturer->id, $courseOffering->id);
+            $sessions = $this->sessionAttendance->handle($lecturer->lecturerId(), $courseOffering->id);
 
             return ApiResponse::success(
                 $sessions,

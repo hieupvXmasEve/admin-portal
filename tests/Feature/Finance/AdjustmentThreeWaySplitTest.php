@@ -12,7 +12,7 @@ use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Support\Integrity\FinanceInvariantRegistry;
 use App\Modules\Finance\Support\ObligationType\ObligationTypeRegistry;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 
@@ -33,12 +33,12 @@ beforeEach(function (): void {
     session(['current_campus_id' => $this->campus->id, '_token' => 'adjustment-csrf']);
     app()->singleton('campus', fn () => $this->campus);
 
-    $mock = Mockery::mock(PermissionService::class);
-    $mock->shouldReceive('getUserPermissions')->andReturn([
+    $mock = Mockery::mock(CampusPermissionReader::class);
+    $mock->shouldReceive('permissionCodesForUserId')->andReturn([
         'create_finance_charges',
         'view_finance_charges',
     ]);
-    app()->instance(PermissionService::class, $mock);
+    app()->instance(CampusPermissionReader::class, $mock);
 });
 
 it('creates a positive adjustment debit through finance intake (manual_adjustment)', function (): void {

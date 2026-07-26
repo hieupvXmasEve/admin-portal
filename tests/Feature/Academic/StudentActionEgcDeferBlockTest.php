@@ -14,9 +14,9 @@ use App\Modules\Academic\Progression\Actions\RecordStudentActionAction;
 use App\Modules\Academic\Progression\Exceptions\InvalidProgressionState;
 use App\Modules\Academic\Queries\ListStudentActionLogsQuery;
 use App\Modules\Academic\Support\StudentActionExcelRowMapper;
-use App\Services\PermissionService;
 use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use App\Shared\Contracts\Academic\DTO\AcademicPeriodReference;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -228,10 +228,10 @@ it('rejects from semester before the active semester on store', function () {
         'current_campus_id' => $campus->id,
     ]);
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')
         ->andReturn(['view_student_action', 'change_student_status']);
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
 
     actingAs($user)
         ->post(route('students.actions.store', ['student' => $rejectedStudent->id]), [

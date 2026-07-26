@@ -6,7 +6,7 @@ namespace App\Mcp\Support;
 
 use App\Models\User;
 use App\Modules\AI\Support\CampusScopeSnapshot;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 
 /**
  * Resolves the campus scope for an MCP tool call from an explicit `campus_id` argument
@@ -20,7 +20,7 @@ use App\Services\PermissionService;
  *  - All-campus AI scope holder omitting  → span every permitted campus.
  *
  * The permitted campus set is the campuses where the actor holds a role (the same
- * user↔campus↔role association `PermissionService` reads); the All-campus AI scope is the
+ * user↔campus↔role association owned by Identity); the All-campus AI scope is the
  * dedicated `view_ai_all_campus` permission (never the finance all-campus permission).
  */
 class PermissionMcpCampusResolver implements McpCampusResolver
@@ -31,7 +31,7 @@ class PermissionMcpCampusResolver implements McpCampusResolver
 
     private const SAFE_CLARIFICATION = 'clarification_required';
 
-    public function __construct(private readonly PermissionService $permissionService) {}
+    public function __construct(private readonly CampusPermissionReader $permissionReader) {}
 
     public function resolve(User $actor, ?int $campusId): CampusScopeSnapshot
     {
@@ -86,7 +86,7 @@ class PermissionMcpCampusResolver implements McpCampusResolver
     {
         return in_array(
             self::ALL_CAMPUS_PERMISSION,
-            $this->permissionService->getUserPermissions($actor, null),
+            $this->permissionReader->permissionCodesForUserId((int) $actor->id, null),
             true,
         );
     }

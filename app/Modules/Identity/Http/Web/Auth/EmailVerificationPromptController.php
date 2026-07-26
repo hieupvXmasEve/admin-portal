@@ -1,6 +1,8 @@
 <?php
 
-namespace App\Http\Controllers\Web\Auth;
+declare(strict_types=1);
+
+namespace App\Modules\Identity\Http\Web\Auth;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;

@@ -10,7 +10,7 @@ use App\Models\Student;
 use App\Models\User;
 use App\Modules\Academic\Progression\Actions\RecordStudentActionAction;
 use App\Modules\Academic\Queries\Reporting\GetStudentStatusBySemesterQuery;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia;
 
@@ -48,9 +48,9 @@ beforeEach(function () {
 
 function grantHubViewPermissions(array $permissions): void
 {
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')->andReturn($permissions);
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')->andReturn($permissions);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
 }
 
 it('resolves status / progression / decision report rows to the student Hub Lifecycle tab', function () {

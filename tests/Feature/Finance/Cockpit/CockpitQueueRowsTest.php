@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Models\Campus;
 use App\Models\User;
 use App\Modules\Finance\Dng\Models\DngWebhookEvent;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 use function Pest\Laravel\actingAs;
@@ -17,9 +17,9 @@ beforeEach(function () {
     session(['current_campus_id' => $this->campus->id]);
     app()->singleton('campus', fn () => $this->campus);
     $user = User::factory()->create();
-    $mock = Mockery::mock(PermissionService::class);
-    $mock->shouldReceive('getUserPermissions')->andReturn(['view_finance_cockpit']);
-    app()->singleton(PermissionService::class, fn () => $mock);
+    $mock = Mockery::mock(CampusPermissionReader::class);
+    $mock->shouldReceive('permissionCodesForUserId')->andReturn(['view_finance_cockpit']);
+    app()->singleton(CampusPermissionReader::class, fn () => $mock);
     $this->user = $user;
 });
 

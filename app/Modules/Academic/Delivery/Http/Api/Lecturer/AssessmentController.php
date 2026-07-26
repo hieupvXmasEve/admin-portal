@@ -71,7 +71,7 @@ class AssessmentController extends Controller
         } catch (\Exception $e) {
             Log::error('Failed to retrieve assessment structure', [
                 'course_offering_id' => $courseOffering->id,
-                'lecturer_id' => $lecturer->id,
+                'lecturer_id' => $lecturer->lecturerId(),
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -174,7 +174,7 @@ class AssessmentController extends Controller
         } catch (\Exception $e) {
             Log::error('Failed to create assessment component', [
                 'course_offering_id' => $courseOffering->id,
-                'lecturer_id' => $lecturer->id,
+                'lecturer_id' => $lecturer->lecturerId(),
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -277,7 +277,7 @@ class AssessmentController extends Controller
             Log::error('Failed to update assessment component', [
                 'assessment_component_id' => $assessmentComponent->id,
                 'course_offering_id' => $courseOffering->id,
-                'lecturer_id' => $lecturer->id,
+                'lecturer_id' => $lecturer->lecturerId(),
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -346,7 +346,7 @@ class AssessmentController extends Controller
             Log::error('Failed to delete assessment component', [
                 'assessment_component_id' => $assessmentComponent->id,
                 'course_offering_id' => $courseOffering->id,
-                'lecturer_id' => $lecturer->id,
+                'lecturer_id' => $lecturer->lecturerId(),
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -415,7 +415,7 @@ class AssessmentController extends Controller
             Log::error('Failed to create assessment detail', [
                 'assessment_component_id' => $assessmentComponent->id,
                 'course_offering_id' => $courseOffering->id,
-                'lecturer_id' => $lecturer->id,
+                'lecturer_id' => $lecturer->lecturerId(),
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -493,7 +493,7 @@ class AssessmentController extends Controller
                 'assessment_detail_id' => $assessmentDetail->id,
                 'assessment_component_id' => $assessmentComponent->id,
                 'course_offering_id' => $courseOffering->id,
-                'lecturer_id' => $lecturer->id,
+                'lecturer_id' => $lecturer->lecturerId(),
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -570,7 +570,7 @@ class AssessmentController extends Controller
                 'assessment_detail_id' => $assessmentDetail->id,
                 'assessment_component_id' => $assessmentComponent->id,
                 'course_offering_id' => $courseOffering->id,
-                'lecturer_id' => $lecturer->id,
+                'lecturer_id' => $lecturer->lecturerId(),
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -619,7 +619,7 @@ class AssessmentController extends Controller
             Log::error('Failed to retrieve student grading data', [
                 'course_offering_id' => $courseOffering->id,
                 'student_id' => (int) $student,
-                'lecturer_id' => $lecturer->id,
+                'lecturer_id' => $lecturer->lecturerId(),
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -663,7 +663,7 @@ class AssessmentController extends Controller
             Log::error('Failed to retrieve assessment component grading data', [
                 'course_offering_id' => $courseOffering->id,
                 'assessment_component_id' => $assessmentComponent->id,
-                'lecturer_id' => $lecturer->id,
+                'lecturer_id' => $lecturer->lecturerId(),
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -707,9 +707,9 @@ class AssessmentController extends Controller
             $validated = $request->validated();
 
             // Add grading metadata
-            $validated['graded_by_lecture_id'] = $lecturer->id;
+            $validated['graded_by_lecture_id'] = $lecturer->lecturerId();
             $validated['graded_at'] = now();
-            $validated['last_modified_by_lecture_id'] = $lecturer->id;
+            $validated['last_modified_by_lecture_id'] = $lecturer->lecturerId();
             $validated['last_modified_at'] = now();
 
             // Update the score
@@ -738,7 +738,7 @@ class AssessmentController extends Controller
             Log::error('Failed to update grade', [
                 'score_id' => $score->id,
                 'course_offering_id' => $courseOffering->id,
-                'lecturer_id' => $lecturer->id,
+                'lecturer_id' => $lecturer->lecturerId(),
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -835,7 +835,7 @@ class AssessmentController extends Controller
         } catch (\Exception $e) {
             Log::error('Failed to bulk update grades', [
                 'course_offering_id' => $courseOffering->id,
-                'lecturer_id' => $lecturer->id,
+                'lecturer_id' => $lecturer->lecturerId(),
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -878,7 +878,7 @@ class AssessmentController extends Controller
         } catch (\Exception $e) {
             Log::error('Failed to validate assessment weights', [
                 'course_offering_id' => $courseOffering->id,
-                'lecturer_id' => $lecturer->id,
+                'lecturer_id' => $lecturer->lecturerId(),
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -929,7 +929,7 @@ class AssessmentController extends Controller
             Log::error('Failed to export grade template', [
                 'course_offering_id' => $courseOffering->id,
                 'assessment_component_detail_id' => $assessmentComponentDetail->id,
-                'lecturer_id' => $lecturer->id,
+                'lecturer_id' => $lecturer->lecturerId(),
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -979,7 +979,7 @@ class AssessmentController extends Controller
                 $courseOffering->id,
                 $file,
                 $validated,
-                $lecturer->id
+                $lecturer->lecturerId()
             );
 
             // Determine response based on results
@@ -1011,7 +1011,7 @@ class AssessmentController extends Controller
             Log::error('Failed to import grades', [
                 'course_offering_id' => $courseOffering->id,
                 'assessment_component_detail_id' => $assessmentComponentDetail->id,
-                'lecturer_id' => $lecturer->id,
+                'lecturer_id' => $lecturer->lecturerId(),
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -1031,7 +1031,7 @@ class AssessmentController extends Controller
     private function canAccessCourseOffering($lecturer, CourseOffering $courseOffering): bool
     {
         return $courseOffering->classSessions()
-            ->where('lecture_id', $lecturer->id)
+            ->where('lecture_id', $lecturer->lecturerId())
             ->exists();
     }
 
@@ -1106,7 +1106,7 @@ class AssessmentController extends Controller
             Log::error('Failed to retrieve grade table data', [
                 'course_offering_id' => $courseOffering->id,
                 'assessment_component_detail_id' => $assessmentComponentDetail->id,
-                'lecturer_id' => $lecturer->id,
+                'lecturer_id' => $lecturer->lecturerId(),
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -1162,7 +1162,7 @@ class AssessmentController extends Controller
             Log::error('Failed to calculate grade statistics', [
                 'course_offering_id' => $courseOffering->id,
                 'assessment_component_detail_id' => $assessmentComponentDetail->id,
-                'lecturer_id' => $lecturer->id,
+                'lecturer_id' => $lecturer->lecturerId(),
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -1221,7 +1221,7 @@ class AssessmentController extends Controller
                 $assessmentComponentDetail,
                 $courseOffering,
                 $validated['grades'],
-                $lecturer->id
+                $lecturer->lecturerId()
             );
 
             if (! empty($results['created']) || ! empty($results['updated'])) {
@@ -1252,7 +1252,7 @@ class AssessmentController extends Controller
             Log::error('Failed to bulk upsert grades', [
                 'course_offering_id' => $courseOffering->id,
                 'assessment_component_detail_id' => $assessmentComponentDetail->id,
-                'lecturer_id' => $lecturer->id,
+                'lecturer_id' => $lecturer->lecturerId(),
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -1330,7 +1330,7 @@ class AssessmentController extends Controller
             Log::error('Failed to export grades', [
                 'course_offering_id' => $courseOffering->id,
                 'assessment_component_detail_id' => $assessmentComponentDetail->id,
-                'lecturer_id' => $lecturer->id,
+                'lecturer_id' => $lecturer->lecturerId(),
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);

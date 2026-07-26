@@ -9,7 +9,9 @@ use App\Models\Role;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
+use App\Modules\Identity\Actions\SyncUserCampusRolesAction;
 use App\Modules\Identity\Queries\GetUsersQuery;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -27,6 +29,28 @@ beforeEach(function (): void {
     $administratorRole->permissions()->attach($permissions->pluck('id'));
     $this->administrator->campusRoles()->attach($administratorRole, ['campus_id' => $this->campus->id]);
     $this->withSession(['current_campus_id' => $this->campus->id, '_token' => 'identity-access-test-token']);
+});
+
+it('invalidates a revoked campus permission cache entry', function (): void {
+    $user = User::factory()->create();
+    $role = Role::factory()->create();
+    $permission = Permission::factory()->create(['code' => 'manage_students']);
+    $role->permissions()->attach($permission);
+    $user->campusRoles()->attach($role, ['campus_id' => $this->campus->id]);
+
+    $reader = app(CampusPermissionReader::class);
+    $reader->forgetPermissionCodesForUserId((int) $user->id, [(int) $this->campus->id]);
+    expect($reader->permissionCodesForUserId((int) $user->id, (int) $this->campus->id))
+        ->toContain('manage_students');
+
+    SyncUserCampusRolesAction::run([
+        'user_id' => (int) $user->id,
+        'campus_id' => (int) $this->campus->id,
+        'role_ids' => [],
+    ]);
+
+    expect($reader->permissionCodesForUserId((int) $user->id, (int) $this->campus->id))
+        ->not->toContain('manage_students');
 });
 
 it('creates and updates a role with its permissions through the established staff routes', function (): void {

@@ -13,9 +13,9 @@ use App\Models\Student;
 use App\Models\SyllabusTemplate;
 use App\Models\Unit;
 use App\Models\User;
-use App\Services\PermissionService;
 use App\Shared\Contracts\Academic\StudentHubAssessmentEvidenceReader;
 use App\Shared\Contracts\Academic\StudentHubCourseOutcomeEvidenceReader;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 use function Pest\Laravel\actingAs;
@@ -98,9 +98,9 @@ it('serves the existing score-detail and lazy-score payloads through Delivery qu
     $user = User::factory()->create();
     session(['current_campus_id' => $campus->id]);
     app()->singleton('campus', fn () => $campus);
-    $permissions = Mockery::mock(PermissionService::class);
-    $permissions->shouldReceive('getUserPermissions')->andReturn(['view_student_summary']);
-    app()->singleton(PermissionService::class, fn () => $permissions);
+    $permissions = Mockery::mock(CampusPermissionReader::class);
+    $permissions->shouldReceive('permissionCodesForUserId')->andReturn(['view_student_summary']);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissions);
 
     $assessmentEvidence = app(StudentHubAssessmentEvidenceReader::class)->forStudent((int) $student->id);
     $outcomeEvidence = app(StudentHubCourseOutcomeEvidenceReader::class)->forStudent((int) $student->id);

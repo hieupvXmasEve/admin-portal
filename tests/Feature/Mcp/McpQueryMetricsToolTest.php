@@ -15,8 +15,8 @@ use App\Models\User;
 use App\Modules\AI\Models\AiToolCall;
 use App\Modules\AI\Support\MetricCatalog;
 use App\Modules\AI\Support\Tools\ToolDispatcher;
-use App\Services\PermissionService;
 use App\Shared\Contracts\Finance\AiFinanceMetricReader;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Contracts\Auth\Factory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -40,14 +40,14 @@ beforeEach(function () {
     // (all-campus detection at campusId=null) and the validator (metric gating at campusId).
     $this->permissionMap = [];
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')
-        ->andReturnUsing(function (User $user, ?int $campusId = null): array {
-            return $this->permissionMap[$user->id][$campusId ?? 'all'] ?? [];
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')
+        ->andReturnUsing(function (int $userId, ?int $campusId = null): array {
+            return $this->permissionMap[$userId][$campusId ?? 'all'] ?? [];
         });
 
-    app()->forgetInstance(PermissionService::class);
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    app()->forgetInstance(CampusPermissionReader::class);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
 });
 
 /**

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Shared\Contracts\Identity;
 
 use Illuminate\Contracts\Auth\Authenticatable;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * Authenticated lecturer capabilities required by Academic Delivery reads.
@@ -14,11 +13,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 interface LecturerTeachingActor extends Authenticatable
 {
+    public function lecturerId(): int;
+
+    public function lecturerDisplayName(): string;
+
     public function lecturerCampusId(): int;
 
     public function lecturerUserId(): int;
-
-    public function classSessions(): HasMany;
-
-    public function courseOfferings(): HasMany;
 }

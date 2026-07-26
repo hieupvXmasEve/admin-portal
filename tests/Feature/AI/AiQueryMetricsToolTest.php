@@ -9,9 +9,9 @@ use App\Modules\AI\Models\AiToolCall;
 use App\Modules\AI\Support\AiAuditRecorder;
 use App\Modules\AI\Support\Tools\ToolDispatcher;
 use App\Modules\AI\Support\Tools\ToolRegistry;
-use App\Services\PermissionService;
 use App\Shared\Contracts\Academic\AiAcademicMetricReader;
 use App\Shared\Contracts\Finance\AiFinanceMetricReader;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
 use Mockery\MockInterface;
@@ -32,18 +32,18 @@ beforeEach(function () {
     session(['current_campus_id' => $this->campus->id]);
     app()->singleton('campus', fn () => $this->campus);
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')
-        ->andReturnUsing(function (User $user, ?int $campusId = null): array {
-            if ($user->id === $this->authorizedUser->id && $campusId === $this->campus->id) {
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')
+        ->andReturnUsing(function (int $userId, ?int $campusId = null): array {
+            if ($userId === $this->authorizedUser->id && $campusId === $this->campus->id) {
                 return ['view_ai_metrics', 'view_finance_reporting', 'view_academic_report'];
             }
 
             return [];
         });
 
-    app()->forgetInstance(PermissionService::class);
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    app()->forgetInstance(CampusPermissionReader::class);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
 });
 
 it('registers the query metrics tool alongside entity and profile tools', function () {
@@ -219,18 +219,18 @@ it('denies invalid plans before source execution and audits the safe error', fun
 });
 
 it('denies metric reads without the required domain permission before source execution', function () {
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')
-        ->andReturnUsing(function (User $user, ?int $campusId = null): array {
-            if ($user->id === $this->authorizedUser->id && $campusId === $this->campus->id) {
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')
+        ->andReturnUsing(function (int $userId, ?int $campusId = null): array {
+            if ($userId === $this->authorizedUser->id && $campusId === $this->campus->id) {
                 return ['view_ai_metrics'];
             }
 
             return [];
         });
 
-    app()->forgetInstance(PermissionService::class);
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    app()->forgetInstance(CampusPermissionReader::class);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
 
     $this->mock(AiFinanceMetricReader::class, function (MockInterface $mock): void {
         $mock->shouldNotReceive('collectionProgress');

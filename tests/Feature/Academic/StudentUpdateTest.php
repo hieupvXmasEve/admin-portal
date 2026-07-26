@@ -10,8 +10,8 @@ use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
-use App\Services\PermissionService;
 use App\Services\StudentService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use App\Shared\Contracts\Identity\GuardianAccessGrantWriter;
 use App\Shared\Contracts\StudentRegistry\StudentGuardianRelationshipWriter;
 use App\Shared\Contracts\StudentRegistry\StudentIdentityWriter;
@@ -54,11 +54,11 @@ beforeEach(function () {
             ->name(StudentRoutes::ACADEMIC_SUMMARY_SHOW);
     }
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')
         ->andReturn(['edit_student']);
 
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
 });
 
 it('syncs the linked user email when updating a student email', function () {

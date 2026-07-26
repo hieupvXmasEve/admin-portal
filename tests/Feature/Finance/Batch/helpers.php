@@ -14,7 +14,7 @@ use App\Models\User;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 
 const BATCH_STUDIO_CSRF = 'batch-studio-test-csrf';
 
@@ -29,9 +29,9 @@ function grantFinance(User $user, array $permissions, Campus $campus): void
     session(financeWebSession($campus));
     app()->singleton('campus', fn () => $campus);
 
-    $mock = Mockery::mock(PermissionService::class);
-    $mock->shouldReceive('getUserPermissions')->andReturn($permissions);
-    app()->instance(PermissionService::class, $mock);
+    $mock = Mockery::mock(CampusPermissionReader::class);
+    $mock->shouldReceive('permissionCodesForUserId')->andReturn($permissions);
+    app()->instance(CampusPermissionReader::class, $mock);
 }
 
 /**

@@ -6,7 +6,7 @@ use App\Models\Campus;
 use App\Models\SyllabusTemplate;
 use App\Models\Unit;
 use App\Models\User;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 use function Pest\Laravel\actingAs;
@@ -26,15 +26,15 @@ beforeEach(function () {
 
 /**
  * Grant the given syllabus permissions to every user by mocking the lazy
- * PermissionService the `can:` gate resolves through.
+ * CampusPermissionReader the `can:` gate resolves through.
  */
 function grantSyllabusPermissions(array $permissions): void
 {
-    $service = Mockery::mock(PermissionService::class);
-    $service->shouldReceive('getUserPermissions')->andReturn($permissions);
+    $service = Mockery::mock(CampusPermissionReader::class);
+    $service->shouldReceive('permissionCodesForUserId')->andReturn($permissions);
 
-    app()->forgetInstance(PermissionService::class);
-    app()->instance(PermissionService::class, $service);
+    app()->forgetInstance(CampusPermissionReader::class);
+    app()->instance(CampusPermissionReader::class, $service);
 }
 
 /**

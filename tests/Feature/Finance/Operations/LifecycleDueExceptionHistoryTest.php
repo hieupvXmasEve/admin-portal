@@ -14,7 +14,7 @@ use App\Modules\Finance\Enums\LifecycleDueExceptionResolutionAction;
 use App\Modules\Finance\Enums\LifecycleDueExceptionReviewEventType;
 use App\Modules\Finance\Models\FinanceLifecycleDueExceptionReview;
 use App\Modules\Finance\Models\FinanceLifecycleDueExceptionReviewEvent;
-use App\Services\PermissionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 use function Pest\Laravel\actingAs;
@@ -67,9 +67,9 @@ beforeEach(function () {
     session(['current_campus_id' => $this->campus->id]);
     app()->singleton('campus', fn () => $this->campus);
 
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')->andReturn(['view_finance_operations_due_calendar']);
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')->andReturn(['view_finance_operations_due_calendar']);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
 });
 
 it('appends acknowledged and keep-as-debt events without overwriting prior history', function () {
@@ -196,9 +196,9 @@ it('filters shared history by DNG request id and search', function () {
 });
 
 it('denies users without lifecycle exception view permission', function () {
-    $permissionService = Mockery::mock(PermissionService::class);
-    $permissionService->shouldReceive('getUserPermissions')->andReturn([]);
-    app()->singleton(PermissionService::class, fn () => $permissionService);
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')->andReturn([]);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
 
     actingAs($this->user);
 
