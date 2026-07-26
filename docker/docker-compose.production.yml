@@ -45,10 +45,14 @@ services:
       - storage_data:/app/storage
       - cache_data:/app/bootstrap/cache
     depends_on:
+      app:
+        condition: service_healthy
       db:
         condition: service_healthy
       redis:
         condition: service_started
+    healthcheck:
+      disable: true
     restart: unless-stopped
 
   scheduler:
@@ -68,10 +72,14 @@ services:
       - storage_data:/app/storage
       - cache_data:/app/bootstrap/cache
     depends_on:
+      app:
+        condition: service_healthy
       db:
         condition: service_healthy
       redis:
         condition: service_started
+    healthcheck:
+      disable: true
     restart: unless-stopped
 
   redis:

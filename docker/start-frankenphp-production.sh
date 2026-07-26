@@ -4,6 +4,17 @@ set -eu
 
 echo "Starting FrankenPHP production container..."
 
+mkdir -p \
+    /app/bootstrap/cache \
+    /app/storage/framework/cache/data \
+    /app/storage/framework/sessions \
+    /app/storage/framework/views \
+    /app/storage/logs
+chown -R www-data:www-data /app/storage /app/bootstrap/cache
+chmod -R 775 /app/storage /app/bootstrap/cache
+rm -f /app/bootstrap/cache/*.php
+rm -f /app/public/hot
+
 # ACME/TLS Caddyfile.prod uses {env.SERVER_NAME}; Caddyfile.proxy listens on :80 only.
 if grep -q '{env.SERVER_NAME}' /etc/caddy/Caddyfile 2>/dev/null; then
     if [ -z "${SERVER_NAME:-}" ]; then

@@ -3,7 +3,7 @@
 set -euo pipefail
 
 COMPOSE_FILE="docker/docker-compose.local-prod.yml"
-ENV_FILE=".env"
+ENV_FILE=".env.prod"
 PROJECT_NAME="swinx-local-prod"
 
 ensure_env() {

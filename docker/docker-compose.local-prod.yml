@@ -5,7 +5,7 @@ services:
       dockerfile: docker/Dockerfile.production
     container_name: swinx-app-local-prod
     env_file:
-      - ../.env
+      - ../.env.prod
     ports:
       - '${LOCAL_PROD_HTTP_PORT:-8080}:80'
       - '${LOCAL_PROD_HTTPS_PORT:-8443}:443'
@@ -38,7 +38,7 @@ services:
       dockerfile: docker/Dockerfile.production
     container_name: swinx-queue-local-prod
     env_file:
-      - ../.env
+      - ../.env.prod
     working_dir: /app
     command: php artisan queue:work --queue=${QUEUE_WORKER_QUEUES:-default,emails,bulk-emails,notifications,finance,webhooks,reconciliation} --sleep=${QUEUE_WORKER_SLEEP:-1} --tries=${QUEUE_WORKER_TRIES:-3} --verbose
     environment:
@@ -51,10 +51,14 @@ services:
       - composer_vendor_local_prod:/app/vendor
       - node_modules_local_prod:/app/node_modules
     depends_on:
+      app:
+        condition: service_healthy
       db:
         condition: service_healthy
       redis:
         condition: service_started
+    healthcheck:
+      disable: true
     restart: unless-stopped
 
   scheduler:
@@ -63,7 +67,7 @@ services:
       dockerfile: docker/Dockerfile.production
     container_name: swinx-scheduler-local-prod
     env_file:
-      - ../.env
+      - ../.env.prod
     working_dir: /app
     command: php artisan schedule:work
     environment:
@@ -76,10 +80,14 @@ services:
       - composer_vendor_local_prod:/app/vendor
       - node_modules_local_prod:/app/node_modules
     depends_on:
+      app:
+        condition: service_healthy
       db:
         condition: service_healthy
       redis:
         condition: service_started
+    healthcheck:
+      disable: true
     restart: unless-stopped
 
   redis:

@@ -16,7 +16,6 @@ use App\Modules\StudentRegistry\Providers\StudentRegistryServiceProvider;
 use App\Modules\Upload\Providers\UploadServiceProvider;
 use App\Providers\AppServiceProvider;
 use App\Providers\EventServiceProvider;
-use Barryvdh\Debugbar\ServiceProvider;
 
 return [
     AppServiceProvider::class,
@@ -34,5 +33,4 @@ return [
     NotificationServiceProvider::class,
     UploadServiceProvider::class,
     // App\Providers\TelescopeServiceProvider::class,
-    ServiceProvider::class,
 ];
