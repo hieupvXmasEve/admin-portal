@@ -301,3 +301,20 @@ human must approve exact dispositions for the 810 exceptions and the affected
 records, and the implementation owners must migrate or permanently classify
 the 18 supported consumers. The previous no-op/date-precision approval does
 not authorize these corrections or projection removal.
+
+### 2026-07-26 — consumer inventory reconciled after defer cutover
+
+The earlier 18-consumer evidence is historical. Commit `157e2ea7` moved the
+three Finance defer lifecycle readers below to
+`StudentDeferLifecycleReader`, then removed them from the supported
+compatibility inventory:
+
+- `BillingExceptionCollector`
+- `BillingExceptionDeferredEnrollmentMatcher`
+- `DeferCaseService`
+
+Fresh read-only execution of
+`academic:audit-progression-reconciliation --all` now reports the same 810
+data exceptions and 15 supported consumers. This 15-consumer manifest is the
+current implementation baseline. It does not change the `needs-info` status,
+authorize any data write, or authorize compatibility projection removal.

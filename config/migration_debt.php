@@ -2,88 +2,22 @@
 
 declare(strict_types=1);
 
+use App\Support\MigrationDebt\MigrationDebtContract;
+
 return [
     /*
     | Models remain physically shared during staged extraction. This map records
     | the module that owns each legacy table so its own references are not
     | misclassified as cross-context shared-model debt.
     */
-    'owned_shared_models' => [
-        'Academic' => [
-            'Catalog' => [
-                'Program',
-                'Semester',
-                'Unit',
-                'EquivalentUnit',
-                'UnitPrerequisiteCondition',
-                'UnitPrerequisiteGroup',
-                'CurriculumUnit',
-                'CurriculumModule',
-                'CurriculumVersion',
-                'Module',
-                'Specialization',
-                'SyllabusTemplate',
-            ],
-            'Delivery' => [
-                'Attendance',
-                'AssessmentComponentDetailScore',
-                'ClassSession',
-                'CourseOffering',
-                'CourseRegistration',
-            ],
-            'Progression' => [
-                'AcademicHold',
-                'AcademicRecord',
-                'GpaCalculation',
-            ],
-        ],
-        'Admissions' => [
-            'ApplicationDocument',
-            'ApplicationDocumentType',
-            'ApplicationGuardian',
-            'StudentApplication',
-        ],
-        'Facilities' => [
-            'Building',
-            'Room',
-            'RoomBooking',
-            'RoomBookingAction',
-        ],
-        'Engagement' => [
-            'Answer',
-            'AnswerOption',
-            'Club',
-            'ClubMember',
-            'ClubMemberRoleHistory',
-            'Event',
-            'EventParticipant',
-            'Form',
-            'FormResponse',
-            'FormResultVisibility',
-            'FormSection',
-            'FormSurvey',
-            'FormTarget',
-            'FormVersion',
-            'QueryAssignment',
-            'QueryReply',
-            'QueryTicket',
-            'QueryTopic',
-            'StudentFormAssignment',
-            'StudentFormSurvey',
-        ],
-    ],
+    'owned_shared_models' => MigrationDebtContract::OWNED_SHARED_MODELS,
 
     /*
     | The scanner deliberately reads source roots only. Runtime output, package
     | dependencies, and the separately versioned portal repositories are not
     | application debt in this inventory.
     */
-    'source_roots' => [
-        'app',
-        'routes',
-        'resources/js',
-        'config/mcp.php',
-    ],
+    'source_roots' => MigrationDebtContract::SOURCE_ROOTS,
 
     'excluded_path_fragments' => [
         '/vendor/',
@@ -95,35 +29,9 @@ return [
         '/repomix-output.xml',
     ],
 
-    'runtime_surfaces' => [
-        'http',
-        'api',
-        'queue',
-        'scheduler',
-        'commands',
-        'imports_exports',
-        'reports',
-        'webhooks',
-        'broadcasts',
-        'mcp',
-        'portal',
-        'frontend',
-        'other',
-    ],
+    'runtime_surfaces' => MigrationDebtContract::RUNTIME_SURFACES,
 
-    'required_runtime_surfaces' => [
-        'http',
-        'api',
-        'queue',
-        'scheduler',
-        'commands',
-        'imports_exports',
-        'reports',
-        'webhooks',
-        'broadcasts',
-        'mcp',
-        'portal',
-    ],
+    'required_runtime_surfaces' => MigrationDebtContract::REQUIRED_RUNTIME_SURFACES,
 
     /*
     | These are the approved transitional categories. Every entry is required
@@ -137,7 +45,7 @@ return [
             'reason' => 'Existing service-led runtime paths remain during vertical cutover.',
             'canonical_replacement' => 'Owning module Actions, Queries, or permanent domain support.',
             'retirement_condition' => 'All supported callers are cut over and behavior evidence passes.',
-            'baseline' => 119,
+            'baseline' => 86,
             'mode' => 'max',
         ],
         'frozen_controllers' => [
@@ -145,7 +53,7 @@ return [
             'reason' => 'Existing top-level controllers preserve public web/API contracts during migration.',
             'canonical_replacement' => 'Thin controller under the owning module HTTP boundary.',
             'retirement_condition' => 'Route ownership and all supported callers move to the module controller.',
-            'baseline' => 120,
+            'baseline' => 76,
             'mode' => 'max',
         ],
         'frozen_routes' => [
@@ -153,7 +61,7 @@ return [
             'reason' => 'Existing split route files still serve supported URLs and route names.',
             'canonical_replacement' => 'Owning module routes with a compatibility-preserving mount.',
             'retirement_condition' => 'No supported caller depends on the legacy file and route evidence is green.',
-            'baseline' => 42,
+            'baseline' => 32,
             'mode' => 'max',
         ],
         'shared_model_imports' => [
@@ -177,7 +85,7 @@ return [
             'reason' => 'Legacy JSON response sites remain while API envelopes are migrated.',
             'canonical_replacement' => 'ApiResponse::success(), error(), paginated(), or validationError().',
             'retirement_condition' => 'The endpoint uses the canonical envelope and its contract test passes.',
-            'baseline' => 56,
+            'baseline' => 45,
             'mode' => 'max',
         ],
         'inline_request_validation' => [
@@ -185,7 +93,7 @@ return [
             'reason' => 'Legacy controllers still validate inline during staged extraction.',
             'canonical_replacement' => 'A typed FormRequest owned by the endpoint context.',
             'retirement_condition' => 'The controller delegates validation to the FormRequest.',
-            'baseline' => 96,
+            'baseline' => 77,
             'mode' => 'max',
         ],
         'missing_strict_types' => [
@@ -193,7 +101,7 @@ return [
             'reason' => 'Older application and route PHP files predate the strict-types standard.',
             'canonical_replacement' => 'declare(strict_types=1) at the top of every application PHP file.',
             'retirement_condition' => 'The file is migrated or receives strict types with behavior unchanged.',
-            'baseline' => 257,
+            'baseline' => 178,
             'mode' => 'max',
         ],
         'missing_route_strict_types' => [
@@ -201,7 +109,7 @@ return [
             'reason' => 'Older split route files predate the strict-types standard.',
             'canonical_replacement' => 'declare(strict_types=1) at the top of every application route PHP file.',
             'retirement_condition' => 'The route file is migrated or receives strict types with route behavior unchanged.',
-            'baseline' => 30,
+            'baseline' => 22,
             'mode' => 'max',
         ],
         'legacy_filter_stacks' => [
@@ -209,7 +117,7 @@ return [
             'reason' => 'Existing pages still use transitional filter composables.',
             'canonical_replacement' => 'useDataTable with the shared server-table workflow.',
             'retirement_condition' => 'The page preserves query/pagination behavior on useDataTable.',
-            'baseline' => 28,
+            'baseline' => 25,
             'mode' => 'max',
         ],
         'literal_frontend_urls' => [
@@ -246,7 +154,7 @@ return [
         ],
     ],
 
-    'allowlist_entry_baseline' => 14,
+    'allowlist_entry_baseline' => count(MigrationDebtContract::RULES),
 
     'portal_contracts' => [
         'student' => [

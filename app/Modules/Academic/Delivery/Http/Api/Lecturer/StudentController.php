@@ -11,6 +11,7 @@ use App\Http\Resources\Api\V1\Lecturer\StudentDetailResource;
 use App\Http\Resources\Api\V1\Lecturer\StudentResource;
 use App\Http\Responses\ApiResponse;
 use App\Modules\Academic\Delivery\Support\LecturerStudentService;
+use App\Shared\Contracts\Identity\LecturerTeachingActor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -25,7 +26,7 @@ class StudentController extends Controller
      */
     public function index(StudentFilterRequest $request): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var LecturerTeachingActor $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -36,7 +37,7 @@ class StudentController extends Controller
             $students = $this->studentService->getStudents($lecturer, $filters, $perPage);
 
             return ApiResponse::paginated(
-                $students->through(fn($student) => new StudentResource($student)),
+                $students->through(fn ($student) => new StudentResource($student)),
                 'Students retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -49,7 +50,7 @@ class StudentController extends Controller
      */
     public function show(Request $request, int $studentId): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var LecturerTeachingActor $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -73,7 +74,7 @@ class StudentController extends Controller
      */
     public function alerts(Request $request): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var LecturerTeachingActor $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -95,7 +96,7 @@ class StudentController extends Controller
      */
     public function addNote(StudentNoteRequest $request, int $studentId): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var LecturerTeachingActor $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -121,7 +122,7 @@ class StudentController extends Controller
      */
     public function updateNote(StudentNoteRequest $request, int $studentId, int $noteId): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var LecturerTeachingActor $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -147,7 +148,7 @@ class StudentController extends Controller
      */
     public function deleteNote(Request $request, int $studentId, int $noteId): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var LecturerTeachingActor $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -171,7 +172,7 @@ class StudentController extends Controller
      */
     public function analytics(Request $request): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var LecturerTeachingActor $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -193,7 +194,7 @@ class StudentController extends Controller
      */
     public function requiresAttention(Request $request): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var LecturerTeachingActor $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -218,7 +219,7 @@ class StudentController extends Controller
      */
     public function summary(Request $request): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var LecturerTeachingActor $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -257,7 +258,7 @@ class StudentController extends Controller
      */
     public function bulkActions(Request $request): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var LecturerTeachingActor $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -322,7 +323,7 @@ class StudentController extends Controller
             'add_note' => $this->studentService->addStudentNote($lecturer, $studentId, $data),
             'send_notification' => $this->sendNotificationToStudent($lecturer, $studentId, $data),
             'mark_for_follow_up' => $this->markStudentForFollowUp($lecturer, $studentId, $data),
-            default => throw new \Exception('Unknown action: ' . $action),
+            default => throw new \Exception('Unknown action: '.$action),
         };
     }
 

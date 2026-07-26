@@ -13,8 +13,11 @@ use App\Http\Resources\Api\V1\Lecturer\SessionResource;
 use App\Http\Resources\Api\V1\Lecturer\TimetableResource;
 use App\Http\Responses\ApiResponse;
 use App\Modules\Academic\Delivery\Support\LecturerTimetableService;
+use App\Shared\Contracts\Identity\LecturerTeachingActor;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class TimetableController extends Controller
 {
@@ -27,7 +30,7 @@ class TimetableController extends Controller
      */
     public function index(TimetableFilterRequest $request): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var LecturerTeachingActor $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -50,7 +53,7 @@ class TimetableController extends Controller
      */
     public function schedule(ScheduleFilterRequest $request): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var LecturerTeachingActor $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -73,7 +76,7 @@ class TimetableController extends Controller
      */
     public function upcomingSessions(Request $request): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var LecturerTeachingActor $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -100,7 +103,7 @@ class TimetableController extends Controller
      */
     public function createSession(CreateSessionRequest $request): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var LecturerTeachingActor $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -133,7 +136,7 @@ class TimetableController extends Controller
      */
     public function updateSession(UpdateSessionRequest $request, int $sessionId): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var LecturerTeachingActor $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -172,7 +175,7 @@ class TimetableController extends Controller
      */
     public function cancelSession(Request $request, int $sessionId): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var LecturerTeachingActor $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -219,8 +222,8 @@ class TimetableController extends Controller
 
             $rooms = $this->timetableService->getAvailableRooms(
                 $validated['date'],
-                $validated['start_time'] . ':00',
-                $validated['end_time'] . ':00',
+                $validated['start_time'].':00',
+                $validated['end_time'].':00',
                 $validated['exclude_session_id'] ?? null
             );
 
@@ -229,7 +232,7 @@ class TimetableController extends Controller
                 [],
                 'Available rooms retrieved successfully'
             );
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return ApiResponse::validationError(
                 $e->errors(),
                 'Room availability validation failed'
@@ -244,7 +247,7 @@ class TimetableController extends Controller
      */
     public function sessionDetails(Request $request, int $sessionId): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var LecturerTeachingActor $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -272,7 +275,7 @@ class TimetableController extends Controller
      */
     public function summary(Request $request): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var LecturerTeachingActor $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -312,7 +315,7 @@ class TimetableController extends Controller
      */
     public function bulkUpdateSessions(Request $request): JsonResponse
     {
-        /** @var \App\Models\Lecture $lecturer */
+        /** @var LecturerTeachingActor $lecturer */
         $lecturer = $request->user();
 
         try {
@@ -372,7 +375,7 @@ class TimetableController extends Controller
 
         foreach ($sessions as $dateSessions) {
             foreach ($dateSessions as $session) {
-                $sessionDateTime = \Carbon\Carbon::parse($session['date'] . ' ' . $session['start_time']);
+                $sessionDateTime = Carbon::parse($session['date'].' '.$session['start_time']);
 
                 if ($sessionDateTime->gt($now)) {
                     $diff = $sessionDateTime->diffInMinutes($now);

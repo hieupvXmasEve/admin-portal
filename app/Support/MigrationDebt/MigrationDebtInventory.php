@@ -9,7 +9,7 @@ use RecursiveIteratorIterator;
 use SplFileInfo;
 
 /**
- * @phpstan-type Finding array{rule: string, path: string, line: int|null, owner: string, runtime_surface: string, message: string}
+ * @phpstan-type Finding array{id: string, rule: string, path: string, line: int|null, owner: string, work_package: string, runtime_surface: string, message: string}
  * @phpstan-type ContractPath array{path: string, kind: string, area: string|null, exists: bool, file_count: int, excluded_from_debt_scan: bool}
  * @phpstan-type InventoryReport array{
  *     schema_version: int,
@@ -20,17 +20,35 @@ use SplFileInfo;
  *         source_file_count: int,
  *         runtime_surfaces: array<string, int>,
  *         owning_contexts: array<string, int>,
+ *         finding_ownership: array{finding_count: int, assigned_count: int, unassigned_count: int, package_counts: array<string, int>, manifest_sha256: string},
  *         portal_contracts: array<string, array{owner: string, reason: string, canonical_replacement: string, retirement_condition: string, paths: list<ContractPath>, consumer_inventory: array{file_count: int, areas: array{types: int, composables: int, stores: int, pages: int}, runtime_surface: string, owner: string}}},
  *     debt: array{
  *         counts: array<string, int>,
  *         by_owner: array<string, int>,
  *         by_runtime_surface: array<string, int>,
+ *         shadow: array{
+ *             unique_paths: array<string, int>,
+ *             pattern_occurrences: array<string, int>
+ *         },
  *         findings: list<Finding>
  *     }
  * }
  */
 final class MigrationDebtInventory
 {
+    /** @var list<string> */
+    private const SHADOW_PATTERN_METRICS = [
+        'response_json_calls',
+        'json_response_constructions',
+        'api_response_compatible_calls',
+        'request_validate_calls',
+        'request_helper_validate_calls',
+        'validator_make_calls',
+        'http_response_exception_constructions',
+        'frontend_application_url_calls',
+        'removed_inertia_api_calls',
+    ];
+
     /**
      * Build a deterministic, read-only inventory of source paths and debt findings.
      *
@@ -42,6 +60,7 @@ final class MigrationDebtInventory
         $findings = [];
         $surfaceCounts = array_fill_keys($this->runtimeSurfaces(), 0);
         $ownerCounts = [];
+        $shadowPatternOccurrences = array_fill_keys(self::SHADOW_PATTERN_METRICS, 0);
 
         foreach ($files as $path => $contents) {
             $surface = $this->runtimeSurface($path);
@@ -51,6 +70,10 @@ final class MigrationDebtInventory
 
             $this->collectPathFindings($path, $contents, $findings);
             $this->collectPatternFindings($path, $contents, $findings);
+
+            foreach ($this->shadowPatternOccurrences($path, $contents) as $metric => $count) {
+                $shadowPatternOccurrences[$metric] += $count;
+            }
         }
 
         $this->collectPageDirectoryFindings($files, $findings);
@@ -58,13 +81,15 @@ final class MigrationDebtInventory
         ksort($surfaceCounts);
         ksort($ownerCounts);
 
-        $findingCounts = array_fill_keys(array_keys(config('migration_debt.allowlists', [])), 0);
+        $findingCounts = array_fill_keys(MigrationDebtContract::RULES, 0);
         $findingsByOwner = [];
         $findingsBySurface = array_fill_keys($this->runtimeSurfaces(), 0);
+        $findingPaths = array_fill_keys(MigrationDebtContract::RULES, []);
 
         foreach ($findings as $finding) {
             $rule = $finding['rule'];
             $findingCounts[$rule] = ($findingCounts[$rule] ?? 0) + 1;
+            $findingPaths[$rule][$finding['path']] = true;
             $findingOwner = $finding['owner'];
             $findingsByOwner[$findingOwner] = ($findingsByOwner[$findingOwner] ?? 0) + 1;
             $findingsBySurface[$finding['runtime_surface']]++;
@@ -73,22 +98,35 @@ final class MigrationDebtInventory
         ksort($findingCounts);
         ksort($findingsByOwner);
         ksort($findingsBySurface);
+        ksort($shadowPatternOccurrences);
+
+        $uniquePaths = [];
+        foreach ($findingPaths as $rule => $paths) {
+            $uniquePaths[$rule] = count($paths);
+        }
+        ksort($uniquePaths);
+        $findingOwnership = $this->findingOwnership($findings);
 
         return [
             'schema_version' => 1,
             'read_only' => true,
-            'scan_roots' => config('migration_debt.source_roots', []),
+            'scan_roots' => MigrationDebtContract::SOURCE_ROOTS,
             'excluded_path_fragments' => config('migration_debt.excluded_path_fragments', []),
             'coverage' => [
                 'source_file_count' => count($files),
                 'runtime_surfaces' => $surfaceCounts,
                 'owning_contexts' => $ownerCounts,
+                'finding_ownership' => $findingOwnership,
                 'portal_contracts' => $this->portalContracts(),
             ],
             'debt' => [
                 'counts' => $findingCounts,
                 'by_owner' => $findingsByOwner,
                 'by_runtime_surface' => $findingsBySurface,
+                'shadow' => [
+                    'unique_paths' => $uniquePaths,
+                    'pattern_occurrences' => $shadowPatternOccurrences,
+                ],
                 'findings' => $findings,
             ],
         ];
@@ -101,7 +139,7 @@ final class MigrationDebtInventory
     {
         $files = [];
 
-        foreach (config('migration_debt.source_roots', []) as $root) {
+        foreach (MigrationDebtContract::SOURCE_ROOTS as $root) {
             $absoluteRoot = base_path($root);
 
             if (is_file($absoluteRoot)) {
@@ -215,6 +253,61 @@ final class MigrationDebtInventory
         if (preg_match('/Inertia::lazy\s*\(|\$page\.props\.flash|<Deferred\b[^>]*:data\s*=\s*(?:\{|\[)/i', $contents) === 1) {
             $this->addFinding($findings, 'removed_inertia_apis', $path, 'Removed Inertia v2 API pattern.');
         }
+    }
+
+    /**
+     * Report broader pattern occurrence counts without changing guarded debt semantics.
+     *
+     * @return array<string, int>
+     */
+    public function shadowPatternOccurrences(string $path, string $contents): array
+    {
+        $counts = array_fill_keys(self::SHADOW_PATTERN_METRICS, 0);
+
+        if (str_ends_with($path, '.php')) {
+            $counts['response_json_calls'] = $this->countMatchesOutsideComments(
+                $contents,
+                '/response\s*\(\s*\)\s*->\s*json\s*\(/',
+            );
+            $counts['json_response_constructions'] = $this->countMatchesOutsideComments(
+                $contents,
+                '/new\s+(?:\\\\?Illuminate\\\\Http\\\\)?JsonResponse\s*\(/',
+            );
+            $counts['api_response_compatible_calls'] = $this->countMatchesOutsideComments(
+                $contents,
+                '/ApiResponse::compatible\s*\(/',
+            );
+            $counts['request_validate_calls'] = $this->countMatchesOutsideComments(
+                $contents,
+                '/\$request\s*->\s*validate\s*\(/',
+            );
+            $counts['request_helper_validate_calls'] = $this->countMatchesOutsideComments(
+                $contents,
+                '/request\s*\(\s*\)\s*->\s*validate\s*\(/',
+            );
+            $counts['validator_make_calls'] = $this->countMatchesOutsideComments(
+                $contents,
+                '/(?:\\\\?Illuminate\\\\Support\\\\Facades\\\\)?Validator::make\s*\(/',
+            );
+            $counts['http_response_exception_constructions'] = $this->countMatchesOutsideComments(
+                $contents,
+                '/new\s+(?:\\\\?Illuminate\\\\Http\\\\Exceptions\\\\)?HttpResponseException\s*\(/',
+            );
+        }
+
+        if (str_starts_with($path, 'resources/js/')) {
+            $counts['frontend_application_url_calls'] = $this->countMatchesOutsideComments(
+                $contents,
+                '/(?:router\.(?:visit|post|put|patch|delete)|fetch|(?:api|http|client)\.(?:get|post|put|patch|delete))\s*\(\s*[`\'"]\/(?!data\/)(?:api\/)?[a-z]/i',
+            );
+        }
+
+        $counts['removed_inertia_api_calls'] = $this->countMatchesOutsideComments(
+            $contents,
+            '/Inertia::lazy\s*\(|router\.cancel\s*\(|\$page\.props\.flash|<Deferred\b[^>]*:data\s*=\s*(?:\{|\[)/i',
+        );
+
+        return $counts;
     }
 
     /**
@@ -488,14 +581,84 @@ final class MigrationDebtInventory
         string $message,
         ?int $line = null,
     ): void {
+        $owner = $this->owner($path);
         $findings[] = [
+            'id' => hash('sha256', implode('|', [$rule, $path, (string) ($line ?? 0)])),
             'rule' => $rule,
             'path' => $path,
             'line' => $line,
-            'owner' => $this->owner($path),
+            'owner' => $owner,
+            'work_package' => $this->workPackage($rule, $path, $owner),
             'runtime_surface' => $this->runtimeSurface($path),
             'message' => $message,
         ];
+    }
+
+    /**
+     * @param  list<Finding>  $findings
+     * @return array{finding_count: int, assigned_count: int, unassigned_count: int, package_counts: array<string, int>, manifest_sha256: string}
+     */
+    private function findingOwnership(array $findings): array
+    {
+        $packageCounts = [];
+        $manifest = [];
+
+        foreach ($findings as $finding) {
+            $package = $finding['work_package'];
+            $packageCounts[$package] = ($packageCounts[$package] ?? 0) + 1;
+            $manifest[] = [
+                'id' => $finding['id'],
+                'work_package' => $package,
+            ];
+        }
+
+        ksort($packageCounts);
+
+        return [
+            'finding_count' => count($findings),
+            'assigned_count' => count($manifest),
+            'unassigned_count' => 0,
+            'package_counts' => $packageCounts,
+            'manifest_sha256' => hash(
+                'sha256',
+                json_encode($manifest, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+            ),
+        ];
+    }
+
+    private function workPackage(string $rule, string $path, string $owner): string
+    {
+        $phase = match ($rule) {
+            'cross_context_concrete_imports', 'removed_inertia_apis' => 1,
+            'legacy_page_directories' => 2,
+            'shared_model_imports' => $this->domainPhase($path, $owner),
+            'direct_json_responses', 'inline_request_validation' => $this->domainPhase($path, $owner),
+            'legacy_filter_stacks', 'literal_frontend_urls' => 8,
+            'frozen_services', 'frozen_controllers', 'frozen_routes',
+            'missing_strict_types', 'missing_route_strict_types' => 9,
+            'migration_commands' => 10,
+            default => 9,
+        };
+        $ownerSlug = strtolower((string) preg_replace('/[^a-z0-9]+/i', '-', trim($owner)));
+        $ownerSlug = trim($ownerSlug, '-');
+
+        return sprintf('phase-%02d:%s:%s', $phase, $ownerSlug, $rule);
+    }
+
+    private function domainPhase(string $path, string $owner): int
+    {
+        return match ($owner) {
+            'Identity', 'Institution', 'StudentRegistry' => 3,
+            'Academic' => match (true) {
+                str_contains($path, '/Progression/') => 5,
+                str_contains($path, '/Reporting/'),
+                str_contains($path, '/Report') => 8,
+                default => 4,
+            },
+            'Finance' => 6,
+            'AI' => 8,
+            default => 7,
+        };
     }
 
     /**
@@ -521,6 +684,96 @@ final class MigrationDebtInventory
     private function lineNumber(string $contents, int $offset): int
     {
         return substr_count(substr($contents, 0, $offset), "\n") + 1;
+    }
+
+    private function countMatches(string $contents, string $pattern): int
+    {
+        return preg_match_all($pattern, $contents) ?: 0;
+    }
+
+    private function countMatchesOutsideComments(string $contents, string $pattern): int
+    {
+        return $this->countMatches($this->stripComments($contents), $pattern);
+    }
+
+    private function stripComments(string $contents): string
+    {
+        $result = '';
+        $quote = null;
+        $escaped = false;
+        $insideLineComment = false;
+        $insideBlockComment = false;
+        $length = strlen($contents);
+
+        for ($index = 0; $index < $length; $index++) {
+            $character = $contents[$index];
+            $next = $contents[$index + 1] ?? '';
+
+            if ($insideLineComment) {
+                if ($character === "\n") {
+                    $insideLineComment = false;
+                    $result .= $character;
+                }
+
+                continue;
+            }
+
+            if ($insideBlockComment) {
+                if ($character === '*' && $next === '/') {
+                    $insideBlockComment = false;
+                    $index++;
+                } elseif ($character === "\n") {
+                    $result .= $character;
+                }
+
+                continue;
+            }
+
+            if ($quote !== null) {
+                $result .= $character;
+
+                if ($escaped) {
+                    $escaped = false;
+                } elseif ($character === '\\') {
+                    $escaped = true;
+                } elseif ($character === $quote) {
+                    $quote = null;
+                }
+
+                continue;
+            }
+
+            if (in_array($character, ['\'', '"', '`'], true)) {
+                $quote = $character;
+                $result .= $character;
+
+                continue;
+            }
+
+            if ($character === '/' && $next === '/') {
+                $insideLineComment = true;
+                $index++;
+
+                continue;
+            }
+
+            if ($character === '/' && $next === '*') {
+                $insideBlockComment = true;
+                $index++;
+
+                continue;
+            }
+
+            if ($character === '#' && $next !== '[') {
+                $insideLineComment = true;
+
+                continue;
+            }
+
+            $result .= $character;
+        }
+
+        return $result;
     }
 
     /**
@@ -678,6 +931,6 @@ final class MigrationDebtInventory
      */
     private function runtimeSurfaces(): array
     {
-        return config('migration_debt.runtime_surfaces', []);
+        return MigrationDebtContract::RUNTIME_SURFACES;
     }
 }
