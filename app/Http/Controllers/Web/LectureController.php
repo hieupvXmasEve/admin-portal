@@ -62,7 +62,7 @@ class LectureController extends Controller
 
         $lectures = $query->handle($filters, $currentCampusId);
 
-        return Inertia::render('lectures/Index', [
+        return Inertia::render('Lectures/Index', [
             'lectures' => $lectures,
             'filters' => $filters,
             'semesters' => Semester::select('id', 'name', 'code')
@@ -142,7 +142,7 @@ class LectureController extends Controller
         $currentCampusId = session('current_campus_id');
         $campuses = Campus::orderBy('name')->get(['id', 'name']);
 
-        return Inertia::render('lectures/Create', [
+        return Inertia::render('Lectures/Create', [
             'campuses' => $campuses,
             'currentCampusId' => $currentCampusId,
         ]);
@@ -211,7 +211,7 @@ class LectureController extends Controller
             'courseOfferings.unit',
         ]);
 
-        return Inertia::render('lectures/Show', [
+        return Inertia::render('Lectures/Show', [
             'lecture' => $lecture,
         ]);
     }
@@ -223,7 +223,7 @@ class LectureController extends Controller
     {
         $campuses = Campus::orderBy('name')->get(['id', 'name']);
 
-        return Inertia::render('lectures/Edit', [
+        return Inertia::render('Lectures/Edit', [
             'lecture' => $lecture,
             'campuses' => $campuses,
         ]);
@@ -459,7 +459,7 @@ class LectureController extends Controller
                 ];
             });
 
-        return Inertia::render('lectures/TeachingHours', [
+        return Inertia::render('Lectures/TeachingHours', [
             'lecturers' => $results,
             'filters' => $filters,
             'semesters' => $semesters,
@@ -497,7 +497,7 @@ class LectureController extends Controller
             ['value' => 'fin', 'label' => 'Finance'],
         ];
 
-        return Inertia::render('lectures/TeachingHoursDetail', [
+        return Inertia::render('Lectures/TeachingHoursDetail', [
             'lecture' => $lecture->only(['id', 'first_name', 'last_name', 'email', 'employee_id']),
             'sessions' => $results['sessions'],
             'stats' => $results['stats'],

@@ -92,7 +92,7 @@ class CurriculumVersionController extends Controller
         // Calculate statistics
         $statistics = $this->calculateGlobalStatistics($request);
 
-        return Inertia::render('curriculum-versions/Index', [
+        return Inertia::render('CurriculumVersions/Index', [
             'curriculumVersions' => $curriculumVersions,
             'statistics' => $statistics,
             'filters' => $request->only(['search', 'program_id', 'specialization_id', 'sort', 'direction', 'per_page']),
@@ -582,7 +582,7 @@ class CurriculumVersionController extends Controller
      */
     public function create(): Response
     {
-        return Inertia::render('curriculum-versions/Create', [
+        return Inertia::render('CurriculumVersions/Create', [
             'programs' => Program::with('specializations')->get(),
             'specializations' => Specialization::select('id', 'name', 'code', 'program_id')->orderBy('name')->get(),
             'semesters' => Semester::select('id', 'name', 'code')->get(),
@@ -622,7 +622,7 @@ class CurriculumVersionController extends Controller
             ->orderBy('code')
             ->get();
 
-        return Inertia::render('curriculum-versions/Show', [
+        return Inertia::render('CurriculumVersions/Show', [
             'curriculumVersion' => $curriculumVersion,
             'availableModules' => $availableModules,
             'units' => Unit::select('id', 'code', 'name', 'credit_points')->orderBy('code')->get(),
@@ -641,7 +641,7 @@ class CurriculumVersionController extends Controller
                 ->with('error', 'Cannot edit a curriculum version that is already active or has passed.');
         }
 
-        return Inertia::render('curriculum-versions/Edit', [
+        return Inertia::render('CurriculumVersions/Edit', [
             'curriculumVersion' => $curriculumVersion,
             'programs' => Program::select('id', 'name', 'code')->orderBy('name')->get(),
             'specializations' => Specialization::select('id', 'name', 'code', 'program_id')->orderBy('name')->get(),
@@ -749,7 +749,7 @@ class CurriculumVersionController extends Controller
         // Calculate overview statistics
         $stats = $this->calculateOverviewStatistics($curriculumVersion);
 
-        return Inertia::render('curriculum-versions/summary/Overview', [
+        return Inertia::render('CurriculumVersions/summary/Overview', [
             'curriculumVersion' => [
                 'id' => $curriculumVersion->id,
                 'version_code' => $curriculumVersion->version_code,
@@ -824,7 +824,7 @@ class CurriculumVersionController extends Controller
         // Check if curriculum has modules
         $modulesCount = $curriculumVersion->curriculumModules()->count();
 
-        return Inertia::render('curriculum-versions/summary/Units', [
+        return Inertia::render('CurriculumVersions/summary/Units', [
             'curriculumVersion' => [
                 'id' => $curriculumVersion->id,
                 'version_code' => $curriculumVersion->version_code,
@@ -870,7 +870,7 @@ class CurriculumVersionController extends Controller
         // Get standalone units count
         $standaloneUnitsCount = $curriculumVersion->curriculumUnits()->count();
 
-        return Inertia::render('curriculum-versions/summary/Modules', [
+        return Inertia::render('CurriculumVersions/summary/Modules', [
             'curriculumVersion' => [
                 'id' => $curriculumVersion->id,
                 'version_code' => $curriculumVersion->version_code,
@@ -904,7 +904,7 @@ class CurriculumVersionController extends Controller
         // Calculate student statistics
         $studentStats = $this->calculateStudentStatistics($curriculumVersion);
 
-        return Inertia::render('curriculum-versions/summary/Students', [
+        return Inertia::render('CurriculumVersions/summary/Students', [
             'curriculumVersion' => [
                 'id' => $curriculumVersion->id,
                 'version_code' => $curriculumVersion->version_code,
@@ -948,7 +948,7 @@ class CurriculumVersionController extends Controller
             'curriculumUnits.unit.prerequisiteGroups.conditions.requiredUnit:id,code',
         ]);
 
-        return Inertia::render('curriculum-versions/summary/Roadmap', [
+        return Inertia::render('CurriculumVersions/summary/Roadmap', [
             'curriculumVersion' => [
                 'id' => $curriculumVersion->id,
                 'version_code' => $curriculumVersion->version_code,
@@ -996,7 +996,7 @@ class CurriculumVersionController extends Controller
         $electiveSlots = $curriculumVersion->getElectiveSlots();
         $availableElectives = $curriculumVersion->getElectiveUnitsByCategory();
 
-        return Inertia::render('curriculum-versions/ElectiveManagement', [
+        return Inertia::render('CurriculumVersions/ElectiveManagement', [
             'curriculumVersion' => $curriculumVersion,
             'electiveSlots' => $electiveSlots->map(function ($slot) {
                 return [

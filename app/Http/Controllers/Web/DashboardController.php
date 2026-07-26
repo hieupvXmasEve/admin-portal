@@ -26,7 +26,7 @@ class DashboardController extends Controller
         $stats = $this->statsReader->statsForCampus($campusId);
         $alerts = $this->statsReader->alertsForCampus($campusId);
 
-        return Inertia::render('dashboard/Dashboard', [
+        return Inertia::render('Dashboard/Dashboard', [
             'stats' => (new DashboardStatsResource($stats))->toArray(request()),
             'alerts' => $alerts,
         ]);

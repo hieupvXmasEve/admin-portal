@@ -81,7 +81,7 @@ it('allows editing when no assigned offering has completed sessions', function (
         ->get(route('syllabus_templates.show', $template))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('syllabus/TemplatesShow')
+            ->component('Syllabus/TemplatesShow')
             ->where('can_edit', true)
             ->where('template.min_attendance_threshold', fn ($value) => (float) $value === 80.0)
             ->where('template.min_grade_threshold', fn ($value) => (float) $value === 40.0)
@@ -92,7 +92,7 @@ it('allows editing when no assigned offering has completed sessions', function (
         ->get(route('syllabus_templates.edit', $template))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('syllabus/TemplatesEdit')
+            ->component('Syllabus/TemplatesEdit')
             ->where('can_edit', true));
 });
 
@@ -105,7 +105,7 @@ it('locks editing when assigned to an offering with a completed class session', 
         ->get(route('syllabus_templates.show', $template))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('syllabus/TemplatesShow')
+            ->component('Syllabus/TemplatesShow')
             ->where('can_edit', false));
 
     actingAs($this->user)
@@ -144,7 +144,7 @@ it('marks locked templates in the index list', function () {
         ->get(route('syllabus_templates.index'))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('syllabus/TemplatesIndex')
+            ->component('Syllabus/TemplatesIndex')
             ->has('items.data', 2)
             ->where('items.data', function ($rows) {
                 $lockedFlags = collect($rows)->pluck('is_locked_for_editing')->all();

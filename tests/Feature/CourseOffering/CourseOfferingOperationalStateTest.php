@@ -129,7 +129,7 @@ it('returns setup lifecycle with no blockers and an allowed finalize action for 
     getOperationalState($this, $offering)
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('course-offerings/Show')
+            ->component('CourseOfferings/Show')
             ->where('operational_state.lifecycle_stage', 'setup')
             ->where('operational_state.readiness_blockers', [])
             ->has('operational_state.available_actions', 1)

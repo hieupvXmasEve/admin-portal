@@ -23,7 +23,7 @@ class UnitImportController extends Controller
 {
     public function showImportForm(): Response
     {
-        return Inertia::render('units/Import', [
+        return Inertia::render('Units/Import', [
             'maxFileSize' => config('import.max_file_size', '10MB'),
             'allowedExtensions' => config('import.allowed_extensions', ['xlsx', 'xls']),
             'availableFormats' => [

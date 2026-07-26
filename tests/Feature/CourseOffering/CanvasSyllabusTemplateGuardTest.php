@@ -116,7 +116,7 @@ it('omits Canvas-reserved syllabus templates from the create page', function () 
         ->withSession(['current_campus_id' => $this->campus->id])
         ->get(route(CourseOfferingRoutes::CREATE))
         ->assertInertia(fn ($page) => $page
-            ->component('course-offerings/Create')
+            ->component('CourseOfferings/Create')
             ->has('syllabus_templates', 1)
             ->where('syllabus_templates.0.id', $reusable->id));
 });
@@ -151,7 +151,7 @@ it('keeps the current mapped syllabus visible on edit but omits another mapped s
         ->get(route(CourseOfferingRoutes::EDIT, $currentOffering))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('course-offerings/Edit')
+            ->component('CourseOfferings/Edit')
             ->has('syllabus_templates', 2)
             ->where('syllabus_templates.0.id', $current->id)
             ->where('syllabus_templates.1.id', $reusable->id));

@@ -210,7 +210,7 @@ class CourseOfferingController extends Controller
         $surveyForms = $this->activeSurveyForms->execute();
 
         // 4. Return to Inertia
-        return Inertia::render('course-offerings/Index', [
+        return Inertia::render('CourseOfferings/Index', [
             'courseOfferings' => $courseOfferings,
             'filters' => [
                 'search' => $validated['search'] ?? '',
@@ -293,7 +293,7 @@ class CourseOfferingController extends Controller
 
         // If no active semester, return with error state
         if (! $activeSemester) {
-            return Inertia::render('course-offerings/Create', [
+            return Inertia::render('CourseOfferings/Create', [
                 'activeSemester' => null,
                 'units' => [],
                 'lectures' => [],
@@ -328,7 +328,7 @@ class CourseOfferingController extends Controller
             ->orderBy('title')
             ->get(['id', 'unit_id', 'title', 'version', 'description', 'applicable_campus_id', 'applicable_program_id', 'delivery_mode']);
 
-        return Inertia::render('course-offerings/Create', [
+        return Inertia::render('CourseOfferings/Create', [
             'activeSemester' => [
                 'id' => $activeSemester->id,
                 'name' => $activeSemester->name,
@@ -469,7 +469,7 @@ class CourseOfferingController extends Controller
         // Survey forms for the SurveyTab create dialog
         $surveyForms = $this->activeSurveyForms->execute();
 
-        return Inertia::render('course-offerings/Show', [
+        return Inertia::render('CourseOfferings/Show', [
             // Eager — needed by Overview, Sessions, Students tabs
             'courseOffering' => $courseOffering,
 
@@ -533,7 +533,7 @@ class CourseOfferingController extends Controller
             ->orderBy('title')
             ->get(['id', 'unit_id', 'title', 'version', 'description', 'applicable_campus_id', 'applicable_program_id', 'delivery_mode']);
 
-        return Inertia::render('course-offerings/Edit', [
+        return Inertia::render('CourseOfferings/Edit', [
             'courseOffering' => $courseOffering,
             'lectures' => $lectures,
             'syllabusTemplates' => $syllabusTemplates,
@@ -1500,7 +1500,7 @@ class CourseOfferingController extends Controller
             ->orderByName()
             ->get(['id', 'first_name', 'last_name', 'email', 'academic_rank']);
 
-        return Inertia::render('course-offerings/Split', [
+        return Inertia::render('CourseOfferings/Split', [
             'courseOffering' => $courseOffering,
             'enrolledStudents' => $enrolledStudents,
             'lectures' => $lectures,

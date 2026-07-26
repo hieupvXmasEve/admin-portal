@@ -89,7 +89,7 @@ it('keeps the attendance index as a cross-offering reporting view', function () 
         ->get('/attendance')
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('attendance/Index')
+            ->component('Attendance/Index')
             ->has('attendances.data', 1)
             ->where('attendances.data.0.id', $this->attendance->id)
             // The reporting view deep-links back to the offering's cockpit

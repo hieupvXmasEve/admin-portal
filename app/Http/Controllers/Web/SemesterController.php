@@ -103,7 +103,7 @@ class SemesterController extends Controller
 
         $semesters = $query->paginate($per_page, ['*'], 'page', $page);
 
-        return Inertia::render('semesters/Index', [
+        return Inertia::render('Semesters/Index', [
             'semesters' => $semesters,
             'filters' => [
                 'search' => $validated['search'] ?? null,

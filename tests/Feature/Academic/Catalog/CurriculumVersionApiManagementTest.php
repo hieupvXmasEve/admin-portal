@@ -88,7 +88,7 @@ it('renders the Catalog-owned curriculum version create page', function (): void
     $this->get(route('curriculum_versions.create'))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('curriculum-versions/Create')
+            ->component('CurriculumVersions/Create')
             ->has('programs', 1)
             ->has('specializations')
             ->has('semesters'));
@@ -101,7 +101,7 @@ it('renders the Catalog-owned curriculum overview summary', function (): void {
     $this->get(route('curriculum_versions.summary.overview', $version))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('curriculum-versions/summary/Overview')
+            ->component('CurriculumVersions/summary/Overview')
             ->where('curriculumVersion.id', $version->id)
             ->where('curriculumVersion.version_code', 'CAT-SUMMARY')
             ->where('data.totalUnits', 0));
@@ -114,7 +114,7 @@ it('renders student summary data through the Student Registry boundary', functio
     $this->get(route('curriculum_versions.summary.students', $version))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('curriculum-versions/summary/Students')
+            ->component('CurriculumVersions/summary/Students')
             ->where('curriculumVersion.id', $version->id)
             ->where('data.total', 0)
             ->where('data.counts.active', 0));

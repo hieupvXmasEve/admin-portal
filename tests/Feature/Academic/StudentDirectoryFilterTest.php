@@ -56,7 +56,7 @@ it('returns selected student codes in the Inertia filter contract', function () 
         ]))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('students/Index')
+            ->component('Students/Index')
             ->where('filters.student_ids', ['SE500001', 'SE500002'])
             ->has('students.data', 2)
             ->where('students.data.0.student_id', 'SE500002')
@@ -109,7 +109,7 @@ it('returns advanced filters and lookup options in the Inertia contract', functi
         ]))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('students/Index')
+            ->component('Students/Index')
             ->where('filters.program_ids', [$this->program->id])
             ->where('filters.specialization_ids', [$specialization->id])
             ->where('filters.statuses', ['graduated'])

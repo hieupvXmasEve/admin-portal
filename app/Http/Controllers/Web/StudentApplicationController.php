@@ -125,7 +125,7 @@ class StudentApplicationController extends Controller
             ->orderBy('intake')
             ->pluck('intake');
 
-        return Inertia::render('student-applications/index', [
+        return Inertia::render('StudentApplications/Index', [
             'applications' => $applications,
             'filters' => $filters,
             'currentCampus' => $currentCampus !== null
@@ -156,7 +156,7 @@ class StudentApplicationController extends Controller
             $query->orderBy('file_type_code')->orderBy('page_index')->orderBy('id');
         }]);
 
-        return Inertia::render('student-applications/documents', [
+        return Inertia::render('StudentApplications/Documents', [
             'application' => [
                 'id' => $studentApplication->id,
                 'full_name' => $studentApplication->full_name,
@@ -174,7 +174,7 @@ class StudentApplicationController extends Controller
      */
     public function create()
     {
-        return Inertia::render('student-applications/create', $this->intentFormOptions());
+        return Inertia::render('StudentApplications/Create', $this->intentFormOptions());
     }
 
     /**
@@ -209,7 +209,7 @@ class StudentApplicationController extends Controller
             'revokedByUser:id,name,email',
         ]);
 
-        return Inertia::render('student-applications/show', [
+        return Inertia::render('StudentApplications/Show', [
             'application' => $studentApplication,
             'guardianRelationships' => ApplicationGuardian::relationships(),
             'documentChecklist' => $documentService->checklist($studentApplication),
@@ -221,7 +221,7 @@ class StudentApplicationController extends Controller
      */
     public function edit(StudentApplication $studentApplication)
     {
-        return Inertia::render('student-applications/edit', [
+        return Inertia::render('StudentApplications/Edit', [
             'application' => $studentApplication,
             ...$this->intentFormOptions(),
         ]);

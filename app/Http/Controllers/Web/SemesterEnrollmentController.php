@@ -123,7 +123,7 @@ class SemesterEnrollmentController extends Controller
             ];
         }
 
-        return Inertia::render('semesters/Enrollment', [
+        return Inertia::render('Semesters/Enrollment', [
             'semester' => $semester,
             'enrollmentStats' => $enrollmentStats,
             'campusStats' => $campusStats,

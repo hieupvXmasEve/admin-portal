@@ -235,7 +235,7 @@ it('shows active-semester lecturer GPA as an average of class-level evaluation s
         ->get(route(LectureRoutes::LECTURER_GPA_INDEX))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('lectures/LecturerGpa')
+            ->component('Lectures/LecturerGpa')
             ->where('filters.semester_id', (string) $activeSemester->id)
             ->has('rows.data', 1)
             ->where('rows.data.0.lecturer_name', 'Dung Nguyen')

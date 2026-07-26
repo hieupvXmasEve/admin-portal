@@ -48,7 +48,7 @@ it('lists only applications for the current campus', function () {
         ->get(route('student-applications.index'))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page) => $page
-            ->component('student-applications/index')
+            ->component('StudentApplications/Index')
             ->has('applications.data', 1)
             ->where('applications.data.0.id', $mine->id)
             ->where('currentCampus.code', $this->campus->code)
@@ -82,7 +82,7 @@ it('renders the focused documents view for an application', function () {
         ->get(route('student-applications.documents', $application))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page) => $page
-            ->component('student-applications/documents')
+            ->component('StudentApplications/Documents')
             ->where('application.id', $application->id)
             ->has('documentChecklist.groups')
         );

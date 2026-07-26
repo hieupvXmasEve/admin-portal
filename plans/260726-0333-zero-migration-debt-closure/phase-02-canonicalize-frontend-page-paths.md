@@ -1,6 +1,6 @@
 ---
 title: "Phase 2: Canonicalize frontend page paths"
-status: todo
+status: completed
 priority: P1
 effort: L
 dependencies: [1]
@@ -16,10 +16,10 @@ This avoids a global 138-file rename followed by immediate rework.
 
 ## Requirements
 
-- [ ] Freeze an exact source/destination/delete ledger with one owning phase per file.
-- [ ] Rename stable survivors and six lower-case Vue filenames through temporary paths.
-- [ ] Update only their render strings, imports, resolver checks, and test assertions.
-- [ ] Preserve named routes, props, layouts, authorization, and lazy/deferred behavior.
+- [x] Freeze an exact source/destination/delete ledger with one owning phase per file.
+- [x] Rename stable survivors and six lower-case Vue filenames through temporary paths.
+- [x] Update only their render strings, imports, resolver checks, and test assertions.
+- [x] Preserve named routes, props, layouts, authorization, and lazy/deferred behavior.
 
 ## File Inventory
 
@@ -65,9 +65,9 @@ only on their relevant batch, not completion of every phase-2 batch.
 
 ## Success Criteria
 
-- [ ] Every legacy directory/file has exactly one terminal-disposition owner.
-- [ ] Stable survivor batches have no stale render/import/test string.
-- [ ] Targeted backend tests, lint, format, typecheck, and production build pass.
+- [x] Every legacy directory/file has exactly one terminal-disposition owner.
+- [x] Stable survivor batches have no stale render/import/test string.
+- [x] Targeted backend tests, lint, format, typecheck, and production build pass.
 
 ## Risks and Security
 

@@ -298,7 +298,7 @@ it('renders the full Hub overview for an act-capable academic officer', function
         ->get(route('students.academic-summary.overview', $student))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('students/AcademicSummary/Overview')
+            ->component('Students/AcademicSummary/Overview')
             ->where('can_act', true)
             ->where('overview.student_info.emergency_contact_name', 'Jane Doe')
             ->has('overview.additional_info')
@@ -384,7 +384,7 @@ it('treats view_student_action alone as act-capable and renders the full overvie
         ->get(route('students.academic-summary.overview', $student))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('students/AcademicSummary/Overview')
+            ->component('Students/AcademicSummary/Overview')
             ->where('can_act', true)
             ->where('overview.student_info.emergency_contact_name', 'Jane Doe')
             ->has('overview.additional_info')
@@ -399,7 +399,7 @@ it('renders a reduced read-only Hub overview for a view-only role', function () 
         ->get(route('students.academic-summary.overview', $student))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('students/AcademicSummary/Overview')
+            ->component('Students/AcademicSummary/Overview')
             ->where('can_act', false)
             ->has('overview.student_info.full_name')
             ->missing('overview.student_info.national_id')

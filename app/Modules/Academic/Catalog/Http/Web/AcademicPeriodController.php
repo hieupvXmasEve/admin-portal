@@ -62,7 +62,7 @@ class AcademicPeriodController extends Controller
             ])
             ->groupBy('semester_id');
 
-        return Inertia::render('semesters/Index', [
+        return Inertia::render('Semesters/Index', [
             'semesters' => $semesters,
             'campuses' => $campuses,
             'campus_period_schedules' => $schedules,

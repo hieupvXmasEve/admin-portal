@@ -314,7 +314,7 @@ it('renders the enabled Graduation tab through the Hub for a permitted viewer', 
         ->get(route('students.academic-summary.graduation', $student))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('students/AcademicSummary/Graduation')
+            ->component('Students/AcademicSummary/Graduation')
             ->has('graduation.credit_summary')
             ->has('graduation.requirements')
             ->has('graduation.graduation_status')

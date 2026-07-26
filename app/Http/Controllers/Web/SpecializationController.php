@@ -9,6 +9,7 @@ use App\Constants\SpecializationRoutes;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreSpecializationRequest;
 use App\Http\Requests\UpdateSpecializationRequest;
+use App\Models\CurriculumVersion;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Specialization;
@@ -81,7 +82,7 @@ class SpecializationController extends Controller
                 ->toArray(),
         ];
 
-        return Inertia::render('specializations/Index', [
+        return Inertia::render('Specializations/Index', [
             'specializations' => $specializations,
             'filters' => [
                 'search' => $validated['search'] ?? null,
@@ -99,7 +100,7 @@ class SpecializationController extends Controller
     {
         // $programId = $request->query('program_id');
 
-        return Inertia::render('specializations/Create', [
+        return Inertia::render('Specializations/Create', [
             'programs' => Program::orderBy('name')->get(['id', 'name']),
             // 'selectedProgramId' => $programId ? (int) $programId : null,
         ]);
@@ -164,7 +165,7 @@ class SpecializationController extends Controller
                 ->count(),
         ];
 
-        return Inertia::render('specializations/Show', [
+        return Inertia::render('Specializations/Show', [
             'specialization' => $specialization,
             'statistics' => $statistics,
             'semesters' => Semester::orderBy('name')->get(['id', 'name', 'code']),
@@ -175,7 +176,7 @@ class SpecializationController extends Controller
     {
         $specialization->load('program:id,name');
 
-        return Inertia::render('specializations/Edit', [
+        return Inertia::render('Specializations/Edit', [
             'specialization' => $specialization,
             'programs' => Program::orderBy('name')->get(['id', 'name']),
         ]);
@@ -296,7 +297,7 @@ class SpecializationController extends Controller
     public function apiDeleteCurriculumVersion(Request $request, $curriculumVersionId)
     {
         try {
-            $curriculumVersion = \App\Models\CurriculumVersion::findOrFail($curriculumVersionId);
+            $curriculumVersion = CurriculumVersion::findOrFail($curriculumVersionId);
 
             // Check if curriculum version belongs to this specialization context
             $specializationId = $request->route('specialization');
@@ -338,7 +339,7 @@ class SpecializationController extends Controller
         ]);
 
         try {
-            $curriculumVersion = \App\Models\CurriculumVersion::findOrFail($curriculumVersionId);
+            $curriculumVersion = CurriculumVersion::findOrFail($curriculumVersionId);
 
             // Check if curriculum version belongs to this specialization context
             $specializationId = $request->route('specialization');

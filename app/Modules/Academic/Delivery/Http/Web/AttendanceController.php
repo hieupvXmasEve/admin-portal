@@ -14,6 +14,6 @@ final class AttendanceController extends Controller
 {
     public function index(ListAttendanceRecordsRequest $request, ListAttendanceRecordsQuery $query): Response
     {
-        return Inertia::render('attendance/Index', $query->handle($request->validated()));
+        return Inertia::render('Attendance/Index', $query->handle($request->validated()));
     }
 }

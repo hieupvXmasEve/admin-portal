@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Campus;
+use App\Models\Lecture;
+use App\Models\Student;
+use App\Models\User;
 use App\Support\CampusLogContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -57,13 +60,13 @@ class ActivityLogController extends Controller
                     ->orWhereJsonContains('properties->campus_name', $filters['search'])
                     ->orWhereJsonContains('properties->user_name', $filters['search'])
                     // Search by causer type with correct column names
-                    ->orWhereMorphRelation('causer', \App\Models\User::class, function ($q) use ($filters) {
+                    ->orWhereMorphRelation('causer', User::class, function ($q) use ($filters) {
                         $q->where('name', 'like', '%'.$filters['search'].'%');
                     })
-                    ->orWhereMorphRelation('causer', \App\Models\Student::class, function ($q) use ($filters) {
+                    ->orWhereMorphRelation('causer', Student::class, function ($q) use ($filters) {
                         $q->where('full_name', 'like', '%'.$filters['search'].'%');
                     })
-                    ->orWhereMorphRelation('causer', \App\Models\Lecture::class, function ($q) use ($filters) {
+                    ->orWhereMorphRelation('causer', Lecture::class, function ($q) use ($filters) {
                         $q->where(function ($nameQuery) use ($filters) {
                             $nameQuery->where('first_name', 'like', '%'.$filters['search'].'%')
                                 ->orWhere('last_name', 'like', '%'.$filters['search'].'%');
@@ -128,7 +131,7 @@ class ActivityLogController extends Controller
             });
         }
 
-        return Inertia::render('systems/ActivityLogs', [
+        return Inertia::render('Systems/ActivityLogs', [
             'activities' => $activities,
             'filters' => $filters,
             'subject_types' => $subjectTypes,

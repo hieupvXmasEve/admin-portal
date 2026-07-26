@@ -43,7 +43,7 @@ class UnitController extends Controller
     {
         $filters = $request->validated();
 
-        return Inertia::render('units/Index', [
+        return Inertia::render('Units/Index', [
             'units' => $this->listUnits->handle($filters),
             'filters' => [
                 'search' => $filters['search'] ?? '',
@@ -64,7 +64,7 @@ class UnitController extends Controller
 
     public function create(): Response
     {
-        return Inertia::render('units/Create', [
+        return Inertia::render('Units/Create', [
             'formDefaults' => ['code' => '', 'name' => '', 'credit_points' => 3],
         ]);
     }
@@ -86,7 +86,7 @@ class UnitController extends Controller
 
     public function show(Unit $unit): Response
     {
-        return Inertia::render('units/Show', [
+        return Inertia::render('Units/Show', [
             ...$this->unitDetails->handle($unit),
             'canEdit' => true,
             'canDelete' => $this->deleteUnit->eligibility($unit)['allowed'],
@@ -98,7 +98,7 @@ class UnitController extends Controller
         $details = $this->unitDetails->handle($unit);
         $unitData = $unit->toArray();
 
-        return Inertia::render('units/Edit', [
+        return Inertia::render('Units/Edit', [
             'unit' => $unitData,
             'prerequisiteDescriptions' => $details['prerequisiteDescriptions'],
         ]);

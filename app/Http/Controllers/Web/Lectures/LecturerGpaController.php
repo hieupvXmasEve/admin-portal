@@ -24,7 +24,7 @@ class LecturerGpaController extends Controller
         $filters = $this->normalizeFilters($request->validated());
         $selectedSemester = $this->selectedSemester($filters['semester_id']);
 
-        return Inertia::render('lectures/LecturerGpa', [
+        return Inertia::render('Lectures/LecturerGpa', [
             'rows' => $query->paginate($filters, $currentCampusId),
             'filters' => $filters,
             'semesters' => $this->semesterOptions(),

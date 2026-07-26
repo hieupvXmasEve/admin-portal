@@ -32,7 +32,7 @@ class ProgramController extends Controller
     {
         $filters = $request->validated();
 
-        return Inertia::render('programs/Index', [
+        return Inertia::render('Programs/Index', [
             'programs' => $this->listPrograms->handle($filters),
             'filters' => [
                 'search' => $filters['search'] ?? '',
@@ -62,7 +62,7 @@ class ProgramController extends Controller
     {
         $this->authorize('view', $program);
 
-        return Inertia::render('programs/Show', $this->programDetails->handle($program));
+        return Inertia::render('Programs/Show', $this->programDetails->handle($program));
     }
 
     public function update(UpdateProgramRequest $request, Program $program): RedirectResponse

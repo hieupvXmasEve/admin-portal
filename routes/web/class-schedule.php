@@ -6,6 +6,6 @@ use Inertia\Inertia;
 // Admin Schedule Management Routes
 Route::middleware(['auth', 'verified'])->name('schedules.')->group(function () {
     Route::get('/schedule-management', function () {
-        return Inertia::render('class-schedule/index');
+        return Inertia::render('ClassSchedule/Index');
     })->name('index');
 });

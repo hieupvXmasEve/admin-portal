@@ -134,7 +134,7 @@ class CourseRegistrationController extends Controller
                 ]);
         }
 
-        return Inertia::render('course-registrations/Index', [
+        return Inertia::render('CourseRegistrations/Index', [
             'registrations' => $registrations,
             'statistics' => $statistics,
             'filters' => $request->only(['search', 'semester_id', 'status', 'course_offering_id', 'per_page']),
@@ -175,7 +175,7 @@ class CourseRegistrationController extends Controller
                 ->get();
         }
 
-        return Inertia::render('course-registrations/Create', [
+        return Inertia::render('CourseRegistrations/Create', [
             'semesters' => $semesters,
             'selectedSemester' => $selectedSemester,
             'courseOfferings' => $courseOfferings,
@@ -276,7 +276,7 @@ class CourseRegistrationController extends Controller
             'courseOffering.lecture',
         ]);
 
-        return Inertia::render('course-registrations/Show', [
+        return Inertia::render('CourseRegistrations/Show', [
             'registration' => $adminCourseRegistration,
         ]);
     }
@@ -295,7 +295,7 @@ class CourseRegistrationController extends Controller
 
         $canEditStatus = $this->canEditRegistrationStatus($adminCourseRegistration->courseOffering);
 
-        return Inertia::render('course-registrations/Edit', [
+        return Inertia::render('CourseRegistrations/Edit', [
             'registration' => $adminCourseRegistration,
             'canEditStatus' => $canEditStatus,
         ]);

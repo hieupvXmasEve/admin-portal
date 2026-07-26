@@ -51,14 +51,14 @@ final class StudentApplicationController extends Controller
         $campus = app()->bound('campus') ? app('campus') : null;
         $lists = $applications->filters($campus?->code);
 
-        return Inertia::render('student-applications/index', ['applications' => $applications->handle($filters, $campus?->code), 'filters' => $filters, 'currentCampus' => $campus === null ? null : ['code' => $campus->code, 'name' => $campus->name], 'documentTypes' => $lists['document_types'], 'intakes' => $lists['intakes'], 'statusOptions' => [['value' => StudentApplication::STATUS_PENDING, 'label' => 'Pending'], ['value' => StudentApplication::STATUS_ENROLLED, 'label' => 'Enrolled'], ['value' => StudentApplication::STATUS_REJECTED, 'label' => 'Rejected']]]);
+        return Inertia::render('StudentApplications/Index', ['applications' => $applications->handle($filters, $campus?->code), 'filters' => $filters, 'currentCampus' => $campus === null ? null : ['code' => $campus->code, 'name' => $campus->name], 'documentTypes' => $lists['document_types'], 'intakes' => $lists['intakes'], 'statusOptions' => [['value' => StudentApplication::STATUS_PENDING, 'label' => 'Pending'], ['value' => StudentApplication::STATUS_ENROLLED, 'label' => 'Enrolled'], ['value' => StudentApplication::STATUS_REJECTED, 'label' => 'Rejected']]]);
     }
 
     public function documents(StudentApplication $studentApplication, GetApplicantDocumentChecklistQuery $documentChecklist): mixed
     {
         $studentApplication->load(['documents' => fn ($query) => $query->orderBy('file_type_code')->orderBy('page_index')->orderBy('id')]);
 
-        return Inertia::render('student-applications/documents', [
+        return Inertia::render('StudentApplications/Documents', [
             'application' => [
                 'id' => $studentApplication->id,
                 'full_name' => $studentApplication->full_name,
@@ -73,7 +73,7 @@ final class StudentApplicationController extends Controller
 
     public function create(): mixed
     {
-        return Inertia::render('student-applications/create', $this->programMappingReader->formOptions());
+        return Inertia::render('StudentApplications/Create', $this->programMappingReader->formOptions());
     }
 
     public function store(StoreApplicationRequest $request): RedirectResponse
@@ -95,7 +95,7 @@ final class StudentApplicationController extends Controller
             'revokedByUser:id,name,email',
         ]);
 
-        return Inertia::render('student-applications/show', [
+        return Inertia::render('StudentApplications/Show', [
             'application' => $studentApplication,
             'guardianRelationships' => ApplicationGuardian::relationships(),
             'documentChecklist' => $documentChecklist->handle($studentApplication),
@@ -104,7 +104,7 @@ final class StudentApplicationController extends Controller
 
     public function edit(StudentApplication $studentApplication): mixed
     {
-        return Inertia::render('student-applications/edit', ['application' => $studentApplication, ...$this->programMappingReader->formOptions()]);
+        return Inertia::render('StudentApplications/Edit', ['application' => $studentApplication, ...$this->programMappingReader->formOptions()]);
     }
 
     public function update(UpdateApplicationRequest $request, StudentApplication $studentApplication): RedirectResponse

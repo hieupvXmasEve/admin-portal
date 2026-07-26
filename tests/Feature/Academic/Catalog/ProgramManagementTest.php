@@ -64,7 +64,7 @@ it('preserves program listing filters and Inertia props', function (): void {
         ->get(route(ProgramRoutes::INDEX, ['search' => 'Catalog', 'per_page' => 15]))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('programs/Index')
+            ->component('Programs/Index')
             ->where('filters.search', 'Catalog')
             ->where('filters.per_page', '15')
             ->has('programs.data', 1)
@@ -90,6 +90,6 @@ it('authorizes a specific program before rendering its detail contract', functio
         ->get(route(ProgramRoutes::SHOW, $program))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('programs/Show')
+            ->component('Programs/Show')
             ->where('program.id', $program->id));
 });

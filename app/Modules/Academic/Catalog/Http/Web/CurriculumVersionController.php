@@ -44,7 +44,7 @@ class CurriculumVersionController extends Controller
         ]);
         $result = app(ListCurriculumVersionsQuery::class)->handle($filters);
 
-        return Inertia::render('curriculum-versions/Index', [
+        return Inertia::render('CurriculumVersions/Index', [
             'curriculumVersions' => $result['items'],
             'statistics' => $result['statistics'],
             'filters' => $filters,
@@ -64,12 +64,12 @@ class CurriculumVersionController extends Controller
 
     public function create(): Response
     {
-        return Inertia::render('curriculum-versions/Create', app(GetCurriculumVersionPageDataQuery::class)->create());
+        return Inertia::render('CurriculumVersions/Create', app(GetCurriculumVersionPageDataQuery::class)->create());
     }
 
     public function showWithModules(CurriculumVersion $curriculumVersion): Response
     {
-        return Inertia::render('curriculum-versions/Show', app(GetCurriculumVersionPageDataQuery::class)->show($curriculumVersion));
+        return Inertia::render('CurriculumVersions/Show', app(GetCurriculumVersionPageDataQuery::class)->show($curriculumVersion));
     }
 
     public function edit(CurriculumVersion $curriculumVersion): Response|RedirectResponse
@@ -84,7 +84,7 @@ class CurriculumVersionController extends Controller
 
         unset($data['editable']);
 
-        return Inertia::render('curriculum-versions/Edit', $data);
+        return Inertia::render('CurriculumVersions/Edit', $data);
     }
 
     public function electiveManagement(CurriculumVersion $curriculumVersion): Response
@@ -92,7 +92,7 @@ class CurriculumVersionController extends Controller
         $data = app(GetCurriculumVersionPageDataQuery::class)->electives($curriculumVersion);
         $availableElectives = $data['availableElectives'];
 
-        return Inertia::render('curriculum-versions/ElectiveManagement', [
+        return Inertia::render('CurriculumVersions/ElectiveManagement', [
             'curriculumVersion' => $data['curriculumVersion'],
             'electiveSlots' => $data['electiveSlots'],
             'availableElectives' => [
@@ -118,7 +118,7 @@ class CurriculumVersionController extends Controller
     public function summaryOverview(CurriculumVersion $curriculumVersion): Response
     {
         return Inertia::render(
-            'curriculum-versions/summary/Overview',
+            'CurriculumVersions/summary/Overview',
             app(GetCurriculumVersionSummaryQuery::class)->overview($curriculumVersion),
         );
     }
@@ -135,7 +135,7 @@ class CurriculumVersionController extends Controller
         ]);
 
         return Inertia::render(
-            'curriculum-versions/summary/Units',
+            'CurriculumVersions/summary/Units',
             app(GetCurriculumVersionSummaryQuery::class)->units($curriculumVersion, $filters),
         );
     }
@@ -143,7 +143,7 @@ class CurriculumVersionController extends Controller
     public function summaryModules(CurriculumVersion $curriculumVersion): Response
     {
         return Inertia::render(
-            'curriculum-versions/summary/Modules',
+            'CurriculumVersions/summary/Modules',
             app(GetCurriculumVersionSummaryQuery::class)->modules($curriculumVersion),
         );
     }
@@ -151,7 +151,7 @@ class CurriculumVersionController extends Controller
     public function summaryRoadmap(Request $request, CurriculumVersion $curriculumVersion): Response
     {
         return Inertia::render(
-            'curriculum-versions/summary/Roadmap',
+            'CurriculumVersions/summary/Roadmap',
             app(GetCurriculumVersionSummaryQuery::class)->roadmap($curriculumVersion),
         );
     }
@@ -168,7 +168,7 @@ class CurriculumVersionController extends Controller
             app('campus')->id,
         );
 
-        return Inertia::render('curriculum-versions/summary/Students', [
+        return Inertia::render('CurriculumVersions/summary/Students', [
             'curriculumVersion' => [
                 'id' => $curriculumVersion->id,
                 'version_code' => $curriculumVersion->version_code,

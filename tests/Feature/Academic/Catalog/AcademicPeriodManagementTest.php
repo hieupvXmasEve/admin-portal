@@ -74,7 +74,7 @@ it('preserves the academic period listing props and filters', function (): void 
         ]))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('semesters/Index')
+            ->component('Semesters/Index')
             ->where('filters.search', 'Spring')
             ->where('filters.is_archived', false)
             ->has('semesters.data', 1)

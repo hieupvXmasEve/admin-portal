@@ -253,7 +253,7 @@ it('shows the primary parent after assigning a new parent email', function () {
         ->get(route(StudentRoutes::EDIT, $student))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('students/Edit')
+            ->component('Students/Edit')
             ->where('student.parent_user.id', $newParentUser->id)
             ->where('student.parent_user.name', 'New Primary Parent')
             ->where('student.parent_user.email', 'new-primary-parent@example.com')
@@ -291,7 +291,7 @@ it('shows the legacy primary parent account while its Registry relationship is n
         ->get(route(StudentRoutes::EDIT, $student))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('students/Edit')
+            ->component('Students/Edit')
             ->where('student.parent_user.id', $parentUser->id)
             ->where('student.parent_user.name', 'Legacy Primary Parent')
             ->where('student.parent_user.email', 'legacy-parent@example.com')
@@ -334,7 +334,7 @@ it('does not expose a legacy account when the primary Registry Guardian has no a
         ->get(route(StudentRoutes::EDIT, $student))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('students/Edit')
+            ->component('Students/Edit')
             ->where('student.parent_user', null)
         );
 });

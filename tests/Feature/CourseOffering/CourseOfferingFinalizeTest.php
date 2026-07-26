@@ -181,7 +181,7 @@ it('blocks finalization when a Canvas-mapped offering is not synced', function (
         ->get(route(CourseOfferingRoutes::SHOW, $offering), [
             'X-Inertia' => 'true',
             'X-Inertia-Version' => Inertia::getVersion(),
-            'X-Inertia-Partial-Component' => 'course-offerings/Show',
+            'X-Inertia-Partial-Component' => 'CourseOfferings/Show',
             'X-Inertia-Partial-Data' => 'operational_state',
         ]);
 
@@ -231,11 +231,11 @@ it('finalizes a ready offering and serves refreshed operational_state on a parti
         ->get(route(CourseOfferingRoutes::SHOW, $offering), [
             'X-Inertia' => 'true',
             'X-Inertia-Version' => Inertia::getVersion(),
-            'X-Inertia-Partial-Component' => 'course-offerings/Show',
+            'X-Inertia-Partial-Component' => 'CourseOfferings/Show',
             'X-Inertia-Partial-Data' => 'operational_state',
         ])
         ->assertOk()
-        ->assertJsonPath('component', 'course-offerings/Show')
+        ->assertJsonPath('component', 'CourseOfferings/Show')
         ->assertJsonPath('props.operational_state.lifecycle_stage', 'completed')
         ->assertJsonPath('props.operational_state.readiness_blockers', [])
         ->assertJsonPath('props.operational_state.available_actions', [])

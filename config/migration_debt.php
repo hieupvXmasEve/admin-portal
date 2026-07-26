@@ -133,8 +133,8 @@ return [
             'reason' => 'Existing Inertia page directories use lowercase or kebab-case names.',
             'canonical_replacement' => 'PascalCase page directories with matching resolver paths.',
             'retirement_condition' => 'The directory is moved with cross-platform render/import verification.',
-            'baseline' => 23,
-            'mode' => 'max',
+            'baseline' => 0,
+            'mode' => 'exact',
         ],
         'removed_inertia_apis' => [
             'owner' => 'Frontend and Platform Teams',

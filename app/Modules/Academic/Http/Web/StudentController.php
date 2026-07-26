@@ -80,7 +80,7 @@ class StudentController extends Controller
         // Get statistics for current campus
         $statistics = $this->studentService->getStudentStatistics($campusId);
 
-        return Inertia::render('students/Index', [
+        return Inertia::render('Students/Index', [
             'students' => $students,
             'filters' => $filters,
             'programs' => $programs,
@@ -137,7 +137,7 @@ class StudentController extends Controller
             ->orderBy('version_code', 'desc')
             ->get();
 
-        return Inertia::render('students/Create', [
+        return Inertia::render('Students/Create', [
             'programs' => $programs,
             'specializations' => $specializations,
             'curriculumVersions' => $curriculumVersions,
@@ -195,7 +195,7 @@ class StudentController extends Controller
             : $this->guardianAccessGrantReader->activeAccountForRelationship($primaryGuardian->id);
         $student->setAttribute('parent_user', $parentAccount?->toArray());
 
-        return Inertia::render('students/Edit', [
+        return Inertia::render('Students/Edit', [
             'student' => $student,
             'campuses' => $campuses,
             'programs' => $programs,
@@ -230,7 +230,7 @@ class StudentController extends Controller
      */
     public function photoCapture(Student $student): Response
     {
-        return Inertia::render('students/PhotoCapture', [
+        return Inertia::render('Students/PhotoCapture', [
             'studentId' => $student->id,
             'returnUrl' => route(StudentRoutes::EDIT, $student),
         ]);

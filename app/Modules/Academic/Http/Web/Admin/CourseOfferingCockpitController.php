@@ -37,7 +37,7 @@ final class CourseOfferingCockpitController extends Controller
 
         $data['surveyForms'] = $this->activeSurveyForms->handle();
 
-        return Inertia::render('course-offerings/Index', $data);
+        return Inertia::render('CourseOfferings/Index', $data);
     }
 
     public function show(object $courseOffering): Response
@@ -48,7 +48,7 @@ final class CourseOfferingCockpitController extends Controller
 
         $data = $this->showQuery->handle($courseOffering, (int) app('campus')->id);
 
-        return Inertia::render('course-offerings/Show', [
+        return Inertia::render('CourseOfferings/Show', [
             'courseOffering' => $data['courseOffering'],
             'operational_state' => $this->operationalStateQuery->handle($data['courseOffering'], Auth::user()),
             'availableRooms' => Inertia::once(fn (): array => $data['availableRooms']),

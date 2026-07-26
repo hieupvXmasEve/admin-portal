@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Web\Units;
 
 use App\Http\Controllers\Controller;
+use App\Models\Unit;
 use App\Services\UnitExcelImportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,6 +14,12 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
+use PhpOffice\PhpSpreadsheet\Cell\DataValidation;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class UnitImportController extends Controller
@@ -23,7 +30,7 @@ class UnitImportController extends Controller
 
     public function showImportForm(): InertiaResponse
     {
-        return Inertia::render('units/Import', [
+        return Inertia::render('Units/Import', [
             'maxFileSize' => config('import.max_file_size', '10MB'),
             'allowedExtensions' => config('import.allowed_extensions', ['xlsx', 'xls']),
             'availableFormats' => [
@@ -185,7 +192,7 @@ class UnitImportController extends Controller
             ];
 
             // Detect if this is a combined format by checking for syllabus-related sheets
-            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($fullPath);
+            $spreadsheet = IOFactory::load($fullPath);
             $sheetNames = array_map(fn ($sheet) => $sheet->getTitle(), $spreadsheet->getAllSheets());
             $isCombinedFormat = in_array('Syllabus', $sheetNames) ||
                 in_array('Assessment Components', $sheetNames) ||
@@ -297,7 +304,7 @@ class UnitImportController extends Controller
         $templatePath = $templateDir."/units_{$format}_template.xlsx";
 
         // Create a simple Excel file with headers based on format
-        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet;
+        $spreadsheet = new Spreadsheet;
 
         switch ($format) {
             case 'simple':
@@ -314,7 +321,7 @@ class UnitImportController extends Controller
                 break;
         }
 
-        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $writer = new Xlsx($spreadsheet);
         $writer->save($templatePath);
 
         return $templatePath;
@@ -344,18 +351,18 @@ class UnitImportController extends Controller
         // Style headers
         $worksheet->getStyle('A1:C1')->getFont()->setBold(true);
         $worksheet->getStyle('A1:C1')->getFill()
-            ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+            ->setFillType(Fill::FILL_SOLID)
             ->getStartColor()->setRGB('4472C4');
         $worksheet->getStyle('A1:C1')->getFont()->getColor()->setRGB('FFFFFF');
 
         // Add borders to header and sample data
         $worksheet->getStyle('A1:C4')->getBorders()->getAllBorders()
-            ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+            ->setBorderStyle(Border::BORDER_THIN);
 
         // Add data validation for Credit Points column
         $validation = $worksheet->getDataValidation('C2:C100');
-        $validation->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_DECIMAL);
-        $validation->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_STOP);
+        $validation->setType(DataValidation::TYPE_DECIMAL);
+        $validation->setErrorStyle(DataValidation::STYLE_STOP);
         $validation->setAllowBlank(false);
         $validation->setShowInputMessage(true);
         $validation->setShowErrorMessage(true);
@@ -363,7 +370,7 @@ class UnitImportController extends Controller
         $validation->setPrompt('Enter a numeric value (e.g., 12.5)');
         $validation->setErrorTitle('Invalid Credit Points');
         $validation->setError('Credit points must be a positive number');
-        $validation->setOperator(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::OPERATOR_GREATERTHAN);
+        $validation->setOperator(DataValidation::OPERATOR_GREATERTHAN);
         $validation->setFormula1('0');
 
         // Auto-size columns
@@ -432,7 +439,7 @@ class UnitImportController extends Controller
             $highestColumn = $sheet->getHighestColumn();
             $sheet->getStyle("A1:{$highestColumn}1")->getFont()->setBold(true);
             $sheet->getStyle("A1:{$highestColumn}1")->getFill()
-                ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+                ->setFillType(Fill::FILL_SOLID)
                 ->getStartColor()->setRGB('4472C4');
             $sheet->getStyle("A1:{$highestColumn}1")->getFont()->getColor()->setRGB('FFFFFF');
 
@@ -508,7 +515,7 @@ class UnitImportController extends Controller
             $highestColumn = $sheet->getHighestColumn();
             $sheet->getStyle("A1:{$highestColumn}1")->getFont()->setBold(true);
             $sheet->getStyle("A1:{$highestColumn}1")->getFill()
-                ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+                ->setFillType(Fill::FILL_SOLID)
                 ->getStartColor()->setRGB('4472C4');
             $sheet->getStyle("A1:{$highestColumn}1")->getFont()->getColor()->setRGB('FFFFFF');
 
@@ -672,14 +679,14 @@ class UnitImportController extends Controller
             // Style headers
             $sheet->getStyle("A1:{$highestColumn}1")->getFont()->setBold(true);
             $sheet->getStyle("A1:{$highestColumn}1")->getFill()
-                ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+                ->setFillType(Fill::FILL_SOLID)
                 ->getStartColor()->setRGB('4472C4');
             $sheet->getStyle("A1:{$highestColumn}1")->getFont()->getColor()->setRGB('FFFFFF');
 
             // Add borders to sample data
             $lastRow = $sheet->getHighestRow();
             $sheet->getStyle("A1:{$highestColumn}{$lastRow}")->getBorders()->getAllBorders()
-                ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+                ->setBorderStyle(Border::BORDER_THIN);
 
             // Auto-size columns
             for ($col = 'A'; $col <= $highestColumn; $col++) {
@@ -711,8 +718,8 @@ class UnitImportController extends Controller
 
         try {
             $validation = $worksheet->getDataValidation($column.$startRow.':'.$column.$endRow);
-            $validation->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST)
-                ->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_INFORMATION)
+            $validation->setType(DataValidation::TYPE_LIST)
+                ->setErrorStyle(DataValidation::STYLE_INFORMATION)
                 ->setAllowBlank(true)
                 ->setShowInputMessage(true)
                 ->setShowErrorMessage(true)
@@ -723,7 +730,7 @@ class UnitImportController extends Controller
                 ->setPrompt('Select the type of prerequisite condition.')
                 ->setFormula1('"'.implode(',', $typeOptions).'"');
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::warning('Failed to add type validation: '.$e->getMessage());
+            Log::warning('Failed to add type validation: '.$e->getMessage());
         }
     }
 
@@ -736,8 +743,8 @@ class UnitImportController extends Controller
 
         try {
             $validation = $worksheet->getDataValidation($column.$startRow.':'.$column.$endRow);
-            $validation->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST)
-                ->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_INFORMATION)
+            $validation->setType(DataValidation::TYPE_LIST)
+                ->setErrorStyle(DataValidation::STYLE_INFORMATION)
                 ->setAllowBlank(true)
                 ->setShowInputMessage(true)
                 ->setShowErrorMessage(true)
@@ -748,7 +755,7 @@ class UnitImportController extends Controller
                 ->setPrompt('Select the logic operator for this prerequisite group.')
                 ->setFormula1('"'.implode(',', $logicOptions).'"');
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::warning('Failed to add group logic validation: '.$e->getMessage());
+            Log::warning('Failed to add group logic validation: '.$e->getMessage());
         }
     }
 
@@ -758,8 +765,8 @@ class UnitImportController extends Controller
     private function addBooleanDropdownValidation($worksheet, string $column, int $startRow, int $endRow): void
     {
         $validation = $worksheet->getDataValidation("{$column}{$startRow}:{$column}{$endRow}");
-        $validation->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST);
-        $validation->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_STOP);
+        $validation->setType(DataValidation::TYPE_LIST);
+        $validation->setErrorStyle(DataValidation::STYLE_STOP);
         $validation->setAllowBlank(false);
         $validation->setShowInputMessage(true);
         $validation->setShowErrorMessage(true);
@@ -777,8 +784,8 @@ class UnitImportController extends Controller
     private function addAssessmentTypeDropdownValidation($worksheet, string $column, int $startRow, int $endRow): void
     {
         $validation = $worksheet->getDataValidation("{$column}{$startRow}:{$column}{$endRow}");
-        $validation->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST);
-        $validation->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_STOP);
+        $validation->setType(DataValidation::TYPE_LIST);
+        $validation->setErrorStyle(DataValidation::STYLE_STOP);
         $validation->setAllowBlank(false);
         $validation->setShowInputMessage(true);
         $validation->setShowErrorMessage(true);
@@ -802,7 +809,7 @@ class UnitImportController extends Controller
         $instructionsSheet->setCellValue('A1', 'Unit Import Template Instructions');
         $instructionsSheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
         $instructionsSheet->getStyle('A1')->getFill()
-            ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+            ->setFillType(Fill::FILL_SOLID)
             ->getStartColor()->setRGB('4472C4');
         $instructionsSheet->getStyle('A1')->getFont()->getColor()->setRGB('FFFFFF');
 
@@ -1079,7 +1086,7 @@ class UnitImportController extends Controller
     private function addUnitCodeDropdownValidation($worksheet, string $column, int $startRow, int $endRow): void
     {
         // Get existing unit codes for validation
-        $units = \App\Models\Unit::orderBy('code')->pluck('code')->toArray();
+        $units = Unit::orderBy('code')->pluck('code')->toArray();
 
         if (empty($units)) {
             // Add some common examples if no units exist
@@ -1099,8 +1106,8 @@ class UnitImportController extends Controller
 
         try {
             $validation = $worksheet->getDataValidation($column.$startRow.':'.$column.$endRow);
-            $validation->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST)
-                ->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_INFORMATION)
+            $validation->setType(DataValidation::TYPE_LIST)
+                ->setErrorStyle(DataValidation::STYLE_INFORMATION)
                 ->setAllowBlank(true)
                 ->setShowInputMessage(true)
                 ->setShowErrorMessage(true)
@@ -1112,7 +1119,7 @@ class UnitImportController extends Controller
                 ->setFormula1($formula);
         } catch (\Exception $e) {
             // If validation fails, skip it to prevent corruption
-            \Illuminate\Support\Facades\Log::warning('Failed to add unit code validation: '.$e->getMessage());
+            Log::warning('Failed to add unit code validation: '.$e->getMessage());
         }
     }
 }

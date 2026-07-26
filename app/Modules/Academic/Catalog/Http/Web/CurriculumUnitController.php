@@ -36,7 +36,7 @@ class CurriculumUnitController extends Controller
     {
         $filters = $request->validated();
 
-        return Inertia::render('curriculum-units/Index', [
+        return Inertia::render('CurriculumUnits/Index', [
             'curriculumUnits' => $this->listCurriculumUnits->handle($filters),
             'filters' => [
                 'search' => $filters['search'] ?? null,
@@ -50,7 +50,7 @@ class CurriculumUnitController extends Controller
 
     public function create(): Response
     {
-        return Inertia::render('curriculum-units/Create', $this->formOptions());
+        return Inertia::render('CurriculumUnits/Create', $this->formOptions());
     }
 
     public function store(StoreCurriculumUnitRequest $request, CreateCurriculumUnitAction $create): RedirectResponse
@@ -72,14 +72,14 @@ class CurriculumUnitController extends Controller
     {
         $curriculumUnit->load(['curriculumVersion.program', 'curriculumVersion.specialization', 'unit', 'semester']);
 
-        return Inertia::render('curriculum-units/Show', ['curriculumUnit' => $curriculumUnit]);
+        return Inertia::render('CurriculumUnits/Show', ['curriculumUnit' => $curriculumUnit]);
     }
 
     public function edit(CurriculumUnit $curriculumUnit): Response
     {
         $curriculumUnit->load(['curriculumVersion', 'unit', 'semester']);
 
-        return Inertia::render('curriculum-units/Edit', ['curriculumUnit' => $curriculumUnit, ...$this->formOptions()]);
+        return Inertia::render('CurriculumUnits/Edit', ['curriculumUnit' => $curriculumUnit, ...$this->formOptions()]);
     }
 
     public function update(UpdateCurriculumUnitRequest $request, CurriculumUnit $curriculumUnit, UpdateCurriculumUnitAction $update): RedirectResponse

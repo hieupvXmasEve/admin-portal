@@ -26,7 +26,7 @@ class CourseOfferingCatalogFormController extends Controller
         $form = $query->handle();
 
         if ($form['active_semester'] === null) {
-            return Inertia::render('course-offerings/Create', [
+            return Inertia::render('CourseOfferings/Create', [
                 'active_semester' => null,
                 'units' => [],
                 'lectures' => [],
@@ -35,7 +35,7 @@ class CourseOfferingCatalogFormController extends Controller
             ]);
         }
 
-        return Inertia::render('course-offerings/Create', [
+        return Inertia::render('CourseOfferings/Create', [
             ...$form,
             'error' => null,
         ]);
@@ -77,7 +77,7 @@ class CourseOfferingCatalogFormController extends Controller
             $courseOffering->syllabus_template_id,
         );
 
-        return Inertia::render('course-offerings/Edit', [
+        return Inertia::render('CourseOfferings/Edit', [
             'course_offering' => $this->courseOfferingPayload($courseOffering, $form),
             'lectures' => $form['lectures'],
             'syllabus_templates' => $form['syllabus_templates'],

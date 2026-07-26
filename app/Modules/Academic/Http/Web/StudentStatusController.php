@@ -50,7 +50,7 @@ class StudentStatusController extends Controller
 
         $enrollments = $enrollmentsQuery->orderBy('created_at', 'desc')->paginate(15);
 
-        return Inertia::render('students/enrollments/Index', [
+        return Inertia::render('Students/enrollments/Index', [
             'enrollments' => $enrollments,
             'filters' => $validated,
         ]);

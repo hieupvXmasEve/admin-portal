@@ -36,12 +36,12 @@ final class ClassSessionController extends Controller
 {
     public function index(ListClassSessionsRequest $request, ListClassSessionsQuery $query): Response
     {
-        return Inertia::render('class-sessions/Index', $query->handle($request->validated()));
+        return Inertia::render('ClassSessions/Index', $query->handle($request->validated()));
     }
 
     public function create(GetClassSessionFormOptionsQuery $query): Response
     {
-        return Inertia::render('class-sessions/Create', $query->handle('create'));
+        return Inertia::render('ClassSessions/Create', $query->handle('create'));
     }
 
     public function store(SaveClassSessionRequest $request): JsonResponse|RedirectResponse
@@ -65,12 +65,12 @@ final class ClassSessionController extends Controller
             return ApiResponse::compatible($data);
         }
 
-        return Inertia::render('class-sessions/Show', $data);
+        return Inertia::render('ClassSessions/Show', $data);
     }
 
     public function edit(ClassSession $classSession, GetClassSessionFormOptionsQuery $query): Response
     {
-        return Inertia::render('class-sessions/Edit', $query->handle('edit', $classSession));
+        return Inertia::render('ClassSessions/Edit', $query->handle('edit', $classSession));
     }
 
     public function update(SaveClassSessionRequest $request, ClassSession $classSession): JsonResponse|RedirectResponse
@@ -127,19 +127,19 @@ final class ClassSessionController extends Controller
 
     public function createForOffering(CourseOfferingCampusRequest $request, CourseOffering $courseOffering, GetClassSessionFormOptionsQuery $query): Response
     {
-        return Inertia::render('class-sessions/modals/Add', $query->handle('createForOffering', $courseOffering));
+        return Inertia::render('ClassSessions/modals/Add', $query->handle('createForOffering', $courseOffering));
     }
 
     public function editModal(ClassSessionCampusRequest $request, ClassSession $classSession, GetClassSessionFormOptionsQuery $query): Response
     {
-        return Inertia::render('class-sessions/modals/QuickEdit', $query->handle('editModal', $classSession));
+        return Inertia::render('ClassSessions/modals/QuickEdit', $query->handle('editModal', $classSession));
     }
 
     public function bulkEditModal(BulkEditClassSessionsRequest $request, CourseOfferingCampusRequest $campusRequest, CourseOffering $courseOffering, GetClassSessionFormOptionsQuery $query): Response
     {
         $sessionIds = array_filter(explode(',', $request->validated('ids', '')));
 
-        return Inertia::render('class-sessions/modals/BulkEdit', $query->handle('bulkEdit', $courseOffering, $sessionIds));
+        return Inertia::render('ClassSessions/modals/BulkEdit', $query->handle('bulkEdit', $courseOffering, $sessionIds));
     }
 
     public function bulkDestroy(BulkDeleteWebClassSessionsRequest $request): RedirectResponse

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Constants\CourseOfferingRoutes;
+use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\AssessmentComponent;
 use App\Models\AssessmentComponentDetail;
 use App\Models\AssessmentComponentDetailScore;
@@ -18,7 +19,6 @@ use App\Services\PermissionService;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Inertia\Inertia;
 
 use function Pest\Laravel\actingAs;
 
@@ -123,12 +123,12 @@ it('renders the same scores grid in the cockpit scores tab that the retired page
         ->withSession(['current_campus_id' => $this->campus->id])
         ->get(route(CourseOfferingRoutes::SHOW, $this->offering), [
             'X-Inertia' => 'true',
-            'X-Inertia-Version' => Inertia::getVersion(),
-            'X-Inertia-Partial-Component' => 'course-offerings/Show',
+            'X-Inertia-Version' => app(HandleInertiaRequests::class)->version(request()),
+            'X-Inertia-Partial-Component' => 'CourseOfferings/Show',
             'X-Inertia-Partial-Data' => 'scoresData',
         ])
         ->assertOk()
-        ->assertJsonPath('component', 'course-offerings/Show')
+        ->assertJsonPath('component', 'CourseOfferings/Show')
         ->assertJsonPath('props.scoresData.assessment_details.0.detail_name', 'Final Exam')
         ->assertJsonPath('props.scoresData.scores_grid.0.student_id', $this->student->student_id)
         ->assertJsonPath('props.scoresData.scores_grid.0.scores.0.percentage_score', '82.50')

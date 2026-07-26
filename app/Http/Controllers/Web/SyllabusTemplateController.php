@@ -42,7 +42,7 @@ class SyllabusTemplateController extends Controller
 
         $units = Unit::query()->orderBy('code')->get(['id', 'code', 'name']);
 
-        return Inertia::render('syllabus/TemplatesIndex', [
+        return Inertia::render('Syllabus/TemplatesIndex', [
             'items' => $items,
             'filters' => [
                 'search' => $validated['search'] ?? null,
@@ -60,7 +60,7 @@ class SyllabusTemplateController extends Controller
     {
         $units = Unit::query()->orderBy('code')->get(['id', 'code', 'name']);
 
-        return Inertia::render('syllabus/TemplatesCreate', [
+        return Inertia::render('Syllabus/TemplatesCreate', [
             'assessmentTypes' => AssessmentComponent::TYPES,
             'units' => $units,
         ]);
@@ -79,7 +79,7 @@ class SyllabusTemplateController extends Controller
 
         $units = Unit::query()->orderBy('code')->get(['id', 'code', 'name']);
 
-        return Inertia::render('syllabus/TemplatesEdit', [
+        return Inertia::render('Syllabus/TemplatesEdit', [
             'unit' => $syllabusTemplate->unit,
             'syllabusTemplate' => $syllabusTemplate->load(['unit', 'applicableProgram', 'applicableCampus', 'creator', 'sourceTemplate', 'assessmentComponents.details']),
             'assessmentTypes' => AssessmentComponent::TYPES,
@@ -90,7 +90,7 @@ class SyllabusTemplateController extends Controller
 
     public function pageShow(SyllabusTemplate $syllabusTemplate): Response
     {
-        return Inertia::render('syllabus/TemplatesShow', [
+        return Inertia::render('Syllabus/TemplatesShow', [
             'unit' => $syllabusTemplate->unit,
             'template' => $syllabusTemplate->load(['unit', 'applicableProgram', 'applicableCampus', 'creator', 'sourceTemplate', 'assessmentComponents.details']),
             'can_edit' => ! $syllabusTemplate->isLockedForEditing(),
@@ -133,7 +133,7 @@ class SyllabusTemplateController extends Controller
             return response()->json(['data' => $syllabusTemplate]);
         }
 
-        return Inertia::render('syllabus/TemplatesShow', [
+        return Inertia::render('Syllabus/TemplatesShow', [
             'unit' => $syllabusTemplate->unit,
             'template' => $syllabusTemplate,
             'can_edit' => ! $syllabusTemplate->isLockedForEditing(),

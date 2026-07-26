@@ -154,7 +154,7 @@ class StudentAcademicSummaryController extends Controller
             );
         }
 
-        return Inertia::render('students/AcademicSummary/Overview', [
+        return Inertia::render('Students/AcademicSummary/Overview', [
             'student' => $this->hubStudentContext($student),
             'overview' => $overviewData,
             'can_act' => $canAct,
@@ -175,7 +175,7 @@ class StudentAcademicSummaryController extends Controller
         $validated = $request->validated();
         $registrationsData = $query->handle((int) $student->id, $validated);
 
-        return Inertia::render('students/AcademicSummary/Registrations', [
+        return Inertia::render('Students/AcademicSummary/Registrations', [
             'student' => $this->hubStudentContext($student),
             'registrations' => $registrationsData,
             'filters' => [
@@ -201,7 +201,7 @@ class StudentAcademicSummaryController extends Controller
     {
         $scoresData = $query->handle((int) $student->id);
 
-        return Inertia::render('students/AcademicSummary/Scores', [
+        return Inertia::render('Students/AcademicSummary/Scores', [
             'student' => $this->hubStudentContext($student),
             'scores' => $scoresData,
         ]);
@@ -217,7 +217,7 @@ class StudentAcademicSummaryController extends Controller
     {
         $attendanceData = $query->execute($student);
 
-        return Inertia::render('students/AcademicSummary/Attendance', [
+        return Inertia::render('Students/AcademicSummary/Attendance', [
             'student' => $this->hubStudentContext($student),
             'attendance' => $attendanceData,
         ]);
@@ -236,7 +236,7 @@ class StudentAcademicSummaryController extends Controller
             $student->expected_graduation_date?->toDateString(),
         );
 
-        return Inertia::render('students/AcademicSummary/Graduation', [
+        return Inertia::render('Students/AcademicSummary/Graduation', [
             'student' => $this->hubStudentContext($student),
             'graduation' => $graduationData,
         ]);
@@ -263,7 +263,7 @@ class StudentAcademicSummaryController extends Controller
         $canChangeStatus = $user?->can('change_student_status') ?? false;
         $canViewActions = $user?->can('view_student_action') ?? false;
 
-        return Inertia::render('students/AcademicSummary/Lifecycle', [
+        return Inertia::render('Students/AcademicSummary/Lifecycle', [
             'student' => $this->hubStudentContext($student),
             'timeline' => $lifecycle['timeline'],
             'egc' => $lifecycle['egc'],
@@ -363,7 +363,7 @@ class StudentAcademicSummaryController extends Controller
         $transactionStats = $this->goldTransactionController->statsForStudent($student);
         $transactionStatsData = $transactionStats->getData(true);
 
-        return Inertia::render('students/AcademicSummary/Gold', [
+        return Inertia::render('Students/AcademicSummary/Gold', [
             'student' => $this->hubStudentContext($student),
             'gold' => [
                 'summary' => $walletData['data'] ?? $walletData,
@@ -383,7 +383,7 @@ class StudentAcademicSummaryController extends Controller
     {
         $feeSummary = $reader->execute((int) $student->id);
 
-        return Inertia::render('students/AcademicSummary/Fee', [
+        return Inertia::render('Students/AcademicSummary/Fee', [
             'student' => $this->hubStudentContext($student),
             'feeSummary' => $feeSummary,
         ]);
@@ -403,7 +403,7 @@ class StudentAcademicSummaryController extends Controller
      */
     public function finance(Student $student, HubStudentFinanceSummaryReader $reader): Response
     {
-        return Inertia::render('students/AcademicSummary/Finance', [
+        return Inertia::render('Students/AcademicSummary/Finance', [
             'student' => $this->hubStudentContext($student),
             'finance' => $reader->summary($student->id),
             // Deep link into the Finance Office surface that owns money operations.

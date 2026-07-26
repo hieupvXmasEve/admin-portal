@@ -67,7 +67,7 @@ class UnitController extends Controller
             ->paginate($validated['per_page'] ?? 15)
             ->withQueryString();
 
-        return Inertia::render('units/Index', [
+        return Inertia::render('Units/Index', [
             'units' => $units,
             'filters' => [
                 'search' => $validated['search'] ?? '',
@@ -88,7 +88,7 @@ class UnitController extends Controller
 
     public function create(): Response
     {
-        return Inertia::render('units/Create', [
+        return Inertia::render('Units/Create', [
             'formDefaults' => [
                 'code' => '',
                 'name' => '',
@@ -139,7 +139,7 @@ class UnitController extends Controller
             ? $this->prerequisiteLogicService->generatePrerequisiteDescription($unit->id)
             : null;
 
-        return Inertia::render('units/Show', [
+        return Inertia::render('Units/Show', [
             'unit' => $unit,
             'equivalentUnits' => $allEquivalentUnits,
             'prerequisiteDescriptions' => $prerequisiteDescriptions,
@@ -184,7 +184,7 @@ class UnitController extends Controller
         $unitData = $unit->toArray();
         $unitData['prerequisite_groups'] = $transformedGroups;
 
-        return Inertia::render('units/Edit', [
+        return Inertia::render('Units/Edit', [
             'unit' => $unitData,
             'prerequisiteDescriptions' => $prerequisiteDescriptions,
             // 'editRestrictions' => $this->validationService->getEditRestrictions($unit),

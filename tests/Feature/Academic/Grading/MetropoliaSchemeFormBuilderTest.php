@@ -197,7 +197,7 @@ it('still saves a default-weighted template without component codes', function (
     expect($template->grading_scheme)->toBeNull();
 });
 
-// Mirrors resources/js/pages/syllabus/components/grading-scheme-examples.ts so
+// Mirrors resources/js/pages/Syllabus/components/grading-scheme-examples.ts so
 // the guide-modal "Áp dụng ví dụ" presets are guaranteed runnable/savable.
 dataset('guideModalExamples', [
     'software1-programming' => [[

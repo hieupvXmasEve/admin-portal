@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { usePermission } from '@/composables/usePermission';
 import { useStudentImpersonation } from '@/composables/useStudentImpersonation';
-import { STUDENT_HUB_TABS } from '@/pages/students/AcademicSummary/hub-tabs';
+import { STUDENT_HUB_TABS } from '@/pages/Students/AcademicSummary/hub-tabs';
 import type { Student, StudentHubContext } from '@/types/models';
 import { studentRoutes } from '@/utils/routes';
 import { Link, router } from '@inertiajs/vue3';

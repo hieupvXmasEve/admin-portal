@@ -13,6 +13,10 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class LectureImportController extends Controller
@@ -23,7 +27,7 @@ class LectureImportController extends Controller
 
     public function showImportForm(): InertiaResponse
     {
-        return Inertia::render('lectures/Import', [
+        return Inertia::render('Lectures/Import', [
             'maxFileSize' => config('import.max_file_size', '10MB'),
             'allowedExtensions' => config('import.allowed_extensions', ['xlsx', 'xls']),
             'availableFormats' => [
@@ -49,7 +53,7 @@ class LectureImportController extends Controller
 
         try {
             $file = $request->file('file');
-            $filename = time() . '_' . $file->getClientOriginalName();
+            $filename = time().'_'.$file->getClientOriginalName();
 
             // Ensure the directory exists
             $uploadDir = storage_path('app/temp/imports');
@@ -66,11 +70,11 @@ class LectureImportController extends Controller
             ]);
 
             // Store file temporarily using direct path
-            $fullPath = storage_path('app/temp/imports/' . $filename);
+            $fullPath = storage_path('app/temp/imports/'.$filename);
 
             try {
                 $file->move(storage_path('app/temp/imports'), $filename);
-                $path = 'temp/imports/' . $filename;
+                $path = 'temp/imports/'.$filename;
 
                 Log::info('Lecture import file move completed', [
                     'full_path' => $fullPath,
@@ -117,11 +121,11 @@ class LectureImportController extends Controller
 
                 return response()->json([
                     'success' => false,
-                    'error' => 'File validation failed: ' . $validationException->getMessage(),
+                    'error' => 'File validation failed: '.$validationException->getMessage(),
                 ], Response::HTTP_BAD_REQUEST);
             }
         } catch (\Exception $e) {
-            Log::error('Lecture import upload failed: ' . $e->getMessage(), [
+            Log::error('Lecture import upload failed: '.$e->getMessage(), [
                 'user_id' => Auth::id(),
             ]);
 
@@ -140,7 +144,7 @@ class LectureImportController extends Controller
         ]);
 
         try {
-            $fullPath = storage_path('app/' . $request->file_path);
+            $fullPath = storage_path('app/'.$request->file_path);
             $previewRows = $request->preview_rows ?? 10;
 
             $preview = $this->importService->previewImportData($fullPath, $previewRows);
@@ -150,7 +154,7 @@ class LectureImportController extends Controller
                 'preview' => $preview,
             ]);
         } catch (\Exception $e) {
-            Log::error('Lecture import preview failed: ' . $e->getMessage(), [
+            Log::error('Lecture import preview failed: '.$e->getMessage(), [
                 'user_id' => Auth::id(),
                 'file_path' => $request->file_path,
             ]);
@@ -172,7 +176,7 @@ class LectureImportController extends Controller
         $startTime = microtime(true);
 
         try {
-            $fullPath = storage_path('app/' . $request->file_path);
+            $fullPath = storage_path('app/'.$request->file_path);
 
             Log::info('Processing lecture import', [
                 'file_path' => $request->file_path,
@@ -183,7 +187,7 @@ class LectureImportController extends Controller
 
             // Check if file exists
             if (! file_exists($fullPath)) {
-                throw new \Exception('Import file not found at: ' . $fullPath);
+                throw new \Exception('Import file not found at: '.$fullPath);
             }
 
             $options = [
@@ -194,7 +198,7 @@ class LectureImportController extends Controller
 
             // Calculate processing time
             $processingTime = round(microtime(true) - $startTime, 2);
-            $result['summary']['processing_time'] = $processingTime . ' seconds';
+            $result['summary']['processing_time'] = $processingTime.' seconds';
 
             // Clean up temporary file
             if (file_exists($fullPath)) {
@@ -216,14 +220,14 @@ class LectureImportController extends Controller
             // Calculate processing time even for failures
             $processingTime = round(microtime(true) - $startTime, 2);
 
-            Log::error('Lecture import failed: ' . $e->getMessage(), [
+            Log::error('Lecture import failed: '.$e->getMessage(), [
                 'user_id' => Auth::id(),
                 'file_path' => $request->file_path,
-                'processing_time' => $processingTime . ' seconds',
+                'processing_time' => $processingTime.' seconds',
             ]);
 
             // Try to clean up the file
-            $fullPath = storage_path('app/' . $request->file_path);
+            $fullPath = storage_path('app/'.$request->file_path);
             if (file_exists($fullPath)) {
                 unlink($fullPath);
                 Log::info('Temporary lecture import file cleaned up after error', ['path' => $fullPath]);
@@ -232,7 +236,7 @@ class LectureImportController extends Controller
             return response()->json([
                 'success' => false,
                 'error' => $e->getMessage(),
-                'processing_time' => $processingTime . ' seconds',
+                'processing_time' => $processingTime.' seconds',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
@@ -253,10 +257,10 @@ class LectureImportController extends Controller
 
             return response()->download($filePath, $fileName, [
                 'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+                'Content-Disposition' => 'attachment; filename="'.$fileName.'"',
             ])->deleteFileAfterSend(true);
         } catch (\Exception $e) {
-            Log::error('Template download failed: ' . $e->getMessage(), [
+            Log::error('Template download failed: '.$e->getMessage(), [
                 'format' => $format,
                 'user_id' => Auth::id(),
             ]);
@@ -357,7 +361,7 @@ class LectureImportController extends Controller
         $tempFile = tempnam(sys_get_temp_dir(), 'lecturer_template_');
         $tempFile .= '.xlsx';
 
-        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $spreadsheet = new Spreadsheet;
         $worksheet = $spreadsheet->getActiveSheet();
         $worksheet->setTitle('Lecturer Import Template');
 
@@ -376,21 +380,21 @@ class LectureImportController extends Controller
         }
 
         // Style the headers
-        $lastColumn = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(count($headers));
-        $headerRange = 'A1:' . $lastColumn . '1';
+        $lastColumn = Coordinate::stringFromColumnIndex(count($headers));
+        $headerRange = 'A1:'.$lastColumn.'1';
         $worksheet->getStyle($headerRange)->getFont()->setBold(true);
         $worksheet->getStyle($headerRange)->getFill()
-            ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+            ->setFillType(Fill::FILL_SOLID)
             ->getStartColor()->setRGB('4472C4');
         $worksheet->getStyle($headerRange)->getFont()->getColor()->setRGB('FFFFFF');
 
         // Auto-size columns
         for ($i = 1; $i <= count($headers); $i++) {
-            $columnLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($i);
+            $columnLetter = Coordinate::stringFromColumnIndex($i);
             $worksheet->getColumnDimension($columnLetter)->setAutoSize(true);
         }
 
-        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $writer = new Xlsx($spreadsheet);
         $writer->save($tempFile);
 
         return $tempFile;

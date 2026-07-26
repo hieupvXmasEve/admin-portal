@@ -116,7 +116,7 @@ it('reaches the Hub Lifecycle tab that the lifecycle reports link to', function 
         ->get(route('students.academic-summary.lifecycle', $this->student->id))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page) => $page
-            ->component('students/AcademicSummary/Lifecycle')
+            ->component('Students/AcademicSummary/Lifecycle')
             ->where('student.id', $this->student->id)
         );
 });
@@ -129,7 +129,7 @@ it('reaches the Hub Scores & GPA tab that the grade reports link to', function (
         ->get(route('students.academic-summary.scores', $this->student->id))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page) => $page
-            ->component('students/AcademicSummary/Scores')
+            ->component('Students/AcademicSummary/Scores')
             ->where('student.id', $this->student->id)
         );
 });

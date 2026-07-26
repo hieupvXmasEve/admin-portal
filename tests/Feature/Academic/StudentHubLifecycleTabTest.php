@@ -67,7 +67,7 @@ it('renders the Lifecycle tab with the merged timeline and egc sub-panel', funct
         ->get(route('students.academic-summary.lifecycle', $this->student->id))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page) => $page
-            ->component('students/AcademicSummary/Lifecycle')
+            ->component('Students/AcademicSummary/Lifecycle')
             ->has('timeline', 1)
             ->has('egc')
             ->where('can_change_status', true)

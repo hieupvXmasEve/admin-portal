@@ -61,7 +61,7 @@ it('uses global semester context for course offering list, stats, and module opt
         ->withSession(['current_campus_id' => $this->campus->id])
         ->get(route(CourseOfferingRoutes::INDEX, ['module_id' => (string) $aiModule->id]))
         ->assertInertia(fn ($page) => $page
-            ->component('course-offerings/Index')
+            ->component('CourseOfferings/Index')
             ->where('statistics.total_offerings', 2)
             ->where('statistics.active_offerings', 2)
             ->where('filters.module_id', (string) $aiModule->id)

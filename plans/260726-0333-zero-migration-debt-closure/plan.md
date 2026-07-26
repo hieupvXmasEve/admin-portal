@@ -19,8 +19,8 @@ after its reader/writer count and unexplained data exceptions are both zero.
 
 ## Progress
 
-- Phase 1 completed and approved: 1/12 phases, 9/95 checklist items (9%).
-- Current phase: none; Phase 2 awaits explicit execution approval.
+- Phases 1–2 completed and approved: 2/12 phases, 16/95 checklist items (16%).
+- Current phase: none; Phase 3 awaits explicit execution approval.
 
 ## Goals
 
@@ -30,7 +30,7 @@ after its reader/writer count and unexplained data exceptions are both zero.
 | Frozen services/controllers/routes | 86 / 76 / 32 | 0 / 0 / 0 exact |
 | Direct JSON / inline validation | 45 / 77 files | 0 / 0 exact |
 | Missing PHP/route strict types | 178 / 22 | 0 / 0 exact |
-| Legacy filters/URLs/page directories | 25 / 60 / 23 | 0 / 0 / 0 exact |
+| Legacy filters/URLs/page directories | 25 / 60 / 0 | 0 / 0 / 0 exact |
 | Migration commands | 7 | 0 migration-classified commands |
 | Cross-context concrete imports / removed Inertia APIs | 0 / 0 | remain 0 exact |
 

@@ -46,7 +46,7 @@ class SyllabusTemplateController extends Controller
     {
         $filters = $request->validate((new ListSyllabusTemplatesRequest)->rules());
 
-        return Inertia::render('syllabus/TemplatesIndex', [
+        return Inertia::render('Syllabus/TemplatesIndex', [
             'items' => app(ListSyllabusTemplatesQuery::class)->handle($filters),
             'filters' => [
                 'search' => $filters['search'] ?? null,
@@ -62,7 +62,7 @@ class SyllabusTemplateController extends Controller
 
     public function pageCreate(): Response
     {
-        return Inertia::render('syllabus/TemplatesCreate', [
+        return Inertia::render('Syllabus/TemplatesCreate', [
             'assessmentTypes' => AssessmentComponent::TYPES,
             'units' => Unit::query()->orderBy('code')->get(['id', 'code', 'name']),
         ]);
@@ -79,7 +79,7 @@ class SyllabusTemplateController extends Controller
             return redirect()->route('syllabus_templates.show', $syllabusTemplate);
         }
 
-        return Inertia::render('syllabus/TemplatesEdit', [
+        return Inertia::render('Syllabus/TemplatesEdit', [
             'unit' => $syllabusTemplate->unit,
             'syllabusTemplate' => $this->loadTemplate($syllabusTemplate),
             'assessmentTypes' => AssessmentComponent::TYPES,
@@ -92,7 +92,7 @@ class SyllabusTemplateController extends Controller
     {
         $template = $this->loadTemplate($syllabusTemplate);
 
-        return Inertia::render('syllabus/TemplatesShow', [
+        return Inertia::render('Syllabus/TemplatesShow', [
             'unit' => $template->unit,
             'template' => $template,
             'can_edit' => ! $template->isLockedForEditing(),
@@ -123,7 +123,7 @@ class SyllabusTemplateController extends Controller
             return ApiResponse::success($template);
         }
 
-        return Inertia::render('syllabus/TemplatesShow', [
+        return Inertia::render('Syllabus/TemplatesShow', [
             'unit' => $template->unit,
             'template' => $template,
             'can_edit' => ! $template->isLockedForEditing(),

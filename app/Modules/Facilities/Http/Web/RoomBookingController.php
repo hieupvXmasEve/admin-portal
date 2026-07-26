@@ -62,7 +62,7 @@ class RoomBookingController extends Controller
 
         $filters = array_merge($validated, ['campus_id' => app('campus')->id]);
 
-        return Inertia::render('room-bookings/Index', [
+        return Inertia::render('RoomBookings/Index', [
             'bookings' => $this->bookingService->getPaginatedBookings($filters, (int) ($validated['per_page'] ?? 15)),
             'filters' => $validated,
             'statistics' => $this->bookingService->getBookingStatistics(),
@@ -85,7 +85,7 @@ class RoomBookingController extends Controller
 
         $user = $request->user();
 
-        return Inertia::render('room-bookings/MyBookings', [
+        return Inertia::render('RoomBookings/MyBookings', [
             'bookings' => $this->bookingService->getMyBookings(
                 RoomBooking::BOOKED_BY_USER,
                 $user->id,
@@ -115,7 +115,7 @@ class RoomBookingController extends Controller
 
         $filters = array_merge($validated, ['campus_id' => app('campus')->id]);
 
-        return Inertia::render('room-bookings/Pending', [
+        return Inertia::render('RoomBookings/Pending', [
             'bookings' => $this->bookingService->getPendingBookings($filters, (int) ($validated['per_page'] ?? 15)),
             'filters' => $validated,
             'statistics' => $this->bookingService->getBookingStatistics(),
@@ -144,7 +144,7 @@ class RoomBookingController extends Controller
             $selectedRoom = $sourceBooking->room;
         }
 
-        return Inertia::render('room-bookings/Create', [
+        return Inertia::render('RoomBookings/Create', [
             'selected_room' => $selectedRoom,
             'clone_source' => $cloneDraft,
             'initial_schedule' => [
@@ -217,7 +217,7 @@ class RoomBookingController extends Controller
         $this->assertBookingCampus($roomBooking);
         $roomBooking->load(['room.building', 'room.campus', 'bookedBy', 'approvedBy', 'actions.actionBy']);
 
-        return Inertia::render('room-bookings/Show', [
+        return Inertia::render('RoomBookings/Show', [
             'booking' => $roomBooking,
         ]);
     }
@@ -234,7 +234,7 @@ class RoomBookingController extends Controller
         $bookingData = $roomBooking->toArray();
         $bookingData['booking_date'] = $roomBooking->booking_date->format('Y-m-d');
 
-        return Inertia::render('room-bookings/Edit', [
+        return Inertia::render('RoomBookings/Edit', [
             'booking' => $bookingData,
             'booking_types' => $this->getBookingTypeOptions(),
             'priorities' => $this->getPriorityOptions(),
@@ -357,7 +357,7 @@ class RoomBookingController extends Controller
             $filters['building_id'] = (int) $validated['building_id'];
         }
 
-        return Inertia::render('room-bookings/Calendar', [
+        return Inertia::render('RoomBookings/Calendar', [
             'calendar_data' => $this->bookingService->getCalendarData($filters, $startDate, $endDate),
             'filters' => array_merge($validated, ['start_date' => $startDate, 'end_date' => $endDate]),
             'buildings' => $this->getBuildingOptions(),
@@ -376,7 +376,7 @@ class RoomBookingController extends Controller
             'end_time' => '20:00',
         ], array_filter($validated, fn ($value) => $value !== null && $value !== ''));
 
-        return Inertia::render('room-bookings/Availability', [
+        return Inertia::render('RoomBookings/Availability', [
             'availability' => $this->availabilityBoardQuery->handle($filters),
             'filters' => $filters,
             'buildings' => $this->getBuildingOptions(),
@@ -414,7 +414,7 @@ class RoomBookingController extends Controller
             $query->whereDate('created_at', '<=', $validated['end_date']);
         }
 
-        return Inertia::render('room-bookings/Logs', [
+        return Inertia::render('RoomBookings/Logs', [
             'logs' => $query->paginate((int) ($validated['per_page'] ?? 25)),
             'filters' => $validated,
             'action_types' => $this->getActionTypeOptions(),

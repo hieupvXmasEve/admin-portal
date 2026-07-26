@@ -84,7 +84,7 @@ final class MigrationDebtContract
         'missing_route_strict_types' => 22,
         'legacy_filter_stacks' => 25,
         'literal_frontend_urls' => 61,
-        'legacy_page_directories' => 23,
+        'legacy_page_directories' => 0,
         'removed_inertia_apis' => 0,
         'migration_commands' => 7,
     ];

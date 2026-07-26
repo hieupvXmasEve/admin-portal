@@ -154,7 +154,7 @@ it('shows scheme fields for a finalized scheme-graded course: converted grades, 
     $response = ($this->getScoresProps)($student);
 
     $response->assertOk()
-        ->assertJsonPath('component', 'students/AcademicSummary/Scores')
+        ->assertJsonPath('component', 'Students/AcademicSummary/Scores')
         ->assertJsonPath('props.scores.standalone_units.data.0.scheme.engine', 'metropolia_v1')
         ->assertJsonPath('props.scores.standalone_units.data.0.scheme.scale', 'numeric_0_5')
         ->assertJsonPath('props.scores.standalone_units.data.0.grade_display.scheme_engine', 'metropolia_v1')

@@ -98,7 +98,7 @@ class ClubController extends Controller
             return Campus::select('id', 'name')->orderBy('name')->get();
         });
 
-        return Inertia::render('clubs/Index', [
+        return Inertia::render('Clubs/Index', [
             'clubs' => $clubs,
             'campuses' => $campuses,
             'filters' => $request->only(['search', 'campus_id', 'status', 'sort', 'direction', 'per_page']),
@@ -110,7 +110,7 @@ class ClubController extends Controller
      */
     public function create(): Response
     {
-        return Inertia::render('clubs/Create');
+        return Inertia::render('Clubs/Create');
     }
 
     /**
@@ -196,7 +196,7 @@ class ClubController extends Controller
             return [$clubData, $membersData];
         });
 
-        return Inertia::render('clubs/Show', [
+        return Inertia::render('Clubs/Show', [
             'club' => $cachedClub,
             'members' => $members->withQueryString(),
             'filters' => $request->only(['search', 'status', 'role', 'sort', 'direction', 'per_page']),
@@ -208,7 +208,7 @@ class ClubController extends Controller
      */
     public function edit(Club $club): Response
     {
-        return Inertia::render('clubs/Edit', [
+        return Inertia::render('Clubs/Edit', [
             'club' => $club->load('campus'),
         ]);
     }

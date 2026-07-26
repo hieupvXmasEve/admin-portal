@@ -48,7 +48,7 @@ class ProgramController extends Controller
             ->withCount(['specializations', 'curriculumVersions'])
             ->paginate($validated['per_page'] ?? 15, ['*'], 'page', $page);
 
-        return Inertia::render('programs/Index', [
+        return Inertia::render('Programs/Index', [
             'programs' => $programs,
             'filters' => [
                 'search' => $validated['search'] ?? '',
@@ -99,7 +99,7 @@ class ProgramController extends Controller
             'totalCurriculumVersions' => $prog->curriculumVersions()->count(),
         ];
 
-        return Inertia::render('programs/Show', [
+        return Inertia::render('Programs/Show', [
             'program' => $prog,
             'stats' => $statsLocal,
         ]);

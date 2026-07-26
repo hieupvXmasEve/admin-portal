@@ -54,7 +54,7 @@ it('preserves unit listing filters and Inertia props', function (): void {
         ->get(route(UnitRoutes::INDEX, ['search' => 'Catalog', 'per_page' => 15]))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('units/Index')
+            ->component('Units/Index')
             ->where('filters.search', 'Catalog')
             ->where('filters.per_page', '15')
             ->has('units.data', 1)

@@ -22,14 +22,14 @@ final class RoleController extends Controller
 
     public function index(): Response
     {
-        return Inertia::render('roles/Index', [
+        return Inertia::render('Roles/Index', [
             'roles' => $this->roles->handle(['operation' => 'paginate']),
         ]);
     }
 
     public function create(): Response
     {
-        return Inertia::render('roles/Add', [
+        return Inertia::render('Roles/Add', [
             'permissions' => $this->roles->handle(['operation' => 'permissions_by_module']),
         ]);
     }
@@ -46,7 +46,7 @@ final class RoleController extends Controller
     {
         $roleRecord = $this->roles->handle(['operation' => 'find', 'role_id' => $role]) ?? abort(404);
 
-        return Inertia::render('roles/Edit', [
+        return Inertia::render('Roles/Edit', [
             'role' => $roleRecord,
             'permissions' => $this->roles->handle(['operation' => 'permissions_by_module']),
             'rolePermissionIds' => $this->roles->handle(['operation' => 'permission_ids', 'role_id' => (int) $roleRecord->id]),
@@ -57,7 +57,7 @@ final class RoleController extends Controller
     {
         $roleRecord = $this->roles->handle(['operation' => 'find', 'role_id' => $role]) ?? abort(404);
 
-        return Inertia::render('roles/Edit', [
+        return Inertia::render('Roles/Edit', [
             'role' => $roleRecord,
             'permissions' => $this->roles->handle(['operation' => 'permissions_by_module']),
             'rolePermissionIds' => $this->roles->handle(['operation' => 'permission_ids', 'role_id' => (int) $roleRecord->id]),

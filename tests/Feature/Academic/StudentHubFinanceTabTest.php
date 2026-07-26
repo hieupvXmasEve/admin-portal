@@ -69,7 +69,7 @@ it('renders the read-only Finance tab with summary and Finance Office deep link'
         ->get(route('students.academic-summary.finance', $student))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('students/AcademicSummary/Finance')
+            ->component('Students/AcademicSummary/Finance')
             ->has('finance.fees')
             ->has('finance.gold')
             ->has('finance.scholarships')

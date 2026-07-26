@@ -226,7 +226,7 @@ it('renders filtered registrations through the permitted Hub route', function ()
         ->get(route('students.academic-summary.registrations', ['student' => $student, 'status' => 'completed']))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('students/AcademicSummary/Registrations')
+            ->component('Students/AcademicSummary/Registrations')
             ->has('registrations.data', 1)
             ->where('filters.status', 'completed'));
 });

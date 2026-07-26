@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Constants\CourseOfferingRoutes;
+use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\AcademicRecord;
 use App\Models\AssessmentComponent;
 use App\Models\AssessmentComponentDetail;
@@ -20,7 +21,6 @@ use App\Services\PermissionService;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Inertia\Inertia;
 
 use function Pest\Laravel\actingAs;
 
@@ -147,8 +147,8 @@ beforeEach(function () {
             ->withSession(['current_campus_id' => $this->campus->id])
             ->get(route(CourseOfferingRoutes::SHOW, $offering), [
                 'X-Inertia' => 'true',
-                'X-Inertia-Version' => Inertia::getVersion(),
-                'X-Inertia-Partial-Component' => 'course-offerings/Show',
+                'X-Inertia-Version' => app(HandleInertiaRequests::class)->version(request()),
+                'X-Inertia-Partial-Component' => 'CourseOfferings/Show',
                 'X-Inertia-Partial-Data' => 'scoresData',
             ]);
     };

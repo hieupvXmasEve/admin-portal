@@ -55,7 +55,7 @@ class CurriculumUnitController extends Controller
             ->paginate($validated['per_page'] ?? 15)
             ->withQueryString();
 
-        return Inertia::render('curriculum-units/Index', [
+        return Inertia::render('CurriculumUnits/Index', [
             'curriculumUnits' => $curriculumUnits,
             'filters' => [
                 'search' => $validated['search'] ?? null,
@@ -76,7 +76,7 @@ class CurriculumUnitController extends Controller
 
     public function create(): Response
     {
-        return Inertia::render('curriculum-units/Create', [
+        return Inertia::render('CurriculumUnits/Create', [
             'curriculumVersions' => CurriculumVersion::with(['program', 'specialization'])
                 ->orderBy('version_code')
                 ->get(['id', 'version_code', 'program_id', 'specialization_id']),
@@ -123,7 +123,7 @@ class CurriculumUnitController extends Controller
             'semester',
         ]);
 
-        return Inertia::render('curriculum-units/Show', [
+        return Inertia::render('CurriculumUnits/Show', [
             'curriculumUnit' => $curriculumUnit,
         ]);
     }
@@ -132,7 +132,7 @@ class CurriculumUnitController extends Controller
     {
         $curriculumUnit->load(['curriculumVersion', 'unit', 'semester']);
 
-        return Inertia::render('curriculum-units/Edit', [
+        return Inertia::render('CurriculumUnits/Edit', [
             'curriculumUnit' => $curriculumUnit,
             'curriculumVersions' => CurriculumVersion::with(['program', 'specialization'])
                 ->orderBy('version_code')

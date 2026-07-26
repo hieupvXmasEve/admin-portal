@@ -46,7 +46,7 @@ class RoomController extends Controller
     {
         $validated = $request->validated();
 
-        return Inertia::render('rooms/Index', [
+        return Inertia::render('Rooms/Index', [
             'rooms' => $this->listRooms->handle($validated),
             'filters' => [
                 'search' => $validated['search'] ?? null,
@@ -77,7 +77,7 @@ class RoomController extends Controller
      */
     public function create(): Response
     {
-        return Inertia::render('rooms/CreateAutoForm', [
+        return Inertia::render('Rooms/CreateAutoForm', [
             'room_types' => $this->getRoomTypeOptions(),
             'room_statuses' => $this->getRoomStatusOptions(),
             'buildings' => $this->roomFilterOptions->buildings(),
@@ -117,7 +117,7 @@ class RoomController extends Controller
 
         $room->load('campus');
 
-        return Inertia::render('rooms/Show', [
+        return Inertia::render('Rooms/Show', [
             'room' => new RoomResource($room),
             'permissions' => [
                 'can_edit' => auth()->user()->can('edit_room'),
@@ -138,7 +138,7 @@ class RoomController extends Controller
 
         $room->load(['campus', 'building']);
 
-        return Inertia::render('rooms/Edit', [
+        return Inertia::render('Rooms/Edit', [
             'room' => $room,
             'room_types' => $this->getRoomTypeOptions(),
             'room_statuses' => $this->getRoomStatusOptions(),
