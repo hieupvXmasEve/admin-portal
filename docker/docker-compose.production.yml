@@ -3,7 +3,6 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.production
-    container_name: swinx-app
     env_file:
       - ../.env
     ports:
@@ -33,7 +32,6 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.production
-    container_name: swinx-queue
     env_file:
       - ../.env
     working_dir: /app
@@ -57,7 +55,6 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.production
-    container_name: swinx-scheduler
     env_file:
       - ../.env
     working_dir: /app
@@ -79,7 +76,6 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: swinx-redis
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
@@ -87,7 +83,6 @@ services:
 
   db:
     image: mariadb:11.4
-    container_name: swinx-db
     environment:
       MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD is required}
       MARIADB_DATABASE: ${DB_DATABASE:?DB_DATABASE is required}

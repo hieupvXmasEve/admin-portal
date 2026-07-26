@@ -2,7 +2,7 @@
 title: Swinx Deployment Guide
 status: canonical
 owner: Platform Team
-last_verified: 2026-07-26
+last_verified: 2026-07-27
 scope: deployment-operations
 ---
 
@@ -95,6 +95,47 @@ Required checks:
 - trusted proxy configuration matches the deployment
 - database/Redis ports are not exposed publicly
 - queue and scheduler containers are healthy
+
+### Multiple schools on one host
+
+Use a separate repository checkout and `.env` file for each school. Each
+instance must have a unique `DEPLOYMENT_NAME`, `HOST_APP_PORT`, database
+credentials, `CACHE_PREFIX`, `APP_KEY`, and persistent backup location. The
+deployment name scopes Docker's generated container, network, and volume names.
+
+For example, use `DEPLOYMENT_NAME=swinx-school-a` with
+`HOST_APP_PORT=8081` for one school and `DEPLOYMENT_NAME=swinx-school-b` with
+`HOST_APP_PORT=8082` for the other. Configure the host reverse proxy to forward
+each school domain to its corresponding loopback port. Do not expose either
+database or Redis port publicly.
+
+The full-production mode binds public ports 80 and 443 and is therefore for a
+dedicated host or a single instance only. Use host-proxy mode for multiple
+schools on one server.
+
+## Empty-instance initialization
+
+Do not run `db:seed` in a new production school instance. The legacy database
+seeder creates sample institution data and legacy administrator accounts.
+
+After the initial deploy and migrations, initialize an otherwise empty instance
+with one campus and one super-admin:
+
+```bash
+./scripts/host.sh artisan instance:initialize \
+  --institution="School A" \
+  --campus-code="SCA" \
+  --campus-address="1 Example Street" \
+  --admin-name="School Administrator" \
+  --admin-email="admin@school-a.example" \
+  --force
+```
+
+The command prompts for the password without displaying it. It requires a
+password of at least 12 characters and refuses to run if roles, permissions,
+campuses, users, or campus-role assignments already exist. Do not pass
+`--admin-password` in production because command-line arguments can be visible
+to other users on the host.
 
 ## Full production deployment
 

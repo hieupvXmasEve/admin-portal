@@ -6,7 +6,8 @@ set -euo pipefail
 
 COMPOSE_FILE="docker/docker-compose.host.yml"
 ENV_FILE=".env"
-PROJECT_NAME="swinx-host"
+PROJECT_NAME="$(grep -E '^DEPLOYMENT_NAME[[:space:]]*=' "$ENV_FILE" 2>/dev/null | tail -n 1 | sed -E 's/^[^=]+=[[:space:]]*//; s/[[:space:]]+$//; s/^"//; s/"$//' || true)"
+PROJECT_NAME="${PROJECT_NAME:-swinx-host}"
 
 ensure_env() {
     if [ ! -f "$ENV_FILE" ]; then
