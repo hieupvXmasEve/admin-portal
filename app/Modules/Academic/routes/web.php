@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use App\Constants\CourseOfferingRoutes;
 use App\Constants\StudentRoutes;
+use App\Modules\Academic\Delivery\Http\Web\Canvas\PreviewCanvasGradeSyncController;
+use App\Modules\Academic\Delivery\Http\Web\Canvas\SyncCanvasGradeController;
 use App\Modules\Academic\Delivery\Http\Api\ClassSessionController as DeliveryClassSessionApiController;
 use App\Modules\Academic\Delivery\Http\Web\Admin\CourseOfferingRosterController;
 use App\Modules\Academic\Delivery\Http\Web\Admin\CourseRegistrationController;
@@ -17,6 +19,7 @@ use App\Modules\Academic\Delivery\Http\Web\CourseOfferingStatisticsController;
 use App\Modules\Academic\Delivery\Http\Web\RecordClassSessionAttendanceController;
 use App\Modules\Academic\Http\Web\AcademicPlacementController;
 use App\Modules\Academic\Http\Web\AcademicProgressionAuditController;
+use App\Modules\Academic\Http\Web\FinalizeCourseOfferingController;
 use App\Modules\Academic\Http\Web\Admin\CourseOfferingBulkDeletionController;
 use App\Modules\Academic\Http\Web\Admin\CourseOfferingCatalogFormController;
 use App\Modules\Academic\Http\Web\Admin\CourseOfferingCockpitController;
@@ -29,6 +32,8 @@ use App\Modules\Academic\Http\Web\CampusDetailController;
 use App\Modules\Academic\Http\Web\ExamResitAttemptController;
 use App\Modules\Academic\Http\Web\ExamScheduleController;
 use App\Modules\Academic\Http\Web\RetakeCourseRegistrationController;
+use App\Modules\Academic\Http\Web\RecalculateApplyController;
+use App\Modules\Academic\Http\Web\RecalculatePreviewController;
 use App\Modules\Academic\Http\Web\StudentAcademicSummaryController;
 use App\Modules\Academic\Http\Web\StudentActionAuditController;
 use App\Modules\Academic\Http\Web\StudentActionController;
@@ -625,5 +630,31 @@ Route::middleware(['auth', 'verified', 'campus.selected'])->group(function () {
         Route::post('/invigilators', [ExamScheduleController::class, 'assignInvigilator'])
             ->middleware('can:manage_exam_schedule')
             ->name('invigilators.store');
+    });
+});
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::prefix('course-offerings')->group(function () {
+        Route::post('/{courseOffering}/finalize', FinalizeCourseOfferingController::class)
+            ->middleware('can:complete_course_offering')
+            ->name(CourseOfferingRoutes::FINALIZE);
+    });
+
+    Route::prefix('api/course-offerings')->group(function () {
+        Route::post('/{courseOffering}/sync-grades/preview', PreviewCanvasGradeSyncController::class)
+            ->middleware('can:sync_course_grades')
+            ->name(CourseOfferingRoutes::API_SYNC_GRADES_PREVIEW);
+
+        Route::post('/{courseOffering}/sync-grades', SyncCanvasGradeController::class)
+            ->middleware('can:sync_course_grades')
+            ->name(CourseOfferingRoutes::API_SYNC_GRADES_APPLY);
+
+        Route::post('/{courseOffering}/recalculate/preview', RecalculatePreviewController::class)
+            ->middleware('can:recalculate_course_offering')
+            ->name(CourseOfferingRoutes::API_RECALCULATE_PREVIEW);
+
+        Route::post('/{courseOffering}/recalculate/apply', RecalculateApplyController::class)
+            ->middleware('can:recalculate_course_offering')
+            ->name(CourseOfferingRoutes::API_RECALCULATE_APPLY);
     });
 });

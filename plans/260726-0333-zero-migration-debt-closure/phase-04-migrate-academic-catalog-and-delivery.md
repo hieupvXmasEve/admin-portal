@@ -87,6 +87,17 @@ controllers/services/routes and frontend debt with each migrated workflow.
      management and automated-enrollment services after confirming no live
      routes, container bindings, or callers remained; lowered the
      frozen-service ratchet accordingly.
+   - [x] Course Offering route retirement (issues 09, 10, 11): moved the
+     finalize, Canvas grade-sync preview/apply (issue 10), and recalculate
+     preview/apply (issue 11) live routes from the frozen
+     `routes/web/course-offerings.php` split file into the owned
+     `app/Modules/Academic/routes/web.php`, removed the now-empty frozen
+     file, updated the retired-path assertion in
+     `AttendanceDeliveryMigrationArchTest`, and lowered the frozen-route
+     ratchet in both `config/migration_debt.php` and
+     `MigrationDebtContract::BASELINE_CEILINGS`. Route names, permissions,
+     and the EGC recalculate-demotion fix (issue 09) are covered by green
+     tests; no orphan reference to the deleted file remains.
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
 7. Review import/export parity, scheduler entries, permissions, and campus scoping.
 

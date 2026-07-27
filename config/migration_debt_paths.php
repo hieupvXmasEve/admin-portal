@@ -132,7 +132,6 @@ return [
         'routes/web/academic.php',
         'routes/web/canvas.php',
         'routes/web/class-schedule.php',
-        'routes/web/course-offerings.php',
         'routes/web/course-statistics.php',
         'routes/web/email-monitoring.php',
         'routes/web/failed-students.php',

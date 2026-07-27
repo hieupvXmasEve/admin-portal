@@ -25,7 +25,6 @@ it('retires legacy session and attendance runtime implementations after Delivery
 it('keeps preserved attendance routes pointed at Delivery-owned controllers', function (): void {
     $routeFiles = [
         base_path('app/Modules/Academic/routes/web.php'),
-        base_path('routes/web/course-offerings.php'),
         base_path('routes/api/v1/student.php'),
         base_path('routes/api/v1/lecturer.php'),
     ];
