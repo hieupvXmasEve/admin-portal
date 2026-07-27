@@ -92,6 +92,13 @@ class SemesterAcademicPeriodReader implements AcademicPeriodReader
         );
     }
 
+    public function courseOfferingCount(int $academicPeriodId): int
+    {
+        $semester = Semester::query()->find($academicPeriodId);
+
+        return $semester?->courseOfferings()->count() ?? 0;
+    }
+
     private function mapPeriod(?Semester $semester): ?AcademicPeriodReference
     {
         if ($semester === null) {

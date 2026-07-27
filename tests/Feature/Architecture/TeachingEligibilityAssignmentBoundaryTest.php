@@ -45,7 +45,7 @@ it('keeps Workforce eligibility calculation off Delivery persistence', function 
 it('keeps routed offering creation from writing instructor assignments directly', function (): void {
     $files = [
         base_path('app/Modules/Academic/Http/Web/Admin/CourseOfferingCatalogFormController.php'),
-        base_path('app/Http/Controllers/Web/SemesterEnrollmentController.php'),
+        base_path('app/Modules/Academic/Progression/Http/Web/SemesterEnrollmentController.php'),
     ];
     $violations = [];
 

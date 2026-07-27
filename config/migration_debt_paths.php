@@ -114,7 +114,6 @@ return [
         'app/Http/Controllers/Web/Lectures/LectureExportController.php',
         'app/Http/Controllers/Web/Lectures/LectureImportController.php',
         'app/Http/Controllers/Web/Lectures/LecturerGpaController.php',
-        'app/Http/Controllers/Web/SemesterEnrollmentController.php',
         'app/Http/Controllers/Web/StudentApplicationController.php',
     ],
     'frozen_routes' => [
@@ -133,7 +132,6 @@ return [
         'routes/web/lectures.php',
         'routes/web/notifications.php',
         'routes/web/scholarships.php',
-        'routes/web/semester.php',
         'routes/web/student-application.php',
         'routes/web/student-scholarships.php',
         'routes/web/systems.php',

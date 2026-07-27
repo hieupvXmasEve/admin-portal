@@ -1,14 +1,75 @@
 ---
 title: "Phase 4b: Retire SemesterEnrollmentController"
-status: superseded
+status: done
 priority: P0
-effort: "S (was L/16-21h — scope cut before any sub-slice started)"
+effort: "S (was L/16-21h — scope cut, then a small direct move instead of S1-S5)"
 dependencies: [4]
 ---
 
 # Phase 4b: Retire SemesterEnrollmentController
 
-## SUPERSEDED (2026-07-28)
+## DONE (2026-07-28)
+
+Completed via a direct move, not the S1-S5 sub-slice plan below (that plan
+targeted the original 8-method/1252-line controller; scope was cut to 2
+methods before any sub-slice started — see "SUPERSEDED" section for that
+history). What actually shipped:
+
+- `Enrollment` added to `Academic.Progression` in `OWNED_SHARED_MODELS`
+  (Open Question 5 resolved: Progression, not Delivery — the controller's
+  only remaining job is tracking a student's per-semester progression,
+  the same concern as sibling Progression models `AcademicRecord`/
+  `AcademicHold`; it touches zero Delivery models like `CourseOffering`/
+  `CourseRegistration` now that the course-offering methods are gone).
+- New controller `App\Modules\Academic\Progression\Http\Web\SemesterEnrollmentController`
+  (`show`, `generateEnrollments`), registered in
+  `app/Modules/Academic/routes/web.php` under the original `auth`-only
+  middleware group (unchanged), `can:edit_semester` gate preserved on
+  both routes, `->whereNumber('semester')` added for parity with the
+  404-on-bad-id behavior Eloquent route-model-binding gave for free.
+- Two new seams built to keep `shared_model_imports` at exactly 494/494
+  (zero headroom, confirmed via the guard before and after):
+  - `AcademicPeriodReader::courseOfferingCount(int): int` — new method
+    on the existing Catalog-owned contract (implemented in
+    `SemesterAcademicPeriodReader`), replacing the old
+    `$semester->load('courseOfferings.unit')` eager-load (which the
+    trimmed frontend never rendered beyond a count anyway).
+  - `App\Shared\Contracts\StudentRegistry\SemesterEnrollmentEligibilityReader`
+    (new contract + 2 DTOs + `EloquentSemesterEnrollmentEligibilityReader`
+    impl in `App\Modules\StudentRegistry\Support`, bound in
+    `StudentRegistryServiceProvider`) — replaces every direct
+    `Student::query()`/`Campus::find()` read in the old controller.
+    `Campus` reads reuse the existing `CampusReferenceReader` (Module-slice
+    precedent).
+  - `Enrollment` itself needs no seam: Progression now owns it, so the
+    controller queries it directly.
+- Route parameter changed from Eloquent-bound `Semester $semester` to a
+  plain `string $semester` cast to int internally — importing the
+  `Semester` model class for the type-hint alone would have cost 1
+  `shared_model_imports` finding even though every actual read goes
+  through `AcademicPeriodReader`.
+- Frontend: `Semester` prop interface trimmed from 11 fields (most never
+  rendered) to `{id, name, course_offerings_count}`; the unused
+  `enrollments`/`Enrollment` prop and type dropped entirely.
+- First-time characterization tests
+  (`tests/Feature/Academic/Progression/SemesterEnrollmentManagementTest.php`,
+  6 cases: overview stats, generate happy path with hold/duplicate/cross
+  -campus exclusion, no-campus 400, no-eligible 200, semester_number
+  increment, semester_number>8 skip) written against the OLD code first,
+  confirmed green, then re-confirmed green after the move.
+- `frozen_controllers` 44→43, `frozen_routes` 21→20 (both configs +
+  `MigrationDebtContract::BASELINE_CEILINGS`); `config/migration_debt_paths.php`
+  entries for the retired file/route removed.
+- Fixed 3 test files that hardcoded the old class path/action name:
+  `AcademicPeriodCatalogBoundaryTest` (route-contract snapshot — action
+  name updated), `CourseRosterDeliveryBoundaryArchTest` and
+  `TeachingEligibilityAssignmentBoundaryTest` (both scanned this file's
+  *content* for CourseRegistration/CourseOffering write patterns that no
+  longer exist in it at all post-trim — removed the now-irrelevant entry
+  from each rather than updating the path, since the file no longer
+  belongs to either test's actual concern).
+
+## SUPERSEDED (2026-07-28) — scope-cut history, before the move above
 
 Before any sub-slice below was started, the product owner cut scope directly:
 the `/semesters/{id}/enrollment` page keeps only the campus/enrollment

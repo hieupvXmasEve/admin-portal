@@ -75,7 +75,7 @@ it('keeps semester and selected-period routes on the Catalog owner', function ()
         ['semesters.activation-statuses', 'api/semesters/activation-statuses', ['GET', 'HEAD'], 'App\\Modules\\Academic\\Catalog\\Http\\Web\\AcademicPeriodController@activationStatuses', ['web', 'auth', 'can:view_semester']],
         ['semester-context.update', 'semester-context', ['POST'], 'App\\Modules\\Academic\\Catalog\\Http\\Web\\SelectedAcademicPeriodController@update', ['web', 'auth', 'verified']],
         ['finance.semester-context.update', 'finance/semester-context', ['POST'], 'App\\Modules\\Academic\\Catalog\\Http\\Web\\SelectedAcademicPeriodController@update', ['web', 'auth']],
-        ['semesters.enrollment.show', 'semesters/{semester}/enrollment', ['GET', 'HEAD'], 'App\\Http\\Controllers\\Web\\SemesterEnrollmentController@show', ['web', 'auth', 'can:edit_semester']],
+        ['semesters.enrollment.show', 'semesters/{semester}/enrollment', ['GET', 'HEAD'], 'App\\Modules\\Academic\\Progression\\Http\\Web\\SemesterEnrollmentController@show', ['web', 'auth', 'can:edit_semester']],
     ];
 
     foreach ($contracts as [$name, $uri, $methods, $action, $middleware]) {

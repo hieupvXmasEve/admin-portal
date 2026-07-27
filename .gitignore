@@ -12,6 +12,7 @@
 .env.backup.*
 .env.docker.dev
 .env.docker.production
+.env.prod
 
 .phpactor.json
 .phpunit.result.cache

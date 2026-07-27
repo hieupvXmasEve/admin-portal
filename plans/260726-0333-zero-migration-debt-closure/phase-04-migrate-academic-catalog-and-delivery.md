@@ -162,20 +162,26 @@ controllers/services/routes and frontend debt with each migrated workflow.
      Lowered the frozen-route and frozen-controller ratchets accordingly;
      `ModuleService` itself stays frozen (single consumer, out of this
      slice's scope).
-   - [ ] Semester Enrollment: a five-sub-slice migration plan was drafted for
-     the then-1252-line `SemesterEnrollmentController` (see
+   - [x] Semester Enrollment retirement: a five-sub-slice migration plan was
+     drafted for the then-1252-line `SemesterEnrollmentController` (see
      [phase 4b](./phase-04b-retire-semester-enrollment.md)), but before any
      sub-slice started, the product owner cut scope directly: the enrollment
      page now keeps only the overview and `generateEnrollments`; the other 6
      methods (suggested-courses, both open-course flows, registration stats,
      bulk-register, registrable-students) were deleted outright rather than
      migrated, along with their now-orphaned action/request/UI files. The
-     controller is now 227 lines / 2 methods and still frozen in
-     `app/Http/Controllers/Web` (unchanged `frozen_controllers`/`frozen_routes`
-     paths and counts) — retiring it into `App\Modules\Academic\Delivery` is
-     now a small future slice, not the XL one originally scoped. Phase 4b is
-     marked superseded; see it for what remains open (`Enrollment` model
-     ownership).
+     remaining 227-line/2-method controller was then moved into
+     `App\Modules\Academic\Progression` (claiming `Enrollment` ownership
+     there — it tracks student semester progression, the same concern as
+     sibling `AcademicRecord`/`AcademicHold`). Two new seams
+     (`AcademicPeriodReader::courseOfferingCount()` on the existing Catalog
+     contract, and a new `SemesterEnrollmentEligibilityReader` in
+     StudentRegistry) replaced every direct `Student`/`Campus`/`Semester`
+     model read so the move added zero new `shared_model_imports` debt at a
+     time the ratchet had zero headroom (494/494). First-time
+     characterization tests written and confirmed green against the old
+     code, then again after the move. Lowered the frozen-route and
+     frozen-controller ratchets accordingly; see phase 4b for full detail.
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
 7. Review import/export parity, scheduler entries, permissions, and campus scoping.
 

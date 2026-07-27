@@ -53,7 +53,7 @@ return [
             'reason' => 'Existing top-level controllers preserve public web/API contracts during migration.',
             'canonical_replacement' => 'Thin controller under the owning module HTTP boundary.',
             'retirement_condition' => 'Route ownership and all supported callers move to the module controller.',
-            'baseline' => 44,
+            'baseline' => 43,
             'mode' => 'max',
         ],
         'frozen_routes' => [
@@ -61,7 +61,7 @@ return [
             'reason' => 'Existing split route files still serve supported URLs and route names.',
             'canonical_replacement' => 'Owning module routes with a compatibility-preserving mount.',
             'retirement_condition' => 'No supported caller depends on the legacy file and route evidence is green.',
-            'baseline' => 21,
+            'baseline' => 20,
             'mode' => 'max',
         ],
         'shared_model_imports' => [

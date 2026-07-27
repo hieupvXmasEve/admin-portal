@@ -74,8 +74,8 @@ final class MigrationDebtContract
     /** @var array<string, int> */
     public const BASELINE_CEILINGS = [
         'frozen_services' => 66,
-        'frozen_controllers' => 44,
-        'frozen_routes' => 21,
+        'frozen_controllers' => 43,
+        'frozen_routes' => 20,
         'shared_model_imports' => 494,
         'cross_context_concrete_imports' => 0,
         'direct_json_responses' => 34,
@@ -133,6 +133,7 @@ final class MigrationDebtContract
                 'AcademicHold',
                 'AcademicRecord',
                 'GpaCalculation',
+                'Enrollment',
             ],
         ],
         'Admissions' => [

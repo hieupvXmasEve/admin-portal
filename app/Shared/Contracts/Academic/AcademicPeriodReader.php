@@ -34,4 +34,9 @@ interface AcademicPeriodReader
     public function selectable(): array;
 
     public function scheduleForCampus(int $academicPeriodId, int $campusId): ?CampusPeriodScheduleReference;
+
+    /**
+     * Count of course offerings registered against this academic period.
+     */
+    public function courseOfferingCount(int $academicPeriodId): int;
 }

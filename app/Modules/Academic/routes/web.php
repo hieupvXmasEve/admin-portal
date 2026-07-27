@@ -3,9 +3,8 @@
 declare(strict_types=1);
 
 use App\Constants\CourseOfferingRoutes;
+use App\Constants\SemesterRoutes;
 use App\Constants\StudentRoutes;
-use App\Modules\Academic\Delivery\Http\Web\Canvas\PreviewCanvasGradeSyncController;
-use App\Modules\Academic\Delivery\Http\Web\Canvas\SyncCanvasGradeController;
 use App\Modules\Academic\Delivery\Http\Api\ClassSessionController as DeliveryClassSessionApiController;
 use App\Modules\Academic\Delivery\Http\Web\Admin\CourseOfferingRosterController;
 use App\Modules\Academic\Delivery\Http\Web\Admin\CourseRegistrationController;
@@ -13,6 +12,8 @@ use App\Modules\Academic\Delivery\Http\Web\AttendanceController as DeliveryAtten
 use App\Modules\Academic\Delivery\Http\Web\AttendanceReportController as DeliveryAttendanceReportController;
 use App\Modules\Academic\Delivery\Http\Web\BulkUpdateClassSessionAttendanceController;
 use App\Modules\Academic\Delivery\Http\Web\BulkUpdateCourseOfferingSessionsController;
+use App\Modules\Academic\Delivery\Http\Web\Canvas\PreviewCanvasGradeSyncController;
+use App\Modules\Academic\Delivery\Http\Web\Canvas\SyncCanvasGradeController;
 use App\Modules\Academic\Delivery\Http\Web\ClassSessionController as DeliveryClassSessionController;
 use App\Modules\Academic\Delivery\Http\Web\CourseOfferingSplitController;
 use App\Modules\Academic\Delivery\Http\Web\CourseOfferingStatisticsController;
@@ -21,7 +22,6 @@ use App\Modules\Academic\Delivery\Http\Web\RecordClassSessionAttendanceControlle
 use App\Modules\Academic\Delivery\Http\Web\UnitStatisticsController;
 use App\Modules\Academic\Http\Web\AcademicPlacementController;
 use App\Modules\Academic\Http\Web\AcademicProgressionAuditController;
-use App\Modules\Academic\Http\Web\FinalizeCourseOfferingController;
 use App\Modules\Academic\Http\Web\Admin\CourseOfferingBulkDeletionController;
 use App\Modules\Academic\Http\Web\Admin\CourseOfferingCatalogFormController;
 use App\Modules\Academic\Http\Web\Admin\CourseOfferingCockpitController;
@@ -33,9 +33,10 @@ use App\Modules\Academic\Http\Web\Admin\CourseOfferingRoomController;
 use App\Modules\Academic\Http\Web\CampusDetailController;
 use App\Modules\Academic\Http\Web\ExamResitAttemptController;
 use App\Modules\Academic\Http\Web\ExamScheduleController;
-use App\Modules\Academic\Http\Web\RetakeCourseRegistrationController;
+use App\Modules\Academic\Http\Web\FinalizeCourseOfferingController;
 use App\Modules\Academic\Http\Web\RecalculateApplyController;
 use App\Modules\Academic\Http\Web\RecalculatePreviewController;
+use App\Modules\Academic\Http\Web\RetakeCourseRegistrationController;
 use App\Modules\Academic\Http\Web\StudentAcademicSummaryController;
 use App\Modules\Academic\Http\Web\StudentActionAuditController;
 use App\Modules\Academic\Http\Web\StudentActionController;
@@ -43,6 +44,7 @@ use App\Modules\Academic\Http\Web\StudentController;
 use App\Modules\Academic\Http\Web\StudentDecisionController;
 use App\Modules\Academic\Http\Web\StudentLifecycleYearlyAnalysisController;
 use App\Modules\Academic\Http\Web\StudentStatusController;
+use App\Modules\Academic\Progression\Http\Web\SemesterEnrollmentController;
 use Illuminate\Support\Facades\Route;
 
 require __DIR__.'/../Catalog/routes/web.php';
@@ -675,4 +677,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware('can:recalculate_course_offering')
             ->name(CourseOfferingRoutes::API_RECALCULATE_APPLY);
     });
+});
+
+Route::middleware('auth')->group(function () {
+    Route::get('semesters/{semester}/enrollment', [SemesterEnrollmentController::class, 'show'])
+        ->whereNumber('semester')
+        ->middleware('can:edit_semester')
+        ->name(SemesterRoutes::ENROLLMENT_SHOW);
+
+    Route::post('api/semesters/{semester}/enrollment/generate', [SemesterEnrollmentController::class, 'generateEnrollments'])
+        ->whereNumber('semester')
+        ->middleware('can:edit_semester')
+        ->name(SemesterRoutes::API_ENROLLMENT_GENERATE);
 });

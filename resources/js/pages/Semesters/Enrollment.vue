@@ -11,28 +11,8 @@ import { toast } from 'vue-sonner';
 
 interface Semester {
     id: number;
-    code: string;
     name: string;
-    start_date: string;
-    end_date: string;
-    enrollment_start_date: string | null;
-    enrollment_end_date: string | null;
-    is_active: boolean;
-    is_archived: boolean;
-    created_at: string;
-    updated_at: string;
-}
-
-interface Enrollment {
-    id: number;
-    student_id: number;
-    semester_id: number;
-    curriculum_version_id: number;
-    semester_number: number;
-    status: 'in_progress' | 'completed' | 'withdrawn';
-    notes?: string;
-    created_at: string;
-    updated_at: string;
+    course_offerings_count: number;
 }
 
 interface CampusStats {
@@ -45,10 +25,7 @@ interface CampusStats {
 }
 
 interface Props {
-    semester: Semester & {
-        enrollments?: Enrollment[];
-        course_offerings?: any[];
-    };
+    semester: Semester;
     enrollmentStats: {
         total_enrolled: number;
         by_status: Record<string, number>;
@@ -156,7 +133,7 @@ const generateEnrollments = async () => {
                 <BookOpen class="text-muted-foreground h-4 w-4" />
             </CardHeader>
             <CardContent>
-                <div class="text-2xl font-bold">{{ semester.course_offerings?.length || 0 }}</div>
+                <div class="text-2xl font-bold">{{ semester.course_offerings_count || 0 }}</div>
             </CardContent>
         </Card>
         <Card>
