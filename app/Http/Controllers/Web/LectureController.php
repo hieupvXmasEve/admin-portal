@@ -8,11 +8,15 @@ use App\Actions\Lecture\GetLectureTeachingDetailsAction;
 use App\Actions\Lecture\GetTeachingHoursAction;
 use App\Constants\LectureRoutes;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Lecture\LectureStatisticsRequest;
+use App\Http\Requests\Lecture\ListAvailableLecturesRequest;
 use App\Http\Requests\Lecture\ListLecturesRequest;
+use App\Http\Requests\Lecture\SearchLecturesRequest;
 use App\Http\Requests\Lecture\StoreLectureRequest;
 use App\Http\Requests\Lecture\UpdateLectureRequest;
 use App\Http\Requests\Lecture\ViewLectureTeachingDetailsRequest;
 use App\Http\Requests\Lecture\ViewTeachingHoursRequest;
+use App\Http\Responses\ApiResponse;
 use App\Models\Campus;
 use App\Models\CourseOffering;
 use App\Models\Lecture;
@@ -20,8 +24,8 @@ use App\Models\Semester;
 use App\Models\User;
 use App\Queries\Lecture\ListLecturesQuery;
 use App\Shared\Support\Enums\UserType;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Redirect;
@@ -298,20 +302,15 @@ class LectureController extends Controller
     /**
      * Get lectures for API/AJAX calls
      */
-    public function apiSearch(Request $request)
+    public function apiSearch(SearchLecturesRequest $request): JsonResponse
     {
-        $request->validate([
-            'query' => 'nullable|string|min:2',
-            'campus_id' => 'nullable|exists:campuses,id',
-            'available_only' => 'boolean',
-            'limit' => 'integer|min:1|max:50',
-        ]);
+        $validated = $request->validated();
 
         $query = Lecture::with(['campus'])
             ->active();
 
-        if ($request->filled('query')) {
-            $search = $request->query;
+        if (isset($validated['query'])) {
+            $search = $validated['query'];
             $query->where(function ($q) use ($search) {
                 $q->where('employee_id', 'like', "%{$search}%")
                     ->orWhere('first_name', 'like', "%{$search}%")
@@ -320,8 +319,8 @@ class LectureController extends Controller
             });
         }
 
-        if ($request->filled('campus_id')) {
-            $query->where('campus_id', $request->campus_id);
+        if (isset($validated['campus_id'])) {
+            $query->where('campus_id', $validated['campus_id']);
         }
 
         if ($request->boolean('available_only')) {
@@ -329,34 +328,23 @@ class LectureController extends Controller
         }
 
         $lectures = $query->orderByName()
-            ->limit($request->get('limit', 20))
+            ->limit($validated['limit'] ?? 20)
             ->get();
 
-        return response()->json([
-            'success' => true,
-            'data' => $lectures,
-            'message' => 'Lectures retrieved successfully',
-        ]);
+        return ApiResponse::success($lectures, message: 'Lectures retrieved successfully');
     }
 
     /**
      * API endpoint for getting lectures (for dropdowns, quick edits, etc.)
      */
-    public function apiIndex(Request $request)
+    public function apiIndex(ListAvailableLecturesRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'campus_id' => 'nullable|exists:campuses,id',
-            'is_active' => 'nullable|string|in:true,false,1,0',
-            'is_available_for_assignment' => 'nullable|string|in:true,false,1,0',
-            'employment_status' => 'nullable|string|in:active,on_leave,sabbatical,retired,terminated,suspended',
-            'employment_type' => 'nullable|string|in:full_time,part_time,contract,visiting,emeritus',
-            'search' => 'nullable|string|max:255',
-            'limit' => 'nullable|integer|min:1|max:100',
-        ]);
+        $validated = $request->validated();
 
-        // Convert string boolean values to actual booleans
-        $isActive = isset($validated['is_active']) ? filter_var($validated['is_active'], FILTER_VALIDATE_BOOLEAN) : null;
-        $isAvailableForAssignment = isset($validated['is_available_for_assignment']) ? filter_var($validated['is_available_for_assignment'], FILTER_VALIDATE_BOOLEAN) : null;
+        $isActive = array_key_exists('is_active', $validated) ? $request->boolean('is_active') : null;
+        $isAvailableForAssignment = array_key_exists('is_available_for_assignment', $validated)
+            ? $request->boolean('is_available_for_assignment')
+            : null;
 
         $query = Lecture::with(['campus'])
             ->where('campus_id', $validated['campus_id'] ?? session('current_campus_id'));
@@ -395,22 +383,18 @@ class LectureController extends Controller
         }
 
         $lectures = $query->orderByName()
-            ->limit($request->input('limit', 50))
+            ->limit($validated['limit'] ?? 50)
             ->get();
 
-        return response()->json([
-            'success' => true,
-            'data' => $lectures,
-            'message' => 'Lecturers retrieved successfully',
-        ]);
+        return ApiResponse::success($lectures, message: 'Lecturers retrieved successfully');
     }
 
     /**
      * Get lecture statistics
      */
-    public function statistics(Request $request)
+    public function statistics(LectureStatisticsRequest $request): JsonResponse
     {
-        $campusId = $request->campus_id;
+        $campusId = $request->validated('campus_id');
 
         $query = Lecture::query();
 
@@ -428,10 +412,7 @@ class LectureController extends Controller
             'lecturers' => (clone $query)->where('academic_rank', 'lecturer')->count(),
         ];
 
-        return response()->json([
-            'success' => true,
-            'data' => $stats,
-        ]);
+        return ApiResponse::success($stats);
     }
 
     /**

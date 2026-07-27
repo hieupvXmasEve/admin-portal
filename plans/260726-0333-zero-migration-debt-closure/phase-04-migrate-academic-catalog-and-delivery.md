@@ -63,6 +63,10 @@ controllers/services/routes and frontend debt with each migrated workflow.
      duplicate POST route, migrated template filtering to `useDataTable`, and
      moved active template navigation and mutations to named routes while
      preserving API response envelopes and edit-lock behavior.
+   - [x] Lectures and Teaching Hours: replaced inline validation and raw JSON
+     responses on lecture helpers and exports, preserved campus and `all`
+     filter compatibility, and migrated teaching-hours detail filtering to
+     `useDataTable`, named routes, and DatePicker controls.
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
 7. Review import/export parity, scheduler entries, permissions, and campus scoping.
 

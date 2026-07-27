@@ -4,10 +4,10 @@ import DataTable from '@/components/DataTable.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import DatePicker from '@/components/ui/DatePicker.vue';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useInertiaFilters } from '@/composables/useInertiaFilters';
+import { useDataTable } from '@/composables/useDataTable';
 import type { PaginatedResponse } from '@/types';
 import { Head, Link } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
@@ -36,12 +36,13 @@ interface UnitTypeOption {
 }
 
 interface TeachingHoursDetailFilters {
-    unit_type?: string;
-    date_from?: string;
-    date_to?: string;
-    sort?: string;
-    direction?: string;
-    per_page?: number;
+    unit_type: string;
+    date_from: string;
+    date_to: string;
+    sort: string | null;
+    direction: 'asc' | 'desc' | null;
+    per_page: number;
+    page?: number;
 }
 
 const props = defineProps<{
@@ -75,22 +76,22 @@ const formatDate = (date: Date) => {
 };
 
 const todayDate = new Date();
-const defaultDateTo = formatDate(new Date(todayDate.getFullYear(), todayDate.getMonth(), 16)); // 16th of current month
+const defaultDateTo = formatDate(new Date(todayDate.getFullYear(), todayDate.getMonth(), 15)); // 15th of current month
 const defaultDateFrom = formatDate(new Date(todayDate.getFullYear(), todayDate.getMonth() - 1, 16)); // 16th of previous month
-const currentMonthEnd = formatDate(new Date(todayDate.getFullYear(), todayDate.getMonth() + 1, 0)); // last day of current month
+const today = formatDate(todayDate);
 
-// Initialize filters
-const { filters, hasActiveFilters, clearFilters, handleSortChange, handlePaginationNavigate, handlePageSizeChange, currentSort, currentDirection } = useInertiaFilters<TeachingHoursDetailFilters>({
-    baseUrl: `/lectures/teaching-hours/${props.lecture.id}`,
+const { filters, hasActiveFilters, clearAllFilters, handleSortChange, handlePaginationNavigate, handlePageSizeChange, setFilter, currentSort, currentDirection, isLoading } = useDataTable<TeachingHoursDetailFilters>({
+    baseUrl: route('lectures.teaching-hours.details', props.lecture.id),
     initialFilters: {
-        unit_type: props.filters?.unit_type || 'all',
-        date_from: props.filters?.date_from || defaultDateFrom,
-        date_to: props.filters?.date_to || defaultDateTo,
-        sort: props.filters?.sort || 'date',
-        direction: props.filters?.direction || 'desc',
-        per_page: props.filters?.per_page || 15,
+        unit_type: props.filters?.unit_type ?? 'all',
+        date_from: props.filters?.date_from ?? defaultDateFrom,
+        date_to: props.filters?.date_to ?? defaultDateTo,
+        sort: typeof props.filters?.sort === 'string' ? props.filters.sort : 'date',
+        direction: props.filters?.direction === 'asc' || props.filters?.direction === 'desc' ? props.filters.direction : 'desc',
+        per_page: props.filters?.per_page ?? 15,
+        page: props.filters?.page ?? 1,
     },
-    emptyFilters: {
+    defaultValues: {
         unit_type: 'all',
         date_from: defaultDateFrom,
         date_to: defaultDateTo,
@@ -98,17 +99,8 @@ const { filters, hasActiveFilters, clearFilters, handleSortChange, handlePaginat
         direction: 'desc',
         per_page: 15,
     },
-    defaultValues: {
-        per_page: 15,
-        sort: 'date',
-        direction: 'desc',
-    },
     only: ['sessions', 'stats', 'filters'],
-    transform: (filters) => ({
-        ...filters,
-        per_page: Number(filters.per_page),
-        unit_type: filters.unit_type === 'all' ? undefined : filters.unit_type,
-    }),
+    immediateFields: ['unit_type', 'date_from', 'date_to'],
 });
 
 // Computed sort values for DataTable
@@ -123,14 +115,20 @@ const directionValue = computed(() => {
 });
 
 // Date handlers
-const handleDateFromChange = (event: Event) => {
-    const target = event.target as HTMLInputElement;
-    filters.date_from = target.value;
+const handleDateFromChange = (value: string) => {
+    if (!value || value <= today) {
+        setFilter('date_from', value);
+    }
 };
 
-const handleDateToChange = (event: Event) => {
-    const target = event.target as HTMLInputElement;
-    filters.date_to = target.value;
+const handleDateToChange = (value: string) => {
+    if (!value || (value >= filters.date_from && value <= today)) {
+        setFilter('date_to', value);
+    }
+};
+
+const handleUnitTypeChange = (value: string | number | bigint | Record<string, any> | null) => {
+    setFilter('unit_type', String(value ?? 'all'));
 };
 
 // Column definitions
@@ -269,16 +267,16 @@ const columns: ColumnDef<ClassSession>[] = [
                 <div class="space-y-2">
                     <Label>Date Range</Label>
                     <div class="flex items-center gap-2">
-                        <Input type="date" :model-value="filters.date_from" :max="currentMonthEnd" @change="handleDateFromChange" class="flex-1" />
+                        <DatePicker :model-value="filters.date_from" placeholder="From date" @update:model-value="handleDateFromChange" class="flex-1" />
                         <span class="text-muted-foreground">-</span>
-                        <Input type="date" :model-value="filters.date_to" :min="filters.date_from" :max="currentMonthEnd" @change="handleDateToChange" class="flex-1" />
+                        <DatePicker :model-value="filters.date_to" placeholder="To date" @update:model-value="handleDateToChange" class="flex-1" />
                     </div>
                 </div>
 
                 <!-- Unit Type Filter (Single Select) -->
                 <div class="space-y-2">
                     <Label>Filter Unit Type</Label>
-                    <Select :model-value="filters.unit_type" @update:model-value="(val) => (filters.unit_type = val)">
+                    <Select :model-value="filters.unit_type" @update:model-value="handleUnitTypeChange">
                         <SelectTrigger class="w-full">
                             <SelectValue placeholder="Select Unit Type" />
                         </SelectTrigger>
@@ -296,14 +294,14 @@ const columns: ColumnDef<ClassSession>[] = [
 
                 <!-- Clear Filters -->
                 <div class="flex items-end justify-end">
-                    <Button v-if="hasActiveFilters" variant="ghost" @click="clearFilters"> <X class="mr-2 h-4 w-4" /> Clear Filters </Button>
+                    <Button v-if="hasActiveFilters" variant="ghost" @click="clearAllFilters"> <X class="mr-2 h-4 w-4" /> Clear Filters </Button>
                 </div>
             </div>
         </CardContent>
     </Card>
 
     <!-- Data Table -->
-    <DataTable :data="data" :columns="columns" :loading="false" :initial-sort="sortValue" :initial-direction="directionValue" empty-message="No teaching sessions found for the selected criteria." @sort-change="handleSortChange" />
+    <DataTable :data="data" :columns="columns" :loading="isLoading" :initial-sort="sortValue" :initial-direction="directionValue" empty-message="No teaching sessions found for the selected criteria." @sort-change="handleSortChange" />
 
     <!-- Pagination -->
     <div v-if="sessions.last_page > 1" class="mt-4">

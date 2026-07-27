@@ -6,11 +6,12 @@ namespace App\Http\Controllers\Web\Lectures;
 
 use App\Actions\Lecture\GetTeachingHoursAction;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Lecture\ExportLecturesRequest;
 use App\Http\Requests\Lecture\ViewTeachingHoursRequest;
+use App\Http\Responses\ApiResponse;
 use App\Services\LectureExcelExportService;
 use App\Services\LectureTeachingHoursExcelExportService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -45,30 +46,16 @@ class LectureExportController extends Controller
                 'user_id' => Auth::id(),
             ]);
 
-            return response()->json([
-                'error' => 'Export failed: '.$e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return ApiResponse::error('Export failed: '.$e->getMessage(), status: Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
     /**
      * Export lecturers to Excel with current filters
      */
-    public function exportExcelWithCurrentFilters(Request $request): BinaryFileResponse|JsonResponse
+    public function exportExcelWithCurrentFilters(ExportLecturesRequest $request): BinaryFileResponse|JsonResponse
     {
-        // Validate request parameters
-        $validated = $request->validate([
-            'search' => 'nullable|string|max:255',
-            'campus_id' => 'nullable|exists:campuses,id',
-            'semester_id' => 'nullable|string|max:20',
-            'unit_type' => 'nullable|string|max:50',
-            'employment_status' => 'nullable|string|in:active,on_leave,sabbatical,retired,terminated,suspended,all',
-            'employment_type' => 'nullable|string|in:full_time,part_time,contract,visiting,emeritus,all',
-            'department' => 'nullable|string|max:100',
-            'academic_rank' => 'nullable|string|in:lecturer,senior_lecturer,associate_professor,professor,emeritus_professor,visiting_lecturer,adjunct_professor,all',
-            'available_for_assignment' => 'nullable|boolean',
-            'is_active' => 'nullable|boolean',
-        ]);
+        $validated = $request->validated();
 
         try {
             // Build filters from validated request
@@ -147,9 +134,7 @@ class LectureExportController extends Controller
                 'filters' => $validated ?? [],
             ]);
 
-            return response()->json([
-                'error' => 'Export failed: '.$e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return ApiResponse::error('Export failed: '.$e->getMessage(), status: Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -185,9 +170,7 @@ class LectureExportController extends Controller
                 'filters' => $filters,
             ]);
 
-            return response()->json([
-                'error' => 'Export failed: '.$e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return ApiResponse::error('Export failed: '.$e->getMessage(), status: Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }
