@@ -2,35 +2,31 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Web;
+namespace App\Modules\Academic\Catalog\Http\Web;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Module\StoreModuleRequest;
-use App\Http\Requests\Module\UpdateModuleRequest;
-use App\Models\Campus;
 use App\Models\Module;
 use App\Models\Unit;
+use App\Modules\Academic\Catalog\Http\Requests\ListModulesRequest;
+use App\Modules\Academic\Catalog\Http\Requests\StoreModuleRequest;
+use App\Modules\Academic\Catalog\Http\Requests\SyncModuleUnitsRequest;
+use App\Modules\Academic\Catalog\Http\Requests\UpdateModuleRequest;
 use App\Services\ModuleService;
+use App\Shared\Contracts\Institution\CampusReferenceReader;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class ModuleController extends Controller
 {
     public function __construct(
-        private ModuleService $moduleService
+        private readonly ModuleService $moduleService,
+        private readonly CampusReferenceReader $campuses,
     ) {}
 
-    public function index(Request $request): Response
+    public function index(ListModulesRequest $request): Response
     {
-        $validated = $request->validate([
-            'search' => 'nullable|string|max:255',
-            'campus_id' => 'nullable|integer|exists:campuses,id',
-            'sort' => 'nullable|string|in:code,name,total_credits,grading_type,created_at',
-            'direction' => 'nullable|string|in:asc,desc',
-            'per_page' => 'nullable|integer|min:5|max:100',
-        ]);
+        $validated = $request->validated();
 
         $modules = Module::query()
             ->with(['campus', 'prerequisiteModule'])
@@ -55,7 +51,7 @@ class ModuleController extends Controller
 
         return Inertia::render('Admin/Modules/Index', [
             'modules' => $modules,
-            'campuses' => Campus::select('id', 'name', 'code')->orderBy('name')->get(),
+            'campuses' => array_map(fn ($campus): array => $campus->toArray(), $this->campuses->all()),
             'filters' => [
                 'search' => $validated['search'] ?? '',
                 'campus_id' => $validated['campus_id'] ?? '',
@@ -69,7 +65,7 @@ class ModuleController extends Controller
     public function create(): Response
     {
         return Inertia::render('Admin/Modules/Create', [
-            'campuses' => Campus::select('id', 'name', 'code')->orderBy('name')->get(),
+            'campuses' => array_map(fn ($campus): array => $campus->toArray(), $this->campuses->all()),
             'modules' => Module::select('id', 'code', 'name')->orderBy('code')->get(), // For prerequisite
             'units' => Unit::select('id', 'code', 'name', 'credit_points')
                 ->orderBy('code')
@@ -114,7 +110,7 @@ class ModuleController extends Controller
 
         return Inertia::render('Admin/Modules/Edit', [
             'module' => $module,
-            'campuses' => Campus::select('id', 'name', 'code')->orderBy('name')->get(),
+            'campuses' => array_map(fn ($campus): array => $campus->toArray(), $this->campuses->all()),
             'modules' => Module::select('id', 'code', 'name')
                 ->where('id', '!=', $module->id) // Exclude self from prerequisite
                 ->orderBy('code')
@@ -149,15 +145,9 @@ class ModuleController extends Controller
             ->with('success', 'Module deleted successfully');
     }
 
-    public function syncUnits(Request $request, Module $module): RedirectResponse
+    public function syncUnits(SyncModuleUnitsRequest $request, Module $module): RedirectResponse
     {
-        $validated = $request->validate([
-            'units' => ['required', 'array'],
-            'units.*.unit_id' => ['required', 'exists:units,id'],
-            'units.*.grading_type' => ['required', 'in:grade,pass_fail'],
-            'units.*.weight' => ['nullable', 'numeric', 'min:0'],
-            'units.*.order' => ['required', 'integer', 'min:0'],
-        ]);
+        $validated = $request->validated();
 
         $this->moduleService->syncUnits($module, $validated['units']);
 

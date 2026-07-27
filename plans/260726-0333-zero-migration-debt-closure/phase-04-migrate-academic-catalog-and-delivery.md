@@ -138,6 +138,30 @@ controllers/services/routes and frontend debt with each migrated workflow.
      Lowered the frozen-route and frozen-controller ratchets accordingly;
      `SpecializationService` itself stays frozen (single consumer, out of
      this slice's scope).
+   - [x] Module retirement: added first-time characterization coverage
+     (index search/filter/sort, create/edit form data, store/update/destroy
+     including the curriculum-assignment delete guard, and unit sync with
+     total-credits recalculation), then moved `ModuleController` and its
+     `Store`/`UpdateModuleRequest` off the frozen `routes/web/modules.php`
+     split file into `App\Modules\Academic\Catalog`. Added
+     `ListModulesRequest`/`SyncModuleUnitsRequest` FormRequests to replace
+     the two remaining inline `$request->validate()` calls. Replaced the
+     direct `Campus` model reads with the existing
+     `App\Shared\Contracts\Institution\CampusReferenceReader` shared
+     contract (the established Catalog precedent, see
+     `AcademicPeriodController`) so the move added zero new
+     `shared_model_imports` debt instead of the +1 a naive move would have
+     introduced. No route-order shadow bug this time. Permission gates: the
+     frozen file had none of the `view_module`/`create_module`/
+     `edit_module`/`delete_module` permissions wired to any of the 8 routes,
+     even though those permissions exist and gate the frontend menu entry;
+     preserved verbatim rather than silently closed, since it is a
+     pre-existing gap (not a regression from this move) and adding
+     `can:*_module` gates is a security decision pending user sign-off —
+     tracked as an open item against step 7's permissions review.
+     Lowered the frozen-route and frozen-controller ratchets accordingly;
+     `ModuleService` itself stays frozen (single consumer, out of this
+     slice's scope).
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
 7. Review import/export parity, scheduler entries, permissions, and campus scoping.
 
