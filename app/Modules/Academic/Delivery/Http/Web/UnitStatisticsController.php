@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Web;
+namespace App\Modules\Academic\Delivery\Http\Web;
 
-use App\Actions\Unit\GetUnitStatisticsAction;
 use App\Http\Controllers\Controller;
-use App\Models\Semester;
+use App\Modules\Academic\Catalog\Queries\GetSemesterFilterOptionsQuery;
+use App\Modules\Academic\Delivery\Actions\GetUnitStatisticsAction;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -14,7 +14,8 @@ use Inertia\Response;
 class UnitStatisticsController extends Controller
 {
     public function __construct(
-        private readonly GetUnitStatisticsAction $getUnitStatisticsAction
+        private readonly GetUnitStatisticsAction $getUnitStatisticsAction,
+        private readonly GetSemesterFilterOptionsQuery $semesterFilterOptions,
     ) {}
 
     /**
@@ -22,15 +23,10 @@ class UnitStatisticsController extends Controller
      */
     public function show(Request $request, int $unitId): Response
     {
-        $semesterId = $request->input('semester_id');
-        $offeringId = $request->input('course_offering_id');
+        $semesterOptions = $this->semesterFilterOptions->handle();
 
-        if (! $semesterId) {
-            $activeSemester = Semester::getActiveSemester();
-            if ($activeSemester) {
-                $semesterId = $activeSemester->id;
-            }
-        }
+        $semesterId = $request->input('semester_id') ?: $semesterOptions['active_semester_id'];
+        $offeringId = $request->input('course_offering_id');
 
         $filters = [
             'semester_id' => $semesterId,
@@ -39,9 +35,7 @@ class UnitStatisticsController extends Controller
 
         $data = $this->getUnitStatisticsAction->execute($unitId, $filters);
 
-        $semesters = Semester::where('is_archived', false)
-            ->orderBy('start_date', 'desc')
-            ->get(['id', 'name', 'code']);
+        $semesters = $semesterOptions['semesters'];
 
         return Inertia::render('CourseStatistics/UnitDetail', [
             'data' => $data,

@@ -16,7 +16,9 @@ use App\Modules\Academic\Delivery\Http\Web\BulkUpdateCourseOfferingSessionsContr
 use App\Modules\Academic\Delivery\Http\Web\ClassSessionController as DeliveryClassSessionController;
 use App\Modules\Academic\Delivery\Http\Web\CourseOfferingSplitController;
 use App\Modules\Academic\Delivery\Http\Web\CourseOfferingStatisticsController;
+use App\Modules\Academic\Delivery\Http\Web\CourseStatisticsController;
 use App\Modules\Academic\Delivery\Http\Web\RecordClassSessionAttendanceController;
+use App\Modules\Academic\Delivery\Http\Web\UnitStatisticsController;
 use App\Modules\Academic\Http\Web\AcademicPlacementController;
 use App\Modules\Academic\Http\Web\AcademicProgressionAuditController;
 use App\Modules\Academic\Http\Web\FinalizeCourseOfferingController;
@@ -117,6 +119,22 @@ Route::middleware(['auth', 'verified', 'campus.selected'])->group(function () {
     Route::get('course-statistics/{courseOffering}/export', [DeliveryAttendanceReportController::class, 'export'])
         ->middleware(['campus.selected', 'can:view_attendance'])
         ->name('course-statistics.export');
+
+    Route::get('course-statistics', [CourseStatisticsController::class, 'index'])
+        ->middleware('can:view_attendance')
+        ->name('course-statistics.index');
+
+    Route::get('course-statistics/units/{unitId}', [UnitStatisticsController::class, 'show'])
+        ->middleware('can:view_attendance')
+        ->name('course-statistics.units.show');
+
+    Route::get('course-statistics/{courseOffering}/assessment-scores', [CourseStatisticsController::class, 'assessmentScores'])
+        ->middleware('can:view_attendance')
+        ->name('course-statistics.assessment-scores');
+
+    Route::get('course-statistics/{courseOffering}/export-combined', [CourseStatisticsController::class, 'exportCombined'])
+        ->middleware('can:view_attendance')
+        ->name('course-statistics.export-combined');
 
     Route::get('class-sessions', [DeliveryClassSessionController::class, 'index'])
         ->middleware('can:view_class_session')

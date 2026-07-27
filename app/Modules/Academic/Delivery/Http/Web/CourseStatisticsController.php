@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Web;
+namespace App\Modules\Academic\Delivery\Http\Web;
 
 use App\Constants\CourseOfferingRoutes;
 use App\Exports\CourseOfferingStatisticsExport;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\CourseStatisticsRequest;
-use App\Http\Resources\UnitStatisticsResource;
 use App\Models\CourseOffering;
-use App\Models\Semester;
+use App\Modules\Academic\Catalog\Queries\GetSemesterFilterOptionsQuery;
+use App\Modules\Academic\Delivery\Http\Requests\CourseStatisticsRequest;
+use App\Modules\Academic\Delivery\Http\Resources\UnitStatisticsResource;
 use App\Services\CourseStatisticsService;
 use App\Services\ExcelExportService;
 use Illuminate\Http\RedirectResponse;
@@ -23,25 +23,23 @@ class CourseStatisticsController extends Controller
     public function __construct(
         private readonly CourseStatisticsService $service,
         private readonly ExcelExportService $excelService,
+        private readonly GetSemesterFilterOptionsQuery $semesterFilterOptions,
     ) {}
 
     public function index(CourseStatisticsRequest $request): Response
     {
         $validated = $request->validated();
 
+        $semesterOptions = $this->semesterFilterOptions->handle();
+
         // Default to current active semester if not provided
-        if (! isset($validated['semester_id'])) {
-            $activeSemester = Semester::getActiveSemester();
-            if ($activeSemester) {
-                $validated['semester_id'] = $activeSemester->id;
-            }
+        if (! isset($validated['semester_id']) && $semesterOptions['active_semester_id']) {
+            $validated['semester_id'] = $semesterOptions['active_semester_id'];
         }
 
         $statistics = $this->service->getStatistics($validated);
 
-        $semesters = Semester::where('is_archived', false)
-            ->orderBy('start_date', 'desc')
-            ->get(['id', 'name', 'code']);
+        $semesters = $semesterOptions['semesters'];
 
         return Inertia::render('CourseStatistics/Index', [
             'statistics' => [

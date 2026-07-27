@@ -98,6 +98,21 @@ controllers/services/routes and frontend debt with each migrated workflow.
      `MigrationDebtContract::BASELINE_CEILINGS`. Route names, permissions,
      and the EGC recalculate-demotion fix (issue 09) are covered by green
      tests; no orphan reference to the deleted file remains.
+   - [x] Course Statistics retirement: added first-time characterization
+     coverage (index, per-unit detail, combined export), then moved
+     `CourseStatisticsController`/`UnitStatisticsController`,
+     `CourseStatisticsRequest`, `GetUnitStatisticsAction`, and
+     `UnitStatisticsResource` off the frozen `routes/web/course-statistics.php`
+     split file into Academic Delivery. Extracted the previously-hidden
+     cross-submodule model reads into owner-scoped seams
+     (`Catalog\Queries\GetSemesterFilterOptionsQuery`,
+     `Catalog\Queries\GetUnitGradingThresholdsQuery`,
+     `Progression\Queries\GetUnitAcademicOutcomesQuery`) so the move added
+     zero new `shared_model_imports` debt instead of the +4 a naive move
+     would have introduced. Lowered the frozen-route and frozen-controller
+     ratchets accordingly; `CourseStatisticsService` itself stays frozen
+     (still consumed by `GetCourseOfferingScoresQuery`, out of this
+     slice's scope).
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
 7. Review import/export parity, scheduler entries, permissions, and campus scoping.
 

@@ -45,7 +45,6 @@ require __DIR__.'/web/semester.php';
 require __DIR__.'/web/specializations.php';
 require __DIR__.'/web/lectures.php';
 // require __DIR__ . '/web/student.php';
-require __DIR__.'/web/course-statistics.php';
 require __DIR__.'/web/failed-students.php';
 require __DIR__.'/web/class-schedule.php';
 require __DIR__.'/web/systems.php';

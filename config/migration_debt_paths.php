@@ -107,7 +107,6 @@ return [
         'app/Http/Controllers/Web/Admin/Academic/GpaManagementController.php',
         'app/Http/Controllers/Web/Admin/NotificationController.php',
         'app/Http/Controllers/Web/ApplicationGuardianController.php',
-        'app/Http/Controllers/Web/CourseStatisticsController.php',
         'app/Http/Controllers/Web/DashboardController.php',
         'app/Http/Controllers/Web/EmailConfigurationController.php',
         'app/Http/Controllers/Web/FailedStudentsController.php',
@@ -119,7 +118,6 @@ return [
         'app/Http/Controllers/Web/SemesterEnrollmentController.php',
         'app/Http/Controllers/Web/SpecializationController.php',
         'app/Http/Controllers/Web/StudentApplicationController.php',
-        'app/Http/Controllers/Web/UnitStatisticsController.php',
     ],
     'frozen_routes' => [
         'routes/api/admin.php',
@@ -132,7 +130,6 @@ return [
         'routes/web/academic.php',
         'routes/web/canvas.php',
         'routes/web/class-schedule.php',
-        'routes/web/course-statistics.php',
         'routes/web/email-monitoring.php',
         'routes/web/failed-students.php',
         'routes/web/lectures.php',
