@@ -83,6 +83,10 @@ controllers/services/routes and frontend debt with each migrated workflow.
      legacy registration service and API controller shells after confirming
      live Delivery actions/controllers own the active flows; lowered the
      frozen-service, frozen-controller, and direct-JSON ratchets accordingly.
+   - [x] Calendar service retirement: removed the unreferenced semester
+     management and automated-enrollment services after confirming no live
+     routes, container bindings, or callers remained; lowered the
+     frozen-service ratchet accordingly.
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
 7. Review import/export parity, scheduler entries, permissions, and campus scoping.
 

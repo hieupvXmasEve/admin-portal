@@ -45,7 +45,7 @@ return [
             'reason' => 'Existing service-led runtime paths remain during vertical cutover.',
             'canonical_replacement' => 'Owning module Actions, Queries, or permanent domain support.',
             'retirement_condition' => 'All supported callers are cut over and behavior evidence passes.',
-            'baseline' => 68,
+            'baseline' => 66,
             'mode' => 'max',
         ],
         'frozen_controllers' => [
