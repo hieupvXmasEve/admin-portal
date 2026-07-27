@@ -71,6 +71,10 @@ controllers/services/routes and frontend debt with each migrated workflow.
      into Delivery FormRequests, preserved sanitized sorting and campus-scoped
      `all` lookup behavior, and migrated mapping interactions to the API
      wrapper and named routes.
+   - [x] Canvas Syllabus, Assignment, and Grade Sync: standardized summary and
+     grade-sync API envelopes, added assignment selection validation, restored
+     the registered syllabus-summary route, and preserved Canvas sync dialogs
+     and course-offering grade preview/apply behavior.
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
 7. Review import/export parity, scheduler entries, permissions, and campus scoping.
 

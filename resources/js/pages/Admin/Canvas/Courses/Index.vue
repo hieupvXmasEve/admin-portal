@@ -483,11 +483,12 @@ const openSyncAssignmentsDialog = async (mapping: CanvasCourseMapping) => {
             return;
         }
 
-        assignmentsSyncSummary.value = data.value;
+        const summary = data.value?.data ?? null;
+        assignmentsSyncSummary.value = summary;
 
         // Auto-select already synced groups
-        if (data.value && 'groups' in data.value && Array.isArray(data.value.groups)) {
-            selectedGroups.value = data.value.groups.filter((g: any) => g.is_currently_synced).map((g: any) => g.id);
+        if (summary && 'groups' in summary && Array.isArray(summary.groups)) {
+            selectedGroups.value = summary.groups.filter((g: any) => g.is_currently_synced).map((g: any) => g.id);
         }
     } catch {
         toast.error('Failed to load sync summary');
@@ -571,7 +572,7 @@ const openSyncGradesDialog = async (mapping: CanvasCourseMapping) => {
             return;
         }
 
-        gradesSyncSummary.value = data.value;
+        gradesSyncSummary.value = data.value?.data ?? null;
     } catch {
         toast.error('Failed to load sync summary');
         syncGradesDialogOpen.value = false;
@@ -592,14 +593,16 @@ const syncGrades = async () => {
             return;
         }
 
+        const syncResults = data.value?.data ?? null;
+
         // Store detailed results
         gradesSyncSummary.value = {
             ...gradesSyncSummary.value,
             sync_completed: true,
-            sync_results: data.value,
+            sync_results: syncResults,
         };
 
-        toast.success(`Grades synced! ${data.value && 'students_synced' in data.value ? data.value.students_synced : 0} students processed`);
+        toast.success(`Grades synced! ${syncResults && 'students_synced' in syncResults ? syncResults.students_synced : 0} students processed`);
     } catch {
         toast.error('Failed to sync grades');
     } finally {

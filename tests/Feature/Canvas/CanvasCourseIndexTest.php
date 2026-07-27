@@ -10,6 +10,9 @@ use App\Models\Semester;
 use App\Models\SyllabusTemplate;
 use App\Models\Unit;
 use App\Models\User;
+use App\Modules\Academic\Delivery\Support\Canvas\CanvasAssignmentSyncService;
+use App\Modules\Academic\Delivery\Support\Canvas\CanvasSyllabusService;
+use App\Modules\Academic\Delivery\Support\CanvasGradeSyncService;
 use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -190,4 +193,78 @@ it('accepts the legacy all-semester sentinel for available offerings', function 
         ->getJson(route('admin.canvas.api.course-offerings', ['semester_id' => 'all']))
         ->assertOk()
         ->assertJsonPath('data.0.id', $offering->id);
+});
+
+it('uses the canonical API envelope for Canvas syllabus, assignment, and grade syncs', function () {
+    $mapping = CanvasCourseMapping::query()->create([
+        'canvas_integration_id' => $this->canvasIntegration->id,
+        'canvas_course_id' => 'SYNC-1',
+        'sync_status' => 'mapped',
+    ]);
+
+    $syllabus = Mockery::mock(CanvasSyllabusService::class);
+    $syllabus->shouldReceive('getSyncSummary')->once()->andReturn(['can_sync' => true, 'syllabus_title' => 'Template']);
+    app()->instance(CanvasSyllabusService::class, $syllabus);
+
+    $assignments = Mockery::mock(CanvasAssignmentSyncService::class);
+    $assignments->shouldReceive('getDetailedSyncSummary')->once()->andReturn(['can_sync' => true, 'groups' => []]);
+    app()->instance(CanvasAssignmentSyncService::class, $assignments);
+
+    $grades = Mockery::mock(CanvasGradeSyncService::class);
+    $grades->shouldReceive('getGradeSyncSummary')->once()->andReturn(['can_sync' => true, 'students' => []]);
+    $grades->shouldReceive('syncCourseGrades')->once()->andReturn(['success' => true, 'students_synced' => 2]);
+    app()->instance(CanvasGradeSyncService::class, $grades);
+
+    actingAs($this->user)
+        ->getJson(route('admin.canvas.courses.sync-summary', $mapping))
+        ->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.syllabus_title', 'Template');
+
+    actingAs($this->user)
+        ->getJson(route('admin.canvas.courses.assignments.sync-summary', $mapping))
+        ->assertOk()
+        ->assertJsonPath('data.groups', []);
+
+    actingAs($this->user)
+        ->getJson(route('admin.canvas.courses.grades.sync-summary', $mapping))
+        ->assertOk()
+        ->assertJsonPath('data.students', []);
+
+    actingAs($this->user)
+        ->postJson(route('admin.canvas.courses.sync-grades', $mapping))
+        ->assertOk()
+        ->assertJsonPath('data.students_synced', 2);
+});
+
+it('validates selected Canvas assignment group identifiers', function () {
+    $mapping = CanvasCourseMapping::query()->create([
+        'canvas_integration_id' => $this->canvasIntegration->id,
+        'canvas_course_id' => 'SYNC-2',
+        'sync_status' => 'mapped',
+    ]);
+
+    actingAs($this->user)
+        ->postJson(route('admin.canvas.courses.sync-assignments', $mapping), ['selected_group_ids' => ['group-1', 2]])
+        ->assertUnprocessable()
+        ->assertJsonPath('errors.0.field', 'selected_group_ids.1');
+});
+
+it('wraps Canvas syllabus summary failures in the canonical API envelope', function () {
+    $mapping = CanvasCourseMapping::query()->create([
+        'canvas_integration_id' => $this->canvasIntegration->id,
+        'canvas_course_id' => 'SYNC-FAILURE',
+        'sync_status' => 'mapped',
+    ]);
+
+    $syllabus = Mockery::mock(CanvasSyllabusService::class);
+    $syllabus->shouldReceive('getSyncSummary')->once()->andThrow(new RuntimeException('Canvas syllabus is unavailable'));
+    app()->instance(CanvasSyllabusService::class, $syllabus);
+
+    actingAs($this->user)
+        ->getJson(route('admin.canvas.courses.sync-summary', $mapping))
+        ->assertBadRequest()
+        ->assertJsonPath('success', false)
+        ->assertJsonPath('data.can_sync', false)
+        ->assertJsonPath('message', 'Canvas syllabus is unavailable');
 });
