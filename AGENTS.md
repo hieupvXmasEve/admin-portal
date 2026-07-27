@@ -167,6 +167,11 @@ Each page declares the files it documents in its frontmatter `source:` list.
 `./scripts/check-docs-freshness.sh` fails when a listed file changed and the
 page did not. When a screen moves or is retired, update the `source:` list too.
 
+The guide is published in Vietnamese at the site root, English under `en/`, and
+Korean under `ko/`. Vietnamese is authoritative: write it first, then update the
+English page in the same change. A locale with no translated page falls back to
+Vietnamese, so a missing Korean page is expected and is not a failure.
+
 Write for staff who do not read code: use the labels shown on screen, describe
 one action per step, and never mention routes, permission codes, table names,
 or framework internals.

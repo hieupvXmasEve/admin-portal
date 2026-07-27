@@ -45,6 +45,21 @@ source:
 request but the page did not. Update the page, or drop the path from `source:`
 when the page no longer documents that file.
 
+## Languages
+
+| Locale | URL | Content |
+| --- | --- | --- |
+| Vietnamese | `/` | Authoritative. Write here first. |
+| English | `/en/` | Translated from Vietnamese in the same change. |
+| Korean | `/ko/` | Not translated yet; falls back to Vietnamese. |
+
+Vietnamese lives at the site root so its published URLs stay stable. Starlight
+renders the Vietnamese page with a notice when a locale has no translation, so
+partial translation is safe to ship.
+
+To translate a page, copy it to `src/content/docs/<locale>/<same path>` and keep
+the `source:` list identical, so the freshness check covers every language.
+
 ## Writing rules
 
 Pages target staff who do not read code:

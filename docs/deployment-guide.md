@@ -266,10 +266,17 @@ and deploys it on pushes to `main` that reach the deploy job.
 
 ### One-time Cloudflare setup
 
-1. Create a Pages project named `admin-portal-user-guide` in the Cloudflare
-   dashboard under **Workers & Pages**. Choose **Direct Upload**, not a Git
-   connection — GitHub Actions performs the upload, so a Git connection would
-   deploy twice.
+1. Create the Pages project. The deploy job does not create it, and fails with
+   `Project not found [code: 8000007]` when it is missing.
+
+   ```bash
+   npx wrangler pages project create admin-portal-user-guide --production-branch=main
+   ```
+
+   The dashboard equivalent is **Workers & Pages → Create → Pages → Upload
+   assets**, which requires a placeholder upload. Choose direct upload, not a
+   Git connection — GitHub Actions performs the upload, so a Git connection
+   would deploy twice.
 2. Create an API token under **My Profile → API Tokens** with the
    **Cloudflare Pages: Edit** permission scoped to the account.
 3. Copy the Account ID from the Workers & Pages overview page.

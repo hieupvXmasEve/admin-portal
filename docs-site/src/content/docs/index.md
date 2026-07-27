@@ -1,11 +1,11 @@
 ---
-title: Hướng dẫn sử dụng Swinx
-description: Hướng dẫn sử dụng Swinx cho đội vận hành học vụ, viết theo menu thật của hệ thống.
+title: Hướng dẫn sử dụng Portal
+description: Hướng dẫn sử dụng Portal cho đội vận hành học vụ, viết theo menu thật của hệ thống.
 source:
   - resources/js/constants/menu-sidebar.ts
 ---
 
-Tài liệu dành cho **cán bộ, nhân viên nhà trường** dùng hệ thống Swinx trên trình duyệt. Không cần biết kỹ thuật.
+Tài liệu dành cho **cán bộ, nhân viên nhà trường** dùng hệ thống Portal trên trình duyệt. Không cần biết kỹ thuật.
 
 Sinh viên và giảng viên dùng cổng riêng, không nằm trong tài liệu này.
 
@@ -13,22 +13,22 @@ Sinh viên và giảng viên dùng cổng riêng, không nằm trong tài liệu
 
 Người mới đọc [Bắt đầu](/bat-dau/) trước: đăng nhập, chọn cơ sở, cách đọc màn hình. Đọc một lần là đủ dùng cho mọi chương sau.
 
-Sau đó vào khu vực công việc của bạn. Hiện có [Academic Operations](/academic-operations/).
+Sau đó vào khu vực công việc của bạn — mười khu vực tương ứng mười nhóm menu, liệt kê bên dưới.
 
 ## Phạm vi
 
 | Khu vực | Trạng thái |
 | --- | --- |
-| Bắt đầu | Đã viết |
-| Academic Operations — Học vụ | Đã viết |
-| Student Services — Sinh viên | Chưa viết |
-| Reports & Audits — Báo cáo, đối chiếu | Chưa viết |
-| Faculty & Teaching — Giảng viên | Chưa viết |
-| Finance Office — Học phí | Chưa viết |
-| Forms & Quality — Biểu mẫu, khảo sát | Chưa viết |
-| Campus Operations — Phòng, sự kiện, câu lạc bộ | Chưa viết |
-| Communications — Email, thông báo | Chưa viết |
-| Administration — Người dùng, phân quyền | Chưa viết |
+| [Bắt đầu](/bat-dau/) | Đã viết |
+| [Academic Operations — Học vụ](/academic-operations/) | Đã viết |
+| [Student Services — Sinh viên](/student-services/) | Đã viết |
+| [Reports & Audits — Báo cáo, đối chiếu](/reports-audits/) | Đã viết |
+| [Faculty & Teaching — Giảng viên](/faculty-teaching/) | Đã viết |
+| [Finance Office — Học phí](/finance-office/) | Đã viết |
+| [Forms & Quality — Biểu mẫu, khảo sát](/forms-quality/) | Đã viết |
+| [Campus Operations — Phòng, sự kiện, câu lạc bộ](/campus-operations/) | Đã viết |
+| [Communications — Email, thông báo](/communications/) | Đã viết |
+| [Administration — Người dùng, phân quyền](/administration/) | Đã viết |
 
 ## Quy ước trong tài liệu
 
