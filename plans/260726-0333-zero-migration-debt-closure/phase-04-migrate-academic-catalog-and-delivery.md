@@ -275,10 +275,31 @@ controllers/services/routes and frontend debt with each migrated workflow.
      `docs/features/canvas/{operations,integration}.md`. Lowered the
      frozen-route ratchet accordingly. This closes phase-04's remaining
      route-retirement scope (`class-schedule.php`, `academic.php`,
-     `lectures.php`, `canvas.php` all retired); step 7 (import/export/
-     permission/Canvas parity review) remains open.
+     `lectures.php`, `canvas.php` all retired).
+   - [x] Parity review for the four route retirements above: diffed each
+     retired file's `name()`/`middleware('can:...')` sequence against its
+     new location — byte-identical for `academic.php`, `canvas.php`, and
+     `lectures.php`. Verified every route's controller/method binding via
+     `route:list -v`. Confirmed no scheduled command
+     (`routes/console.php`) references any moved or retired class.
+     Confirmed `campus.selected` middleware presence/absence preserved
+     per group (Canvas has it; Academic and Lectures never did). One
+     accepted behavior delta: `GpaManagementController::index`,
+     `LectureController::index`, and `LectureController::teachingHours`
+     now source their semester dropdown from the shared
+     `GetSemesterFilterOptionsQuery`/`AcademicPeriodReader` seam (filters
+     `is_archived = false`) instead of an unfiltered raw `Semester` query,
+     matching the already-established pattern in `AcademicReportController`
+     and `CourseRankingController`. Product owner confirmed keeping this
+     (closes a pre-existing inconsistency rather than introducing one).
+     `GpaHistoryController` (untouched, outside this session's scope)
+     still shows archived semesters — a leftover inconsistency for a
+     future slice, not a regression from this work.
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
 7. Review import/export parity, scheduler entries, permissions, and campus scoping.
+   - [x] Done for this session's four route retirements (see above). The
+     remaining Catalog/Delivery/assessment slices from earlier phase-04
+     work are not yet re-reviewed under this step.
 
 ## Test Scenario Matrix
 
