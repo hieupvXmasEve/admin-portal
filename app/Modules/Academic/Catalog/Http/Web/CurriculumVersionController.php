@@ -17,6 +17,12 @@ use App\Models\Specialization;
 use App\Modules\Academic\Catalog\Actions\CreateCurriculumVersionAction;
 use App\Modules\Academic\Catalog\Actions\ManageCurriculumVersionApiAction;
 use App\Modules\Academic\Catalog\Actions\ModifyCurriculumVersionAction;
+use App\Modules\Academic\Catalog\Http\Requests\BulkCurriculumVersionOperationRequest;
+use App\Modules\Academic\Catalog\Http\Requests\BulkDeleteCurriculumVersionsRequest;
+use App\Modules\Academic\Catalog\Http\Requests\ExportCurriculumVersionsRequest;
+use App\Modules\Academic\Catalog\Http\Requests\ListCurriculumVersionsByProgramRequest;
+use App\Modules\Academic\Catalog\Http\Requests\ListCurriculumVersionsRequest;
+use App\Modules\Academic\Catalog\Http\Requests\ListCurriculumVersionSummaryUnitsRequest;
 use App\Modules\Academic\Catalog\Queries\GetCurriculumVersionPageDataQuery;
 use App\Modules\Academic\Catalog\Queries\GetCurriculumVersionSummaryQuery;
 use App\Modules\Academic\Catalog\Queries\ListCurriculumVersionsQuery;
@@ -32,22 +38,22 @@ use Inertia\Response;
  */
 class CurriculumVersionController extends Controller
 {
-    public function index(Request $request): Response
+    public function index(ListCurriculumVersionsRequest $request): Response
     {
-        $filters = $request->validate([
-            'search' => ['nullable', 'string', 'max:255'],
-            'program_id' => ['nullable', 'exists:programs,id'],
-            'specialization_id' => ['nullable', 'exists:specializations,id'],
-            'sort' => ['nullable', 'in:version_code,program_name,specialization_name,created_at,units_count'],
-            'direction' => ['nullable', 'in:asc,desc'],
-            'per_page' => ['nullable', 'integer', 'min:5', 'max:100'],
-        ]);
+        $filters = $request->validated();
         $result = app(ListCurriculumVersionsQuery::class)->handle($filters);
 
         return Inertia::render('CurriculumVersions/Index', [
             'curriculumVersions' => $result['items'],
             'statistics' => $result['statistics'],
-            'filters' => $filters,
+            'filters' => (object) [
+                'search' => $filters['search'] ?? '',
+                'program_id' => isset($filters['program_id']) ? (string) $filters['program_id'] : '',
+                'specialization_id' => isset($filters['specialization_id']) ? (string) $filters['specialization_id'] : '',
+                'sort' => $filters['sort'] ?? null,
+                'direction' => $filters['direction'] ?? null,
+                'per_page' => $filters['per_page'] ?? 15,
+            ],
             'programs' => Program::query()->select('id', 'name', 'code')->orderBy('name')->get(),
             'specializations' => Specialization::query()->select('id', 'name', 'code', 'program_id')->orderBy('name')->get(),
             'semesters' => Semester::query()->select('id', 'name', 'code')->orderBy('name')->get(),
@@ -128,20 +134,11 @@ class CurriculumVersionController extends Controller
         );
     }
 
-    public function summaryUnits(Request $request, CurriculumVersion $curriculumVersion): Response
+    public function summaryUnits(ListCurriculumVersionSummaryUnitsRequest $request, CurriculumVersion $curriculumVersion): Response
     {
-        $filters = $request->validate([
-            'search' => ['nullable', 'string', 'max:255'],
-            'unit_scope' => ['nullable', 'in:program,common,specialization_specific,cross_program'],
-            'year_level' => ['nullable', 'integer', 'min:1', 'max:5'],
-            'semester_number' => ['nullable', 'integer', 'min:1', 'max:9'],
-            'page' => ['nullable', 'integer', 'min:1'],
-            'per_page' => ['nullable', 'integer', 'min:5', 'max:50'],
-        ]);
-
         return Inertia::render(
             'CurriculumVersions/summary/Units',
-            app(GetCurriculumVersionSummaryQuery::class)->units($curriculumVersion, $filters),
+            app(GetCurriculumVersionSummaryQuery::class)->units($curriculumVersion, $request->validated()),
         );
     }
 
@@ -232,10 +229,10 @@ class CurriculumVersionController extends Controller
         return redirect()->route(CurriculumRoutes::VERSION_SUMMARY_OVERVIEW, $duplicatedVersion);
     }
 
-    public function exportFiltered(Request $request): JsonResponse
+    public function exportFiltered(ExportCurriculumVersionsRequest $request): JsonResponse
     {
         try {
-            $export = app(ManageCurriculumVersionApiAction::class)->export($request->all());
+            $export = app(ManageCurriculumVersionApiAction::class)->export($request->validated());
 
             return ApiResponse::success($export, message: 'Export would be generated');
         } catch (\Throwable $exception) {
@@ -245,12 +242,12 @@ class CurriculumVersionController extends Controller
         }
     }
 
-    public function bulkOperations(Request $request): JsonResponse
+    public function bulkOperations(BulkCurriculumVersionOperationRequest $request): JsonResponse
     {
-        $input = app(ManageCurriculumVersionApiAction::class)->validateBulkOperation($request->all());
+        $input = $request->validated();
 
         if ($input['action'] === 'delete') {
-            return $this->bulkDelete($request);
+            return $this->deleteVersions($input['curriculum_version_ids']);
         }
 
         return ApiResponse::success([
@@ -259,24 +256,30 @@ class CurriculumVersionController extends Controller
         ], message: 'Selected curriculum versions exported successfully.');
     }
 
-    public function getSpecializationsByProgram(Request $request): JsonResponse
+    public function getSpecializationsByProgram(ListCurriculumVersionsByProgramRequest $request): JsonResponse
     {
         return ApiResponse::success(
-            app(ManageCurriculumVersionApiAction::class)->specializationsForProgram($request->all()),
+            app(ManageCurriculumVersionApiAction::class)->specializationsForProgram((int) $request->validated('program_id')),
         );
     }
 
-    public function getCurriculumVersionsByProgramSpecialization(Request $request): JsonResponse
+    public function getCurriculumVersionsByProgramSpecialization(ListCurriculumVersionsByProgramRequest $request): JsonResponse
     {
         return ApiResponse::success(
-            app(ManageCurriculumVersionApiAction::class)->versionsForProgram($request->all()),
+            app(ManageCurriculumVersionApiAction::class)->versionsForProgram((int) $request->validated('program_id')),
         );
     }
 
-    public function bulkDelete(Request $request): JsonResponse
+    public function bulkDelete(BulkDeleteCurriculumVersionsRequest $request): JsonResponse
+    {
+        return $this->deleteVersions($request->validated('curriculum_version_ids'));
+    }
+
+    /** @param list<int> $curriculumVersionIds */
+    private function deleteVersions(array $curriculumVersionIds): JsonResponse
     {
         try {
-            $result = app(ManageCurriculumVersionApiAction::class)->bulkDelete($request->all());
+            $result = app(ManageCurriculumVersionApiAction::class)->bulkDelete($curriculumVersionIds);
 
             return ApiResponse::success($result, message: count($result['deleted']).' curriculum versions deleted successfully.');
         } catch (\Throwable $exception) {

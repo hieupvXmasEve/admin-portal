@@ -14,15 +14,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { usePermissions } from '@/composables';
+import { useDataTable } from '@/composables/useDataTable';
 import type { PaginatedResponse } from '@/types';
 import { ValidationRules } from '@/types/validation';
+import { curriculumRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { toTypedSchema } from '@vee-validate/zod';
-import { useDebounceFn } from '@vueuse/core';
 import { Book, Copy, Edit, Eye, Plus, Search, Trash2, X } from 'lucide-vue-next';
 import { useForm } from 'vee-validate';
-import { computed, h, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import { z } from 'zod';
 
@@ -81,111 +82,52 @@ const props = defineProps<{
 // Reactive data
 const data = computed(() => props.curriculumVersions.data);
 
-// Filter state - Handle case where props.filters might be empty array or object
-const getInitialFilters = () => {
-    // Check if props.filters is a valid object (not array) and has properties
-    const validFilters = props.filters && typeof props.filters === 'object' && !Array.isArray(props.filters) ? props.filters : {};
+interface CurriculumVersionFilters {
+    search: string;
+    program_id: string;
+    specialization_id: string;
+    sort: string | null;
+    direction: 'asc' | 'desc' | null;
+    per_page: number;
+}
 
-    return {
-        search: validFilters.search || '',
-        program_id: validFilters.program_id || '',
-        specialization_id: validFilters.specialization_id || '',
-        sort: validFilters.sort || '',
-        direction: validFilters.direction || 'asc',
-        per_page: validFilters.per_page || 15,
-    };
-};
-
-const filtersState = ref(getInitialFilters());
-
-// Track if user is currently interacting with filters to prevent overriding their input
-const isUserInteracting = ref(false);
-
-// Debounced function to reset user interaction flag
-const resetUserInteraction = useDebounceFn(() => {
-    isUserInteracting.value = false;
-}, 800);
-
-// Sync filters with props when they change (e.g., from navigation), but only if user is not currently typing
-watch(
-    () => props.filters,
-    (newFilters, oldFilters) => {
-        // Only sync if user is not currently interacting and filters actually changed
-        if (!isUserInteracting.value && newFilters && typeof newFilters === 'object' && !Array.isArray(newFilters) && JSON.stringify(newFilters) !== JSON.stringify(oldFilters)) {
-            const updatedFilters = {
-                search: newFilters.search || '',
-                program_id: newFilters.program_id || '',
-                specialization_id: newFilters.specialization_id || '',
-                sort: newFilters.sort || '',
-                direction: newFilters.direction || 'asc',
-                per_page: newFilters.per_page || 15,
-            };
-
-            // Only update if there's actually a difference to prevent unnecessary reactivity
-            if (JSON.stringify(filtersState.value) !== JSON.stringify(updatedFilters)) {
-                filtersState.value = updatedFilters;
-            }
-        }
+const {
+    filters: filtersState,
+    setFilter,
+    clearAllFilters,
+    handleSearch,
+    handleSortChange,
+    handlePaginationNavigate,
+    handlePageSizeChange,
+    hasActiveFilters,
+    isLoading,
+    currentSort,
+    currentDirection,
+} = useDataTable<CurriculumVersionFilters>({
+    baseUrl: curriculumRoutes.curriculumVersions.index(),
+    initialFilters: {
+        search: props.filters?.search ?? '',
+        program_id: props.filters?.program_id ?? '',
+        specialization_id: props.filters?.specialization_id ?? '',
+        sort: typeof props.filters?.sort === 'string' ? props.filters.sort : null,
+        direction: props.filters?.direction === 'desc' ? 'desc' : props.filters?.direction === 'asc' ? 'asc' : null,
+        per_page: props.filters?.per_page ?? 15,
     },
-    { immediate: false }, // Don't run on initial mount
-);
-
-// Ensure filters are properly initialized on mount
-onMounted(async () => {
-    await nextTick();
-
-    // Debug: Log initial filter state
-    console.log('Initial filters:', filtersState.value);
-    console.log('Props filters:', props.filters);
-
-    // On initial mount, sync once from props if available
-    if (props.filters && Object.values(props.filters).some((value) => value !== undefined && value !== '' && value !== null)) {
-        const initialFilters = {
-            search: props.filters.search || '',
-            program_id: props.filters.program_id || '',
-            specialization_id: props.filters.specialization_id || '',
-            sort: props.filters.sort || '',
-            direction: props.filters.direction || 'asc',
-            per_page: props.filters.per_page || 15,
-        };
-
-        if (JSON.stringify(filtersState.value) !== JSON.stringify(initialFilters)) {
-            filtersState.value = initialFilters;
-        }
-        console.log('Filters synced from server-side props');
-    } else {
-        console.log('No initial filters, starting with defaults');
-    }
+    defaultValues: { search: '', program_id: '', specialization_id: '', sort: null, direction: null, per_page: 15 },
+    only: ['curriculumVersions', 'filters'],
+    fieldDebounce: { search: 400 },
+    immediateFields: ['program_id', 'specialization_id'],
 });
 
 // Computed specializations based on selected program
 const filteredSpecializations = computed(() => {
-    if (!filtersState.value.program_id) return props.specializations;
-    return props.specializations.filter((spec) => spec.program_id.toString() === filtersState.value.program_id);
+    if (!filtersState.program_id) return props.specializations;
+    return props.specializations.filter((spec) => spec.program_id.toString() === filtersState.program_id);
 });
-
-// Watch for program changes to reset specialization
-watch(
-    () => filtersState.value.program_id,
-    (newProgramId, oldProgramId) => {
-        if (newProgramId !== oldProgramId && filtersState.value.specialization_id) {
-            // Check if current specialization belongs to new program
-            const currentSpec = props.specializations.find((spec) => spec.id.toString() === filtersState.value.specialization_id);
-            if (!currentSpec || currentSpec.program_id.toString() !== newProgramId) {
-                filtersState.value.specialization_id = '';
-            }
-        }
-    },
-);
 
 // Computed display values for select components
-const displayProgramId = computed(() => filtersState.value.program_id || 'all');
-const displaySpecializationId = computed(() => filtersState.value.specialization_id || 'all');
-
-// Computed for checking if filters have active values
-const hasActiveFilters = computed(() => {
-    return !!(filtersState.value.search || filtersState.value.program_id || filtersState.value.specialization_id);
-});
+const displayProgramId = computed(() => filtersState.program_id || 'all');
+const displaySpecializationId = computed(() => filtersState.specialization_id || 'all');
 
 // Delete dialog state
 const deleteDialogOpen = ref(false);
@@ -248,7 +190,7 @@ const editCurriculumVersion = (curriculumVersion: CurriculumVersion) => {
 };
 
 const viewCurriculumVersion = (curriculumVersion: CurriculumVersion) => {
-    router.visit(`/curriculum-versions/${curriculumVersion.id}/overview`);
+    router.visit(curriculumRoutes.curriculumVersions.summary.overview(curriculumVersion.id));
 };
 
 const deleteCurriculumVersion = (curriculumVersion: CurriculumVersion) => {
@@ -263,7 +205,7 @@ const duplicateCurriculumVersion = (curriculumVersion: CurriculumVersion) => {
 
 const confirmDelete = () => {
     if (curriculumVersionToDelete.value) {
-        router.delete(`/curriculum-versions/${curriculumVersionToDelete.value.id}`, {
+        router.delete(route('curriculum_versions.destroy', { curriculum_version: curriculumVersionToDelete.value.id }), {
             preserveScroll: true,
             onSuccess: () => {
                 toast.success('Curriculum version deleted successfully');
@@ -293,7 +235,7 @@ const onEditSubmit = (values: any) => {
         semester_id: values.semester_id ? parseInt(values.semester_id) : null,
     };
 
-    router.put(`/curriculum-versions/${curriculumVersionToEdit.value.id}`, submitData, {
+    router.put(route('curriculum_versions.update', { curriculum_version: curriculumVersionToEdit.value.id }), submitData, {
         onSuccess: () => {
             toast.success('Curriculum version updated successfully');
             closeEditModal();
@@ -319,7 +261,7 @@ const onDuplicateSubmit = (values: any) => {
         include_curriculum_units: values.include_curriculum_units,
     };
 
-    router.post(`/curriculum-versions/${curriculumVersionToDuplicate.value.id}/duplicate`, submitData, {
+    router.post(route('curriculum_versions.duplicate', { curriculum_version: curriculumVersionToDuplicate.value.id }), submitData, {
         onSuccess: () => {
             toast.success(`Curriculum version duplicated successfully as '${values.version_code}'`);
             closeDuplicateModal();
@@ -336,117 +278,30 @@ const generateSuggestedVersionCode = (originalVersionCode: string): string => {
     return `${originalVersionCode}-Copy-${timestamp}`;
 };
 
-// Server-side filtering functions
-const applyFilters = (newFilters: typeof filtersState.value) => {
-    const params = new URLSearchParams();
-
-    if (newFilters.search) params.set('search', newFilters.search);
-    if (newFilters.program_id) params.set('program_id', newFilters.program_id);
-    if (newFilters.specialization_id) params.set('specialization_id', newFilters.specialization_id);
-    if (newFilters.sort) params.set('sort', newFilters.sort);
-    if (newFilters.direction) params.set('direction', newFilters.direction);
-    if (newFilters.per_page) params.set('per_page', newFilters.per_page.toString());
-
-    const url = `/curriculum-versions${params.toString() ? '?' + params.toString() : ''}`;
-
-    router.visit(url, {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['curriculumVersions', 'filters'],
-    });
-};
-
-// Filter application functions
-
-// Handle search using DebouncedInput pattern (following development standards)
-const handleSearch = (value: string | number) => {
-    isUserInteracting.value = true;
-    filtersState.value.search = String(value);
-
-    // Reset the flag and apply filters
-    resetUserInteraction();
-    router.get('/curriculum-versions', filtersState.value, {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['curriculumVersions', 'filters'],
-    });
-};
-
 const updateProgramFilter = (value: any) => {
-    isUserInteracting.value = true;
-    filtersState.value.program_id = value === 'all' ? '' : String(value || '');
-
-    // Auto-reset specialization when program changes
-    if (!filtersState.value.program_id || !filteredSpecializations.value.some((spec) => spec.id.toString() === filtersState.value.specialization_id)) {
-        filtersState.value.specialization_id = '';
+    const programId = value === 'all' ? '' : String(value || '');
+    const specializationId = filtersState.specialization_id;
+    if (!programId || !props.specializations.some((spec) => spec.id.toString() === specializationId && spec.program_id.toString() === programId)) {
+        filtersState.specialization_id = '';
     }
-
-    // Reset the flag after applying filters
-    resetUserInteraction();
-
-    applyFilters(filtersState.value);
+    setFilter('program_id', programId);
 };
 
 const updateSpecializationFilter = (value: any) => {
-    isUserInteracting.value = true;
-    filtersState.value.specialization_id = value === 'all' ? '' : String(value || '');
-
-    // Reset the flag after applying filters
-    resetUserInteraction();
-
-    applyFilters(filtersState.value);
+    setFilter('specialization_id', value === 'all' ? '' : String(value || ''));
 };
 
-const clearFilters = () => {
-    isUserInteracting.value = true;
-    filtersState.value = {
-        search: '',
-        program_id: '',
-        specialization_id: '',
-        sort: '',
-        direction: 'asc',
-        per_page: 15,
-    };
-
-    // Reset the flag after navigation
-    resetUserInteraction();
-
-    router.visit('/curriculum-versions', {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['curriculumVersions', 'filters'],
-    });
+const curriculumVersionSortFields: Record<string, string> = {
+    version_code: 'version_code',
+    program_name: 'program_name',
+    specialization_name: 'specialization_name',
+    units_count: 'units_count',
+    created_at: 'created_at',
 };
 
-// Export functionality
-// const isExporting = ref(false);
-
-// const exportToExcel = async () => {
-//     if (isExporting.value) return;
-
-//     isExporting.value = true;
-
-//     try {
-//         const params = new URLSearchParams();
-
-//         if (filtersState.value.search) params.set('search', filtersState.value.search);
-//         if (filtersState.value.program_id) params.set('program_id', filtersState.value.program_id);
-//         if (filtersState.value.specialization_id) params.set('specialization_id', filtersState.value.specialization_id);
-
-//         const exportUrl = `/curriculum-versions/export/excel/filtered${params.toString() ? '?' + params.toString() : ''}`;
-
-//         window.location.href = exportUrl;
-
-//         setTimeout(() => {
-//             toast.success('Export started successfully');
-//         }, 500);
-//     } catch (error) {
-//         console.error('Export failed:', error);
-//         toast.error('Failed to export curriculum versions');
-//     } finally {
-//         isExporting.value = false;
-//     }
-// };
+const handleCurriculumVersionSort = (field: string | null, direction: 'asc' | 'desc' | null) => {
+    handleSortChange(field ? (curriculumVersionSortFields[field] ?? null) : null, direction);
+};
 
 // Column definitions - Fixed Badge warning by using function slots
 const columns: ColumnDef<CurriculumVersion>[] = [
@@ -473,7 +328,7 @@ const columns: ColumnDef<CurriculumVersion>[] = [
     },
     {
         header: 'Program & Specialization',
-        accessorKey: 'program.name',
+        id: 'program_name',
         enableSorting: true,
         cell: ({ row }) => {
             const cv = row.original;
@@ -504,7 +359,7 @@ const columns: ColumnDef<CurriculumVersion>[] = [
     {
         header: 'Effective Semester',
         accessorKey: 'effective_from_semester.name',
-        enableSorting: true,
+        enableSorting: false,
         cell: ({ row }) => {
             const cv = row.original;
             const semester = cv.effective_from_semester;
@@ -518,8 +373,8 @@ const columns: ColumnDef<CurriculumVersion>[] = [
     },
     {
         header: 'Units',
-        accessorKey: 'curriculum_units_count',
-        enableSorting: false,
+        id: 'units_count',
+        enableSorting: true,
         cell: ({ row }) => {
             const cv = row.original;
             return h('div', { class: 'flex items-center gap-1' }, [h(Book, { class: 'h-3 w-3 text-gray-400' }), h('span', {}, `${cv.curriculum_units_count} units`)]);
@@ -534,29 +389,15 @@ const columns: ColumnDef<CurriculumVersion>[] = [
     },
 ];
 
-// Pagination navigation
-const handlePaginationNavigate = (url: string) => {
-    router.visit(url, {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['curriculumVersions'],
-    });
-};
-
-const handlePageSizeChange = (pageSize: number) => {
-    filtersState.value.per_page = pageSize;
-    applyFilters(filtersState.value);
-};
-
 const navigateToCreate = () => {
-    const createUrl = new URL('/curriculum-versions/create', window.location.origin);
+    const createUrl = new URL(curriculumRoutes.curriculumVersions.create(), window.location.origin);
 
     // Pass current filters if they exist
-    if (filtersState.value.program_id) {
-        createUrl.searchParams.set('program_id', filtersState.value.program_id);
+    if (filtersState.program_id) {
+        createUrl.searchParams.set('program_id', filtersState.program_id);
     }
-    if (filtersState.value.specialization_id) {
-        createUrl.searchParams.set('specialization_id', filtersState.value.specialization_id);
+    if (filtersState.specialization_id) {
+        createUrl.searchParams.set('specialization_id', filtersState.specialization_id);
     }
 
     router.visit(createUrl.toString());
@@ -599,15 +440,6 @@ const navigateToCreate = () => {
     <div class="flex items-center justify-between">
         <h1 class="text-2xl font-semibold">Curriculum Versions</h1>
         <div class="flex items-center gap-2">
-            <!--            <Button @click="exportToExcel" variant="outline" :disabled="isExporting" class="flex items-center gap-2">-->
-            <!--                <FileSpreadsheet class="h-4 w-4" />-->
-            <!--                {{ isExporting ? 'Exporting...' : 'Export Excel' }}-->
-            <!--            </Button>-->
-            <!--            <Button @click="router.visit('/curriculum-versions/import')" variant="outline" class="flex items-center gap-2">-->
-            <!--                <Upload class="h-4 w-4" />-->
-            <!--                Import Excel-->
-            <!--            </Button>-->
-
             <Button v-if="permission.can('create_curriculum_version')" size="sm" @click="navigateToCreate">
                 <Plus class="mr-2 h-4 w-4" />
                 Add Curriculum Version
@@ -621,7 +453,7 @@ const navigateToCreate = () => {
         <div class="min-w-[200px] flex-1">
             <div class="relative">
                 <Search class="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-                <DebouncedInput v-model="filtersState.search" @debounced="handleSearch" placeholder="Search curriculum versions..." class="pl-9" :debounce="300" />
+                <DebouncedInput v-model="filtersState.search" @debounced="handleSearch" placeholder="Search curriculum versions..." class="pl-9" :debounce="400" />
             </div>
         </div>
 
@@ -662,18 +494,18 @@ const navigateToCreate = () => {
         </div>
 
         <!-- Clear Filters Button -->
-        <Button v-if="hasActiveFilters" variant="ghost" size="sm" @click="clearFilters">
+        <Button v-if="hasActiveFilters" variant="ghost" size="sm" @click="clearAllFilters">
             <X class="mr-2 h-4 w-4" />
             Clear Filters
         </Button>
 
         <!-- Active Filters Indicator -->
-        <div v-if="hasActiveFilters" class="text-muted-foreground text-sm">{{ Object.values(filtersState).filter(Boolean).length }} filter(s) active</div>
+        <div v-if="hasActiveFilters" class="text-muted-foreground text-sm">Filters active</div>
     </div>
 
     <!-- Data Table -->
     <div class="rounded-md border">
-        <DataTable :data="data" :columns="columns">
+        <DataTable :data="data" :columns="columns" :loading="isLoading" :initial-sort="currentSort ?? undefined" :initial-direction="currentDirection ?? undefined" @sort-change="handleCurriculumVersionSort">
             <template #cell-actions="{ row }">
                 <div class="flex items-center gap-2">
                     <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>

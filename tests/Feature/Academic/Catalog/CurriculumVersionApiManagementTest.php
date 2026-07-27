@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Campus;
+use App\Models\CurriculumUnit;
 use App\Models\CurriculumVersion;
 use App\Models\Program;
 use App\Models\Semester;
@@ -92,6 +93,51 @@ it('renders the Catalog-owned curriculum version create page', function (): void
             ->has('programs', 1)
             ->has('specializations')
             ->has('semesters'));
+});
+
+it('sanitizes curriculum version list filters through the Catalog request contract', function (): void {
+    $this->withoutMiddleware(Authorize::class);
+    $program = Program::factory()->create(['name' => 'Catalog Program']);
+    $version = CurriculumVersion::factory()->forProgram($program)->create(['version_code' => 'CAT-FILTER']);
+
+    $this->get(route('curriculum_versions.index', [
+        'search' => 'FILTER',
+        'program_id' => $program->id,
+        'sort' => 'version_code',
+        'direction' => 'asc',
+        'per_page' => 15,
+    ]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('CurriculumVersions/Index')
+            ->where('filters.program_id', (string) $program->id)
+            ->where('filters.sort', 'version_code')
+            ->where('filters.direction', 'asc')
+            ->where('curriculumVersions.data.0.id', $version->id));
+
+    $this->get(route('curriculum_versions.index', ['sort' => 'invalid', 'per_page' => 101]))
+        ->assertInvalid(['sort', 'per_page']);
+});
+
+it('uses the flat Curriculum Unit filter contract and rejects unsupported filters', function (): void {
+    $this->withoutMiddleware(Authorize::class);
+    $version = CurriculumVersion::factory()->create();
+    $matching = CurriculumUnit::factory()->create(['curriculum_version_id' => $version->id, 'unit_scope' => 'program']);
+    CurriculumUnit::factory()->create(['unit_scope' => 'common']);
+
+    $this->get(route('curriculum_unit.index', [
+        'curriculum_version_id' => $version->id,
+        'unit_scope' => 'program',
+    ]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('CurriculumUnits/Index')
+            ->where('filters.curriculum_version_id', (string) $version->id)
+            ->where('filters.unit_scope', 'program')
+            ->where('curriculumUnits.data.0.id', $matching->id));
+
+    $this->get(route('curriculum_unit.index', ['unit_scope' => 'unsupported']))
+        ->assertInvalid(['unit_scope']);
 });
 
 it('renders the Catalog-owned curriculum overview summary', function (): void {

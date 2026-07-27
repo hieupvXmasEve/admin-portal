@@ -23,11 +23,8 @@ final class ManageCurriculumVersionApiAction
     /**
      * @return Collection<int, Specialization>
      */
-    public function specializationsForProgram(array $input): Collection
+    public function specializationsForProgram(int $programId): Collection
     {
-        $programId = validator($input, ['program_id' => ['required', 'exists:programs,id']])
-            ->validate()['program_id'];
-
         return Specialization::query()
             ->where('program_id', $programId)
             ->orderBy('name')
@@ -37,11 +34,8 @@ final class ManageCurriculumVersionApiAction
     /**
      * @return Collection<int, CurriculumVersion>
      */
-    public function versionsForProgram(array $input): Collection
+    public function versionsForProgram(int $programId): Collection
     {
-        $programId = validator($input, ['program_id' => ['required', 'exists:programs,id']])
-            ->validate()['program_id'];
-
         return CurriculumVersion::query()
             ->where('program_id', $programId)
             ->orderByDesc('created_at')
@@ -51,13 +45,8 @@ final class ManageCurriculumVersionApiAction
     /**
      * @return array{deleted: list<string>, failed: list<array{version_code: string, reason: string}>}
      */
-    public function bulkDelete(array $input): array
+    public function bulkDelete(array $curriculumVersionIds): array
     {
-        $curriculumVersionIds = validator($input, [
-            'curriculum_version_ids' => ['required', 'array', 'min:1', 'max:100'],
-            'curriculum_version_ids.*' => ['integer', 'exists:curriculum_versions,id'],
-        ])->validate()['curriculum_version_ids'];
-
         return DB::transaction(function () use ($curriculumVersionIds): array {
             $deleted = [];
             $failed = [];
@@ -92,33 +81,11 @@ final class ManageCurriculumVersionApiAction
     }
 
     /**
-     * @param  array<string, mixed>  $input
-     * @return array{action: 'delete'|'export', curriculum_version_ids: list<int>}
-     */
-    public function validateBulkOperation(array $input): array
-    {
-        /** @var array{action: 'delete'|'export', curriculum_version_ids: list<int>} $validated */
-        $validated = validator($input, [
-            'action' => ['required', 'in:delete,export'],
-            'curriculum_version_ids' => ['required', 'array', 'min:1', 'max:100'],
-            'curriculum_version_ids.*' => ['integer', 'exists:curriculum_versions,id'],
-        ])->validate();
-
-        return $validated;
-    }
-
-    /**
      * @param  array<string, mixed>  $filters
      * @return array{filename: string, total_records: int}
      */
     public function export(array $filters): array
     {
-        $filters = validator($filters, [
-            'search' => ['nullable', 'string', 'max:255'],
-            'program_id' => ['nullable', 'exists:programs,id'],
-            'specialization_id' => ['nullable', 'exists:specializations,id'],
-        ])->validate();
-
         $query = CurriculumVersion::query()
             ->with(['program', 'specialization', 'effectiveFromSemester', 'curriculumUnits.unit'])
             ->withCount('curriculumUnits');

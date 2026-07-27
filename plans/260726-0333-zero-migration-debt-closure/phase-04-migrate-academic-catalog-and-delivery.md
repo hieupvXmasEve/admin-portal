@@ -55,6 +55,10 @@ controllers/services/routes and frontend debt with each migrated workflow.
    - [x] Unit Catalog: migrated index filtering to `useDataTable`, sanitized
      filter state, and named-route HTTP/frontend interactions; preserved filtered
      exports and added bulk-delete authorization coverage.
+   - [x] Curriculum Versions and Curriculum Units: replaced inline HTTP/action
+     validation with Catalog FormRequests, aligned supported filter contracts,
+     removed unsupported Unit controls, and migrated active frontend interactions
+     to `useDataTable`, named routes, and the API wrapper.
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
 7. Review import/export parity, scheduler entries, permissions, and campus scoping.
 

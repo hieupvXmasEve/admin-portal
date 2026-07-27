@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import type { CurriculumVersion, Program, Semester, Specialization } from '@/types/models';
 import { ValidationRules } from '@/types/validation';
+import { curriculumRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { toTypedSchema } from '@vee-validate/zod';
 import { ArrowLeft, Save } from 'lucide-vue-next';
@@ -77,7 +78,7 @@ const onSubmit = handleSubmit((formValues) => {
         notes: formValues.notes || null,
     };
 
-    router.put(`/curriculum-versions/${props.curriculumVersion.id}`, submitData, {
+    router.put(route('curriculum_versions.update', { curriculum_version: props.curriculumVersion.id }), submitData, {
         onSuccess: () => {
             toast.success('Curriculum version updated successfully');
         },
@@ -117,7 +118,7 @@ const formatSemesterDisplay = (semester: Semester): string => {
             </div>
 
             <div class="flex items-center gap-2">
-                <Link :href="`/curriculum-versions/${curriculumVersion.id}`">
+                <Link :href="curriculumRoutes.curriculumVersions.summary.overview(curriculumVersion.id)">
                     <Button variant="outline">
                         <ArrowLeft class="mr-2 h-4 w-4" />
                         Back to View
@@ -231,7 +232,7 @@ const formatSemesterDisplay = (semester: Semester): string => {
 
                 <!-- Form Actions -->
                 <div class="flex items-center justify-end gap-3 pt-6">
-                    <Link :href="`/curriculum-versions/${curriculumVersion.id}`">
+                    <Link :href="curriculumRoutes.curriculumVersions.summary.overview(curriculumVersion.id)">
                         <Button type="button" variant="outline"> Cancel </Button>
                     </Link>
                     <Button type="submit" :disabled="isSubmitting">

@@ -6,7 +6,7 @@ namespace App\Modules\Academic\Catalog\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class ListCurriculumUnitsRequest extends FormRequest
+class ListCurriculumVersionsRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -18,9 +18,9 @@ class ListCurriculumUnitsRequest extends FormRequest
     {
         return [
             'search' => ['nullable', 'string', 'max:255'],
-            'curriculum_version_id' => ['nullable', 'integer', 'exists:curriculum_versions,id'],
-            'unit_scope' => ['nullable', 'in:program,common,specialization_specific,cross_program'],
-            'sort' => ['nullable', 'in:created_at'],
+            'program_id' => ['nullable', 'integer', 'exists:programs,id'],
+            'specialization_id' => ['nullable', 'integer', 'exists:specializations,id'],
+            'sort' => ['nullable', 'in:version_code,program_name,specialization_name,created_at,units_count'],
             'direction' => ['nullable', 'in:asc,desc'],
             'per_page' => ['nullable', 'integer', 'min:5', 'max:100'],
         ];

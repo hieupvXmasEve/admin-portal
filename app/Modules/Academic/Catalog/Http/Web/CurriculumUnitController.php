@@ -38,10 +38,13 @@ class CurriculumUnitController extends Controller
 
         return Inertia::render('CurriculumUnits/Index', [
             'curriculumUnits' => $this->listCurriculumUnits->handle($filters),
-            'filters' => [
-                'search' => $filters['search'] ?? null,
-                'curriculum_version_id' => $filters['filter']['curriculum_version_id'] ?? null,
-                'unit_scope' => $filters['filter']['unit_scope'] ?? null,
+            'filters' => (object) [
+                'search' => $filters['search'] ?? '',
+                'curriculum_version_id' => isset($filters['curriculum_version_id']) ? (string) $filters['curriculum_version_id'] : '',
+                'unit_scope' => $filters['unit_scope'] ?? '',
+                'sort' => $filters['sort'] ?? null,
+                'direction' => $filters['direction'] ?? null,
+                'per_page' => $filters['per_page'] ?? 15,
             ],
             'curriculumVersions' => $this->curriculumVersions(),
             'unitScopes' => $this->unitScopes(false),

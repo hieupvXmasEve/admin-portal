@@ -10,6 +10,7 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/comp
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useApi, useGlobalConfirmDialog, usePermissions } from '@/composables';
+import { useDataTable } from '@/composables/useDataTable';
 import CurriculumVersionSummaryLayout from '@/layouts/CurriculumVersionSummaryLayout.vue';
 import { createColumns } from '@/lib/table-utils';
 import type { CurriculumUnit, Unit } from '@/types/models';
@@ -20,7 +21,7 @@ import type { ColumnDef } from '@tanstack/vue-table';
 import { toTypedSchema } from '@vee-validate/zod';
 import { Book, ChevronsUpDown, Edit, GraduationCap, Info, Plus, Target, Trash2 } from 'lucide-vue-next';
 import { Form } from 'vee-validate';
-import { computed, h, reactive, ref, watch } from 'vue';
+import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import { z } from 'zod';
 
@@ -62,8 +63,9 @@ interface Props {
         filters: {
             search?: string;
             unit_scope?: string;
-            year_level?: string;
-            semester_number?: string;
+            year_level?: string | number;
+            semester_number?: string | number;
+            per_page?: number;
         };
     };
     units?: Unit[];
@@ -73,13 +75,32 @@ const props = defineProps<Props>();
 const api = useApi();
 const { confirmDelete } = useGlobalConfirmDialog();
 
-// Filters state for the tab
-const filters = reactive({
-    search: props.meta.filters.search || '',
-    unit_scope: props.meta.filters.unit_scope || 'all',
-    year_level: props.meta.filters.year_level || 'all',
-    semester_number: props.meta.filters.semester_number || 'all',
+interface CurriculumVersionUnitFilters {
+    search: string;
+    unit_scope: string;
+    year_level: string;
+    semester_number: string;
+    per_page: number;
+}
+
+const { filters, setFilter, handleSearch, isLoading } = useDataTable<CurriculumVersionUnitFilters>({
+    baseUrl: route('curriculum_versions.summary.units', { curriculum_version: props.curriculumVersion.id }),
+    initialFilters: {
+        search: props.meta.filters.search ?? '',
+        unit_scope: props.meta.filters.unit_scope ?? '',
+        year_level: props.meta.filters.year_level ? String(props.meta.filters.year_level) : '',
+        semester_number: props.meta.filters.semester_number ? String(props.meta.filters.semester_number) : '',
+        per_page: props.meta.filters.per_page ?? 15,
+    },
+    defaultValues: { search: '', unit_scope: '', year_level: '', semester_number: '', per_page: 15 },
+    only: ['data', 'meta', 'units'],
+    fieldDebounce: { search: 400 },
+    immediateFields: ['unit_scope', 'year_level', 'semester_number'],
 });
+
+const displayUnitScope = computed(() => filters.unit_scope || 'all');
+const displayYearLevel = computed(() => filters.year_level || 'all');
+const displaySemesterNumber = computed(() => filters.semester_number || 'all');
 
 // Modal states
 const showAddUnitModal = ref(false);
@@ -278,26 +299,9 @@ const columns = createColumns(baseColumns, {
     enableSelection: true,
 });
 
-// Event handlers
-const handleSearch = (value: string | number) => {
-    filters.search = String(value);
-    applyFilters();
-};
-
-const applyFilters = () => {
-    const query = {
-        search: filters.search || undefined,
-        unit_scope: filters.unit_scope !== 'all' ? filters.unit_scope : undefined,
-        year_level: filters.year_level !== 'all' ? filters.year_level : undefined,
-        semester_number: filters.semester_number !== 'all' ? filters.semester_number : undefined,
-    };
-
-    router.get(route('curriculum_versions.summary.units', { curriculum_version: props.curriculumVersion.id }), query, {
-        replace: true,
-        preserveScroll: true,
-        preserveState: true,
-    });
-};
+const updateUnitScopeFilter = (value: string) => setFilter('unit_scope', value === 'all' ? '' : value);
+const updateYearLevelFilter = (value: string) => setFilter('year_level', value === 'all' ? '' : value);
+const updateSemesterNumberFilter = (value: string) => setFilter('semester_number', value === 'all' ? '' : value);
 
 // Event handlers
 const handleAddUnitClick = () => {
@@ -319,7 +323,7 @@ const onAddUnitSubmit = async (values: any) => {
         note: formData.note || null,
     };
 
-    const { data, error, statusCode } = await api.post('/api/curriculum-units', submitData);
+    const { data, error, statusCode } = await api.post(route('api.curriculum-units.store'), submitData);
 
     if (statusCode.value === 201 && data.value?.success) {
         toast.success('Curriculum unit added successfully');
@@ -357,7 +361,7 @@ const onEditUnitSubmit = async (values: any) => {
         note: formData.note || null,
     };
 
-    const { data, error, statusCode } = await api.put(`/api/curriculum-units/${curriculumUnitToEdit.value.id}`, submitData);
+    const { data, error, statusCode } = await api.put(route('api.curriculum-units.update', { curriculumUnit: curriculumUnitToEdit.value.id }), submitData);
 
     if (statusCode.value === 200 && data.value?.success) {
         toast.success('Curriculum unit updated successfully');
@@ -375,7 +379,7 @@ const onEditUnitSubmit = async (values: any) => {
 const deleteCurriculumUnit = (curriculumUnit: CurriculumUnit) => {
     confirmDelete(`${curriculumUnit.unit?.code} - ${curriculumUnit.unit?.name}`, 'curriculum unit', async () => {
         isDeleting.value = true;
-        const { data, error, statusCode } = await api.delete(`/api/curriculum-units/${curriculumUnit.id}`);
+        const { data, error, statusCode } = await api.delete(route('api.curriculum-units.destroy', { curriculumUnit: curriculumUnit.id }));
 
         if (statusCode.value === 200 && data.value?.success) {
             toast.success('Curriculum unit deleted successfully');
@@ -403,10 +407,6 @@ const getUnitScopeColor = (scope: string) => {
     }
 };
 
-// Watch for filter changes
-watch([() => filters.unit_scope, () => filters.year_level, () => filters.semester_number], () => {
-    applyFilters();
-});
 const organizedUnits = computed(() => {
     const units = curriculumUnits.value;
 
@@ -575,7 +575,7 @@ const organizedUnits = computed(() => {
                     <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-4">
                         <DebouncedInput v-model="filters.search" @debounced="handleSearch" placeholder="Search units..." class="w-full" />
 
-                        <Select v-model="filters.unit_scope">
+                        <Select :model-value="displayUnitScope" @update:model-value="updateUnitScopeFilter">
                             <SelectTrigger>
                                 <SelectValue placeholder="All scopes" />
                             </SelectTrigger>
@@ -588,7 +588,7 @@ const organizedUnits = computed(() => {
                             </SelectContent>
                         </Select>
 
-                        <Select v-model="filters.year_level">
+                        <Select :model-value="displayYearLevel" @update:model-value="updateYearLevelFilter">
                             <SelectTrigger>
                                 <SelectValue placeholder="All years" />
                             </SelectTrigger>
@@ -598,7 +598,7 @@ const organizedUnits = computed(() => {
                             </SelectContent>
                         </Select>
 
-                        <Select v-model="filters.semester_number">
+                        <Select :model-value="displaySemesterNumber" @update:model-value="updateSemesterNumberFilter">
                             <SelectTrigger>
                                 <SelectValue placeholder="All semesters" />
                             </SelectTrigger>
@@ -628,7 +628,7 @@ const organizedUnits = computed(() => {
                     </div>
 
                     <div v-else>
-                        <DataTable :data="data.units" :columns="columns" :loading="false" :enable-row-selection="false" class="border-0" />
+                        <DataTable :data="data.units" :columns="columns" :loading="isLoading" :enable-row-selection="false" class="border-0" />
                     </div>
                 </CardContent>
             </Card>

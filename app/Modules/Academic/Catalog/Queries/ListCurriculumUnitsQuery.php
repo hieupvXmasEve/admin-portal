@@ -19,8 +19,8 @@ class ListCurriculumUnitsQuery
                     ->where('name', 'like', "%{$search}%")
                     ->orWhere('code', 'like', "%{$search}%"));
             })
-            ->when($filters['filter']['curriculum_version_id'] ?? null, fn ($query, int $id) => $query->where('curriculum_version_id', $id))
-            ->when($filters['filter']['unit_scope'] ?? null, fn ($query, string $scope) => $query->where('unit_scope', $scope))
+            ->when($filters['curriculum_version_id'] ?? null, fn ($query, int $id) => $query->where('curriculum_version_id', $id))
+            ->when($filters['unit_scope'] ?? null, fn ($query, string $scope) => $query->where('unit_scope', $scope))
             ->when($filters['sort'] ?? null, fn ($query, string $sort) => $query->orderBy($sort, $filters['direction'] ?? 'asc'))
             ->orderByDesc('created_at')
             ->paginate((int) ($filters['per_page'] ?? 15))
