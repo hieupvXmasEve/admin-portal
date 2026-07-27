@@ -98,7 +98,7 @@ services:
       MARIADB_USER: ${DB_USERNAME:?DB_USERNAME is required}
       MARIADB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
     volumes:
-      - db_data:/var/lib/mysql
+      - db_data_host:/var/lib/mysql
       - ./mysql/my.cnf:/etc/mysql/conf.d/my.cnf:ro
       - ../backups:/backups
     healthcheck:
@@ -116,7 +116,7 @@ services:
 volumes:
   storage_data:
   cache_data:
-  db_data:
+  db_data_host:
   redis_data:
   caddy_data:
   caddy_config:
