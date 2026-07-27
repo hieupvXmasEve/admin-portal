@@ -157,3 +157,37 @@ it('searches mapped offerings by unit code and section code', function () {
         ->assertOk()
         ->assertInertia(fn ($page) => $page->has('mappings.data', 1));
 });
+
+it('returns campus-scoped available offerings in the canonical API envelope', function () {
+    $offering = makeOffering($this, $this->unit, $this->template, $this->semester, 'API-1');
+    $otherCampus = Campus::factory()->create();
+    $otherCampusOffering = CourseOffering::factory()->create([
+        'campus_id' => $otherCampus->id,
+        'semester_id' => $this->semester->id,
+        'unit_id' => $this->unit->id,
+        'section_code' => 'OTHER',
+        'is_active' => true,
+    ]);
+
+    actingAs($this->user)
+        ->withSession(['current_campus_id' => $this->campus->id])
+        ->getJson(route('admin.canvas.api.course-offerings', [
+            'semester_id' => $this->semester->id,
+            'search' => 'API-1',
+        ]))
+        ->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('message', 'Course offerings retrieved successfully')
+        ->assertJsonPath('data.0.id', $offering->id)
+        ->assertJsonMissing(['id' => $otherCampusOffering->id]);
+});
+
+it('accepts the legacy all-semester sentinel for available offerings', function () {
+    $offering = makeOffering($this, $this->unit, $this->template, $this->semester, 'ALL-1');
+
+    actingAs($this->user)
+        ->withSession(['current_campus_id' => $this->campus->id])
+        ->getJson(route('admin.canvas.api.course-offerings', ['semester_id' => 'all']))
+        ->assertOk()
+        ->assertJsonPath('data.0.id', $offering->id);
+});

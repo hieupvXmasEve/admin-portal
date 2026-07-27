@@ -164,9 +164,7 @@ const filteredFilterUnits = computed(() => {
         return props.units.slice(0, 50);
     }
 
-    return props.units
-        .filter((unit) => unit.code.toLowerCase().includes(query) || unit.name.toLowerCase().includes(query))
-        .slice(0, 50);
+    return props.units.filter((unit) => unit.code.toLowerCase().includes(query) || unit.name.toLowerCase().includes(query)).slice(0, 50);
 });
 
 const unitFilterDisplayValue = computed(() => {
@@ -246,12 +244,12 @@ const syncCourses = () => {
     // Only require manual auth if no token AND no refresh token
     if (!props.integration.has_token && !props.integration.has_refresh_token) {
         toast.error('Please authorize Canvas integration first');
-        router.visit('/admin/canvas/integrations');
+        router.visit(route('admin.canvas.integrations.index'));
         return;
     }
 
     router.post(
-        `/admin/canvas/sync/${props.integration.id}`,
+        route('admin.canvas.sync.courses', props.integration.id),
         {},
         {
             preserveScroll: true,
@@ -302,25 +300,16 @@ const getCourseOfferingDisplayValue = (value: unknown) => {
 const loadCourseOfferings = async () => {
     isLoadingCourseOfferings.value = true;
     try {
-        const params = new URLSearchParams();
+        const { data, error } = await api.get<CourseOffering[]>(route('admin.canvas.api.course-offerings'), {
+            search: searchCourseOffering.value.trim() || undefined,
+            semester_id: selectedMappingSemester.value === 'all' ? undefined : selectedMappingSemester.value,
+        });
 
-        if (searchCourseOffering.value.trim()) {
-            params.set('search', searchCourseOffering.value.trim());
+        if (error.value) {
+            throw error.value;
         }
 
-        if (selectedMappingSemester.value !== 'all') {
-            params.set('semester_id', selectedMappingSemester.value);
-        }
-
-        const queryString = params.toString();
-        const response = await fetch(`${route('admin.canvas.api.course-offerings')}${queryString ? `?${queryString}` : ''}`);
-
-        if (!response.ok) {
-            throw new Error('Course offerings request failed');
-        }
-
-        const data = await response.json();
-        availableCourseOfferings.value = data;
+        availableCourseOfferings.value = Array.isArray(data.value) ? data.value : [];
     } catch (error) {
         toast.error('Failed to load course offerings');
         console.error(error);
@@ -370,7 +359,7 @@ const mapCourse = () => {
     }
 
     router.post(
-        '/admin/canvas/courses/map',
+        route('admin.canvas.courses.map'),
         {
             mapping_id: selectedMapping.value.id,
             course_offering_id: selectedCourseOffering.value.id,
@@ -402,7 +391,7 @@ const unmapCourse = (mapping: CanvasCourseMapping) => {
         {
             onConfirm: () => {
                 router.post(
-                    `/admin/canvas/courses/${mapping.id}/unmap`,
+                    route('admin.canvas.courses.unmap', mapping.id),
                     {},
                     {
                         preserveScroll: true,
@@ -429,7 +418,7 @@ const ignoreCourse = (mapping: CanvasCourseMapping) => {
         {
             onConfirm: () => {
                 router.post(
-                    `/admin/canvas/courses/${mapping.id}/ignore`,
+                    route('admin.canvas.courses.ignore', mapping.id),
                     {},
                     {
                         preserveScroll: true,
@@ -667,7 +656,7 @@ const columns: ColumnDef<CanvasCourseMapping>[] = [
                 return h('span', { class: 'text-muted-foreground text-sm' }, '—');
             }
             const offering = mapping.course_offering;
-            const courseUrl = `/course-offerings/${offering.id}`;
+            const courseUrl = route('course-offerings.show', offering.id);
 
             return h('div', {}, [
                 h(
@@ -723,7 +712,7 @@ const columns: ColumnDef<CanvasCourseMapping>[] = [
             </div>
 
             <div class="flex items-center gap-2">
-                <Button variant="outline" @click="() => router.visit('/admin/canvas/integrations')"> Manage Integrations </Button>
+                <Button variant="outline" @click="() => router.visit(route('admin.canvas.integrations.index'))"> Manage Integrations </Button>
                 <Button @click="syncCourses" :disabled="!integration?.has_token && !integration?.has_refresh_token">
                     <RefreshCw class="mr-2 h-4 w-4" />
                     Sync Courses
@@ -759,7 +748,7 @@ const columns: ColumnDef<CanvasCourseMapping>[] = [
                 <AlertCircle class="text-muted-foreground mx-auto h-12 w-12" />
                 <h3 class="mt-4 text-lg font-semibold">No Canvas Integration</h3>
                 <p class="text-muted-foreground mt-2">Please set up a Canvas integration first.</p>
-                <Button class="mt-4" @click="() => router.visit('/admin/canvas/integrations')"> Go to Integrations </Button>
+                <Button class="mt-4" @click="() => router.visit(route('admin.canvas.integrations.index'))"> Go to Integrations </Button>
             </CardContent>
         </Card>
 
@@ -768,11 +757,7 @@ const columns: ColumnDef<CanvasCourseMapping>[] = [
             <CardContent class="pt-6">
                 <div class="flex flex-wrap items-end gap-4">
                     <div class="min-w-[280px] flex-1">
-                        <DebouncedInput
-                            :model-value="tableFilters.search"
-                            placeholder="Search Canvas code, name, ID, section, or unit..."
-                            @debounced="handleSearch"
-                        />
+                        <DebouncedInput :model-value="tableFilters.search" placeholder="Search Canvas code, name, ID, section, or unit..." @debounced="handleSearch" />
                     </div>
                     <Select :model-value="tableFilters.sync_status" @update:model-value="handleSyncStatusChange">
                         <SelectTrigger class="w-[180px]">
@@ -785,30 +770,16 @@ const columns: ColumnDef<CanvasCourseMapping>[] = [
                             <SelectItem value="ignored">Ignored</SelectItem>
                         </SelectContent>
                     </Select>
-                    <Select
-                        :model-value="tableFilters.semester_id"
-                        :disabled="!mappedFiltersEnabled"
-                        @update:model-value="(value) => setFilter('semester_id', String(value ?? 'all'))"
-                    >
+                    <Select :model-value="tableFilters.semester_id" :disabled="!mappedFiltersEnabled" @update:model-value="(value) => setFilter('semester_id', String(value ?? 'all'))">
                         <SelectTrigger class="w-[220px]">
                             <SelectValue placeholder="Semester (mapped)" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All semesters</SelectItem>
-                            <SelectItem v-for="semester in semesters" :key="semester.id" :value="String(semester.id)">
-                                {{ semester.name }} ({{ semester.code }})
-                            </SelectItem>
+                            <SelectItem v-for="semester in semesters" :key="semester.id" :value="String(semester.id)"> {{ semester.name }} ({{ semester.code }}) </SelectItem>
                         </SelectContent>
                     </Select>
-                    <Combobox
-                        :model-value="selectedFilterUnit"
-                        by="id"
-                        v-model:open="unitFilterOpen"
-                        v-model:search-term="unitFilterSearch"
-                        :ignore-filter="true"
-                        :disabled="!mappedFiltersEnabled"
-                        @update:model-value="handleUnitFilterSelect"
-                    >
+                    <Combobox :model-value="selectedFilterUnit" by="id" v-model:open="unitFilterOpen" v-model:search-term="unitFilterSearch" :ignore-filter="true" :disabled="!mappedFiltersEnabled" @update:model-value="handleUnitFilterSelect">
                         <ComboboxAnchor as-child>
                             <ComboboxTrigger as-child>
                                 <Button variant="outline" class="h-10 w-[260px] justify-between" :disabled="!mappedFiltersEnabled">
@@ -834,11 +805,7 @@ const columns: ColumnDef<CanvasCourseMapping>[] = [
 
                         <ComboboxList class="w-[var(--reka-combobox-trigger-width)]">
                             <div class="relative w-full items-center">
-                                <ComboboxInput
-                                    class="h-10 rounded-none border-0 border-b pr-4 pl-10 focus-visible:ring-0"
-                                    placeholder="Search unit code or name..."
-                                    @update:model-value="(value) => (unitFilterSearch = String(value ?? ''))"
-                                />
+                                <ComboboxInput class="h-10 rounded-none border-0 border-b pr-4 pl-10 focus-visible:ring-0" placeholder="Search unit code or name..." @update:model-value="(value) => (unitFilterSearch = String(value ?? ''))" />
                                 <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center justify-center px-3">
                                     <Search class="text-muted-foreground size-4" />
                                 </span>
@@ -847,12 +814,7 @@ const columns: ColumnDef<CanvasCourseMapping>[] = [
                             <ComboboxViewport class="max-h-[300px] overflow-y-auto">
                                 <ComboboxEmpty v-if="filteredFilterUnits.length === 0">No units found.</ComboboxEmpty>
                                 <ComboboxGroup v-else>
-                                    <ComboboxItem
-                                        v-for="unit in filteredFilterUnits"
-                                        :key="unit.id"
-                                        :value="unit"
-                                        class="cursor-pointer"
-                                    >
+                                    <ComboboxItem v-for="unit in filteredFilterUnits" :key="unit.id" :value="unit" class="cursor-pointer">
                                         <div class="flex min-w-0 flex-1 flex-col">
                                             <span class="truncate font-medium">{{ unit.code }} - {{ unit.name }}</span>
                                         </div>
@@ -869,23 +831,14 @@ const columns: ColumnDef<CanvasCourseMapping>[] = [
                     </Combobox>
                     <Button v-if="hasActiveFilters" variant="outline" @click="clearAllFilters">Clear filters</Button>
                 </div>
-                <p v-if="!mappedFiltersEnabled" class="text-muted-foreground mt-3 text-sm">
-                    Semester and unit filters apply to mapped courses only. Switch status to Mapped or All Status to use them.
-                </p>
+                <p v-if="!mappedFiltersEnabled" class="text-muted-foreground mt-3 text-sm">Semester and unit filters apply to mapped courses only. Switch status to Mapped or All Status to use them.</p>
             </CardContent>
         </Card>
 
         <!-- Data Table -->
         <Card>
             <CardContent class="pt-6">
-                <DataTable
-                    :columns="columns"
-                    :data="mappings.data"
-                    enable-server-sorting
-                    :initial-sort="currentSort ?? undefined"
-                    :initial-direction="currentDirection ?? undefined"
-                    @sort-change="handleSortChange"
-                >
+                <DataTable :columns="columns" :data="mappings.data" enable-server-sorting :initial-sort="currentSort ?? undefined" :initial-direction="currentDirection ?? undefined" @sort-change="handleSortChange">
                     <template #cell-actions="{ row }">
                         <DropdownMenu>
                             <DropdownMenuTrigger as-child>

@@ -5,62 +5,40 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Delivery\Http\Web\Canvas;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Academic\Delivery\Http\Requests\Canvas\CanvasCourseMappingRequest;
-use App\Modules\Academic\Delivery\Http\Resources\Canvas\CanvasCourseResource;
+use App\Http\Responses\ApiResponse;
 use App\Models\CanvasCourseMapping;
 use App\Models\CanvasIntegration;
 use App\Models\CourseOffering;
 use App\Models\Semester;
 use App\Models\Unit;
+use App\Modules\Academic\Delivery\Http\Requests\Canvas\CanvasCourseMappingRequest;
+use App\Modules\Academic\Delivery\Http\Requests\Canvas\ListAvailableCanvasCourseOfferingsRequest;
+use App\Modules\Academic\Delivery\Http\Requests\Canvas\ListCanvasCourseMappingsRequest;
+use App\Modules\Academic\Delivery\Http\Resources\Canvas\CanvasCourseResource;
 use App\Modules\Academic\Delivery\Support\Canvas\CanvasSyncService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class CanvasCourseController extends Controller
 {
-    private const SORTABLE_COLUMNS = [
-        'canvas_course_code',
-        'canvas_course_name',
-        'canvas_course_id',
-        'sync_status',
-        'last_synced_at',
-        'created_at',
-        'updated_at',
-    ];
-
     public function __construct(
         private CanvasSyncService $syncService
     ) {}
 
-    public function index(Request $request): Response
+    public function index(ListCanvasCourseMappingsRequest $request): Response
     {
-        $validated = $request->validate([
-            'search' => ['nullable', 'string', 'max:255'],
-            'sync_status' => ['nullable', 'string', 'in:pending,mapped,ignored'],
-            'semester_id' => ['nullable', 'integer', 'exists:semesters,id'],
-            'unit_id' => ['nullable', 'integer', 'exists:units,id'],
-            'direction' => ['nullable', 'string', 'in:asc,desc'],
-            'per_page' => ['nullable', 'integer', 'min:5', 'max:100'],
-        ]);
-
-        $requestedSort = $request->input('sort');
-        $sort = is_string($requestedSort) && in_array($requestedSort, self::SORTABLE_COLUMNS, true)
-            ? $requestedSort
-            : 'created_at';
-
-        $requestedDirection = $validated['direction'] ?? 'desc';
-        $direction = in_array($requestedDirection, ['asc', 'desc'], true) ? $requestedDirection : 'desc';
+        $validated = $request->validated();
 
         $filters = [
             'search' => $validated['search'] ?? null,
             'sync_status' => $validated['sync_status'] ?? null,
             'semester_id' => isset($validated['semester_id']) ? (int) $validated['semester_id'] : null,
             'unit_id' => isset($validated['unit_id']) ? (int) $validated['unit_id'] : null,
-            'sort' => $sort,
-            'direction' => $direction,
+            'sort' => $validated['sort'] ?? 'created_at',
+            'direction' => $validated['direction'] ?? 'desc',
             'per_page' => isset($validated['per_page']) ? (int) $validated['per_page'] : 15,
         ];
 
@@ -69,7 +47,7 @@ class CanvasCourseController extends Controller
 
         if (! $integration) {
             // Return empty pagination structure
-            $emptyPagination = new \Illuminate\Pagination\LengthAwarePaginator(
+            $emptyPagination = new LengthAwarePaginator(
                 [],
                 0,
                 $filters['per_page'],
@@ -205,11 +183,14 @@ class CanvasCourseController extends Controller
         }
     }
 
-    public function getAvailableCourseOfferings(Request $request): JsonResponse
+    public function getAvailableCourseOfferings(ListAvailableCanvasCourseOfferingsRequest $request): JsonResponse
     {
         $campusId = session('current_campus_id');
-        $search = $request->input('search', '');
-        $semesterId = $request->integer('semester_id');
+        $validated = $request->validated();
+        $search = $validated['search'] ?? '';
+        $semesterId = isset($validated['semester_id']) && $validated['semester_id'] !== 'all'
+            ? (int) $validated['semester_id']
+            : null;
 
         $offerings = CourseOffering::with(['unit', 'semester'])
             ->where('campus_id', $campusId)
@@ -247,7 +228,7 @@ class CanvasCourseController extends Controller
                 ];
             });
 
-        return response()->json($offerings);
+        return ApiResponse::success($offerings, message: 'Course offerings retrieved successfully');
     }
 
     private function getSemesterOptions()

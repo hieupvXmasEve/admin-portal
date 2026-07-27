@@ -67,6 +67,10 @@ controllers/services/routes and frontend debt with each migrated workflow.
      responses on lecture helpers and exports, preserved campus and `all`
      filter compatibility, and migrated teaching-hours detail filtering to
      `useDataTable`, named routes, and DatePicker controls.
+   - [x] Canvas Course Mapping: moved mapping-list and offering lookup filters
+     into Delivery FormRequests, preserved sanitized sorting and campus-scoped
+     `all` lookup behavior, and migrated mapping interactions to the API
+     wrapper and named routes.
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
 7. Review import/export parity, scheduler entries, permissions, and campus scoping.
 
