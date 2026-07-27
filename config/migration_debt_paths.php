@@ -116,7 +116,6 @@ return [
         'app/Http/Controllers/Web/Lectures/LecturerGpaController.php',
         'app/Http/Controllers/Web/ModuleController.php',
         'app/Http/Controllers/Web/SemesterEnrollmentController.php',
-        'app/Http/Controllers/Web/SpecializationController.php',
         'app/Http/Controllers/Web/StudentApplicationController.php',
     ],
     'frozen_routes' => [
@@ -137,7 +136,6 @@ return [
         'routes/web/notifications.php',
         'routes/web/scholarships.php',
         'routes/web/semester.php',
-        'routes/web/specializations.php',
         'routes/web/student-application.php',
         'routes/web/student-scholarships.php',
         'routes/web/systems.php',

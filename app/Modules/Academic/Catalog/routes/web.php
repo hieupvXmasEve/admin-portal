@@ -5,12 +5,14 @@ declare(strict_types=1);
 use App\Constants\CurriculumRoutes;
 use App\Constants\ProgramRoutes;
 use App\Constants\SemesterRoutes;
+use App\Constants\SpecializationRoutes;
 use App\Constants\UnitRoutes;
 use App\Modules\Academic\Catalog\Http\Web\AcademicPeriodController;
 use App\Modules\Academic\Catalog\Http\Web\CurriculumModuleController;
 use App\Modules\Academic\Catalog\Http\Web\CurriculumUnitController;
 use App\Modules\Academic\Catalog\Http\Web\ProgramController;
 use App\Modules\Academic\Catalog\Http\Web\SelectedAcademicPeriodController;
+use App\Modules\Academic\Catalog\Http\Web\SpecializationController;
 use App\Modules\Academic\Catalog\Http\Web\UnitController;
 use App\Modules\Academic\Catalog\Http\Web\UnitExportController;
 use App\Modules\Academic\Catalog\Http\Web\UnitImportController;
@@ -128,4 +130,53 @@ Route::middleware(['auth', 'web'])->group(function (): void {
     Route::put('curriculum-modules/{curriculum_module}', [CurriculumModuleController::class, 'update'])
         ->middleware('can:edit_curriculum_version')
         ->name('curriculum-modules.update');
+});
+
+Route::middleware(['auth', 'verified'])->group(function (): void {
+    // Specialization resource routes
+    Route::get('specializations', [SpecializationController::class, 'index'])
+        ->middleware('can:view_specialization')
+        ->name(SpecializationRoutes::INDEX);
+
+    Route::get('specializations/create', [SpecializationController::class, 'create'])
+        ->middleware('can:create_specialization')
+        ->name(SpecializationRoutes::CREATE);
+
+    Route::get('specializations/{specialization}/edit', [SpecializationController::class, 'edit'])
+        ->middleware('can:edit_specialization')
+        ->name(SpecializationRoutes::EDIT);
+
+    Route::post('specializations', [SpecializationController::class, 'store'])
+        ->middleware('can:create_specialization')
+        ->name(SpecializationRoutes::STORE);
+
+    Route::get('specializations/{specialization}', [SpecializationController::class, 'show'])
+        ->middleware('can:view_specialization')
+        ->name(SpecializationRoutes::SHOW);
+
+    Route::put('specializations/{specialization}', [SpecializationController::class, 'update'])
+        ->middleware('can:edit_specialization')
+        ->name(SpecializationRoutes::UPDATE);
+
+    // API routes for operations. The bulk-delete literal route must stay
+    // registered before the {specialization} wildcard destroy route below,
+    // otherwise Laravel matches "bulk-delete" as a specialization route key
+    // and 404s before reaching this handler.
+    Route::delete('api/specializations/bulk-delete', [SpecializationController::class, 'bulkDelete'])
+        ->middleware('can:delete_specialization')
+        ->name(SpecializationRoutes::API_BULK_DELETE);
+
+    Route::delete('specializations/{specialization}', [SpecializationController::class, 'destroy'])
+        ->middleware('can:delete_specialization')
+        ->name(SpecializationRoutes::DESTROY);
+
+    Route::delete('api/specializations/{specialization}', [SpecializationController::class, 'apiDestroy'])
+        ->middleware('can:delete_specialization')
+        ->name(SpecializationRoutes::API_DESTROY);
+
+    // API route for curriculum version updates within specializations.
+    Route::put('api/curriculum-versions/{curriculumVersion}', [SpecializationController::class, 'apiUpdateCurriculumVersion'])
+        ->middleware('can:edit_curriculum_version')
+        ->whereNumber('curriculumVersion')
+        ->name(SpecializationRoutes::API_CURRICULUM_VERSION_UPDATE);
 });

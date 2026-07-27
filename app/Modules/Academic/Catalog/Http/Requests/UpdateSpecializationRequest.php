@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Requests;
+namespace App\Modules\Academic\Catalog\Http\Requests;
 
 use App\Models\Specialization;
 use Illuminate\Foundation\Http\FormRequest;

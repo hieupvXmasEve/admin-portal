@@ -31,8 +31,6 @@ class SpecializationRoutes
     public const API_BULK_DELETE = 'api.specializations.bulk-delete';
 
     // Curriculum Version API Routes within Specializations
-    public const API_CURRICULUM_VERSION_DESTROY = 'api.curriculum_version.destroy';
-
     public const API_CURRICULUM_VERSION_UPDATE = 'api.curriculum_version.update';
 
     // Route Prefixes

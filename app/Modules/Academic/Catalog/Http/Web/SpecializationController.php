@@ -2,20 +2,22 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Web;
+namespace App\Modules\Academic\Catalog\Http\Web;
 
 use App\Constants\ProgramRoutes;
 use App\Constants\SpecializationRoutes;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\StoreSpecializationRequest;
-use App\Http\Requests\UpdateSpecializationRequest;
 use App\Models\CurriculumVersion;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Specialization;
+use App\Modules\Academic\Catalog\Http\Requests\BulkDeleteSpecializationsRequest;
+use App\Modules\Academic\Catalog\Http\Requests\ListSpecializationsRequest;
+use App\Modules\Academic\Catalog\Http\Requests\StoreSpecializationRequest;
+use App\Modules\Academic\Catalog\Http\Requests\UpdateSpecializationCurriculumVersionRequest;
+use App\Modules\Academic\Catalog\Http\Requests\UpdateSpecializationRequest;
 use App\Services\SpecializationService;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
@@ -25,15 +27,9 @@ class SpecializationController extends Controller
 {
     public function __construct(protected SpecializationService $specializationService) {}
 
-    public function index(Request $request): Response
+    public function index(ListSpecializationsRequest $request): Response
     {
-        $validated = $request->validate([
-            'search' => 'nullable|string|max:255',
-            'program_id' => 'nullable|exists:programs,id',
-            'sort' => 'nullable|string|in:name,code,created_at,program_name',
-            'direction' => 'nullable|string|in:asc,desc',
-            'per_page' => 'nullable|integer|min:5|max:100',
-        ]);
+        $validated = $request->validated();
 
         $query = Specialization::with(['program:id,name'])
             ->withCount('curriculumVersions');
@@ -96,13 +92,10 @@ class SpecializationController extends Controller
         ]);
     }
 
-    public function create(Request $request): Response
+    public function create(): Response
     {
-        // $programId = $request->query('program_id');
-
         return Inertia::render('Specializations/Create', [
             'programs' => Program::orderBy('name')->get(['id', 'name']),
-            // 'selectedProgramId' => $programId ? (int) $programId : null,
         ]);
     }
 
@@ -264,12 +257,9 @@ class SpecializationController extends Controller
         }
     }
 
-    public function bulkDelete(Request $request)
+    public function bulkDelete(BulkDeleteSpecializationsRequest $request)
     {
-        $validated = $request->validate([
-            'specialization_ids' => 'required|array|min:1|max:100',
-            'specialization_ids.*' => 'integer|exists:specializations,id',
-        ]);
+        $validated = $request->validated();
 
         try {
             DB::beginTransaction();
@@ -294,49 +284,9 @@ class SpecializationController extends Controller
         }
     }
 
-    public function apiDeleteCurriculumVersion(Request $request, $curriculumVersionId)
+    public function apiUpdateCurriculumVersion(UpdateSpecializationCurriculumVersionRequest $request, $curriculumVersionId)
     {
-        try {
-            $curriculumVersion = CurriculumVersion::findOrFail($curriculumVersionId);
-
-            // Check if curriculum version belongs to this specialization context
-            $specializationId = $request->route('specialization');
-            if ($specializationId && $curriculumVersion->specialization_id != $specializationId) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Curriculum version does not belong to this specialization.',
-                ], 403);
-            }
-
-            DB::beginTransaction();
-
-            $versionCode = $curriculumVersion->version_code;
-            $curriculumVersion->delete();
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => "Curriculum version '{$versionCode}' deleted successfully.",
-            ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Curriculum version deletion failed: '.$e->getMessage());
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to delete curriculum version. Please try again.',
-            ], 500);
-        }
-    }
-
-    public function apiUpdateCurriculumVersion(Request $request, $curriculumVersionId)
-    {
-        $validated = $request->validate([
-            'version_code' => 'required|string|max:50',
-            'semester_id' => 'nullable|exists:semesters,id',
-            'notes' => 'nullable|string|max:1000',
-        ]);
+        $validated = $request->validated();
 
         try {
             $curriculumVersion = CurriculumVersion::findOrFail($curriculumVersionId);
@@ -354,8 +304,8 @@ class SpecializationController extends Controller
 
             $curriculumVersion->update([
                 'version_code' => $validated['version_code'],
-                'semester_id' => $validated['semester_id'],
-                'notes' => $validated['notes'],
+                'semester_id' => $validated['semester_id'] ?? $curriculumVersion->semester_id,
+                'notes' => $validated['notes'] ?? $curriculumVersion->notes,
             ]);
 
             DB::commit();

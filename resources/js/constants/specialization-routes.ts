@@ -16,7 +16,6 @@ export const SPECIALIZATION_ROUTE_NAMES = {
     // API
     API_DESTROY: 'api.specializations.destroy',
     API_BULK_DELETE: 'api.specializations.bulk-delete',
-    API_CURRICULUM_VERSION_DESTROY: 'api.curriculum_version.destroy',
     API_CURRICULUM_VERSION_UPDATE: 'api.curriculum_version.update',
 } as const;
 
@@ -41,8 +40,6 @@ export const specializationRoutes = {
     // API
     apiDestroy: (id: number | string) => SPECIALIZATION_ROUTE_NAMES.API_DESTROY.replace(':specialization', id.toString()),
     apiBulkDelete: () => SPECIALIZATION_ROUTE_NAMES.API_BULK_DELETE,
-    apiCurriculumVersionDestroy: (id: number | string) =>
-        SPECIALIZATION_ROUTE_NAMES.API_CURRICULUM_VERSION_DESTROY.replace(':curriculumVersion', id.toString()),
     apiCurriculumVersionUpdate: (id: number | string) =>
         SPECIALIZATION_ROUTE_NAMES.API_CURRICULUM_VERSION_UPDATE.replace(':curriculumVersion', id.toString()),
 

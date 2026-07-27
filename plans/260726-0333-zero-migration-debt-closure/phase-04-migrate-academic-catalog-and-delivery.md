@@ -113,6 +113,31 @@ controllers/services/routes and frontend debt with each migrated workflow.
      ratchets accordingly; `CourseStatisticsService` itself stays frozen
      (still consumed by `GetCourseOfferingScoresQuery`, out of this
      slice's scope).
+   - [x] Specialization retirement: added first-time characterization
+     coverage (list/filter/sort, create/store/update/destroy including both
+     redirect branches, `apiDestroy`, bulk-delete, and the curriculum-version
+     update action), then moved `SpecializationController` and its
+     FormRequests off the frozen `routes/web/specializations.php` split file
+     into `App\Modules\Academic\Catalog`. Replaced the three remaining inline
+     `$request->validate()` calls with FormRequests and removed the
+     unregistered dead `apiDeleteCurriculumVersion` method. Fixed a live
+     production bug found via characterization: the `bulk-delete` API route
+     was shadowed by the `{specialization}` wildcard destroy route
+     registered before it, so the frontend's bulk-delete button 404'd;
+     reordered so the literal route wins, matching the existing
+     `units/bulk-delete` precedent already established in Catalog's own
+     route file. Code review caught that the retired file's bulk-delete
+     route had never carried `can:delete_specialization` (harmless while
+     shadowed and 404ing; live and unauthorized once reachable) — added the
+     gate and a structural test asserting it stays there. Also changed the
+     curriculum-version-update action's field defaults from `?? null`
+     (silent data-wipe on a partial payload) to `?? $curriculumVersion->x`
+     (preserve existing value), and removed the two dead
+     `API_CURRICULUM_VERSION_DESTROY` references (PHP constant + unused TS
+     helper) left behind by the `apiDeleteCurriculumVersion` deletion.
+     Lowered the frozen-route and frozen-controller ratchets accordingly;
+     `SpecializationService` itself stays frozen (single consumer, out of
+     this slice's scope).
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
 7. Review import/export parity, scheduler entries, permissions, and campus scoping.
 
