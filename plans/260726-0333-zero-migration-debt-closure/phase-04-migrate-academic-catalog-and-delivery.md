@@ -79,6 +79,10 @@ controllers/services/routes and frontend debt with each migrated workflow.
      Delivery lecturer FormRequests, preserved authorization-before-validation
      and export-format behavior, and standardized validation failures with the
      existing API envelope.
+   - [x] Calendar/Course Registration retirement: removed the unregistered
+     legacy registration service and API controller shells after confirming
+     live Delivery actions/controllers own the active flows; lowered the
+     frozen-service, frozen-controller, and direct-JSON ratchets accordingly.
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
 7. Review import/export parity, scheduler entries, permissions, and campus scoping.
 
