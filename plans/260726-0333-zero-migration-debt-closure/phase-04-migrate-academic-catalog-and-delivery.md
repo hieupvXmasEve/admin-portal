@@ -52,6 +52,9 @@ controllers/services/routes and frontend debt with each migrated workflow.
 4. [x] Migrate attendance, roster, assessment/gradebook, course result, and all Canvas
    mapping/sync/provider behavior within Academic Delivery.
 5. In each slice replace inline validation, raw responses, legacy filters, and literal URLs.
+   - [x] Unit Catalog: migrated index filtering to `useDataTable`, sanitized
+     filter state, and named-route HTTP/frontend interactions; preserved filtered
+     exports and added bulk-delete authorization coverage.
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
 7. Review import/export parity, scheduler entries, permissions, and campus scoping.
 

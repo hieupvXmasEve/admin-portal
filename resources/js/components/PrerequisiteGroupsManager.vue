@@ -85,7 +85,7 @@ const searchUnits = async (query: string) => {
             limit: '10',
         };
 
-        const result = await api.get('/units/search', params);
+        const result = await api.get(route('units.search'), params);
 
         if (result.data.value?.success) {
             unitSearchResults.value = result.data.value.data;
@@ -245,33 +245,22 @@ if (groups.value.length === 0) {
         <div class="rounded-lg border border-blue-200 bg-blue-50 p-4">
             <h4 class="mb-3 flex items-center text-sm font-semibold text-blue-800">
                 <svg class="mr-2 h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path
-                        fill-rule="evenodd"
-                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                        clip-rule="evenodd"
-                    />
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
                 </svg>
                 Prerequisite Type Examples
             </h4>
             <div class="space-y-2 text-sm text-blue-700">
                 <div class="flex items-center space-x-2">
-                    <span class="inline-flex items-center rounded border-purple-200 bg-purple-100 px-2 py-1 font-mono text-xs text-purple-800"
-                        >AK</span
-                    >
+                    <span class="inline-flex items-center rounded border-purple-200 bg-purple-100 px-2 py-1 font-mono text-xs text-purple-800">AK</span>
                     <span>Familiarity with boolean algebra and number systems</span>
                 </div>
                 <div class="flex items-center space-x-2">
-                    <span class="inline-flex items-center rounded border-yellow-200 bg-yellow-100 px-2 py-1 font-mono text-xs text-yellow-800"
-                        >Concurrent-req</span
-                    >
+                    <span class="inline-flex items-center rounded border-yellow-200 bg-yellow-100 px-2 py-1 font-mono text-xs text-yellow-800">Concurrent-req</span>
                     <span>COS10009 OR</span>
                     <span class="inline-flex items-center rounded border-blue-200 bg-blue-100 px-2 py-1 font-mono text-xs text-blue-800">P</span>
                     <span>ICT10001</span>
                 </div>
-                <div class="mt-2 text-xs text-blue-600">
-                    <strong>Types:</strong> P (Prerequisite), Co-req (Co-requisite), Concurrent-req (Concurrent), A (Anti-requisite), AK (Assumed
-                    Knowledge)
-                </div>
+                <div class="mt-2 text-xs text-blue-600"><strong>Types:</strong> P (Prerequisite), Co-req (Co-requisite), Concurrent-req (Concurrent), A (Anti-requisite), AK (Assumed Knowledge)</div>
             </div>
         </div>
 
@@ -319,13 +308,7 @@ if (groups.value.length === 0) {
                 <div class="space-y-4">
                     <div class="relative">
                         <Search class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                        <Input
-                            v-model="unitSearchQuery"
-                            @input="watchUnitSearch(unitSearchQuery)"
-                            placeholder="Search by unit code or name..."
-                            class="pl-9"
-                            autofocus
-                        />
+                        <Input v-model="unitSearchQuery" @input="watchUnitSearch(unitSearchQuery)" placeholder="Search by unit code or name..." class="pl-9" autofocus />
                     </div>
 
                     <div v-if="isSearchingUnits" class="py-4 text-center">
@@ -334,12 +317,7 @@ if (groups.value.length === 0) {
                     </div>
 
                     <div v-else-if="unitSearchResults.length > 0" class="max-h-60 space-y-2 overflow-y-auto">
-                        <div
-                            v-for="unit in unitSearchResults"
-                            :key="unit.id"
-                            class="cursor-pointer rounded-lg border p-3 hover:bg-gray-50"
-                            @click="selectUnitForCondition(unit)"
-                        >
+                        <div v-for="unit in unitSearchResults" :key="unit.id" class="cursor-pointer rounded-lg border p-3 hover:bg-gray-50" @click="selectUnitForCondition(unit)">
                             <div class="flex items-center justify-between">
                                 <div>
                                     <code class="font-mono text-sm">{{ unit.code }}</code>

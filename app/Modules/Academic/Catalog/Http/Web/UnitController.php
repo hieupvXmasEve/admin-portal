@@ -45,13 +45,13 @@ class UnitController extends Controller
 
         return Inertia::render('Units/Index', [
             'units' => $this->listUnits->handle($filters),
-            'filters' => [
+            'filters' => (object) [
                 'search' => $filters['search'] ?? '',
-                'sort' => $filters['sort'] ?? '',
-                'direction' => $filters['direction'] ?? 'asc',
+                'sort' => $filters['sort'] ?? null,
+                'direction' => $filters['direction'] ?? null,
                 'per_page' => $filters['per_page'] ?? 15,
-                'type' => $filters['type'] ?? 'all',
-                'level' => $filters['level'] ?? 'all',
+                'type' => $filters['type'] ?? '',
+                'level' => isset($filters['level']) ? (string) $filters['level'] : '',
             ],
             'statistics' => [
                 'total_units' => Unit::query()->count(),

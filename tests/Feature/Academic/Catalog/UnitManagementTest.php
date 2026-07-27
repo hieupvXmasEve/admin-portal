@@ -65,6 +65,40 @@ it('preserves unit listing filters and Inertia props', function (): void {
             ->where('units.data.0.id', $matching->id));
 });
 
+it('sanitizes Unit list filters and retains them for pagination', function (): void {
+    $matching = Unit::factory()->create([
+        'code' => 'CAT201',
+        'unit_type' => 'ai',
+        'level' => 2,
+    ]);
+    Unit::factory()->create([
+        'code' => 'CAT202',
+        'unit_type' => 'general',
+        'level' => 2,
+    ]);
+
+    actingAs($this->user)
+        ->get(route(UnitRoutes::INDEX, [
+            'type' => 'ai',
+            'level' => 2,
+            'sort' => 'code',
+            'direction' => 'asc',
+            'per_page' => 15,
+        ]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('filters.type', 'ai')
+            ->where('filters.level', '2')
+            ->where('filters.sort', 'code')
+            ->where('filters.direction', 'asc')
+            ->where('units.data.0.id', $matching->id)
+            ->where('units.next_page_url', null));
+
+    actingAs($this->user)
+        ->get(route(UnitRoutes::INDEX, ['sort' => 'invalid', 'direction' => 'sideways', 'per_page' => 101]))
+        ->assertInvalid(['sort', 'direction', 'per_page']);
+});
+
 it('creates and validates a unit through the Catalog-owned routes', function (): void {
     actingAs($this->user)
         ->post(route(UnitRoutes::STORE), [
@@ -96,6 +130,18 @@ it('validates prerequisite expressions through the Catalog endpoint without pers
         ->assertJsonPath('message', 'Expression is valid');
 
     expect($prerequisite->prerequisiteGroups()->count())->toBe(0);
+});
+
+it('requires the Unit delete permission for bulk deletion', function (): void {
+    $unit = Unit::factory()->create();
+    $userWithoutDeletePermission = User::factory()->create();
+    grantCatalogUnitPermission($userWithoutDeletePermission, $this->campus, 'view_unit');
+
+    actingAs($userWithoutDeletePermission)
+        ->deleteJson(route('units.bulk-delete'), ['unit_ids' => [$unit->id]])
+        ->assertForbidden();
+
+    expect($unit->fresh())->not->toBeNull();
 });
 
 it('validates Catalog unit export filters before generating a spreadsheet', function (): void {

@@ -64,7 +64,7 @@ const validateCode = async (code: string) => {
     isValidatingCode.value = true;
 
     try {
-        const result = await api.post('/units/validate-code', {
+        const result = await api.post(route('units.validate-code'), {
             code: code,
         });
 
@@ -100,7 +100,7 @@ const searchUnits = async (query: string) => {
             limit: '10',
         };
 
-        const result = await api.get('/units/search', params);
+        const result = await api.get(route('units.search'), params);
 
         if (result.data.value?.success) {
             unitSearchResults.value = result.data.value.data;
@@ -171,7 +171,7 @@ const handleSubmit = () => {
     console.log('prerequisiteGroups', prerequisiteGroups.value);
     console.log('formData', formData);
 
-    router.post('/units', formData, {
+    router.post(route('units.store'), formData, {
         preserveScroll: true,
         onSuccess: () => {
             console.log('Unit created successfully');

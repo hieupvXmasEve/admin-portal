@@ -89,7 +89,7 @@ const validateCode = async (code: string) => {
     isValidatingCode.value = true;
 
     try {
-        const result = await api.post('/units/validate-code', {
+        const result = await api.post(route('units.validate-code'), {
             code: code,
             unit_id: props.unit.id,
         });
@@ -130,7 +130,7 @@ const searchUnits = async (query: string) => {
             limit: '10',
         };
 
-        const result = await api.get('/units/search', params);
+        const result = await api.get(route('units.search'), params);
 
         if (result.data.value?.success) {
             unitSearchResults.value = result.data.value.data;
@@ -188,7 +188,7 @@ const handleSubmit = () => {
         formData.return = returnUrl;
     }
 
-    router.put(`/units/${props.unit.id}`, formData, {
+    router.put(route('units.update', { unit: props.unit.id }), formData, {
         preserveScroll: true,
         onSuccess: () => {
             toast.success('Unit updated successfully');

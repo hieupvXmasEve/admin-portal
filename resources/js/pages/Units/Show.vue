@@ -572,7 +572,7 @@ const hasRelationships = () => {
             <BookOpen class="mb-4 h-16 w-16 text-gray-400" />
             <h3 class="mb-2 text-xl font-semibold text-gray-900">No Relationships</h3>
             <p class="max-w-md text-gray-500">This unit doesn't have any prerequisites, equivalencies, or curriculum relationships yet. You can add these relationships by editing the unit.</p>
-            <Button v-if="canEdit" class="mt-4" as="a" :href="`/units/edit/${unit.id}`">
+            <Button v-if="canEdit" class="mt-4" as="a" :href="route('units.edit', { unit: unit.id })">
                 <Edit class="mr-2 h-4 w-4" />
                 Add Relationships
             </Button>

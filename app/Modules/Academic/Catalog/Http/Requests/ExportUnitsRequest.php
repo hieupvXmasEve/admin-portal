@@ -18,6 +18,8 @@ class ExportUnitsRequest extends FormRequest
     {
         return [
             'search' => ['nullable', 'string', 'max:255'],
+            'type' => ['nullable', 'string', 'in:general,egc,semi,ai,mkt,ba,cs,ee,me,fin'],
+            'level' => ['nullable', 'integer', 'min:0', 'max:9'],
             'credit_points_from' => ['nullable', 'numeric', 'min:0'],
             'credit_points_to' => ['nullable', 'numeric', 'min:0', 'gte:credit_points_from'],
         ];

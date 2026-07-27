@@ -1,23 +1,22 @@
 <script setup lang="ts">
 import DataPagination from '@/components/DataPagination.vue';
 import DataTable from '@/components/DataTable.vue';
-import DebouncedInput from '@/components/DebouncedInput.vue';
+import FilterPanel from '@/components/filters/FilterPanel.vue';
+import FilterSearchInput from '@/components/filters/FilterSearchInput.vue';
+import FilterSelect from '@/components/filters/FilterSelect.vue';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useInertiaFilters } from '@/composables/useInertiaFilters';
+import { useApi } from '@/composables/useApiRequest';
+import { useDataTable } from '@/composables/useDataTable';
 import { useModuleNavigation } from '@/composables/useModuleNavigation';
 import type { PaginatedResponse } from '@/types';
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { Edit, Eye, FileSpreadsheet, Plus, Trash2, Upload, X } from 'lucide-vue-next';
+import { Edit, Eye, FileSpreadsheet, Plus, Trash2, Upload } from 'lucide-vue-next';
 import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
-
-// Type alias for reka-ui AcceptableValue
-type AcceptableValue = string | number | bigint | Record<string, any> | null;
 
 interface Unit {
     id: number;
@@ -45,19 +44,13 @@ interface Statistics {
 }
 
 interface UnitsFilters {
-    search?: string;
-    sort?: string;
-    direction?: string;
-    per_page?: number;
-    page?: number;
-    type?: string;
-    level?: string | null;
-    credit_points?: number;
-    has_prerequisites?: boolean;
-    has_equivalents?: boolean;
-    in_curriculum?: boolean;
-    min_credit_points?: number;
-    max_credit_points?: number;
+    search: string;
+    sort: string | null;
+    direction: 'asc' | 'desc' | null;
+    per_page: number;
+    page: number;
+    type: string;
+    level: string;
 }
 
 const props = defineProps<{
@@ -69,24 +62,30 @@ const props = defineProps<{
 // Reactive data
 const data = computed(() => props.units.data);
 
-// Initialize filters with useInertiaFilters composable
-const { filters, hasActiveFilters, clearFilters, handleSearch, handleSelectFilter, handleSortChange, handlePaginationNavigate, handlePageSizeChange, currentSort, currentDirection } = useInertiaFilters<UnitsFilters>({
-    baseUrl: '/units',
+const { filters, setFilter, clearAllFilters, handleSearch, handleSortChange, handlePaginationNavigate, handlePageSizeChange, hasActiveFilters, isLoading, currentSort, currentDirection } = useDataTable<UnitsFilters>({
+    baseUrl: route('units.index'),
     initialFilters: {
-        search: props.filters?.search || '',
-        sort: props.filters?.sort || '',
-        direction: props.filters?.direction || 'asc',
-        per_page: props.filters?.per_page || 15,
-        type: props.filters?.type || 'all',
-        level: props.filters?.level !== undefined && props.filters?.level !== null ? String(props.filters.level) : 'all',
+        search: props.filters?.search ?? '',
+        sort: typeof props.filters?.sort === 'string' ? props.filters.sort : null,
+        direction: props.filters?.direction ?? null,
+        per_page: props.filters?.per_page ?? 15,
+        page: 1,
+        type: props.filters?.type ?? '',
+        level: props.filters?.level ?? '',
     },
     defaultValues: {
+        search: '',
+        sort: null,
+        direction: null,
         per_page: 15,
-        direction: 'asc',
-        type: 'all',
-        level: 'all',
+        page: 1,
+        type: '',
+        level: '',
     },
     only: ['units', 'filters'],
+    debounce: 300,
+    fieldDebounce: { search: 400 },
+    immediateFields: ['type', 'level'],
 });
 
 // Module navigation với return param
@@ -95,6 +94,7 @@ const { getLinkUrlWithReturn } = useModuleNavigation({
 });
 // Selected rows for bulk actions
 const selectedRows = ref<number[]>([]);
+const api = useApi();
 
 // Delete dialog state
 const deleteDialogOpen = ref(false);
@@ -124,7 +124,7 @@ const deleteUnit = (unit: Unit) => {
 // Confirm delete function
 const confirmDelete = () => {
     if (unitToDelete.value) {
-        router.delete(`/units/${unitToDelete.value.id}`, {
+        router.delete(route('units.destroy', { unit: unitToDelete.value.id }), {
             preserveScroll: true,
             only: ['units', 'statistics'],
             onSuccess: () => {
@@ -137,16 +137,6 @@ const confirmDelete = () => {
             },
         });
     }
-};
-
-// Type filter handler
-const handleTypeChange = (value: AcceptableValue) => {
-    handleSelectFilter('type', value, 'all');
-};
-
-// Level filter handler
-const handleLevelChange = (value: AcceptableValue) => {
-    handleSelectFilter('level', value, 'all');
 };
 
 // Unit type options
@@ -193,16 +183,13 @@ const confirmBulkDelete = async () => {
     isBulkDeleting.value = true;
 
     try {
-        await fetch('/api/units/bulk-delete', {
-            method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-            },
-            body: JSON.stringify({
-                unit_ids: selectedRows.value,
-            }),
+        const response = await api.delete(route('units.bulk-delete'), {
+            unit_ids: selectedRows.value,
         });
+
+        if (!response.data.value?.success) {
+            throw new Error(response.data.value?.message || 'Bulk delete failed');
+        }
 
         selectedRows.value = [];
         bulkDeleteDialogOpen.value = false;
@@ -226,19 +213,13 @@ const exportToExcel = async () => {
     isExporting.value = true;
 
     try {
-        // Build export URL with current filters
-        const params = new URLSearchParams();
-
-        if (filters.search) params.set('search', filters.search);
-        if (filters.sort) params.set('sort', filters.sort);
-        if (filters.direction) params.set('direction', filters.direction);
-        if (filters.type && filters.type !== 'all') params.set('type', filters.type);
-        if (filters.level && filters.level !== 'all') params.set('level', filters.level.toString());
-
-        const exportUrl = `/units/export/excel/filtered${params.toString() ? '?' + params.toString() : ''}`;
-
-        // Use window.location for file downloads to trigger browser download
-        window.location.href = exportUrl;
+        window.location.href = route('units.export.excel.filtered', {
+            search: filters.search || undefined,
+            sort: filters.sort || undefined,
+            direction: filters.direction || undefined,
+            type: filters.type || undefined,
+            level: filters.level || undefined,
+        });
 
         // Show success message after a short delay
         setTimeout(() => {
@@ -474,45 +455,14 @@ const columns: ColumnDef<Unit>[] = [
     </div>
 
     <!-- Filters Section -->
-    <div class="bg-muted/20 flex flex-wrap items-center gap-4 rounded-lg border p-4">
-        <div class="min-w-[200px] flex-1">
-            <DebouncedInput :model-value="filters.search" placeholder="Search units..." @debounced="handleSearch" />
-        </div>
-
-        <div class="min-w-[160px]">
-            <Select :model-value="filters.type" @update:model-value="handleTypeChange">
-                <SelectTrigger>
-                    <SelectValue placeholder="All Types" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem v-for="option in unitTypeOptions" :key="option.value" :value="option.value">
-                        {{ option.label }}
-                    </SelectItem>
-                </SelectContent>
-            </Select>
-        </div>
-
-        <div class="min-w-[140px]">
-            <Select :model-value="filters.level" @update:model-value="handleLevelChange">
-                <SelectTrigger>
-                    <SelectValue placeholder="All Levels" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem v-for="option in levelOptions" :key="option.value" :value="option.value">
-                        {{ option.label }}
-                    </SelectItem>
-                </SelectContent>
-            </Select>
-        </div>
-
-        <Button v-if="hasActiveFilters" variant="ghost" size="sm" @click="clearFilters">
-            <X class="mr-2 h-4 w-4" />
-            Clear Filters
-        </Button>
-    </div>
+    <FilterPanel :has-active-filters="hasActiveFilters" :columns="3" @clear="clearAllFilters">
+        <FilterSearchInput :model-value="filters.search" placeholder="Search units..." @update:model-value="filters.search = $event" @search="handleSearch" />
+        <FilterSelect :model-value="filters.type" :options="unitTypeOptions.filter((option) => option.value !== 'all')" placeholder="All Types" all-label="All Types" @update:model-value="filters.type = $event" @change="setFilter('type', $event)" />
+        <FilterSelect :model-value="filters.level" :options="levelOptions.filter((option) => option.value !== 'all')" placeholder="All Levels" all-label="All Levels" @update:model-value="filters.level = $event" @change="setFilter('level', $event)" />
+    </FilterPanel>
 
     <!-- Data Table -->
-    <DataTable :data="data" :columns="columns" :loading="false" :initial-sort="currentSort" :initial-direction="currentDirection" @sort-change="handleSortChange">
+    <DataTable :data="data" :columns="columns" :loading="isLoading" :initial-sort="currentSort ?? undefined" :initial-direction="currentDirection ?? undefined" @sort-change="handleSortChange">
         <template #cell-actions="{ row }">
             <div class="flex items-center gap-2">
                 <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>

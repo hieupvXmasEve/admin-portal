@@ -87,7 +87,9 @@ Route::middleware(['auth', 'web'])->group(function (): void {
     Route::post('units/validate-code', [UnitController::class, 'validateCode'])->name('units.validate-code');
     Route::post('units/validate-prerequisite-expression', [UnitController::class, 'validatePrerequisiteExpression'])
         ->name('units.validate-prerequisite-expression');
-    Route::delete('units/bulk-delete', [UnitController::class, 'bulkDelete'])->name('units.bulk-delete');
+    Route::delete('units/bulk-delete', [UnitController::class, 'bulkDelete'])
+        ->middleware('can:delete_unit')
+        ->name('units.bulk-delete');
     Route::post('units', [UnitController::class, 'store'])->middleware('can:create_unit')->name(UnitRoutes::STORE);
     Route::get('units/{unit}', [UnitController::class, 'show'])->middleware('can:view_unit')->name(UnitRoutes::SHOW);
     Route::get('units/{unit}/edit', [UnitController::class, 'edit'])->middleware('can:edit_unit')->name(UnitRoutes::EDIT);

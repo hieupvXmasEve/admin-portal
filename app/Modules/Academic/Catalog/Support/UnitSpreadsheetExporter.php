@@ -503,6 +503,14 @@ final class UnitSpreadsheetExporter
             });
         }
 
+        if (! empty($filters['type'])) {
+            $query->where('unit_type', $filters['type']);
+        }
+
+        if (isset($filters['level'])) {
+            $query->where('level', $filters['level']);
+        }
+
         if (isset($filters['credit_points_from'])) {
             $query->where('credit_points', '>=', $filters['credit_points_from']);
         }
