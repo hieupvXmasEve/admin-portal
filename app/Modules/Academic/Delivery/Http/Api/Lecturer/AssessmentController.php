@@ -1274,7 +1274,7 @@ class AssessmentController extends Controller
                 );
             }
 
-            $format = $request->format();
+            $format = $request->exportFormat();
 
             if ($format === 'excel') {
                 // Use existing Excel service for export

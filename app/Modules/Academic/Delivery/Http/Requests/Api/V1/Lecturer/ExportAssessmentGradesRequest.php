@@ -16,7 +16,7 @@ final class ExportAssessmentGradesRequest extends LecturerAssessmentRequest
         return [];
     }
 
-    public function format(): string
+    public function exportFormat(): string
     {
         $format = $this->query('format', 'excel');
 
