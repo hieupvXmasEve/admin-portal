@@ -167,11 +167,11 @@ const totalAssessmentWeight = props.template.assessment_components?.reduce((sum,
             <div class="text-muted-foreground">Version {{ template.version }} • {{ unit.code }} — {{ unit.name }}</div>
         </div>
         <div class="flex items-center gap-3">
-            <Button variant="outline" @click="router.visit('/syllabus-templates')">
+            <Button variant="outline" @click="router.visit(route('syllabus_templates.index'))">
                 <ArrowLeft class="mr-2 h-4 w-4" />
                 Back to Templates
             </Button>
-            <Button v-if="can_edit" @click="router.visit(`/syllabus-templates/${template.id}/edit`)">
+            <Button v-if="can_edit" @click="router.visit(route('syllabus_templates.edit', template.id))">
                 <Edit class="mr-2 h-4 w-4" />
                 Edit Template
             </Button>
@@ -368,7 +368,7 @@ const totalAssessmentWeight = props.template.assessment_components?.reduce((sum,
                                 <div class="font-medium">{{ template.source_template.title }}</div>
                                 <div class="text-muted-foreground text-sm">Version {{ template.source_template.version }}</div>
                             </div>
-                            <Button variant="ghost" size="sm" @click="router.visit(`/syllabus-templates/${template.source_template.id}`)"> View Original </Button>
+                            <Button variant="ghost" size="sm" @click="router.visit(route('syllabus_templates.show', template.source_template.id))"> View Original </Button>
                         </div>
                     </div>
                 </div>

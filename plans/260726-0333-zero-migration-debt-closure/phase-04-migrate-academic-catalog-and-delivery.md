@@ -59,6 +59,10 @@ controllers/services/routes and frontend debt with each migrated workflow.
      validation with Catalog FormRequests, aligned supported filter contracts,
      removed unsupported Unit controls, and migrated active frontend interactions
      to `useDataTable`, named routes, and the API wrapper.
+   - [x] Syllabus Templates: replaced page-index inline validation and the
+     duplicate POST route, migrated template filtering to `useDataTable`, and
+     moved active template navigation and mutations to named routes while
+     preserving API response envelopes and edit-lock behavior.
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
 7. Review import/export parity, scheduler entries, permissions, and campus scoping.
 

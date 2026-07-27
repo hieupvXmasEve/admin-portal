@@ -153,6 +153,35 @@ it('marks locked templates in the index list', function () {
             }));
 });
 
+it('sanitizes syllabus template filters and retains the canonical store route', function () {
+    $matching = SyllabusTemplate::factory()->create([
+        'unit_id' => $this->unit->id,
+        'title' => 'Catalog Syllabus Filter',
+        'is_active' => true,
+    ]);
+    SyllabusTemplate::factory()->create(['title' => 'Other Syllabus', 'is_active' => false]);
+
+    actingAs($this->user)
+        ->withSession(['current_campus_id' => $this->campus->id])
+        ->get(route('syllabus_templates.index', [
+            'search' => 'Filter',
+            'unit_id' => $this->unit->id,
+            'is_active' => '1',
+            'sort' => 'title',
+            'direction' => 'asc',
+            'per_page' => 10,
+        ]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('filters.unit_id', (string) $this->unit->id)
+            ->where('filters.is_active', '1')
+            ->where('filters.sort', 'title')
+            ->where('items.data.0.id', $matching->id));
+
+    expect(app('router')->getRoutes()->getByName('syllabus_templates.store.direct'))->toBeNull()
+        ->and(app('router')->getRoutes()->getByName('syllabus_templates.store'))->not->toBeNull();
+});
+
 it('still allows editing when offering only has non-completed sessions', function () {
     $template = makeEditableTemplate($this);
 

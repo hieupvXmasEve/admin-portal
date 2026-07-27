@@ -44,16 +44,16 @@ class SyllabusTemplateController extends Controller
         return ApiResponse::success($templates);
     }
 
-    public function pageIndex(Request $request): Response
+    public function pageIndex(ListSyllabusTemplatesRequest $request): Response
     {
-        $filters = $request->validate((new ListSyllabusTemplatesRequest)->rules());
+        $filters = $request->validated();
 
         return Inertia::render('Syllabus/TemplatesIndex', [
             'items' => app(ListSyllabusTemplatesQuery::class)->handle($filters),
-            'filters' => [
-                'search' => $filters['search'] ?? null,
-                'unit_id' => $filters['unit_id'] ?? 'all',
-                'is_active' => $filters['is_active'] ?? 'all',
+            'filters' => (object) [
+                'search' => $filters['search'] ?? '',
+                'unit_id' => isset($filters['unit_id']) ? (string) $filters['unit_id'] : '',
+                'is_active' => $filters['is_active'] ?? '',
                 'sort' => $filters['sort'] ?? null,
                 'direction' => $filters['direction'] ?? null,
                 'per_page' => $filters['per_page'] ?? 10,

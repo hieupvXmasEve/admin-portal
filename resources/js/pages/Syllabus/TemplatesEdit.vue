@@ -233,10 +233,10 @@ const onSubmit = form.handleSubmit((formData) => {
         // but kept in UI for consistency
     } as Record<string, any>;
 
-    router.put(`/syllabus-templates/${props.syllabusTemplate.id}`, submitData, {
+    router.put(route('syllabus_templates.update', props.syllabusTemplate.id), submitData, {
         onSuccess: () => {
             toast.success('Syllabus template updated');
-            router.visit('/syllabus-templates');
+            router.visit(route('syllabus_templates.index'));
         },
         onError: (errors) => {
             toast.error('Failed to update syllabus template');
@@ -258,7 +258,7 @@ const onSubmit = form.handleSubmit((formData) => {
             <div class="text-muted-foreground">{{ unit.code }} — {{ unit.name }}</div>
         </div>
         <div class="flex items-center gap-3">
-            <Button variant="outline" @click="router.visit('/syllabus-templates')">
+            <Button variant="outline" @click="router.visit(route('syllabus_templates.index'))">
                 <ArrowLeft class="mr-2 h-4 w-4" />
                 Back
             </Button>

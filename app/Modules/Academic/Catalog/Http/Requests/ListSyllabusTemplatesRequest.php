@@ -18,8 +18,8 @@ class ListSyllabusTemplatesRequest extends FormRequest
     {
         return [
             'search' => ['nullable', 'string', 'max:255'],
-            'unit_id' => ['nullable', 'string'],
-            'is_active' => ['nullable', 'string', 'in:1,0,all'],
+            'unit_id' => ['nullable', 'integer', 'exists:units,id'],
+            'is_active' => ['nullable', 'string', 'in:1,0'],
             'sort' => ['nullable', 'string', 'in:title,version,is_active,exam_resit_fee,created_at'],
             'direction' => ['nullable', 'string', 'in:asc,desc'],
             'per_page' => ['nullable', 'integer', 'min:5', 'max:100'],

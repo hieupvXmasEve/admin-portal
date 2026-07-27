@@ -8,7 +8,6 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::get('/syllabus-templates', [SyllabusTemplateController::class, 'pageIndex'])->middleware('can:view_syllabus')->name('syllabus_templates.index');
     Route::get('/syllabus-templates/create', [SyllabusTemplateController::class, 'pageCreate'])->middleware('can:create_syllabus')->name('syllabus_templates.create');
-    Route::post('/syllabus-templates', [SyllabusTemplateController::class, 'store'])->middleware('can:create_syllabus')->name('syllabus_templates.store.direct');
     Route::get('/syllabus-templates/{syllabusTemplate}/edit', [SyllabusTemplateController::class, 'pageEdit'])->middleware('can:edit_syllabus')->name('syllabus_templates.edit');
     Route::get('/syllabus-templates/{syllabusTemplate}', [SyllabusTemplateController::class, 'pageShow'])->middleware('can:view_syllabus')->name('syllabus_templates.show');
     Route::post('syllabus-templates', [SyllabusTemplateController::class, 'store'])->middleware('can:create_syllabus')->name('syllabus_templates.store');

@@ -5,7 +5,7 @@ import Badge from '@/components/ui/badge/Badge.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useInertiaFilters } from '@/composables/useInertiaFilters';
+import { useDataTable } from '@/composables/useDataTable';
 import type { PaginatedResponse } from '@/types';
 import { formatCurrency } from '@/types/finance';
 import { Head, router } from '@inertiajs/vue3';
@@ -47,30 +47,44 @@ interface SyllabusTemplateFilters {
 
 const props = defineProps<{
     items: PaginatedResponse<TemplateRow>;
-    filters: Partial<SyllabusTemplateFilters>;
+    filters?: Partial<SyllabusTemplateFilters>;
     units: Unit[];
 }>();
 
-const { filters, hasActiveFilters, clearFilters, handleSearch, handleSelectFilter, handleSortChange, handlePaginationNavigate, handlePageSizeChange, currentSort, currentDirection } = useInertiaFilters<SyllabusTemplateFilters>({
+const { filters, setFilter, clearAllFilters, handleSearch, handleSortChange, handlePaginationNavigate, handlePageSizeChange, hasActiveFilters, isLoading, currentSort, currentDirection } = useDataTable<SyllabusTemplateFilters>({
     baseUrl: route('syllabus_templates.index'),
     initialFilters: {
-        search: (typeof props.filters?.search === 'string' ? props.filters.search : '') || '',
-        unit_id: (typeof props.filters?.unit_id === 'string' ? props.filters.unit_id : 'all') || 'all',
-        is_active: (typeof props.filters?.is_active === 'string' ? props.filters.is_active : 'all') || 'all',
-        sort: (typeof props.filters?.sort === 'string' ? props.filters.sort : 'created_at') || 'created_at',
-        direction: (props.filters?.direction as 'asc' | 'desc') || 'desc',
-        per_page: props.filters?.per_page || 10,
-        page: props.items.current_page || 1,
+        search: typeof props.filters?.search === 'string' ? props.filters.search : '',
+        unit_id: typeof props.filters?.unit_id === 'string' && props.filters.unit_id !== 'all' ? props.filters.unit_id : '',
+        is_active: typeof props.filters?.is_active === 'string' && props.filters.is_active !== 'all' ? props.filters.is_active : '',
+        sort: typeof props.filters?.sort === 'string' ? props.filters.sort : null,
+        direction: props.filters?.direction === 'asc' || props.filters?.direction === 'desc' ? props.filters.direction : null,
+        per_page: props.filters?.per_page ?? 10,
+        page: props.items.current_page ?? 1,
     },
     defaultValues: {
-        unit_id: 'all',
-        is_active: 'all',
+        search: '',
+        unit_id: '',
+        is_active: '',
         per_page: 10,
-        direction: 'desc',
-        sort: 'created_at',
+        direction: null,
+        sort: null,
     },
     only: ['items', 'filters'],
+    fieldDebounce: { search: 400 },
+    immediateFields: ['unit_id', 'is_active'],
 });
+
+const displayUnitId = computed(() => filters.unit_id || 'all');
+const displayIsActive = computed(() => filters.is_active || 'all');
+
+const updateUnitFilter = (value: string) => {
+    setFilter('unit_id', value === 'all' ? '' : value);
+};
+
+const updateActiveFilter = (value: string) => {
+    setFilter('is_active', value === 'all' ? '' : value);
+};
 
 const columns = computed<ColumnDef<TemplateRow>[]>(() => [
     {
@@ -95,11 +109,13 @@ const columns = computed<ColumnDef<TemplateRow>[]>(() => [
         accessorKey: 'version',
         header: 'Version',
         cell: ({ row }) => row.original.version ?? '—',
+        enableSorting: true,
     },
     {
         accessorKey: 'status',
         header: 'Status',
         cell: 'status',
+        enableSorting: false,
     },
     // {
     //     accessorKey: 'delivery_mode',
@@ -110,13 +126,13 @@ const columns = computed<ColumnDef<TemplateRow>[]>(() => [
         accessorKey: 'min_attendance_threshold',
         header: 'Min Attend',
         cell: ({ row }) => `${Number(row.original.min_attendance_threshold)}%`,
-        enableSorting: true,
+        enableSorting: false,
     },
     {
         accessorKey: 'min_grade_threshold',
         header: 'Min Grade',
         cell: ({ row }) => Number(row.original.min_grade_threshold),
-        enableSorting: true,
+        enableSorting: false,
     },
     {
         accessorKey: 'exam_resit_fee',
@@ -134,6 +150,7 @@ const columns = computed<ColumnDef<TemplateRow>[]>(() => [
         accessorKey: 'created_at',
         header: 'Created',
         cell: ({ row }) => new Date(row.original.created_at).toLocaleDateString(),
+        enableSorting: true,
     },
     {
         id: 'actions',
@@ -150,7 +167,7 @@ const columns = computed<ColumnDef<TemplateRow>[]>(() => [
         <div class="flex items-center justify-between">
             <h1 class="text-xl font-semibold">Syllabus Templates</h1>
             <div class="flex gap-2">
-                <Button @click="router.get(`/syllabus-templates/create`)"> <Plus class="mr-2 h-4 w-4" /> New Template </Button>
+                <Button @click="router.visit(route('syllabus_templates.create'))"> <Plus class="mr-2 h-4 w-4" /> New Template </Button>
             </div>
         </div>
 
@@ -163,7 +180,7 @@ const columns = computed<ColumnDef<TemplateRow>[]>(() => [
                     </div>
                     <div class="flex flex-col">
                         <label class="mb-1 text-sm font-medium">Unit</label>
-                        <Select :model-value="filters.unit_id" @update:model-value="(v) => handleSelectFilter('unit_id', v)">
+                        <Select :model-value="displayUnitId" @update:model-value="updateUnitFilter">
                             <SelectTrigger>
                                 <SelectValue placeholder="All units" />
                             </SelectTrigger>
@@ -175,7 +192,7 @@ const columns = computed<ColumnDef<TemplateRow>[]>(() => [
                     </div>
                     <div class="flex flex-col">
                         <label class="mb-1 text-sm font-medium">Status</label>
-                        <Select :model-value="filters.is_active" @update:model-value="(v) => handleSelectFilter('is_active', v)">
+                        <Select :model-value="displayIsActive" @update:model-value="updateActiveFilter">
                             <SelectTrigger>
                                 <SelectValue placeholder="All statuses" />
                             </SelectTrigger>
@@ -190,11 +207,11 @@ const columns = computed<ColumnDef<TemplateRow>[]>(() => [
             </div>
 
             <div v-if="hasActiveFilters" class="shrink-0 pb-0.5">
-                <Button variant="ghost" size="sm" class="text-muted-foreground text-xs" @click="clearFilters"> <X class="mr-1 h-3 w-3" /> Clear filters </Button>
+                <Button variant="ghost" size="sm" class="text-muted-foreground text-xs" @click="clearAllFilters"> <X class="mr-1 h-3 w-3" /> Clear filters </Button>
             </div>
         </div>
 
-        <DataTable :data="items.data" :columns="columns" :initial-sort="currentSort" :initial-direction="currentDirection" enable-server-sorting @sort-change="handleSortChange">
+        <DataTable :data="items.data" :columns="columns" :loading="isLoading" :initial-sort="currentSort ?? undefined" :initial-direction="currentDirection ?? undefined" enable-server-sorting @sort-change="handleSortChange">
             <template #cell-status="{ row }">
                 <div class="flex gap-2">
                     <Badge v-if="row.original.is_default" variant="default">Default</Badge>
@@ -203,10 +220,10 @@ const columns = computed<ColumnDef<TemplateRow>[]>(() => [
             </template>
             <template #cell-actions="{ row }">
                 <div class="justify-left flex items-center gap-2">
-                    <Button variant="ghost" size="sm" @click="router.visit(`/syllabus-templates/${row.original.id}`)">
+                    <Button variant="ghost" size="sm" @click="router.visit(route('syllabus_templates.show', row.original.id))">
                         <Eye class="h-4 w-4" />
                     </Button>
-                    <Button v-if="!row.original.is_locked_for_editing" variant="ghost" size="sm" @click="router.visit(`/syllabus-templates/${row.original.id}/edit`)">
+                    <Button v-if="!row.original.is_locked_for_editing" variant="ghost" size="sm" @click="router.visit(route('syllabus_templates.edit', row.original.id))">
                         <Edit class="h-4 w-4" />
                     </Button>
                 </div>

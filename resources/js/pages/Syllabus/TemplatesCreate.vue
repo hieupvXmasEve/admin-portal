@@ -241,7 +241,7 @@ const onSubmit = form.handleSubmit((formData) => {
         grading_scheme: gradingScheme.value,
     };
 
-    router.post(`/syllabus-templates`, submitData, {
+    router.post(route('syllabus_templates.store'), submitData, {
         onSuccess: () => {
             toast.success('Syllabus created successfully');
         },
@@ -273,7 +273,7 @@ const filteredAvailableUnits = computed(() => {
             <h1 class="text-3xl font-bold">Create Syllabus Template</h1>
         </div>
         <div class="flex items-center gap-3">
-            <Button variant="outline" @click="router.visit(`/syllabus-templates`)">
+            <Button variant="outline" @click="router.visit(route('syllabus_templates.index'))">
                 <ArrowLeft class="mr-2 h-4 w-4" />
                 Cancel
             </Button>
