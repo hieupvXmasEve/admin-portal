@@ -9,11 +9,12 @@ use Illuminate\Support\Facades\DB;
 
 final class UpdateCourseRegistrationStatusAction
 {
-    /** @param array{course_registration_id: int, registration_status: string, notes?: string|null} $data */
+    /** @param array{course_registration_id: int, campus_id: int, registration_status: string, notes?: string|null} $data */
     public static function run(array $data): CourseRegistration
     {
         return DB::transaction(function () use ($data): CourseRegistration {
             $registration = CourseRegistration::query()
+                ->whereHas('courseOffering', fn ($query) => $query->where('campus_id', $data['campus_id']))
                 ->lockForUpdate()
                 ->findOrFail($data['course_registration_id']);
             $registration->update([

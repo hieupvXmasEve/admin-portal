@@ -53,7 +53,7 @@ return [
             'reason' => 'Existing top-level controllers preserve public web/API contracts during migration.',
             'canonical_replacement' => 'Thin controller under the owning module HTTP boundary.',
             'retirement_condition' => 'Route ownership and all supported callers move to the module controller.',
-            'baseline' => 56,
+            'baseline' => 55,
             'mode' => 'max',
         ],
         'frozen_routes' => [
@@ -61,7 +61,7 @@ return [
             'reason' => 'Existing split route files still serve supported URLs and route names.',
             'canonical_replacement' => 'Owning module routes with a compatibility-preserving mount.',
             'retirement_condition' => 'No supported caller depends on the legacy file and route evidence is green.',
-            'baseline' => 26,
+            'baseline' => 25,
             'mode' => 'max',
         ],
         'shared_model_imports' => [
@@ -85,7 +85,7 @@ return [
             'reason' => 'Legacy JSON response sites remain while API envelopes are migrated.',
             'canonical_replacement' => 'ApiResponse::success(), error(), paginated(), or validationError().',
             'retirement_condition' => 'The endpoint uses the canonical envelope and its contract test passes.',
-            'baseline' => 37,
+            'baseline' => 36,
             'mode' => 'max',
         ],
         'inline_request_validation' => [
@@ -93,7 +93,7 @@ return [
             'reason' => 'Legacy controllers still validate inline during staged extraction.',
             'canonical_replacement' => 'A typed FormRequest owned by the endpoint context.',
             'retirement_condition' => 'The controller delegates validation to the FormRequest.',
-            'baseline' => 60,
+            'baseline' => 59,
             'mode' => 'max',
         ],
         'missing_strict_types' => [

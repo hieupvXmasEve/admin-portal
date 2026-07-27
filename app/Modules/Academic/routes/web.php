@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Constants\CourseOfferingRoutes;
 use App\Constants\StudentRoutes;
 use App\Modules\Academic\Delivery\Http\Api\ClassSessionController as DeliveryClassSessionApiController;
+use App\Modules\Academic\Delivery\Http\Web\Admin\CourseRegistrationController;
 use App\Modules\Academic\Delivery\Http\Web\AttendanceController as DeliveryAttendanceController;
 use App\Modules\Academic\Delivery\Http\Web\AttendanceReportController as DeliveryAttendanceReportController;
 use App\Modules\Academic\Delivery\Http\Web\BulkUpdateCourseOfferingSessionsController;
@@ -51,7 +52,55 @@ Route::model('courseOffering', implode('\\', ['App', 'Models', 'CourseOffering']
 |
 */
 
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth', 'verified', 'campus.selected'])->group(function () {
+    Route::prefix('course-registrations')->name('course-registrations.')->group(function () {
+        Route::get('/', [CourseRegistrationController::class, 'index'])
+            ->middleware('can:view_course_registration')
+            ->name('index');
+        Route::get('/create', [CourseRegistrationController::class, 'create'])
+            ->middleware('can:create_course_registration')
+            ->name('create');
+        Route::post('/', [CourseRegistrationController::class, 'store'])
+            ->middleware('can:create_course_registration')
+            ->name('store');
+        Route::get('/{adminCourseRegistration}', [CourseRegistrationController::class, 'show'])
+            ->middleware('can:view_course_registration')
+            ->name('show');
+        Route::get('/{adminCourseRegistration}/edit', [CourseRegistrationController::class, 'edit'])
+            ->middleware('can:edit_course_registration')
+            ->name('edit');
+        Route::put('/{adminCourseRegistration}', [CourseRegistrationController::class, 'update'])
+            ->middleware('can:edit_course_registration')
+            ->name('update');
+        Route::delete('/{adminCourseRegistration}', [CourseRegistrationController::class, 'destroy'])
+            ->middleware('can:delete_course_registration')
+            ->name('destroy');
+        Route::patch('/{adminCourseRegistration}/drop', [CourseRegistrationController::class, 'drop'])
+            ->middleware(['can:edit_course_registration', 'can:manage_course_registration'])
+            ->name('drop');
+        Route::patch('/{adminCourseRegistration}/withdraw', [CourseRegistrationController::class, 'withdraw'])
+            ->middleware(['can:edit_course_registration', 'can:manage_course_registration'])
+            ->name('withdraw');
+    });
+
+    Route::prefix('api/course-registrations')->name('api.course-registrations.')->group(function () {
+        Route::delete('/bulk-delete', [CourseRegistrationController::class, 'bulkDestroy'])
+            ->middleware('can:delete_course_registration')
+            ->name('bulk-delete');
+        Route::get('/available-courses', [CourseRegistrationController::class, 'getAvailableCourses'])
+            ->middleware('can:view_course_registration')
+            ->name('available-courses');
+        Route::get('/available-units', [CourseRegistrationController::class, 'getAvailableUnits'])
+            ->middleware('can:view_course_registration')
+            ->name('available-units');
+        Route::get('/check-eligibility', [CourseRegistrationController::class, 'checkEligibility'])
+            ->middleware('can:view_course_registration')
+            ->name('check-eligibility');
+        Route::get('/student-registrations', [CourseRegistrationController::class, 'getStudentRegistrations'])
+            ->middleware('can:view_course_registration')
+            ->name('student-registrations');
+    });
+
     Route::get('attendance', [DeliveryAttendanceController::class, 'index'])
         ->middleware('can:view_course_offering')
         ->name('attendance.index');

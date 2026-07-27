@@ -10,24 +10,25 @@ use Illuminate\Support\Facades\DB;
 
 final class RemoveStudentFromCourseOfferingAction
 {
-    public static function run(int $courseRegistrationId): void
+    public static function run(int $courseRegistrationId, int $campusId): void
     {
-        DB::transaction(fn (): mixed => self::remove($courseRegistrationId));
+        DB::transaction(fn (): mixed => self::remove($courseRegistrationId, $campusId));
     }
 
     /** @param list<int> $courseRegistrationIds */
-    public static function runMany(array $courseRegistrationIds): void
+    public static function runMany(array $courseRegistrationIds, int $campusId): void
     {
-        DB::transaction(function () use ($courseRegistrationIds): void {
+        DB::transaction(function () use ($courseRegistrationIds, $campusId): void {
             foreach (array_values(array_unique($courseRegistrationIds)) as $courseRegistrationId) {
-                self::remove($courseRegistrationId);
+                self::remove($courseRegistrationId, $campusId);
             }
         });
     }
 
-    private static function remove(int $courseRegistrationId): void
+    private static function remove(int $courseRegistrationId, int $campusId): void
     {
         $registration = CourseRegistration::query()
+            ->whereHas('courseOffering', fn ($query) => $query->where('campus_id', $campusId))
             ->lockForUpdate()
             ->findOrFail($courseRegistrationId);
         $offering = CourseOffering::query()

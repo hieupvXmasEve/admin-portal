@@ -13,6 +13,8 @@ final readonly class CourseOfferingUnitReference
         public string $credit_points,
         public ?int $level,
         public ?string $unit_type,
+        /** @var array<string, mixed> */
+        public array $payload = [],
     ) {}
 
     /**
@@ -20,6 +22,10 @@ final readonly class CourseOfferingUnitReference
      */
     public function toArray(): array
     {
+        if ($this->payload !== []) {
+            return $this->payload;
+        }
+
         return [
             'unit_id' => $this->id,
             'code' => $this->code,

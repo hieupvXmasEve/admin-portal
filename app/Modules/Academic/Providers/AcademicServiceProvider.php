@@ -100,6 +100,7 @@ use App\Shared\Contracts\Academic\TranscriptEntryGpaReader;
 use App\Shared\Contracts\Finance\FinanceCancellationCompletionContract;
 use App\Shared\Contracts\Identity\ActiveLecturerReader;
 use App\Shared\Contracts\Identity\AvailableLecturerReader;
+use App\Shared\Contracts\Identity\LecturerReferenceReader;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
@@ -128,6 +129,7 @@ class AcademicServiceProvider extends ServiceProvider
         $this->app->bind(TeachingEligibilityReader::class, EloquentTeachingEligibilityReader::class);
         $this->app->bind(ActiveLecturerReader::class, EloquentActiveLecturerReader::class);
         $this->app->bind(AvailableLecturerReader::class, EloquentAvailableLecturerReader::class);
+        $this->app->bind(LecturerReferenceReader::class, EloquentActiveLecturerReader::class);
         $this->app->bind(LecturerImpersonationTokenIssuer::class, EloquentLecturerTokenIssuer::class);
         $this->app->bind(LegacyTranscriptOutcomeReader::class, EloquentLegacyTranscriptOutcomeReader::class);
         $this->app->bind(InstructorAssignmentWriter::class, DeliveryInstructorAssignmentWriter::class);

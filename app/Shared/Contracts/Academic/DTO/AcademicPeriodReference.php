@@ -17,5 +17,7 @@ readonly class AcademicPeriodReference
         public ?CarbonImmutable $registration_start_date,
         public ?CarbonImmutable $registration_end_date,
         public bool $is_current,
+        /** @var array<string, mixed> */
+        public array $payload = [],
     ) {}
 }

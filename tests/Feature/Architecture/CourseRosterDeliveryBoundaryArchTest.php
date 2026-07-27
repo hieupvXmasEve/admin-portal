@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 it('keeps new routed staff roster writes inside Delivery commands', function (): void {
     $files = [
-        base_path('app/Http/Controllers/Web/CourseRegistrationController.php'),
+        base_path('app/Modules/Academic/Delivery/Http/Web/Admin/CourseRegistrationController.php'),
         base_path('app/Modules/Academic/Http/Web/Admin/CourseOfferingRegistrationController.php'),
         base_path('app/Modules/Academic/Http/Web/Admin/CourseOfferingRosterController.php'),
         base_path('app/Http/Controllers/Web/SemesterEnrollmentController.php'),
@@ -50,4 +50,30 @@ it('keeps Delivery roster moves off Progression attempt persistence', function (
     expect($contents)
         ->not->toContain('App\\Models\\AcademicRecord')
         ->toContain('CourseOfferingAttemptWriter');
+});
+
+it('presents staff registrations through owner contracts instead of hydrated foreign relations', function (): void {
+    $files = [
+        base_path('app/Modules/Academic/Delivery/Queries/ListCourseRegistrationsQuery.php'),
+        base_path('app/Modules/Academic/Delivery/Queries/GetCourseRegistrationFormOptionsQuery.php'),
+        base_path('app/Modules/Academic/Delivery/Queries/GetAvailableCourseRegistrationsQuery.php'),
+        base_path('app/Modules/Academic/Delivery/Queries/ListStudentCourseRegistrationsQuery.php'),
+        base_path('app/Modules/Academic/Delivery/Http/Web/Admin/CourseRegistrationController.php'),
+    ];
+
+    foreach ($files as $file) {
+        $contents = file_get_contents($file) ?: '';
+
+        expect($contents)
+            ->not->toMatch('/->(?:with|load)\([^;]*(?:student|unit|lecture|semester)/')
+            ->not->toMatch('/join\([\'\"](?:students|units|lectures|semesters)/');
+    }
+
+    $presenter = file_get_contents(base_path('app/Modules/Academic/Delivery/Support/CourseRegistrationPresenter.php')) ?: '';
+
+    expect($presenter)
+        ->toContain('StudentSerializedReferenceReader')
+        ->toContain('CourseOfferingCatalogReader')
+        ->toContain('LecturerReferenceReader')
+        ->not->toMatch('/use\s+App\\\\Models\\\\(?:Student|Unit|Semester|Lecture)\s*;/');
 });

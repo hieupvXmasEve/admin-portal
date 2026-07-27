@@ -44,7 +44,6 @@ require __DIR__.'/web/semester.php';
 // @deprecated Unit routes migrated to App\Modules\Academic\Catalog\routes\web.php.
 require __DIR__.'/web/specializations.php';
 require __DIR__.'/web/course-offerings.php';
-require __DIR__.'/web/course-registrations.php';
 require __DIR__.'/web/lectures.php';
 // require __DIR__ . '/web/student.php';
 require __DIR__.'/web/course-statistics.php';

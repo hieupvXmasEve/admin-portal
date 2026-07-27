@@ -10,9 +10,10 @@ use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
 use App\Shared\Contracts\StudentRegistry\StudentProfilePersistenceWriter;
 use App\Shared\Contracts\StudentRegistry\StudentProfileReader;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
+use App\Shared\Contracts\StudentRegistry\StudentSerializedReferenceReader;
 use Illuminate\Database\Eloquent\Builder;
 
-final class EloquentStudentRegistryStore implements StudentProfilePersistenceWriter, StudentProfileReader, StudentReferenceReader
+final class EloquentStudentRegistryStore implements StudentProfilePersistenceWriter, StudentProfileReader, StudentReferenceReader, StudentSerializedReferenceReader
 {
     public function update(int $studentId, array $attributes): bool
     {
@@ -27,6 +28,20 @@ final class EloquentStudentRegistryStore implements StudentProfilePersistenceWri
             ->find($studentId);
 
         return $student !== null ? $this->reference($student) : null;
+    }
+
+    public function findSerialized(int $studentId): ?array
+    {
+        return Student::query()->find($studentId)?->toArray();
+    }
+
+    public function findManySerialized(array $studentIds): array
+    {
+        return Student::query()
+            ->whereIn('id', array_values(array_unique($studentIds)))
+            ->get()
+            ->mapWithKeys(static fn (Student $student): array => [(int) $student->id => $student->toArray()])
+            ->all();
     }
 
     public function findProfile(int $studentId): ?StudentProfile

@@ -14,6 +14,9 @@ interface CourseOfferingCatalogReader
 
     public function offeringPeriod(int $academicPeriodId): ?AcademicPeriodReference;
 
+    /** @return list<AcademicPeriodReference> */
+    public function offeringPeriods(): array;
+
     /**
      * @return list<CourseOfferingUnitReference>
      */

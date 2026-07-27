@@ -28,6 +28,15 @@ class EloquentCourseOfferingCatalogReader implements CourseOfferingCatalogReader
         return $this->mapPeriod(Semester::query()->find($academicPeriodId));
     }
 
+    public function offeringPeriods(): array
+    {
+        return Semester::query()
+            ->orderByDesc('start_date')
+            ->get()
+            ->map(fn (Semester $period): AcademicPeriodReference => $this->mapPeriod($period))
+            ->all();
+    }
+
     private function mapPeriod(?Semester $period): ?AcademicPeriodReference
     {
         if ($period === null) {
@@ -43,6 +52,7 @@ class EloquentCourseOfferingCatalogReader implements CourseOfferingCatalogReader
             registration_start_date: $this->nullableDate($period->enrollment_start_date),
             registration_end_date: $this->nullableDate($period->enrollment_end_date),
             is_current: (bool) $period->is_active,
+            payload: $period->toArray(),
         );
     }
 
@@ -53,7 +63,7 @@ class EloquentCourseOfferingCatalogReader implements CourseOfferingCatalogReader
     {
         return Unit::query()
             ->orderBy('code')
-            ->get(['id', 'code', 'name', 'credit_points', 'level', 'unit_type'])
+            ->get()
             ->map(fn (Unit $unit): CourseOfferingUnitReference => new CourseOfferingUnitReference(
                 id: (int) $unit->id,
                 code: (string) $unit->code,
@@ -67,7 +77,7 @@ class EloquentCourseOfferingCatalogReader implements CourseOfferingCatalogReader
 
     public function offeringUnit(int $unitId): ?CourseOfferingUnitReference
     {
-        $unit = Unit::query()->find($unitId, ['id', 'code', 'name', 'credit_points', 'level', 'unit_type']);
+        $unit = Unit::query()->find($unitId);
 
         return $unit === null ? null : $this->mapUnit($unit);
     }
@@ -152,6 +162,7 @@ class EloquentCourseOfferingCatalogReader implements CourseOfferingCatalogReader
             credit_points: (string) $unit->credit_points,
             level: $unit->level === null ? null : (int) $unit->level,
             unit_type: $unit->unit_type,
+            payload: $unit->toArray(),
         );
     }
 

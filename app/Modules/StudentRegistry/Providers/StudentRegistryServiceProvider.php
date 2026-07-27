@@ -30,6 +30,7 @@ use App\Shared\Contracts\StudentRegistry\StudentProfilePersistenceWriter;
 use App\Shared\Contracts\StudentRegistry\StudentProfileReader;
 use App\Shared\Contracts\StudentRegistry\StudentProfileWriter;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
+use App\Shared\Contracts\StudentRegistry\StudentSerializedReferenceReader;
 use Illuminate\Support\ServiceProvider;
 
 class StudentRegistryServiceProvider extends ServiceProvider
@@ -37,6 +38,7 @@ class StudentRegistryServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(StudentReferenceReader::class, EloquentStudentRegistryStore::class);
+        $this->app->bind(StudentSerializedReferenceReader::class, EloquentStudentRegistryStore::class);
         $this->app->bind(CurriculumStudentSummaryReader::class, EloquentCurriculumStudentSummaryReader::class);
         $this->app->bind(StudentCollectionEligibilityReader::class, EloquentStudentCollectionEligibilityReader::class);
         $this->app->bind(StudentGuardianRelationshipWriter::class, EloquentStudentGuardianRelationshipWriter::class);
