@@ -162,6 +162,20 @@ controllers/services/routes and frontend debt with each migrated workflow.
      Lowered the frozen-route and frozen-controller ratchets accordingly;
      `ModuleService` itself stays frozen (single consumer, out of this
      slice's scope).
+   - [ ] Semester Enrollment: a five-sub-slice migration plan was drafted for
+     the then-1252-line `SemesterEnrollmentController` (see
+     [phase 4b](./phase-04b-retire-semester-enrollment.md)), but before any
+     sub-slice started, the product owner cut scope directly: the enrollment
+     page now keeps only the overview and `generateEnrollments`; the other 6
+     methods (suggested-courses, both open-course flows, registration stats,
+     bulk-register, registrable-students) were deleted outright rather than
+     migrated, along with their now-orphaned action/request/UI files. The
+     controller is now 227 lines / 2 methods and still frozen in
+     `app/Http/Controllers/Web` (unchanged `frozen_controllers`/`frozen_routes`
+     paths and counts) — retiring it into `App\Modules\Academic\Delivery` is
+     now a small future slice, not the XL one originally scoped. Phase 4b is
+     marked superseded; see it for what remains open (`Enrollment` model
+     ownership).
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
 7. Review import/export parity, scheduler entries, permissions, and campus scoping.
 

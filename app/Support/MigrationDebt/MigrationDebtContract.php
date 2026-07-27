@@ -79,7 +79,7 @@ final class MigrationDebtContract
         'shared_model_imports' => 494,
         'cross_context_concrete_imports' => 0,
         'direct_json_responses' => 34,
-        'inline_request_validation' => 59,
+        'inline_request_validation' => 50,
         'missing_strict_types' => 163,
         'missing_route_strict_types' => 16,
         'legacy_filter_stacks' => 25,

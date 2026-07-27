@@ -40,18 +40,6 @@ class SemesterRoutes
     // API Semester Enrollment Routes
     public const API_ENROLLMENT_GENERATE = 'api.semesters.enrollment.generate';
 
-    public const API_ENROLLMENT_SUGGESTED_COURSES = 'api.semesters.enrollment.suggested-courses';
-
-    public const API_ENROLLMENT_BULK_OPEN_COURSES = 'api.semesters.enrollment.bulk-open-courses';
-
-    public const API_ENROLLMENT_OPEN_SINGLE_COURSE = 'api.semesters.enrollment.open-single-course';
-
-    public const API_ENROLLMENT_STATS = 'api.semesters.enrollment.stats';
-
-    public const API_ENROLLMENT_REGISTRABLE_STUDENTS = 'api.semesters.enrollment.registrable-students';
-
-    public const API_ENROLLMENT_BULK_REGISTER = 'api.semesters.enrollment.bulk-register';
-
     // Route Prefixes
     public const WEB_PREFIX = 'semesters.';
 
