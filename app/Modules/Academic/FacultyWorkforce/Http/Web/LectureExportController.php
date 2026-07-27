@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Web\Lectures;
+namespace App\Modules\Academic\FacultyWorkforce\Http\Web;
 
 use App\Actions\Lecture\GetTeachingHoursAction;
 use App\Http\Controllers\Controller;

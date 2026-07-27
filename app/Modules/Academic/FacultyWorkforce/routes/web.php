@@ -1,10 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Constants\LectureRoutes;
-use App\Http\Controllers\Web\LectureController;
-use App\Http\Controllers\Web\Lectures\LectureExportController;
-use App\Http\Controllers\Web\Lectures\LectureImportController;
-use App\Http\Controllers\Web\Lectures\LecturerGpaController;
+use App\Modules\Academic\FacultyWorkforce\Http\Web\LectureController;
+use App\Modules\Academic\FacultyWorkforce\Http\Web\LectureExportController;
+use App\Modules\Academic\FacultyWorkforce\Http\Web\LectureImportController;
+use App\Modules\Academic\FacultyWorkforce\Http\Web\LecturerGpaController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth')->group(function () {

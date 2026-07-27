@@ -40,19 +40,15 @@ Route::get('/health', function () {
 
 // @deprecated User routes migrated to App\Modules\Identity\routes\web.php. Remove after 2024-12-31.
 // require __DIR__ . '/web/user.php';
-require __DIR__.'/web/lectures.php';
 // require __DIR__ . '/web/student.php';
 require __DIR__.'/web/failed-students.php';
-require __DIR__.'/web/class-schedule.php';
 require __DIR__.'/web/systems.php';
 require __DIR__.'/web/email-monitoring.php';
 // @deprecated Syllabus template routes migrated to Academic Catalog.
 // Forms, surveys, and student-support routes are owned by Engagement.
 require __DIR__.'/web/scholarships.php';
-require __DIR__.'/web/canvas.php';
 require __DIR__.'/web/student-scholarships.php';
 require __DIR__.'/web/tuition-plans.php';
 require __DIR__.'/web/vouchers.php';
 // require __DIR__ . '/web/surveys.php';
 require __DIR__.'/web/notifications.php';
-require __DIR__.'/web/academic.php';

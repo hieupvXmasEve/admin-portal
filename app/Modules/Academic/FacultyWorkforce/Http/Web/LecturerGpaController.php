@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Web\Lectures;
+namespace App\Modules\Academic\FacultyWorkforce\Http\Web;
 
 use App\Exports\LecturerGpaReportExport;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Lecture\ListLecturerGpaRequest;
-use App\Models\Semester;
+use App\Modules\Academic\Catalog\Queries\GetLecturerGpaSemesterContextQuery;
 use App\Queries\Lecture\ListLecturerGpaQuery;
 use App\Services\ExcelExportService;
 use Illuminate\Support\Facades\Auth;
@@ -18,16 +18,19 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class LecturerGpaController extends Controller
 {
-    public function index(ListLecturerGpaRequest $request, ListLecturerGpaQuery $query): Response
-    {
+    public function index(
+        ListLecturerGpaRequest $request,
+        ListLecturerGpaQuery $query,
+        GetLecturerGpaSemesterContextQuery $semesters,
+    ): Response {
         $currentCampusId = (int) session('current_campus_id');
-        $filters = $this->normalizeFilters($request->validated());
-        $selectedSemester = $this->selectedSemester($filters['semester_id']);
+        $filters = $this->normalizeFilters($request->validated(), $semesters);
+        $selectedSemester = $filters['semester_id'] !== null ? $semesters->find((int) $filters['semester_id']) : null;
 
         return Inertia::render('Lectures/LecturerGpa', [
             'rows' => $query->paginate($filters, $currentCampusId),
             'filters' => $filters,
-            'semesters' => $this->semesterOptions(),
+            'semesters' => $semesters->listAll(),
             'active_semester' => $selectedSemester,
         ]);
     }
@@ -36,10 +39,11 @@ class LecturerGpaController extends Controller
         ListLecturerGpaRequest $request,
         ListLecturerGpaQuery $query,
         ExcelExportService $excelService,
+        GetLecturerGpaSemesterContextQuery $semesters,
     ): BinaryFileResponse {
         $currentCampusId = (int) session('current_campus_id');
-        $filters = $this->normalizeFilters($request->validated());
-        $semester = $this->selectedSemester($filters['semester_id']);
+        $filters = $this->normalizeFilters($request->validated(), $semesters);
+        $semester = $filters['semester_id'] !== null ? $semesters->find((int) $filters['semester_id']) : null;
         $rows = $query->all($filters, $currentCampusId);
 
         $filenamePrefix = 'lecturer_gpa';
@@ -67,11 +71,11 @@ class LecturerGpaController extends Controller
      * @param  array<string, mixed>  $validated
      * @return array<string, mixed>
      */
-    private function normalizeFilters(array $validated): array
+    private function normalizeFilters(array $validated, GetLecturerGpaSemesterContextQuery $semesters): array
     {
         return [
             'search' => $validated['search'] ?? '',
-            'semester_id' => $this->resolveSemesterId($validated['semester_id'] ?? null),
+            'semester_id' => $this->resolveSemesterId($validated['semester_id'] ?? null, $semesters),
             'page' => (int) ($validated['page'] ?? 1),
             'per_page' => (int) ($validated['per_page'] ?? 15),
             'sort' => $validated['sort'] ?? 'lecturer_name',
@@ -79,62 +83,12 @@ class LecturerGpaController extends Controller
         ];
     }
 
-    private function resolveSemesterId(null|string|int $semesterId): ?string
+    private function resolveSemesterId(null|string|int $semesterId, GetLecturerGpaSemesterContextQuery $semesters): ?string
     {
         if ($semesterId !== null && $semesterId !== '') {
             return (string) $semesterId;
         }
 
-        $activeSemester = Semester::getActiveSemester();
-        if ($activeSemester !== null) {
-            return (string) $activeSemester->id;
-        }
-
-        $latestSemester = Semester::query()
-            ->orderByDesc('start_date')
-            ->orderByDesc('id')
-            ->first();
-
-        return $latestSemester ? (string) $latestSemester->id : null;
-    }
-
-    /**
-     * @return array<string, mixed>|null
-     */
-    private function selectedSemester(?string $semesterId): ?array
-    {
-        if ($semesterId === null) {
-            return null;
-        }
-
-        $semester = Semester::query()->find((int) $semesterId);
-
-        if ($semester === null) {
-            return null;
-        }
-
-        return [
-            'id' => $semester->id,
-            'name' => $semester->name,
-            'code' => $semester->code,
-        ];
-    }
-
-    /**
-     * @return array<int, array{id: int, name: string, code: string|null}>
-     */
-    private function semesterOptions(): array
-    {
-        return Semester::query()
-            ->select('id', 'name', 'code')
-            ->orderByDesc('start_date')
-            ->orderByDesc('id')
-            ->get()
-            ->map(fn (Semester $semester): array => [
-                'id' => $semester->id,
-                'name' => $semester->name,
-                'code' => $semester->code,
-            ])
-            ->all();
+        return $semesters->resolveActiveOrLatestId();
     }
 }

@@ -23,8 +23,8 @@ Before a sync:
 - Canvas SIS IDs or login IDs match local student codes;
 - queue and application logs are available for diagnosis.
 
-Use the named routes in `routes/web/canvas.php`; do not build literal URLs in
-new UI code.
+Use the named routes registered in `app/Modules/Academic/routes/web.php`
+(`admin.canvas.*`); do not build literal URLs in new UI code.
 
 ## Course catalog and mapping
 

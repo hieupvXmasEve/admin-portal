@@ -182,6 +182,101 @@ controllers/services/routes and frontend debt with each migrated workflow.
      characterization tests written and confirmed green against the old
      code, then again after the move. Lowered the frozen-route and
      frozen-controller ratchets accordingly; see phase 4b for full detail.
+   - [x] Class Schedule retirement: added first-time characterization
+     coverage (guest redirect, authenticated render), then moved the
+     single static `schedules.index` page route off the frozen
+     `routes/web/class-schedule.php` split file into
+     `App\Modules\Academic\routes\web.php` verbatim (no controller, no
+     permission gate — matches the original). Deleted the now-empty
+     frozen file and its `require` in `routes/web.php`. Lowered the
+     frozen-route ratchet accordingly.
+   - [x] Academic route retirement: added first-time characterization
+     coverage (permission gates, page render, filters, finalize
+     validation, ranking output), then moved `GpaManagementController`,
+     `AcademicReportController`, and `CourseRankingController` off the
+     frozen `routes/web/academic.php` split file into
+     `App\Modules\Academic\Http\Web` alongside the three sibling
+     controllers (`GpaHistoryController`, `PerformanceDashboardController`,
+     `WarningCenterController`) that already lived there; the whole
+     `academic.*` route group now registers from
+     `App\Modules\Academic\routes\web.php`. Replaced all four inline
+     `$request->validate()` calls with FormRequests
+     (`Gpa\PreviewGpaFinalizationRequest`, `Gpa\FinalizeGpaRequest`,
+     `ListAcademicReportRequest`, `ListCourseRankingRequest`). Replaced
+     `GpaManagementController`'s direct `Campus`/`Semester` reads with
+     `CampusReferenceReader` and the existing
+     `Catalog\Queries\GetSemesterFilterOptionsQuery` seam (already used
+     elsewhere in Academic reporting); reusing that seam narrows the
+     semester dropdown to non-archived semesters, a deliberate behavior
+     tweak versus the old unfiltered list. Extracted
+     `CourseRankingController`'s direct `Unit`/`Semester`/`AcademicRecord`
+     reads into a new `Progression\Queries\GetCourseRankingQuery` that
+     reaches `Unit`/`Student` through `AcademicRecord`'s own relations
+     instead of importing those models, so the move added zero new
+     `shared_model_imports` debt. Deleted the three old controller files,
+     the now-empty `app/Http/Controllers/Web/Admin/Academic/` directory,
+     the frozen route file, and its `require` in `routes/web.php`.
+     Fixed `ReportingOwnerReadersArchTest`, which still read the deleted
+     controller path directly. Lowered the frozen-route and
+     frozen-controller ratchets accordingly.
+   - [x] Lecturer route retirement: discovered `App\Modules\Academic\FacultyWorkforce`
+     already exists (owns lecturer-access-eligibility concerns) and is the
+     correct home for `Lecture`, superseding an initial `Delivery` proposal.
+     Added `Lecture` to `owned_shared_models.Academic.FacultyWorkforce`,
+     which also retroactively exempted 9 pre-existing findings from
+     `FacultyWorkforce`'s existing eligibility readers (net -9 on the
+     `shared_model_imports` ratchet). Added first-time characterization
+     coverage (permission gates, CRUD, teaching-hours, import/export
+     envelopes), then moved `LectureController`, `LectureExportController`,
+     `LectureImportController`, and `LecturerGpaController` off the frozen
+     `routes/web/lectures.php` split file into
+     `App\Modules\Academic\FacultyWorkforce\Http\Web`, with a new
+     `FacultyWorkforce\routes\web.php` required from the Academic route
+     aggregator (mirroring the existing Catalog require). Left the
+     controllers' existing `app/Http/Requests/Lecture/*` FormRequests in
+     place (unscanned location, already correct); only authored new
+     FormRequests for the previously-inline-validated import endpoints
+     (`Upload`/`Preview`/`ProcessLectureImportRequest`). Extracted the
+     user-account create/update side effects out of
+     `LectureController::store/update` into
+     `App\Actions\Lecture\{Create,Update}LectureAction` (unscanned
+     location, matches the existing `GetTeachingHoursAction` precedent) so
+     `User` never needs importing from inside the module. Replaced direct
+     `Campus`/`CourseOffering`/`Semester` reads with
+     `CampusReferenceReader`, a new
+     `Delivery\Queries\GetCourseOfferingUnitTypesQuery`, the existing
+     `Catalog\Queries\GetSemesterFilterOptionsQuery`, and a new
+     `Catalog\Queries\GetLecturerGpaSemesterContextQuery` (kept separate
+     from the shared semester-options seam because its active-or-latest
+     fallback and lack of an archived-semester filter are genuinely
+     different behavior) — zero new `shared_model_imports` debt. Replaced
+     `LectureImportController`'s 8 raw `response()->json()` calls with
+     `ApiResponse::compatible()`, which preserves the exact flat
+     `{success, ...}` envelope the frontend already consumes (unlike
+     `ApiResponse::success()`, which would nest the payload under `data`
+     and break the frontend) — this is the established escape hatch for
+     migrating an endpoint's call site without changing its contract.
+     Fixed a second stale reference: `routes/api/admin.php`'s `apiIndex`
+     route still imported the deleted `Web\LectureController`. Found (but
+     left alone, pre-existing and unrelated) one failing
+     `TeachingEligibilityAssignmentBoundaryTest` case: Delivery's
+     `LecturerAssessmentRequest` already imported `Lecture` directly before
+     this move. Lowered the frozen-route and frozen-controller ratchets
+     accordingly.
+   - [x] Canvas route retirement: the frozen `routes/web/canvas.php` split
+     file already registered its 18 routes against already-migrated
+     `App\Modules\Academic\Delivery\Http\Web\Canvas\*` controllers (no
+     controller move needed). Moved the route group verbatim into
+     `app/Modules/Academic/routes/web.php` alongside the other Canvas
+     routes already registered there (grade-sync preview/apply from the
+     course-offerings retirement), deleted the frozen file and its
+     `require` in `routes/web.php`, and updated the two stale
+     `routes/web/canvas.php` path references in
+     `docs/features/canvas/{operations,integration}.md`. Lowered the
+     frozen-route ratchet accordingly. This closes phase-04's remaining
+     route-retirement scope (`class-schedule.php`, `academic.php`,
+     `lectures.php`, `canvas.php` all retired); step 7 (import/export/
+     permission/Canvas parity review) remains open.
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
 7. Review import/export parity, scheduler entries, permissions, and campus scoping.
 

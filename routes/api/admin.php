@@ -8,7 +8,7 @@ use App\Http\Controllers\Api\V1\Admin\EmailConfigurationController;
 use App\Http\Controllers\Api\V1\Admin\EmailController;
 use App\Http\Controllers\Api\V1\Admin\EmailTemplateController;
 use App\Http\Controllers\Web\DashboardController;
-use App\Http\Controllers\Web\LectureController;
+use App\Modules\Academic\FacultyWorkforce\Http\Web\LectureController;
 use App\Modules\Academic\Http\Web\StudentController as WebStudentController;
 use App\Modules\Notification\Http\Api\V1\Admin\NotificationTemplateController as NotificationTemplateApiController;
 use Illuminate\Support\Facades\Route;

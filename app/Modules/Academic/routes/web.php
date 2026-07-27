@@ -6,12 +6,23 @@ use App\Constants\CourseOfferingRoutes;
 use App\Constants\SemesterRoutes;
 use App\Constants\StudentRoutes;
 use App\Modules\Academic\Delivery\Http\Api\ClassSessionController as DeliveryClassSessionApiController;
+use App\Modules\Academic\Http\Web\AcademicReportController;
+use App\Modules\Academic\Http\Web\CourseRankingController;
+use App\Modules\Academic\Http\Web\GpaHistoryController;
+use App\Modules\Academic\Http\Web\GpaManagementController;
+use App\Modules\Academic\Http\Web\PerformanceDashboardController;
+use App\Modules\Academic\Http\Web\WarningCenterController;
 use App\Modules\Academic\Delivery\Http\Web\Admin\CourseOfferingRosterController;
 use App\Modules\Academic\Delivery\Http\Web\Admin\CourseRegistrationController;
 use App\Modules\Academic\Delivery\Http\Web\AttendanceController as DeliveryAttendanceController;
 use App\Modules\Academic\Delivery\Http\Web\AttendanceReportController as DeliveryAttendanceReportController;
 use App\Modules\Academic\Delivery\Http\Web\BulkUpdateClassSessionAttendanceController;
 use App\Modules\Academic\Delivery\Http\Web\BulkUpdateCourseOfferingSessionsController;
+use App\Modules\Academic\Delivery\Http\Web\Canvas\CanvasCourseController;
+use App\Modules\Academic\Delivery\Http\Web\Canvas\CanvasIntegrationController;
+use App\Modules\Academic\Delivery\Http\Web\Canvas\CanvasOAuthController;
+use App\Modules\Academic\Delivery\Http\Web\Canvas\CanvasSyllabusController;
+use App\Modules\Academic\Delivery\Http\Web\Canvas\CanvasSyncController;
 use App\Modules\Academic\Delivery\Http\Web\Canvas\PreviewCanvasGradeSyncController;
 use App\Modules\Academic\Delivery\Http\Web\Canvas\SyncCanvasGradeController;
 use App\Modules\Academic\Delivery\Http\Web\ClassSessionController as DeliveryClassSessionController;
@@ -46,8 +57,10 @@ use App\Modules\Academic\Http\Web\StudentLifecycleYearlyAnalysisController;
 use App\Modules\Academic\Http\Web\StudentStatusController;
 use App\Modules\Academic\Progression\Http\Web\SemesterEnrollmentController;
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
 require __DIR__.'/../Catalog/routes/web.php';
+require __DIR__.'/../FacultyWorkforce/routes/web.php';
 
 Route::model('courseOffering', implode('\\', ['App', 'Models', 'CourseOffering']));
 
@@ -690,3 +703,123 @@ Route::middleware('auth')->group(function () {
         ->middleware('can:edit_semester')
         ->name(SemesterRoutes::API_ENROLLMENT_GENERATE);
 });
+
+Route::middleware(['auth', 'verified'])->name('schedules.')->group(function () {
+    Route::get('/schedule-management', function () {
+        return Inertia::render('ClassSchedule/Index');
+    })->name('index');
+});
+
+Route::middleware(['auth', 'verified'])->prefix('academic')->name('academic.')->group(function () {
+    Route::prefix('gpa')->name('gpa.')->group(function () {
+        Route::get('/finalize', [GpaManagementController::class, 'index'])
+            ->middleware('can:view_gpa_finalization')
+            ->name('finalize.index');
+        Route::post('/finalize', [GpaManagementController::class, 'finalize'])
+            ->middleware('can:create_gpa_finalization')
+            ->name('finalize.store');
+
+        // History & Export
+        Route::get('/history', [GpaHistoryController::class, 'index'])
+            ->middleware('can:view_gpa_history')
+            ->name('history');
+        Route::get('/history/export', [GpaHistoryController::class, 'export'])
+            ->middleware('can:view_gpa_history')
+            ->name('history.export');
+    });
+
+    // Performance Dashboard
+    Route::get('/students/performance', [PerformanceDashboardController::class, 'index'])
+        ->middleware('can:view_performance_dashboard')
+        ->name('students.performance');
+
+    Route::prefix('warnings')->name('warnings.')->group(function () {
+        Route::get('/', [WarningCenterController::class, 'index'])
+            ->name('index');
+        Route::get('/settings', [WarningCenterController::class, 'settings'])
+            ->name('settings');
+        Route::put('/settings', [WarningCenterController::class, 'updateSettings'])
+            ->name('settings.update');
+        Route::post('/academic-standing/{gpaCalculation}/send', [WarningCenterController::class, 'sendAcademicStanding'])
+            ->name('academic-standing.send');
+        Route::post('/attendance/{courseOffering}/{student}/send', [WarningCenterController::class, 'sendAttendance'])
+            ->name('attendance.send');
+    });
+
+    Route::get('/report', [AcademicReportController::class, 'index'])
+        ->middleware('can:view_academic_report')
+        ->name('report.index');
+
+    Route::get('/course-ranking', [CourseRankingController::class, 'index'])
+        ->middleware('can:view_academic_report')
+        ->name('course-ranking.index');
+});
+
+Route::prefix('admin/canvas')
+    ->middleware(['auth', 'verified', 'campus.selected'])
+    ->name('admin.canvas.')
+    ->group(function () {
+        // Canvas Integrations
+        Route::get('/integrations', [CanvasIntegrationController::class, 'index'])
+            ->middleware('can:view_canvas_integration')
+            ->name('integrations.index');
+
+        Route::post('/integrations', [CanvasIntegrationController::class, 'store'])
+            ->middleware('can:create_canvas_integration')
+            ->name('integrations.store');
+
+        Route::delete('/integrations/{integration}', [CanvasIntegrationController::class, 'destroy'])
+            ->middleware('can:delete_canvas_integration')
+            ->name('integrations.destroy');
+
+        Route::post('/integrations/{integration}/toggle', [CanvasIntegrationController::class, 'toggleActive'])
+            ->middleware('can:edit_canvas_integration')
+            ->name('integrations.toggle');
+
+        // OAuth Flow
+        Route::get('/oauth/redirect/{integration}', [CanvasOAuthController::class, 'redirect'])
+            ->name('oauth.redirect');
+
+        Route::get('/oauth/callback', [CanvasOAuthController::class, 'callback'])
+            ->name('oauth.callback');
+
+        Route::post('/oauth/revoke/{integration}', [CanvasOAuthController::class, 'revoke'])
+            ->name('oauth.revoke');
+
+        // Sync
+        Route::post('/sync/{integration}', [CanvasSyncController::class, 'syncCourses'])
+            ->name('sync.courses');
+
+        // Canvas Courses
+        Route::get('/courses', [CanvasCourseController::class, 'index'])
+            ->name('courses.index');
+
+        Route::post('/courses/map', [CanvasCourseController::class, 'mapCourse'])
+            ->name('courses.map');
+
+        Route::post('/courses/{mapping}/unmap', [CanvasCourseController::class, 'unmapCourse'])
+            ->name('courses.unmap');
+
+        Route::post('/courses/{mapping}/ignore', [CanvasCourseController::class, 'ignoreCourse'])
+            ->name('courses.ignore');
+
+        // API endpoint for course offerings dropdown
+        Route::get('/api/course-offerings', [CanvasCourseController::class, 'getAvailableCourseOfferings'])
+            ->name('api.course-offerings');
+
+        // Syllabus sync
+        Route::get('/courses/{mapping}/sync-summary', [CanvasSyllabusController::class, 'getSyncSummary'])
+            ->name('courses.sync-summary');
+
+        // Assignment sync
+        Route::get('/courses/{mapping}/assignments/sync-summary', [CanvasSyllabusController::class, 'getAssignmentSyncSummary'])
+            ->name('courses.assignments.sync-summary');
+        Route::post('/courses/{mapping}/sync-assignments', [CanvasSyllabusController::class, 'syncAssignments'])
+            ->name('courses.sync-assignments');
+
+        // Grade sync
+        Route::get('/courses/{mapping}/grades/sync-summary', [CanvasSyllabusController::class, 'getGradeSyncSummary'])
+            ->name('courses.grades.sync-summary');
+        Route::post('/courses/{mapping}/sync-grades', [CanvasSyllabusController::class, 'syncGrades'])
+            ->name('courses.sync-grades');
+    });

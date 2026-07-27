@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Web\Admin\Academic;
+namespace App\Modules\Academic\Http\Web;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Academic\Http\Requests\ListAcademicReportRequest;
 use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use App\Shared\Contracts\Academic\AcademicReportReader;
 use App\Shared\Contracts\Academic\ProgramReferenceReader;
 use App\Shared\Contracts\Institution\CampusReferenceReader;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -19,7 +19,7 @@ class AcademicReportController extends Controller
      * Display the academic report page.
      */
     public function index(
-        Request $request,
+        ListAcademicReportRequest $request,
         AcademicReportReader $reportReader,
         AcademicPeriodReader $academicPeriods,
         CampusReferenceReader $campuses,
@@ -28,13 +28,7 @@ class AcademicReportController extends Controller
         $activeSemester = $academicPeriods->active();
         $currentCampusId = session('current_campus_id');
 
-        $validated = $request->validate([
-            'campus_id' => ['nullable', 'integer'],
-            'semester_id' => ['nullable', 'integer'],
-            'program_id' => ['nullable', 'integer'],
-            'keyword' => ['nullable', 'string'],
-            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
-        ]);
+        $validated = $request->validated();
 
         // Set defaults if not provided in request
         $filters = array_merge([

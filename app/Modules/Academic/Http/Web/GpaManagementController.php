@@ -2,29 +2,30 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Web\Admin\Academic;
+namespace App\Modules\Academic\Http\Web;
 
 use App\Actions\Academic\CheckGpaFinalizationEligibilityAction;
 use App\Actions\Academic\FinalizeSemesterGpaAction;
 use App\Actions\Academic\PreviewSemesterGpaAction;
 use App\Http\Controllers\Controller;
-use App\Models\Campus;
-use App\Models\Semester;
-use Illuminate\Http\Request;
+use App\Modules\Academic\Catalog\Queries\GetSemesterFilterOptionsQuery;
+use App\Modules\Academic\Http\Requests\Gpa\FinalizeGpaRequest;
+use App\Modules\Academic\Http\Requests\Gpa\PreviewGpaFinalizationRequest;
+use App\Shared\Contracts\Institution\CampusReferenceReader;
+use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class GpaManagementController extends Controller
 {
     public function index(
-        Request $request,
+        PreviewGpaFinalizationRequest $request,
         PreviewSemesterGpaAction $previewAction,
-        CheckGpaFinalizationEligibilityAction $eligibilityAction
+        CheckGpaFinalizationEligibilityAction $eligibilityAction,
+        GetSemesterFilterOptionsQuery $semesterFilterOptions,
+        CampusReferenceReader $campuses,
     ): Response {
-        $validated = $request->validate([
-            'semester_id' => 'nullable|integer|exists:semesters,id',
-            'campus_id' => 'nullable|integer|exists:campuses,id',
-        ]);
+        $validated = $request->validated();
 
         $semesterId = $validated['semester_id'] ?? null;
         $campusId = $validated['campus_id'] ?? session('current_campus_id');
@@ -38,8 +39,11 @@ class GpaManagementController extends Controller
         }
 
         return Inertia::render('Admin/Academic/Gpa/Index', [
-            'semesters' => Semester::orderBy('start_date', 'desc')->get(),
-            'campuses' => Campus::all(),
+            'semesters' => $semesterFilterOptions->handle()['semesters'],
+            'campuses' => collect($campuses->all())
+                ->map(static fn ($campus): array => ['id' => $campus->id, 'name' => $campus->name])
+                ->values()
+                ->all(),
             'default_campus_id' => session('current_campus_id'),
             'filters' => [
                 'semester_id' => $semesterId,
@@ -50,19 +54,16 @@ class GpaManagementController extends Controller
         ]);
     }
 
-    public function finalize(Request $request, FinalizeSemesterGpaAction $action): \Illuminate\Http\RedirectResponse
+    public function finalize(FinalizeGpaRequest $request, FinalizeSemesterGpaAction $action): RedirectResponse
     {
-        $request->validate([
-            'semester_id' => 'required|exists:semesters,id',
-            'campus_id' => 'nullable|exists:campuses,id',
-        ]);
+        $validated = $request->validated();
 
         // In a real app, authorized admin's lecture ID or user ID would be used.
         // For this project context, we'll assume the current user is an admin.
         $adminId = auth()->id();
-        $campusId = $request->campus_id ?? session('current_campus_id');
+        $campusId = $validated['campus_id'] ?? session('current_campus_id');
 
-        $result = $action->execute($request->semester_id, (int) $adminId, (int) $campusId);
+        $result = $action->execute($validated['semester_id'], (int) $adminId, (int) $campusId);
 
         if (($result['success'] ?? true) === false) {
             return back()->withErrors(['finalize' => $result['message']]);

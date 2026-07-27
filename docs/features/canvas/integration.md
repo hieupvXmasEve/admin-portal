@@ -35,7 +35,7 @@ Executable owners:
 - `app/Services/Canvas/CanvasApiService.php`
 - `app/Services/Canvas/CanvasTokenService.php`
 - `app/Services/Canvas/CanvasSyncService.php`
-- `routes/web/canvas.php`
+- `app/Modules/Academic/routes/web.php` (`admin.canvas.*` routes)
 
 Client secrets, access tokens, and refresh tokens are encrypted by the
 `CanvasIntegration` model and hidden from serialization. OAuth state is stored
@@ -75,7 +75,7 @@ than stored in those environment variables.
 5. Open the Canvas courses page and map each required Canvas course to exactly
    one local course offering.
 
-Route permissions are declared in `routes/web/canvas.php` and
+Route permissions are declared in `app/Modules/Academic/routes/web.php` and
 `config/permission.php`. Integration creation, editing, deletion, course sync,
 and course mapping use distinct permissions; do not replace them with a broad
 Canvas-admin check.

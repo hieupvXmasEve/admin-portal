@@ -2,10 +2,12 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Web;
+namespace App\Modules\Academic\FacultyWorkforce\Http\Web;
 
+use App\Actions\Lecture\CreateLectureAction;
 use App\Actions\Lecture\GetLectureTeachingDetailsAction;
 use App\Actions\Lecture\GetTeachingHoursAction;
+use App\Actions\Lecture\UpdateLectureAction;
 use App\Constants\LectureRoutes;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Lecture\LectureStatisticsRequest;
@@ -17,43 +19,36 @@ use App\Http\Requests\Lecture\UpdateLectureRequest;
 use App\Http\Requests\Lecture\ViewLectureTeachingDetailsRequest;
 use App\Http\Requests\Lecture\ViewTeachingHoursRequest;
 use App\Http\Responses\ApiResponse;
-use App\Models\Campus;
-use App\Models\CourseOffering;
 use App\Models\Lecture;
-use App\Models\Semester;
-use App\Models\User;
+use App\Modules\Academic\Catalog\Queries\GetSemesterFilterOptionsQuery;
+use App\Modules\Academic\Delivery\Queries\GetCourseOfferingUnitTypesQuery;
 use App\Queries\Lecture\ListLecturesQuery;
-use App\Shared\Support\Enums\UserType;
+use App\Shared\Contracts\Institution\CampusReferenceReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Redirect;
-use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class LectureController extends Controller
 {
-    public function __construct()
-    {
-        // $this->middleware('can:view_lecturer')->only(['index', 'show']);
-        // $this->middleware('can:create_lecturer')->only(['create', 'store']);
-        // $this->middleware('can:edit_lecturer')->only(['edit', 'update']);
-        // $this->middleware('can:delete_lecturer')->only(['destroy']);
-    }
-
     /**
      * Display a listing of lectures
      */
-    public function index(ListLecturesRequest $request, ListLecturesQuery $query): Response
-    {
+    public function index(
+        ListLecturesRequest $request,
+        ListLecturesQuery $query,
+        GetSemesterFilterOptionsQuery $semesterFilterOptions,
+        GetCourseOfferingUnitTypesQuery $unitTypes,
+    ): Response {
         $currentCampusId = (int) session('current_campus_id');
         $validated = $request->validated();
+        $semesterOptions = $semesterFilterOptions->handle();
+
         $filters = [
             'search' => $validated['search'] ?? '',
             'campus_id' => $validated['campus_id'] ?? 'all',
-            'semester_id' => $this->resolveLectureSemesterFilter($validated['semester_id'] ?? null),
+            'semester_id' => $this->resolveLectureSemesterFilter($validated['semester_id'] ?? null, $semesterOptions['active_semester_id']),
             'unit_type' => $validated['unit_type'] ?? 'all',
             'employment_status' => $validated['employment_status'] ?? 'all',
             'employment_type' => $validated['employment_type'] ?? 'all',
@@ -69,10 +64,14 @@ class LectureController extends Controller
         return Inertia::render('Lectures/Index', [
             'lectures' => $lectures,
             'filters' => $filters,
-            'semesters' => Semester::select('id', 'name', 'code')
-                ->orderBy('start_date', 'desc')
-                ->get(),
-            'unitTypeOptions' => $this->getLectureUnitTypeOptions($currentCampusId),
+            'semesters' => $semesterOptions['semesters'],
+            'unitTypeOptions' => collect($unitTypes->handle($currentCampusId))
+                ->map(fn (string $type): array => [
+                    'value' => $type,
+                    'label' => $this->getUnitTypeLabel($type),
+                ])
+                ->values()
+                ->all(),
             'employmentStatusOptions' => [
                 ['value' => 'active', 'label' => 'Active'],
                 ['value' => 'on_leave', 'label' => 'On Leave'],
@@ -91,35 +90,13 @@ class LectureController extends Controller
         ]);
     }
 
-    private function resolveLectureSemesterFilter(null|string|int $semesterId): string
+    private function resolveLectureSemesterFilter(null|string|int $semesterId, ?int $activeSemesterId): string
     {
         if ($semesterId !== null && $semesterId !== '') {
             return (string) $semesterId;
         }
 
-        $activeSemester = Semester::getActiveSemester();
-
-        return $activeSemester ? (string) $activeSemester->id : 'all';
-    }
-
-    /**
-     * @return array<int, array{value: string, label: string}>
-     */
-    private function getLectureUnitTypeOptions(int $campusId): array
-    {
-        return CourseOffering::query()
-            ->join('units', 'course_offerings.unit_id', '=', 'units.id')
-            ->where('course_offerings.campus_id', $campusId)
-            ->whereNotNull('units.unit_type')
-            ->distinct()
-            ->orderBy('units.unit_type')
-            ->pluck('units.unit_type')
-            ->map(fn (string $type): array => [
-                'value' => $type,
-                'label' => $this->getUnitTypeLabel($type),
-            ])
-            ->values()
-            ->all();
+        return $activeSemesterId !== null ? (string) $activeSemesterId : 'all';
     }
 
     private function getUnitTypeLabel(string $type): string
@@ -141,13 +118,15 @@ class LectureController extends Controller
     /**
      * Show the form for creating a new lecture
      */
-    public function create(): Response
+    public function create(CampusReferenceReader $campuses): Response
     {
         $currentCampusId = session('current_campus_id');
-        $campuses = Campus::orderBy('name')->get(['id', 'name']);
 
         return Inertia::render('Lectures/Create', [
-            'campuses' => $campuses,
+            'campuses' => collect($campuses->all())
+                ->map(static fn ($campus): array => ['id' => $campus->id, 'name' => $campus->name])
+                ->values()
+                ->all(),
             'currentCampusId' => $currentCampusId,
         ]);
     }
@@ -155,50 +134,9 @@ class LectureController extends Controller
     /**
      * Store a newly created lecture
      */
-    public function store(StoreLectureRequest $request): RedirectResponse
+    public function store(StoreLectureRequest $request, CreateLectureAction $action): RedirectResponse
     {
-        $validated = $request->validated();
-
-        DB::transaction(function () use ($validated, &$lecture) {
-            // Extract password if provided (remove from validated to avoid storing in Lecture)
-            $password = $validated['password'] ?? null;
-            unset($validated['password']);
-
-            // Create or find User record
-            $user = User::firstOrCreate(
-                ['email' => $validated['email']],
-                [
-                    'name' => trim(($validated['first_name'] ?? '').' '.($validated['last_name'] ?? '')),
-                    'email' => $validated['email'],
-                    'phone' => $validated['phone'] ?? null,
-                    'password' => Hash::make($password ?? Str::random(16)),
-                    'type' => UserType::LECTURER,
-                    'status' => User::STATUS_ACTIVE,
-                ]
-            );
-
-            // Update user type if it was created with different type
-            if ($user->type !== UserType::LECTURER) {
-                $user->update(['type' => UserType::LECTURER]);
-            }
-
-            // Update user fields from lecture data
-            $user->update([
-                'name' => trim(($validated['first_name'] ?? '').' '.($validated['last_name'] ?? '')),
-                'phone' => $validated['phone'] ?? $user->phone,
-            ]);
-
-            // Update password if provided
-            if ($password !== null) {
-                $user->update(['password' => Hash::make($password)]);
-            }
-
-            // Set user_id in validated data
-            $validated['user_id'] = $user->id;
-
-            // Create lecture record
-            $lecture = Lecture::create($validated);
-        });
+        $action->execute($request->validated());
 
         return Redirect::route(LectureRoutes::INDEX)
             ->with('success', 'Lecturer created successfully.');
@@ -223,60 +161,23 @@ class LectureController extends Controller
     /**
      * Show the form for editing the specified lecture
      */
-    public function edit(Lecture $lecture): Response
+    public function edit(Lecture $lecture, CampusReferenceReader $campuses): Response
     {
-        $campuses = Campus::orderBy('name')->get(['id', 'name']);
-
         return Inertia::render('Lectures/Edit', [
             'lecture' => $lecture,
-            'campuses' => $campuses,
+            'campuses' => collect($campuses->all())
+                ->map(static fn ($campus): array => ['id' => $campus->id, 'name' => $campus->name])
+                ->values()
+                ->all(),
         ]);
     }
 
     /**
      * Update the specified lecture
      */
-    public function update(UpdateLectureRequest $request, Lecture $lecture): RedirectResponse
+    public function update(UpdateLectureRequest $request, Lecture $lecture, UpdateLectureAction $action): RedirectResponse
     {
-        $validated = $request->validated();
-
-        DB::transaction(function () use ($validated, $lecture) {
-            // Extract password if provided (remove from validated to avoid storing in Lecture)
-            $password = $validated['password'] ?? null;
-            unset($validated['password']);
-
-            // Get or create User record
-            $user = $lecture->user;
-
-            if (! $user) {
-                // Create new User if doesn't exist
-                $user = User::create([
-                    'name' => trim(($validated['first_name'] ?? '').' '.($validated['last_name'] ?? '')),
-                    'email' => $validated['email'],
-                    'phone' => $validated['phone'] ?? null,
-                    'password' => Hash::make($password ?? Str::random(16)),
-                    'type' => UserType::LECTURER,
-                    'status' => User::STATUS_ACTIVE,
-                ]);
-                $validated['user_id'] = $user->id;
-            } else {
-                // Update existing User
-                $user->update([
-                    'name' => trim(($validated['first_name'] ?? '').' '.($validated['last_name'] ?? '')),
-                    'email' => $validated['email'],
-                    'phone' => $validated['phone'] ?? $user->phone,
-                    'type' => UserType::LECTURER, // Ensure type is lecturer
-                ]);
-
-                // Update password if provided
-                if ($password !== null) {
-                    $user->update(['password' => Hash::make($password)]);
-                }
-            }
-
-            // Update lecture record
-            $lecture->update($validated);
-        });
+        $action->execute($lecture, $request->validated());
 
         return Redirect::route(LectureRoutes::INDEX)
             ->with('success', 'Lecturer updated successfully.');
@@ -287,7 +188,6 @@ class LectureController extends Controller
      */
     public function destroy(Lecture $lecture): RedirectResponse
     {
-        // Check if lecture has any course offerings assigned
         if ($lecture->courseOfferings()->count() > 0) {
             return Redirect::back()
                 ->with('error', 'Cannot delete lecture with assigned course offerings.');
@@ -349,7 +249,6 @@ class LectureController extends Controller
         $query = Lecture::with(['campus'])
             ->where('campus_id', $validated['campus_id'] ?? session('current_campus_id'));
 
-        // Apply filters using converted boolean values
         if ($isActive !== null) {
             $query->where('is_active', $isActive);
         }
@@ -377,7 +276,6 @@ class LectureController extends Controller
             });
         }
 
-        // Default to active lecturers if not specified
         if ($isActive === null) {
             $query->where('is_active', true);
         }
@@ -418,8 +316,11 @@ class LectureController extends Controller
     /**
      * Display teaching hours report for lecturers
      */
-    public function teachingHours(ViewTeachingHoursRequest $request, GetTeachingHoursAction $action): Response
-    {
+    public function teachingHours(
+        ViewTeachingHoursRequest $request,
+        GetTeachingHoursAction $action,
+        GetSemesterFilterOptionsQuery $semesterFilterOptions,
+    ): Response {
         $currentCampusId = session('current_campus_id');
 
         $validated = $request->validated();
@@ -427,18 +328,14 @@ class LectureController extends Controller
 
         $results = $action->execute($filters, (int) $currentCampusId);
 
-        // Get semesters for filter dropdown
-        $semesters = Semester::select('id', 'name', 'code', 'start_date', 'end_date', 'is_active')
-            ->orderBy('start_date', 'desc')
-            ->get()
-            ->map(function ($semester) {
-                return [
-                    'id' => $semester->id,
-                    'name' => $semester->name,
-                    'code' => $semester->code,
-                    'is_active' => $semester->is_active,
-                ];
-            });
+        $semesterOptions = $semesterFilterOptions->handle();
+        $semesters = collect($semesterOptions['semesters'])
+            ->map(fn ($semester): array => [
+                'id' => $semester->id,
+                'name' => $semester->name,
+                'code' => $semester->code,
+                'is_active' => $semester->id === $semesterOptions['active_semester_id'],
+            ]);
 
         return Inertia::render('Lectures/TeachingHours', [
             'lecturers' => $results,
@@ -454,7 +351,6 @@ class LectureController extends Controller
     {
         $validated = $request->validated();
 
-        // Set default dates if not provided
         if (! isset($validated['date_from'])) {
             $validated['date_from'] = now()->subMonth()->day(16)->format('Y-m-d');
         }
@@ -464,7 +360,6 @@ class LectureController extends Controller
 
         $results = $action->execute($lecture->id, $validated);
 
-        // Unit types for filter
         $unitTypes = [
             ['value' => 'general', 'label' => 'General'],
             ['value' => 'egc', 'label' => 'EGC'],

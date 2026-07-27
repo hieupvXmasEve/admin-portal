@@ -2,12 +2,15 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Web\Lectures;
+namespace App\Modules\Academic\FacultyWorkforce\Http\Web;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Lecture\PreviewLectureImportRequest;
+use App\Http\Requests\Lecture\ProcessLectureImportRequest;
+use App\Http\Requests\Lecture\UploadLectureImportFileRequest;
+use App\Http\Responses\ApiResponse;
 use App\Services\LectureExcelImportService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -36,7 +39,7 @@ class LectureImportController extends Controller
         ]);
     }
 
-    public function uploadFile(Request $request): JsonResponse
+    public function uploadFile(UploadLectureImportFileRequest $request): JsonResponse
     {
         Log::info('Lecture import upload request received', [
             'has_file' => $request->hasFile('file'),
@@ -46,10 +49,7 @@ class LectureImportController extends Controller
             'user_id' => Auth::id(),
         ]);
 
-        $request->validate([
-            'file' => 'required|file|mimes:xlsx,xls|max:2048', // 2MB max to match PHP limits
-            'duplicate_handling' => 'nullable|in:skip,update,error',
-        ]);
+        $request->validated();
 
         try {
             $file = $request->file('file');
@@ -86,7 +86,7 @@ class LectureImportController extends Controller
                     'upload_dir' => $uploadDir,
                 ]);
 
-                return response()->json([
+                return ApiResponse::compatible([
                     'success' => false,
                     'error' => 'Failed to save uploaded file',
                 ], Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -102,7 +102,7 @@ class LectureImportController extends Controller
                     'estimated_lecturers' => $preview['estimated_lecturers'],
                 ]);
 
-                return response()->json([
+                return ApiResponse::compatible([
                     'success' => true,
                     'file_path' => $path,
                     'preview' => $preview,
@@ -119,7 +119,7 @@ class LectureImportController extends Controller
                     'file_cleaned_up' => true,
                 ]);
 
-                return response()->json([
+                return ApiResponse::compatible([
                     'success' => false,
                     'error' => 'File validation failed: '.$validationException->getMessage(),
                 ], Response::HTTP_BAD_REQUEST);
@@ -129,19 +129,16 @@ class LectureImportController extends Controller
                 'user_id' => Auth::id(),
             ]);
 
-            return response()->json([
+            return ApiResponse::compatible([
                 'success' => false,
                 'error' => $e->getMessage(),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
-    public function previewImport(Request $request): JsonResponse
+    public function previewImport(PreviewLectureImportRequest $request): JsonResponse
     {
-        $request->validate([
-            'file_path' => 'required|string',
-            'preview_rows' => 'nullable|integer|min:1|max:50',
-        ]);
+        $request->validated();
 
         try {
             $fullPath = storage_path('app/'.$request->file_path);
@@ -149,7 +146,7 @@ class LectureImportController extends Controller
 
             $preview = $this->importService->previewImportData($fullPath, $previewRows);
 
-            return response()->json([
+            return ApiResponse::compatible([
                 'success' => true,
                 'preview' => $preview,
             ]);
@@ -159,19 +156,16 @@ class LectureImportController extends Controller
                 'file_path' => $request->file_path,
             ]);
 
-            return response()->json([
+            return ApiResponse::compatible([
                 'success' => false,
                 'error' => $e->getMessage(),
             ], Response::HTTP_BAD_REQUEST);
         }
     }
 
-    public function processImport(Request $request): JsonResponse
+    public function processImport(ProcessLectureImportRequest $request): JsonResponse
     {
-        $request->validate([
-            'file_path' => 'required|string',
-            'duplicate_handling' => 'nullable|in:skip,update,error',
-        ]);
+        $request->validated();
 
         $startTime = microtime(true);
 
@@ -212,7 +206,7 @@ class LectureImportController extends Controller
                 'summary' => $result['summary'],
             ]);
 
-            return response()->json([
+            return ApiResponse::compatible([
                 'success' => true,
                 'result' => $result,
             ]);
@@ -233,7 +227,7 @@ class LectureImportController extends Controller
                 Log::info('Temporary lecture import file cleaned up after error', ['path' => $fullPath]);
             }
 
-            return response()->json([
+            return ApiResponse::compatible([
                 'success' => false,
                 'error' => $e->getMessage(),
                 'processing_time' => $processingTime.' seconds',

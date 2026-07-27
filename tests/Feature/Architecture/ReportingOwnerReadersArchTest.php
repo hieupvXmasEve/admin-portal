@@ -45,7 +45,7 @@ it('keeps reporting adapters free of state-changing application calls', function
     $files = [
         base_path('app/Http/Controllers/Web/DashboardController.php'),
         base_path('app/Http/Controllers/Api/V1/Student/DashboardController.php'),
-        base_path('app/Http/Controllers/Web/Admin/Academic/AcademicReportController.php'),
+        base_path('app/Modules/Academic/Http/Web/AcademicReportController.php'),
         base_path('app/Http/Controllers/Api/Admin/AcademicReportController.php'),
     ];
 
