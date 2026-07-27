@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use App\Constants\CourseOfferingRoutes;
-use App\Modules\Academic\Http\Web\Canvas\PreviewCanvasGradeSyncController;
-use App\Modules\Academic\Http\Web\Canvas\SyncCanvasGradeController;
+use App\Modules\Academic\Delivery\Http\Web\Canvas\PreviewCanvasGradeSyncController;
+use App\Modules\Academic\Delivery\Http\Web\Canvas\SyncCanvasGradeController;
 use App\Modules\Academic\Http\Web\FinalizeCourseOfferingController;
 use App\Modules\Academic\Http\Web\RecalculateApplyController;
 use App\Modules\Academic\Http\Web\RecalculatePreviewController;

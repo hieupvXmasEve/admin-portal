@@ -16,6 +16,7 @@ use App\Modules\Academic\Catalog\Support\EloquentCurriculumModuleCompositionRead
 use App\Modules\Academic\Catalog\Support\EloquentProgramReferenceReader;
 use App\Modules\Academic\Catalog\Support\SemesterAcademicPeriodReader;
 use App\Modules\Academic\Delivery\Actions\CommitCourseResultsAndTranscriptEntriesAction;
+use App\Modules\Academic\Delivery\Support\AssessmentGradeExcelService;
 use App\Modules\Academic\Delivery\Support\DeliveryAssessmentDefinitionWriter;
 use App\Modules\Academic\Delivery\Support\DeliveryInstructorAssignmentWriter;
 use App\Modules\Academic\Delivery\Support\EloquentAcademicSpaceOccupancyReader;
@@ -51,7 +52,6 @@ use App\Modules\Academic\Support\AiAcademicMetricReader as ModuleAiAcademicMetri
 use App\Modules\Academic\Support\AiAcademicStudentProfileReader as ModuleAiAcademicStudentProfileReader;
 use App\Modules\Academic\Support\CampusBuildingCountReader as ModuleCampusBuildingCountReader;
 use App\Modules\Academic\Support\StudentLifecycleStatusReader as ModuleStudentLifecycleStatusReader;
-use App\Services\AssessmentGradeExcelService;
 use App\Services\V1\Student\DashboardService;
 use App\Shared\Contracts\Academic\AcademicFinanceChargeSourceGateway;
 use App\Shared\Contracts\Academic\AcademicPeriodReader;

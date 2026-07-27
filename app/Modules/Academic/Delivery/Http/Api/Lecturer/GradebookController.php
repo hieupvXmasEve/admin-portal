@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Delivery\Http\Api\Lecturer;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Api\V1\Lecturer\SaveGradebookScoresRequest;
 use App\Http\Responses\ApiResponse;
 use App\Models\CourseOffering;
 use App\Modules\Academic\Delivery\Actions\SaveLecturerGradebookScoresAction;
+use App\Modules\Academic\Delivery\Http\Requests\Api\V1\Lecturer\SaveGradebookScoresRequest;
 use App\Modules\Academic\Delivery\Queries\GetLecturerCourseGradebookQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

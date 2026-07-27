@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Delivery\Http\Api\Student;
 
 use App\Http\Controllers\Controller;
-use App\Http\Resources\Api\V1\Student\AttendanceReportResource;
-// use App\Http\Resources\Api\V1\Student\CourseAttendanceResource;
 use App\Http\Responses\ApiResponse;
+// use App\Http\Resources\Api\V1\Student\CourseAttendanceResource;
 use App\Models\Student;
+use App\Modules\Academic\Delivery\Http\Requests\StudentAttendanceFilterRequest;
+use App\Modules\Academic\Delivery\Http\Requests\StudentAttendanceRequest;
+use App\Modules\Academic\Delivery\Http\Requests\StudentAttendanceSemesterRequest;
+use App\Modules\Academic\Delivery\Http\Resources\Api\V1\Student\AttendanceReportResource;
 use App\Modules\Academic\Delivery\Queries\GetStudentAttendanceQuery;
-use App\Modules\Academic\Http\Requests\Delivery\StudentAttendanceFilterRequest;
-use App\Modules\Academic\Http\Requests\Delivery\StudentAttendanceRequest;
-use App\Modules\Academic\Http\Requests\Delivery\StudentAttendanceSemesterRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
 

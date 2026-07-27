@@ -5,14 +5,15 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Delivery\Http\Api\Lecturer;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Api\V1\Lecturer\ExportAssessmentRequest;
 use App\Http\Responses\ApiResponse;
 use App\Models\CourseOffering;
+use App\Modules\Academic\Delivery\Http\Requests\Api\V1\Lecturer\ExportAssessmentRequest;
 use App\Modules\Academic\Delivery\Support\AssessmentExportService;
 use App\Modules\Academic\Delivery\Support\AssessmentReportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class AssessmentReportController extends Controller
@@ -70,9 +71,9 @@ class AssessmentReportController extends Controller
             // Get filters from request
             $filters = [
                 'include_excluded' => $request->boolean('include_excluded', false),
-//                'score_status' => $request->input('score_status', 'final'),
-//                'student_ids' => $request->input('student_ids', []),
-//                'component_ids' => $request->input('component_ids', []),
+                //                'score_status' => $request->input('score_status', 'final'),
+                //                'student_ids' => $request->input('student_ids', []),
+                //                'component_ids' => $request->input('component_ids', []),
             ];
 
             $gradeMatrix = $this->assessmentReportService->generateGradeMatrix($courseOffering, $filters);
@@ -164,13 +165,13 @@ class AssessmentReportController extends Controller
             $filePath = $this->assessmentExportService->exportToExcel($courseOffering, $filters);
 
             // Generate download filename
-            $downloadName = 'assessment_export_' . $courseOffering->course_code . '_' . now()->format('Y-m-d_H-i-s') . '.xlsx';
+            $downloadName = 'assessment_export_'.$courseOffering->course_code.'_'.now()->format('Y-m-d_H-i-s').'.xlsx';
 
             // Return file download response
             return response()->download($filePath, $downloadName, [
                 'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             ])->deleteFileAfterSend(true);
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return ApiResponse::validationError($e->errors());
         } catch (\Exception $e) {
             return ApiResponse::serverError('Failed to export to Excel');
@@ -194,13 +195,13 @@ class AssessmentReportController extends Controller
             $filePath = $this->assessmentExportService->exportToPdf($courseOffering, $options);
 
             // Generate download filename
-            $downloadName = 'assessment_report_' . $courseOffering->course_code . '_' . now()->format('Y-m-d_H-i-s') . '.pdf';
+            $downloadName = 'assessment_report_'.$courseOffering->course_code.'_'.now()->format('Y-m-d_H-i-s').'.pdf';
 
             // Return file download response
             return response()->download($filePath, $downloadName, [
                 'Content-Type' => 'application/pdf',
             ])->deleteFileAfterSend(true);
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return ApiResponse::validationError($e->errors());
         } catch (\Exception $e) {
             return ApiResponse::serverError('Failed to export to PDF');

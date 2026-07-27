@@ -8,7 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
 use App\Models\CourseOffering;
 use App\Modules\Academic\Delivery\Actions\BulkUpdateCourseOfferingSessionsAction;
-use App\Modules\Academic\Http\Requests\Delivery\BulkUpdateCourseOfferingSessionsRequest;
+use App\Modules\Academic\Delivery\Http\Requests\BulkUpdateCourseOfferingSessionsRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Log;

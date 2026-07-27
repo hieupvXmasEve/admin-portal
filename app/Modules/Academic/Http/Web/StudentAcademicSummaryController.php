@@ -10,11 +10,13 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Student\GetRegistrationsRequest;
 use App\Http\Responses\ApiResponse;
 use App\Models\Student;
+use App\Modules\Academic\Delivery\Http\Requests\GetStudentHubCourseScoresRequest;
+use App\Modules\Academic\Delivery\Http\Requests\GetStudentHubScoreDetailsRequest;
+use App\Modules\Academic\Delivery\Queries\GetStudentAcademicAttendanceDetailsQuery;
+use App\Modules\Academic\Delivery\Queries\GetStudentAcademicAttendanceSummaryQuery;
 use App\Modules\Academic\Delivery\Queries\GetStudentHubCourseScoresQuery;
 use App\Modules\Academic\Delivery\Queries\GetStudentHubScoreDetailsQuery;
 use App\Modules\Academic\Exports\StudentAcademicSummaryExport;
-use App\Modules\Academic\Http\Requests\Delivery\GetStudentHubCourseScoresRequest;
-use App\Modules\Academic\Http\Requests\Delivery\GetStudentHubScoreDetailsRequest;
 use App\Modules\Academic\Progression\Actions\AttachDecisionToTransitionAction;
 use App\Modules\Academic\Progression\Queries\GetStudentAcademicSummaryExportQuery;
 use App\Modules\Academic\Progression\Queries\GetStudentGraduationProgressQuery;
@@ -22,8 +24,6 @@ use App\Modules\Academic\Progression\Queries\GetStudentHubOverviewQuery;
 use App\Modules\Academic\Progression\Queries\GetStudentHubScoresQuery;
 use App\Modules\Academic\Progression\Queries\GetStudentLifecycleTimelineQuery;
 use App\Modules\Academic\Progression\Queries\GetStudentRegistrationsQuery;
-use App\Modules\Academic\Queries\GetStudentAttendanceDetailsQuery;
-use App\Modules\Academic\Queries\GetStudentAttendanceQuery;
 use App\Modules\Academic\Support\LifecycleFormOptions;
 use App\Services\ExcelExportService;
 use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
@@ -213,7 +213,7 @@ class StudentAcademicSummaryController extends Controller
      * @param  Student  $student  The student to display attendance for
      * @return Response Inertia response with attendance data
      */
-    public function attendance(Student $student, GetStudentAttendanceQuery $query): Response
+    public function attendance(Student $student, GetStudentAcademicAttendanceSummaryQuery $query): Response
     {
         $attendanceData = $query->execute($student);
 
@@ -418,7 +418,7 @@ class StudentAcademicSummaryController extends Controller
      * @param  Request  $request  Request containing unit filter
      * @return JsonResponse Detailed attendance data
      */
-    public function getAttendanceDetails(Student $student, Request $request, GetStudentAttendanceDetailsQuery $query): JsonResponse
+    public function getAttendanceDetails(Student $student, Request $request, GetStudentAcademicAttendanceDetailsQuery $query): JsonResponse
     {
         $validated = $request->validate([
             'unit_id' => 'required|exists:units,id',

@@ -6,7 +6,7 @@ namespace App\Exports;
 
 use App\Models\AssessmentComponentDetail;
 use App\Models\CourseOffering;
-use App\Services\AssessmentGradeExcelService;
+use App\Modules\Academic\Delivery\Support\AssessmentGradeExcelService;
 use Illuminate\Database\Eloquent\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;

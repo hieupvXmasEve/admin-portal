@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands\Academic;
 
-use App\Modules\Academic\Actions\RemediateEgcAttendanceFailuresAction;
+use App\Modules\Academic\Delivery\Actions\RemediateEgcAttendanceFailuresAction;
 use Illuminate\Console\Command;
 
 class RemediateEgcAttendanceFailuresCommand extends Command

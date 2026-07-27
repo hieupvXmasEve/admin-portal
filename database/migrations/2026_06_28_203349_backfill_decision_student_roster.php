@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Modules\Academic\Actions\BackfillDecisionStudentRosterAction;
+use App\Modules\Academic\Delivery\Actions\BackfillDecisionStudentRosterAction;
 use Illuminate\Database\Migrations\Migration;
 
 return new class extends Migration

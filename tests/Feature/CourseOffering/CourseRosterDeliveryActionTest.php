@@ -488,7 +488,7 @@ it('removes a roster member through Delivery and releases their counted seat', f
         'credit_hours' => 3,
     ]);
 
-    RemoveStudentFromCourseOfferingAction::run($registration->id);
+    RemoveStudentFromCourseOfferingAction::run($registration->id, $this->campus->id);
 
     expect(CourseRegistration::query()->find($registration->id))->toBeNull()
         ->and($offering->fresh()->current_enrollment)->toBe(0)

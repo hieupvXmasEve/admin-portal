@@ -12,7 +12,7 @@ use App\Models\AssessmentComponentDetailScore;
 use App\Models\CanvasCourseMapping;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
-use App\Services\Canvas\CanvasApiService;
+use App\Modules\Academic\Delivery\Support\Canvas\CanvasApiService;
 use App\Shared\Contracts\Academic\CourseOfferingCatalogReader;
 use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;

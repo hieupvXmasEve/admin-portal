@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-use App\Http\Controllers\Web\Canvas\CanvasIntegrationController;
-use App\Http\Controllers\Web\Canvas\CanvasOAuthController;
-use App\Http\Controllers\Web\Canvas\CanvasSyncController;
-use App\Http\Controllers\Web\Canvas\CanvasCourseController;
-use App\Http\Controllers\Web\Canvas\CanvasSyllabusController;
+use App\Modules\Academic\Delivery\Http\Web\Canvas\CanvasCourseController;
+use App\Modules\Academic\Delivery\Http\Web\Canvas\CanvasIntegrationController;
+use App\Modules\Academic\Delivery\Http\Web\Canvas\CanvasOAuthController;
+use App\Modules\Academic\Delivery\Http\Web\Canvas\CanvasSyllabusController;
+use App\Modules\Academic\Delivery\Http\Web\Canvas\CanvasSyncController;
 use Illuminate\Support\Facades\Route;
 
 // 'canvas' => [

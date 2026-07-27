@@ -10,8 +10,8 @@ use App\Models\CourseRegistration;
 use App\Models\GpaCalculation;
 use App\Models\Student;
 use App\Models\StudentActionLog;
+use App\Modules\Academic\Delivery\Queries\GetStudentAcademicAttendanceSummaryQuery;
 use App\Modules\Academic\Queries\GetStudentActionHistoryQuery;
-use App\Modules\Academic\Queries\GetStudentAttendanceQuery;
 use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use App\Shared\Contracts\Academic\AiAcademicStudentProfileReader as AiAcademicStudentProfileReaderContract;
 use Illuminate\Database\Eloquent\Collection;
@@ -19,7 +19,7 @@ use Illuminate\Database\Eloquent\Collection;
 class AiAcademicStudentProfileReader implements AiAcademicStudentProfileReaderContract
 {
     public function __construct(
-        private readonly GetStudentAttendanceQuery $attendanceQuery,
+        private readonly GetStudentAcademicAttendanceSummaryQuery $attendanceQuery,
         private readonly GetStudentActionHistoryQuery $actionHistoryQuery,
         private readonly AcademicPeriodReader $academicPeriods,
     ) {}

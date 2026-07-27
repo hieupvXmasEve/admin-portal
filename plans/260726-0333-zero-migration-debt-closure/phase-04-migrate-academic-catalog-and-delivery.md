@@ -49,7 +49,7 @@ controllers/services/routes and frontend debt with each migrated workflow.
 1. Freeze route/component/payload behavior with targeted characterization tests.
 2. Migrate Catalog: units, curriculum versions, programs, specializations, syllabus.
 3. Migrate Calendar/Delivery: semesters, offerings, registrations, lectures, sessions.
-4. Migrate attendance, roster, assessment/gradebook, course result, and all Canvas
+4. [x] Migrate attendance, roster, assessment/gradebook, course result, and all Canvas
    mapping/sync/provider behavior within Academic Delivery.
 5. In each slice replace inline validation, raw responses, legacy filters, and literal URLs.
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.

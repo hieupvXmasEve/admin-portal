@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Delivery\Http\Web;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Academic\Delivery\Http\Requests\ListAttendanceRecordsRequest;
 use App\Modules\Academic\Delivery\Queries\ListAttendanceRecordsQuery;
-use App\Modules\Academic\Http\Requests\Delivery\ListAttendanceRecordsRequest;
 use Inertia\Inertia;
 use Inertia\Response;
 

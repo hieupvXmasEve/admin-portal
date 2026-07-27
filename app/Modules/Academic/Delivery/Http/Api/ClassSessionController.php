@@ -15,10 +15,10 @@ use App\Modules\Academic\Delivery\Actions\DeleteClassSessionAction;
 use App\Modules\Academic\Delivery\Actions\DeleteCourseOfferingClassSessionsAction;
 use App\Modules\Academic\Delivery\Actions\GenerateClassSessionAttendanceAction;
 use App\Modules\Academic\Delivery\Actions\GenerateCourseOfferingClassSessionsAction;
+use App\Modules\Academic\Delivery\Http\Requests\BulkDeleteClassSessionsRequest;
+use App\Modules\Academic\Delivery\Http\Requests\GenerateClassSessionsRequest;
+use App\Modules\Academic\Delivery\Http\Requests\SaveClassSessionRequest;
 use App\Modules\Academic\Delivery\Queries\ListCourseOfferingClassSessionsQuery;
-use App\Modules\Academic\Http\Requests\Delivery\BulkDeleteClassSessionsRequest;
-use App\Modules\Academic\Http\Requests\Delivery\GenerateClassSessionsRequest;
-use App\Modules\Academic\Http\Requests\Delivery\SaveClassSessionRequest;
 use Illuminate\Http\JsonResponse;
 
 final class ClassSessionController extends Controller

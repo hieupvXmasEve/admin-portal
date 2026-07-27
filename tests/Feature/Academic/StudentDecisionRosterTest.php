@@ -11,7 +11,7 @@ use App\Models\Student;
 use App\Models\StudentActionLog;
 use App\Models\StudentDecision;
 use App\Models\User;
-use App\Modules\Academic\Actions\BackfillDecisionStudentRosterAction;
+use App\Modules\Academic\Delivery\Actions\BackfillDecisionStudentRosterAction;
 use App\Modules\Academic\Progression\Actions\BulkLinkStudentsToDecisionAction;
 use App\Modules\Academic\Progression\Actions\RecordStudentActionAction;
 use App\Modules\Academic\Progression\Queries\GetMissingDecisionReportQuery;

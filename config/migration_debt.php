@@ -45,7 +45,7 @@ return [
             'reason' => 'Existing service-led runtime paths remain during vertical cutover.',
             'canonical_replacement' => 'Owning module Actions, Queries, or permanent domain support.',
             'retirement_condition' => 'All supported callers are cut over and behavior evidence passes.',
-            'baseline' => 79,
+            'baseline' => 69,
             'mode' => 'max',
         ],
         'frozen_controllers' => [
@@ -53,7 +53,7 @@ return [
             'reason' => 'Existing top-level controllers preserve public web/API contracts during migration.',
             'canonical_replacement' => 'Thin controller under the owning module HTTP boundary.',
             'retirement_condition' => 'Route ownership and all supported callers move to the module controller.',
-            'baseline' => 55,
+            'baseline' => 50,
             'mode' => 'max',
         ],
         'frozen_routes' => [

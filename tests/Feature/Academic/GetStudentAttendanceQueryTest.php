@@ -9,8 +9,8 @@ use App\Models\CourseRegistration;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
-use App\Modules\Academic\Queries\GetStudentAttendanceDetailsQuery;
-use App\Modules\Academic\Queries\GetStudentAttendanceQuery;
+use App\Modules\Academic\Delivery\Queries\GetStudentAcademicAttendanceDetailsQuery;
+use App\Modules\Academic\Delivery\Queries\GetStudentAcademicAttendanceSummaryQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -91,7 +91,7 @@ it('separates retake attendance attempts for the same unit', function () {
         ['2026-05-30', 'present'],
     ]);
 
-    $summary = app(GetStudentAttendanceQuery::class)->execute($student);
+    $summary = app(GetStudentAcademicAttendanceSummaryQuery::class)->execute($student);
 
     expect($summary['data'])->toHaveCount(2)
         ->and($summary['summary']['total_units'])->toBe(1)
@@ -116,7 +116,7 @@ it('separates retake attendance attempts for the same unit', function () {
         ->and($retakeAttempt['is_retake'])->toBeTrue()
         ->and($retakeAttempt['attempt_label'])->toBe('Retake attempt 2');
 
-    $retakeDetails = app(GetStudentAttendanceDetailsQuery::class)->execute(
+    $retakeDetails = app(GetStudentAcademicAttendanceDetailsQuery::class)->execute(
         $student->id,
         $unit->id,
         $semester->id,
