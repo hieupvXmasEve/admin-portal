@@ -20,6 +20,18 @@ it('resolves the orange theme preset from config', function () {
         ->and(ThemeConfig::variables()['dark']['--primary'])->toBe('oklch(0.52 0.14 46)');
 });
 
+it('resolves every campus brand preset dropped into config/themes', function (string $theme, string $lightPrimary, string $darkPrimary) {
+    config(['theme.active' => $theme]);
+
+    expect(ThemeConfig::activeName())->toBe($theme)
+        ->and(ThemeConfig::variables()['light']['--primary'])->toBe($lightPrimary)
+        ->and(ThemeConfig::variables()['dark']['--primary'])->toBe($darkPrimary);
+})->with([
+    ['knu', 'oklch(0.505 0.213 27.518)', 'oklch(0.444 0.177 26.899)'],
+    ['jinan', 'oklch(0.511 0.096 186.391)', 'oklch(0.437 0.078 188.216)'],
+    ['gachon', 'oklch(0.5 0.134 242.749)', 'oklch(0.443 0.11 240.79)'],
+]);
+
 it('falls back to green for unknown theme values', function () {
     Log::spy();
 
