@@ -51,7 +51,7 @@ when the page no longer documents that file.
 | --- | --- | --- |
 | Vietnamese | `/` | Authoritative. Write here first. |
 | English | `/en/` | Translated from Vietnamese in the same change. |
-| Korean | `/ko/` | Not translated yet; falls back to Vietnamese. |
+| Korean | `/ko/` | Translated from Vietnamese in the same change. |
 
 Vietnamese lives at the site root so its published URLs stay stable. Starlight
 renders the Vietnamese page with a notice when a locale has no translation, so

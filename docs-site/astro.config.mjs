@@ -13,7 +13,7 @@ export default defineConfig({
       title: 'Portal User Guide',
       description: 'Tài liệu hướng dẫn sử dụng Portal cho đội vận hành học vụ.',
       customCss: ['./src/styles/custom.css'],
-      pagefind: false,
+      pagefind: true,
       // Vietnamese is served from the root so its published URLs stay stable.
       // A locale with no translated page falls back to the Vietnamese one.
       defaultLocale: 'root',
