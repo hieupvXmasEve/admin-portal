@@ -7,7 +7,7 @@ use App\Modules\Institution\Http\Web\Admin\DepartmentMemberController;
 use App\Modules\Institution\Http\Web\CampusController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth', 'verified'])->group(function (): void {
+Route::middleware(['web', 'auth', 'verified', 'campus.selected'])->group(function (): void {
     Route::prefix('campuses')->name('campuses.')->group(function (): void {
         Route::get('/', [CampusController::class, 'index'])
             ->middleware('can:view_campus')

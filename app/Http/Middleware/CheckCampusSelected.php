@@ -52,7 +52,7 @@ class CheckCampusSelected
 
         // 4. If no campus selected, redirect to selection page
         if (! $campusId) {
-            return redirect()->route('select-campus.index');
+            return redirect()->guest(route('select-campus.index'));
         }
 
         return $next($request);

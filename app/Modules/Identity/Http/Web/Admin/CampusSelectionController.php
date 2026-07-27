@@ -15,7 +15,7 @@ class CampusSelectionController extends Controller
     public function index(IdentityContext $identity)
     {
         $user = $identity->user();
-        if (!$user) {
+        if (! $user) {
             return redirect()->route('login');
         }
 
@@ -34,7 +34,7 @@ class CampusSelectionController extends Controller
                 $request->validated('selectedCampus')
             );
 
-            return redirect()->route('dashboard');
+            return redirect()->intended(route('dashboard'));
         } catch (\Exception $e) {
             Log::error('Error in setCurrentCampus:', [
                 'error' => $e->getMessage(),

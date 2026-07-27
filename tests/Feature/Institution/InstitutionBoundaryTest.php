@@ -130,7 +130,10 @@ it('preserves campus administration URLs and authorization through Institution',
     grantInstitutionPermission($staff, $currentCampus, 'create_campus');
     grantInstitutionPermission($staff, $currentCampus, 'edit_campus');
 
-    session(['current_campus_id' => $currentCampus->id]);
+    session([
+        'current_campus_id' => $currentCampus->id,
+        '_token' => 'institution-campus-token',
+    ]);
 
     $this->actingAs($staff)
         ->get(route('campuses.index'))
@@ -142,6 +145,7 @@ it('preserves campus administration URLs and authorization through Institution',
             'name' => 'Can Tho Campus',
             'code' => 'CT',
             'address' => 'Can Tho',
+            '_token' => 'institution-campus-token',
         ])
         ->assertRedirect();
 
@@ -157,6 +161,7 @@ it('preserves campus administration URLs and authorization through Institution',
             'name' => 'Can Tho Main Campus',
             'code' => 'CT',
             'address' => 'Can Tho',
+            '_token' => 'institution-campus-token',
         ])
         ->assertRedirect();
 
@@ -182,7 +187,10 @@ it('preserves department membership administration URLs through Institution', fu
     $department = Department::factory()->create();
     grantInstitutionPermission($staff, $campus, 'manage_departments');
 
-    session(['current_campus_id' => $campus->id]);
+    session([
+        'current_campus_id' => $campus->id,
+        '_token' => 'institution-department-token',
+    ]);
 
     $this->actingAs($staff)
         ->get(route('admin.departments.index'))
@@ -193,6 +201,7 @@ it('preserves department membership administration URLs through Institution', fu
         ->post(route('admin.departments.members.store', $department), [
             'user_id' => $candidate->id,
             'department_role' => 'staff',
+            '_token' => 'institution-department-token',
         ])
         ->assertRedirect();
 
@@ -202,3 +211,23 @@ it('preserves department membership administration URLs through Institution', fu
         'department_role' => 'staff',
     ]);
 });
+
+it('returns to the requested Institution administration page after selecting a campus', function (string $routeName, string $permission): void {
+    $campus = Campus::factory()->create();
+    $staff = User::factory()->create();
+    grantInstitutionPermission($staff, $campus, $permission);
+    session()->forget('current_campus_id');
+
+    $this->actingAs($staff)
+        ->withSession(['_token' => 'institution-return-token'])
+        ->get(route($routeName))
+        ->assertRedirect(route('select-campus.index'));
+
+    $this->post(route('select-campus.set-current'), [
+        'selectedCampus' => $campus->id,
+        '_token' => 'institution-return-token',
+    ])->assertRedirect(route($routeName));
+})->with([
+    'campuses' => ['campuses.index', 'view_campus'],
+    'departments' => ['admin.departments.index', 'manage_departments'],
+]);
