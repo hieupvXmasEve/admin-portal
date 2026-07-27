@@ -1,0 +1,60 @@
+:root {
+  --sl-color-accent-low: #0f2f2b;
+  --sl-color-accent: #2dd4bf;
+  --sl-color-accent-high: #ccfbf1;
+}
+
+:root[data-theme='light'] {
+  --sl-color-accent-low: #ccfbf1;
+  --sl-color-accent: #0f766e;
+  --sl-color-accent-high: #042f2e;
+  --sl-color-bg: #f8fafc;
+  --sl-color-bg-nav: rgba(248, 250, 252, 0.94);
+  --sl-color-bg-sidebar: #f8fafc;
+  --sl-color-hairline: #dbe3ea;
+}
+
+.hero {
+  padding-block: clamp(3rem, 6vw, 5rem);
+}
+
+.hero h1 {
+  letter-spacing: -0.055em;
+}
+
+.sl-markdown-content table {
+  font-size: 0.92rem;
+}
+
+.sl-markdown-content {
+  color: var(--sl-color-gray-2);
+}
+
+:root[data-theme='light'] .sl-markdown-content {
+  color: #243447;
+}
+
+.sl-markdown-content th {
+  white-space: nowrap;
+}
+
+:root[data-theme='light'] .sl-markdown-content th,
+:root[data-theme='light'] .sl-markdown-content td {
+  border-color: #94a3b8;
+}
+
+:root[data-theme='light'] .sl-markdown-content th {
+  color: #0f172a;
+}
+
+.sl-markdown-content blockquote {
+  border-inline-start-color: var(--sl-color-accent);
+  background: color-mix(in srgb, var(--sl-color-accent-low), transparent 52%);
+  border-radius: 0.85rem;
+  padding: 0.8rem 1rem;
+}
+
+:root[data-theme='light'] .sidebar a[aria-current='page'] {
+  color: #042f2e;
+  background: #99f6e4;
+}

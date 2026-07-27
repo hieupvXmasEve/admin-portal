@@ -253,6 +253,48 @@ Also verify:
 Controlled MCP has additional OAuth, proxy, Cloudflare, and connector checks.
 Follow `docs/features/ai/mcp.md`.
 
+## User guide deployment
+
+The end-user guide in `docs-site/` is a static Astro Starlight site published to
+Cloudflare Pages on its own public subdomain. It is independent of the school
+instances: one site serves every deployment, and it contains no tenant data.
+
+The public origin is `https://docs.knu.edu.vn`.
+
+`.github/workflows/admin-portal-user-guide.yml` builds it on every pull request
+and deploys it on pushes to `main` that reach the deploy job.
+
+### One-time Cloudflare setup
+
+1. Create a Pages project named `admin-portal-user-guide` in the Cloudflare
+   dashboard under **Workers & Pages**. Choose **Direct Upload**, not a Git
+   connection — GitHub Actions performs the upload, so a Git connection would
+   deploy twice.
+2. Create an API token under **My Profile → API Tokens** with the
+   **Cloudflare Pages: Edit** permission scoped to the account.
+3. Copy the Account ID from the Workers & Pages overview page.
+4. In the GitHub repository, create an environment named `user-guide` and add
+   two secrets to it:
+   - `CLOUDFLARE_API_TOKEN`
+   - `CLOUDFLARE_ACCOUNT_ID`
+5. After the first successful deploy, open the Pages project, go to
+   **Custom domains**, and add `docs.knu.edu.vn`. Cloudflare creates the DNS
+   record automatically when the `knu.edu.vn` zone is on the same account;
+   otherwise add a proxied `CNAME` from `docs` to the
+   `admin-portal-user-guide.pages.dev` hostname.
+
+### Changing the public domain
+
+`SITE_URL` in `docs-site/astro.config.mjs` is the canonical origin used for
+metadata and the sitemap. Update that constant in the same change that moves the
+custom domain, otherwise the sitemap advertises the old host.
+
+### Verification
+
+- The Pages project shows a successful deployment for the commit.
+- The custom domain serves the guide over HTTPS with a valid certificate.
+- `/sitemap-index.xml` lists the current pages under the live domain.
+
 ## Rollback
 
 Rollback is environment-specific:

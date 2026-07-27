@@ -1,0 +1,80 @@
+name: Admin Portal User Guide
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  freshness:
+    name: Check guide is in sync with the app
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout with history
+        uses: actions/checkout@v4
+        with:
+          # Full history so the script can diff against the target branch.
+          fetch-depth: 0
+
+      - name: Compare against target branch
+        run: ./scripts/check-docs-freshness.sh "origin/${{ github.base_ref }}"
+
+  build:
+    name: Build guide
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Version comes from the "packageManager" field in package.json.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: docs-site/pnpm-lock.yaml
+
+      - name: Install
+        working-directory: docs-site
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        working-directory: docs-site
+        run: pnpm build
+
+      - name: Upload build
+        if: github.event_name == 'push' && github.ref_name == 'main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: user-guide-dist
+          path: docs-site/dist
+          retention-days: 1
+
+  deploy:
+    name: Deploy to Cloudflare Pages
+    if: github.event_name == 'push' && github.ref_name == 'main'
+    needs: build
+    runs-on: ubuntu-latest
+    environment: user-guide
+    concurrency:
+      group: admin-portal-user-guide-deploy
+      cancel-in-progress: false
+    steps:
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: user-guide-dist
+          path: dist
+
+      - name: Publish
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=admin-portal-user-guide --branch=main

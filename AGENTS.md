@@ -92,6 +92,7 @@ Run the narrowest checks that prove the changed behavior:
 ./scripts/dev.sh npm exec prettier --check <changed-files>
 ./scripts/dev.sh composer exec pint -- --dirty --format agent
 ./scripts/check-docs.sh
+./scripts/check-docs-freshness.sh
 ```
 
 Do not run repository-wide PHP tests, global type-check, or global frontend lint
@@ -152,8 +153,23 @@ Before changing student- or lecturer-facing contracts:
 - `docs/adr/` contains accepted, currently applicable decisions only.
 - `docs/api/` contains public API contracts.
 - `docs/features/` contains current integration and operations runbooks.
+- `docs-site/` holds the Vietnamese end-user guide. It is the only home for
+  user-facing instructions; do not duplicate them under `docs/`.
 - Do not create plans, reports, stories, archives, or duplicate framework docs
   in the repository.
+
+### End-user guide
+
+A change to the staff sidebar or to a user-facing screen must update the
+matching page under `docs-site/src/content/docs/` in the same change.
+
+Each page declares the files it documents in its frontmatter `source:` list.
+`./scripts/check-docs-freshness.sh` fails when a listed file changed and the
+page did not. When a screen moves or is retired, update the `source:` list too.
+
+Write for staff who do not read code: use the labels shown on screen, describe
+one action per step, and never mention routes, permission codes, table names,
+or framework internals.
 
 ## Forbidden patterns
 

@@ -51,5 +51,7 @@ public/favicon.ico
 # /tests/*
 /demo-v3
 /FE/*
-docs-site/
+docs-site/node_modules/
+docs-site/dist/
+docs-site/.astro/
 engineer/
