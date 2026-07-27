@@ -166,6 +166,18 @@ Do not select among `deploy.sh`, `deploy-production.sh`, and
 `deploy-ubuntu.sh` by filename alone. Inspect the active workflow and server
 configuration first.
 
+`.github/workflows/deploy.yml` runs two distinct production deploy paths on
+push to `main`:
+
+- `deploy-production` (bare-metal `php84`/`composer84` via `scripts/deploy-ubuntu.sh`)
+  for `x.metropolia.edu.vn` and `x.asia-vn.edu.vn`.
+- `deploy-knu-docker` (`docker compose build` + `up -d --force-recreate` against
+  `docker/docker-compose.production.yml`, project `school-knu`) for
+  `x.knu.edu.vn`.
+
+New docker-based production domains get their own job in the same pattern as
+`deploy-knu-docker`, not folded into the `deploy-production` matrix.
+
 ## Database backup
 
 Use the environment wrapper:

@@ -143,3 +143,65 @@ jobs:
             DEPLOY_ENVIRONMENT="production" \
             DEPLOY_RUN_MIGRATIONS="${RUN_MIGRATIONS}" \
             bash scripts/deploy-ubuntu.sh
+
+  deploy-knu-docker:
+    name: Deploy x.knu.edu.vn (Docker)
+    if: ${{ (github.event_name == 'push' && github.ref_name == 'main') || (github.event_name == 'workflow_dispatch' && inputs.target == 'production') }}
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: swinx-deploy-knu-docker
+      cancel-in-progress: false
+    steps:
+      - name: Deploy knu over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER || 'root' }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          script: |
+            set -Eeuo pipefail
+
+            TARGET_PATH="/www/wwwroot/x.knu.edu.vn/asia-admin-portal"
+            DEPLOY_BRANCH="main"
+            DEPLOY_SHA="${{ github.event_name == 'push' && github.sha || '' }}"
+            RUN_MIGRATIONS="${{ github.event_name == 'workflow_dispatch' && inputs.run_migrations || 'false' }}"
+            PROJECT_NAME="school-knu"
+            COMPOSE_FILE="docker/docker-compose.production.yml"
+
+            echo "Deploying main branch to ${TARGET_PATH} (docker)"
+            cd "${TARGET_PATH}"
+
+            if [ ! -d .git ]; then
+              echo "Target path is not a git worktree: ${TARGET_PATH}" >&2
+              exit 10
+            fi
+
+            tracked_changes="$(git status --porcelain --untracked-files=no)"
+            if [ -n "${tracked_changes}" ]; then
+              echo "Tracked server-side changes exist in ${TARGET_PATH}; aborting to avoid overwriting manual edits." >&2
+              printf '%s\n' "${tracked_changes}"
+              exit 11
+            fi
+
+            git fetch origin "${DEPLOY_BRANCH}" --prune
+            git checkout -B "${DEPLOY_BRANCH}" "origin/${DEPLOY_BRANCH}"
+
+            if [ -n "${DEPLOY_SHA}" ]; then
+              git cat-file -e "${DEPLOY_SHA}^{commit}"
+              git reset --hard "${DEPLOY_SHA}"
+            else
+              git reset --hard "origin/${DEPLOY_BRANCH}"
+            fi
+
+            dc() {
+              docker compose --env-file .env -f "${COMPOSE_FILE}" -p "${PROJECT_NAME}" "$@"
+            }
+
+            dc build app queue scheduler
+            dc up -d --force-recreate app queue scheduler
+
+            if [ "${RUN_MIGRATIONS}" = "true" ]; then
+              dc exec -T app php artisan migrate --force
+            fi
