@@ -339,3 +339,55 @@ it('rejects assessment details from another syllabus template for the same unit'
 
     expect(AssessmentComponentDetailScore::query()->count())->toBe(0);
 });
+
+it('returns the standard validation envelope for invalid lecturer assessment requests', function (): void {
+    $syllabus = ($this->makeSyllabus)();
+    $offering = ($this->makeOffering)($syllabus);
+    $detail = ($this->makeAssignmentDetail)($syllabus);
+
+    Sanctum::actingAs($this->lecturer);
+
+    $bulkResponse = $this->postJson("/api/v1/lecturer/courses/{$offering->id}/assessments/details/{$detail->id}/bulk-grades", [
+        'grades' => [],
+    ]);
+    $statisticsResponse = $this->getJson("/api/v1/lecturer/courses/{$offering->id}/assessments/report/statistics?type=invalid");
+    $gradeMatrixResponse = $this->getJson("/api/v1/lecturer/courses/{$offering->id}/assessments/report/grade-matrix?include_excluded=invalid");
+
+    $bulkResponse->assertUnprocessable()
+        ->assertJsonPath('success', false)
+        ->assertJsonPath('errors.0.field', 'grades');
+    $statisticsResponse->assertUnprocessable()
+        ->assertJsonPath('success', false)
+        ->assertJsonPath('errors.0.field', 'type');
+    $gradeMatrixResponse->assertUnprocessable()
+        ->assertJsonPath('success', false)
+        ->assertJsonPath('errors.0.field', 'include_excluded');
+});
+
+it('preserves assessment authorization and invalid export-format responses', function (): void {
+    $syllabus = ($this->makeSyllabus)();
+    $offering = ($this->makeOffering)($syllabus);
+    $detail = ($this->makeAssignmentDetail)($syllabus);
+    $otherLecturer = Lecture::factory()->create([
+        'campus_id' => $this->campus->id,
+        'is_active' => true,
+        'employment_status' => 'active',
+        'is_available_for_assignment' => true,
+    ]);
+
+    Sanctum::actingAs($otherLecturer);
+
+    $unauthorizedResponse = $this->postJson("/api/v1/lecturer/courses/{$offering->id}/assessments/details/{$detail->id}/bulk-grades", [
+        'grades' => [],
+    ]);
+
+    Sanctum::actingAs($this->lecturer);
+
+    $exportResponse = $this->getJson("/api/v1/lecturer/courses/{$offering->id}/assessments/details/{$detail->id}/export?format=pdf");
+
+    $unauthorizedResponse->assertForbidden()
+        ->assertJsonPath('success', false);
+    $exportResponse->assertBadRequest()
+        ->assertJsonPath('success', false)
+        ->assertJsonPath('message', 'Invalid export format. Supported formats: excel, csv');
+});

@@ -75,6 +75,10 @@ controllers/services/routes and frontend debt with each migrated workflow.
      grade-sync API envelopes, added assignment selection validation, restored
      the registered syllabus-summary route, and preserved Canvas sync dialogs
      and course-offering grade preview/apply behavior.
+   - [x] Lecturer Assessment: moved bulk-grade and report query validation into
+     Delivery lecturer FormRequests, preserved authorization-before-validation
+     and export-format behavior, and standardized validation failures with the
+     existing API envelope.
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
 7. Review import/export parity, scheduler entries, permissions, and campus scoping.
 

@@ -7,7 +7,9 @@ namespace App\Modules\Academic\Delivery\Http\Api\Lecturer;
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
 use App\Models\CourseOffering;
+use App\Modules\Academic\Delivery\Http\Requests\Api\V1\Lecturer\AssessmentStatisticsReportRequest;
 use App\Modules\Academic\Delivery\Http\Requests\Api\V1\Lecturer\ExportAssessmentRequest;
+use App\Modules\Academic\Delivery\Http\Requests\Api\V1\Lecturer\GradeMatrixReportRequest;
 use App\Modules\Academic\Delivery\Support\AssessmentExportService;
 use App\Modules\Academic\Delivery\Support\AssessmentReportService;
 use Illuminate\Http\JsonResponse;
@@ -61,20 +63,14 @@ class AssessmentReportController extends Controller
     /**
      * Get comprehensive grade matrix for all students and assessments.
      */
-    public function gradeMatrix(CourseOffering $courseOffering, Request $request): JsonResponse
+    public function gradeMatrix(CourseOffering $courseOffering, GradeMatrixReportRequest $request): JsonResponse
     {
         if ($response = $this->denyUnauthorizedCourse($courseOffering, $request)) {
             return $response;
         }
 
         try {
-            // Get filters from request
-            $filters = [
-                'include_excluded' => $request->boolean('include_excluded', false),
-                //                'score_status' => $request->input('score_status', 'final'),
-                //                'student_ids' => $request->input('student_ids', []),
-                //                'component_ids' => $request->input('component_ids', []),
-            ];
+            $filters = $request->filters();
 
             $gradeMatrix = $this->assessmentReportService->generateGradeMatrix($courseOffering, $filters);
 
@@ -96,14 +92,14 @@ class AssessmentReportController extends Controller
     /**
      * Get detailed analytics and statistics.
      */
-    public function statistics(CourseOffering $courseOffering, Request $request): JsonResponse
+    public function statistics(CourseOffering $courseOffering, AssessmentStatisticsReportRequest $request): JsonResponse
     {
         if ($response = $this->denyUnauthorizedCourse($courseOffering, $request)) {
             return $response;
         }
 
         try {
-            $statisticsType = $request->input('type', 'all');
+            $statisticsType = $request->statisticsType();
             $data = [];
 
             // Generate different types of statistics based on request

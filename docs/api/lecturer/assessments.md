@@ -48,7 +48,7 @@ current API contract.
 | ------ | ------------------------------------------------------ | --------------------------------------------------------------------------------- |
 | `GET`  | `/details/{assessmentComponentDetail}/grades`          | Pagination, sorting, score/status/date filters from `GradeTableRequest`.          |
 | `GET`  | `/details/{assessmentComponentDetail}/statistics`      | Grade statistics.                                                                 |
-| `POST` | `/details/{assessmentComponentDetail}/bulk-grades`     | Bulk upsert body validated in the controller.                                     |
+| `POST` | `/details/{assessmentComponentDetail}/bulk-grades`     | Bulk upsert body validated by `BulkUpsertAssessmentGradesRequest`.                |
 | `GET`  | `/details/{assessmentComponentDetail}/export-template` | Spreadsheet download.                                                             |
 | `POST` | `/details/{assessmentComponentDetail}/import-grades`   | Multipart `file`; optional import controls.                                       |
 | `GET`  | `/details/{assessmentComponentDetail}/export`          | `format` defaults to `excel`; supported values are implemented by the controller. |
@@ -69,8 +69,10 @@ Imports accept `.xlsx`, `.xls`, or `.csv` files up to 10 MB. Options include
 | `GET`  | `/report/export/pdf`   |
 
 The export routes return binary downloads. Report filters and options are
-validated by `ExportAssessmentRequest`. The JSON report endpoints retain the
-response shape implemented directly by `AssessmentReportController`.
+validated by `ExportAssessmentRequest`; grade-matrix and statistics query
+parameters are validated by their dedicated lecturer FormRequests. The JSON
+report endpoints retain the response shape implemented directly by
+`AssessmentReportController`.
 
 ## Gradebook
 

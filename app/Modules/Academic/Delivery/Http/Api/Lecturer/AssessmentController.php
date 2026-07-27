@@ -16,6 +16,8 @@ use App\Models\AssessmentComponentDetail;
 use App\Models\AssessmentComponentDetailScore;
 use App\Models\CourseOffering;
 use App\Modules\Academic\Delivery\Actions\ManageAssessmentGradeWorkbookAction;
+use App\Modules\Academic\Delivery\Http\Requests\Api\V1\Lecturer\BulkUpsertAssessmentGradesRequest;
+use App\Modules\Academic\Delivery\Http\Requests\Api\V1\Lecturer\ExportAssessmentGradesRequest;
 use App\Modules\Academic\Delivery\Http\Requests\Assessment\StoreAssessmentDetailRequest;
 use App\Modules\Academic\Delivery\Http\Requests\Assessment\StoreAssessmentRequest;
 use App\Modules\Academic\Delivery\Http\Requests\Assessment\UpdateAssessmentDetailRequest;
@@ -28,7 +30,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
@@ -1178,7 +1179,7 @@ class AssessmentController extends Controller
     /**
      * Bulk create or update grades for an assessment detail.
      */
-    public function bulkUpsertGrades(Request $request, CourseOffering $courseOffering, AssessmentComponentDetail $assessmentComponentDetail): JsonResponse
+    public function bulkUpsertGrades(BulkUpsertAssessmentGradesRequest $request, CourseOffering $courseOffering, AssessmentComponentDetail $assessmentComponentDetail): JsonResponse
     {
         /** @var Lecture $lecturer */
         $lecturer = $request->user();
@@ -1202,25 +1203,12 @@ class AssessmentController extends Controller
                 );
             }
 
-            // Validate request data
-            $validated = $request->validate([
-                'grades' => ['required', 'array', 'min:1'],
-                'grades.*.student_id' => ['required', 'integer', 'exists:students,id'],
-                'grades.*.points_earned' => ['sometimes', 'numeric', 'min:0'],
-                'grades.*.percentage_score' => ['sometimes', 'numeric', 'min:0', 'max:100'],
-                'grades.*.letter_grade' => ['sometimes', 'string', 'max:5'],
-                'grades.*.status' => ['sometimes', 'string', Rule::in(['not_submitted', 'submitted', 'grading', 'graded', 'returned'])],
-                'grades.*.score_status' => ['sometimes', 'string', Rule::in(['draft', 'provisional', 'final'])],
-                'grades.*.instructor_feedback' => ['sometimes', 'string', 'max:1000'],
-                'grades.*.private_notes' => ['sometimes', 'string', 'max:1000'],
-            ]);
-
             // Use service to bulk upsert grades
             $assessmentService = app(AssessmentManagementService::class);
             $results = $assessmentService->bulkUpsertGrades(
                 $assessmentComponentDetail,
                 $courseOffering,
-                $validated['grades'],
+                $request->validated('grades'),
                 $lecturer->lecturerId()
             );
 
@@ -1242,12 +1230,6 @@ class AssessmentController extends Controller
                 [],
                 'Bulk grade operation completed successfully'
             );
-        } catch (ValidationException $e) {
-            return ApiResponse::error(
-                'Validation failed',
-                $e->errors(),
-                422
-            );
         } catch (\Exception $e) {
             Log::error('Failed to bulk upsert grades', [
                 'course_offering_id' => $courseOffering->id,
@@ -1268,7 +1250,7 @@ class AssessmentController extends Controller
     /**
      * Export grades for an assessment detail.
      */
-    public function exportGrades(Request $request, CourseOffering $courseOffering, AssessmentComponentDetail $assessmentComponentDetail): BinaryFileResponse|JsonResponse
+    public function exportGrades(ExportAssessmentGradesRequest $request, CourseOffering $courseOffering, AssessmentComponentDetail $assessmentComponentDetail): BinaryFileResponse|JsonResponse
     {
         /** @var Lecture $lecturer */
         $lecturer = $request->user();
@@ -1292,8 +1274,7 @@ class AssessmentController extends Controller
                 );
             }
 
-            // Get format from request
-            $format = $request->query('format', 'excel');
+            $format = $request->format();
 
             if ($format === 'excel') {
                 // Use existing Excel service for export
