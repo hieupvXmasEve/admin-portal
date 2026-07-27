@@ -20,6 +20,7 @@ final class EloquentActiveLecturerReader implements ActiveLecturerReader, Lectur
                 'id' => (int) $lecturer->id,
                 'first_name' => (string) $lecturer->first_name,
                 'last_name' => (string) $lecturer->last_name,
+                'display_name' => trim($lecturer->first_name.' '.$lecturer->last_name),
             ])
             ->all();
     }
