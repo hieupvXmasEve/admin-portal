@@ -9,8 +9,8 @@ use App\Modules\Academic\Catalog\Queries\GetSemesterReferenceOptionsQuery;
 use App\Modules\Academic\Exports\StudentLifecycleStatusExport;
 use App\Modules\Academic\Progression\Http\Requests\ExportStudentLifecycleYearlyRequest;
 use App\Modules\Academic\Progression\Http\Requests\ListStudentLifecycleYearlyRequest;
+use App\Modules\Academic\Progression\Queries\Reporting\GetStudentLifecycleCohortMatrixQuery;
 use App\Modules\Academic\Progression\Queries\Reporting\GetStudentStatusBySemesterQuery;
-use App\Modules\Academic\Queries\Reporting\GetStudentLifecycleYearlyAnalysisQuery;
 use App\Services\ExcelExportService;
 use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use Inertia\Inertia;
@@ -20,7 +20,7 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 class StudentLifecycleYearlyAnalysisController extends Controller
 {
     public function __construct(
-        private readonly GetStudentLifecycleYearlyAnalysisQuery $yearlyQuery,
+        private readonly GetStudentLifecycleCohortMatrixQuery $cohortMatrix,
         private readonly GetStudentStatusBySemesterQuery $statusBySemesterQuery,
         private readonly AcademicPeriodReader $academicPeriods,
         private readonly GetSemesterReferenceOptionsQuery $semesterOptions,
@@ -31,7 +31,7 @@ class StudentLifecycleYearlyAnalysisController extends Controller
         $validated = $request->validated();
 
         $currentCampusId = session('current_campus_id');
-        $rows = $this->yearlyQuery->handle($currentCampusId);
+        $matrix = $this->cohortMatrix->handle($currentCampusId);
 
         $semesterOptions = $this->semesterOptions->lifecycleOptions();
 
@@ -50,7 +50,7 @@ class StudentLifecycleYearlyAnalysisController extends Controller
             : null;
 
         return Inertia::render('Admin/Reports/StudentLifecycleYearlyAnalysis/Index', [
-            'rows' => $rows->values()->all(),
+            'matrix' => $matrix,
             'statusTable' => $statusTable,
             'statusFilters' => [
                 'selected_semester_id' => $selectedSemesterId > 0 ? $selectedSemesterId : null,

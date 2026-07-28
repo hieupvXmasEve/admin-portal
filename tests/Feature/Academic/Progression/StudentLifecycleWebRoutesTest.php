@@ -147,7 +147,7 @@ describe('student enrollments overview', function (): void {
 });
 
 describe('student lifecycle yearly analysis', function (): void {
-    it('renders yearly rows plus the semester and status option lists', function (): void {
+    it('renders the cohort matrix plus the semester and status option lists', function (): void {
         Student::factory()->create([
             'campus_id' => $this->campus->id,
             'intake' => 1,
@@ -159,7 +159,10 @@ describe('student lifecycle yearly analysis', function (): void {
             ->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->component('Admin/Reports/StudentLifecycleYearlyAnalysis/Index')
-                ->has('rows')
+                ->has('matrix.semesters')
+                ->has('matrix.cohorts')
+                ->has('matrix.events')
+                ->has('matrix.totals')
                 ->has('statusOptions.semesters')
                 ->has('statusOptions.statuses')
                 ->where('meta.campus_id', $this->campus->id)
