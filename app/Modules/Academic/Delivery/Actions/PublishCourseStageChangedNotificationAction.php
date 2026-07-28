@@ -4,15 +4,16 @@ declare(strict_types=1);
 
 namespace App\Modules\Academic\Delivery\Actions;
 
-use App\Models\Semester;
 use App\Models\Student;
 use App\Modules\Academic\Progression\Support\AcademicLifecycleEventFactory;
+use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use App\Shared\Contracts\DomainEvents\DomainEventPublisher;
 
 class PublishCourseStageChangedNotificationAction
 {
     public function __construct(
         private readonly DomainEventPublisher $domainEventPublisher,
+        private readonly AcademicPeriodReader $academicPeriods,
     ) {}
 
     public function run(
@@ -26,8 +27,7 @@ class PublishCourseStageChangedNotificationAction
             return;
         }
 
-        $semester = Semester::find($semesterId);
-        $semesterLabel = $semester?->code ?? ('Semester '.$semesterId);
+        $semesterLabel = $this->academicPeriods->find($semesterId)?->code ?? ('Semester '.$semesterId);
         $body = $message;
 
         if ($body === null) {

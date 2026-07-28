@@ -9,8 +9,8 @@ use App\Http\Responses\ApiResponse;
 use App\Models\CanvasCourseMapping;
 use App\Models\CanvasIntegration;
 use App\Models\CourseOffering;
-use App\Models\Semester;
-use App\Models\Unit;
+use App\Modules\Academic\Catalog\Queries\GetSemesterFilterOptionsQuery;
+use App\Modules\Academic\Catalog\Queries\GetUnitReferenceOptionsQuery;
 use App\Modules\Academic\Delivery\Http\Requests\Canvas\CanvasCourseMappingRequest;
 use App\Modules\Academic\Delivery\Http\Requests\Canvas\ListAvailableCanvasCourseOfferingsRequest;
 use App\Modules\Academic\Delivery\Http\Requests\Canvas\ListCanvasCourseMappingsRequest;
@@ -25,7 +25,9 @@ use Inertia\Response;
 class CanvasCourseController extends Controller
 {
     public function __construct(
-        private CanvasSyncService $syncService
+        private CanvasSyncService $syncService,
+        private readonly GetSemesterFilterOptionsQuery $semesters,
+        private readonly GetUnitReferenceOptionsQuery $units,
     ) {}
 
     public function index(ListCanvasCourseMappingsRequest $request): Response
@@ -233,15 +235,11 @@ class CanvasCourseController extends Controller
 
     private function getSemesterOptions()
     {
-        return Semester::where('is_archived', false)
-            ->orderBy('start_date', 'desc')
-            ->get(['id', 'name', 'code']);
+        return $this->semesters->semesters();
     }
 
     private function getUnitOptions()
     {
-        return Unit::query()
-            ->orderBy('code')
-            ->get(['id', 'code', 'name']);
+        return $this->units->options();
     }
 }

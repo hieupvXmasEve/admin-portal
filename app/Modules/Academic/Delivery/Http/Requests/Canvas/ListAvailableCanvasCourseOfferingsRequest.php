@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Academic\Delivery\Http\Requests\Canvas;
 
-use App\Models\Semester;
+use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use Illuminate\Foundation\Http\FormRequest;
 
 class ListAvailableCanvasCourseOfferingsRequest extends FormRequest
@@ -23,7 +23,7 @@ class ListAvailableCanvasCourseOfferingsRequest extends FormRequest
                     return;
                 }
 
-                if (! ctype_digit((string) $value) || ! Semester::query()->whereKey((int) $value)->exists()) {
+                if (! ctype_digit((string) $value) || app(AcademicPeriodReader::class)->find((int) $value) === null) {
                     $fail("The selected {$attribute} is invalid.");
                 }
             }],

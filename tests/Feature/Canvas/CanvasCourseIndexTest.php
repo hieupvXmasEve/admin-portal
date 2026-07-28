@@ -268,3 +268,28 @@ it('wraps Canvas syllabus summary failures in the canonical API envelope', funct
         ->assertJsonPath('data.can_sync', false)
         ->assertJsonPath('message', 'Canvas syllabus is unavailable');
 });
+
+it('renders newest-first semester options and code-ordered unit options', function () {
+    $archived = Semester::factory()->create([
+        'code' => 'ARCHIVED',
+        'is_archived' => true,
+    ]);
+
+    $response = actingAs($this->user)
+        ->get(route('admin.canvas.courses.index'))
+        ->assertOk();
+
+    $props = $response->viewData('page')['props'];
+
+    $semesterCodes = collect($props['semesters'])->pluck('code')->all();
+    $semesterKeys = array_keys((array) collect($props['semesters'])->first());
+    $unitCodes = collect($props['units'])->pluck('code')->all();
+    $unitKeys = array_keys((array) collect($props['units'])->first());
+
+    // Archived semesters stay out of the picker; both lists keep their
+    // narrow column selection and their ordering.
+    expect($semesterCodes)->not->toContain($archived->code)
+        ->and($semesterKeys)->toBe(['id', 'name', 'code'])
+        ->and($unitCodes)->toBe(['ACC101', 'MKT201'])
+        ->and($unitKeys)->toBe(['id', 'code', 'name']);
+});

@@ -26,13 +26,21 @@ class GetSemesterFilterOptionsQuery
     {
         $activeSemester = Semester::getActiveSemester();
 
-        $semesters = Semester::where('is_archived', false)
-            ->orderBy('start_date', 'desc')
-            ->get(['id', 'name', 'code']);
-
         return [
             'active_semester_id' => $activeSemester?->id,
-            'semesters' => $semesters,
+            'semesters' => $this->semesters(),
         ];
+    }
+
+    /**
+     * Newest-first, non-archived `id`/`name`/`code` rows.
+     *
+     * @return Collection<int, Semester>
+     */
+    public function semesters(): Collection
+    {
+        return Semester::where('is_archived', false)
+            ->orderBy('start_date', 'desc')
+            ->get(['id', 'name', 'code']);
     }
 }
