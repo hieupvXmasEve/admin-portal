@@ -379,6 +379,7 @@ export const academicSummaryRoutes = {
     performanceDashboard: () => route('academic.students.performance'),
     warningCenter: () => route('academic.warnings.index'),
     academicReport: () => route('academic.report.index'),
+    studentCompletedUnits: () => route('academic.reports.student-units.index'),
     courseRanking: () => route('academic.course-ranking.index'),
     degreeClassification: () => '#',
     transcriptHistory: () => '#',

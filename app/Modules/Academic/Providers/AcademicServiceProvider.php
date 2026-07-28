@@ -40,6 +40,7 @@ use App\Modules\Academic\Progression\Queries\FilterStudentsByProgramEnrollmentSt
 use App\Modules\Academic\Progression\Queries\GetStudentAcademicRecordsQuery;
 use App\Modules\Academic\Progression\Queries\GetStudentGpaTrendQuery;
 use App\Modules\Academic\Progression\Queries\Reporting\GetAcademicReportQuery;
+use App\Modules\Academic\Progression\Queries\Reporting\GetStudentCompletedUnitsQuery;
 use App\Modules\Academic\Progression\Support\EloquentProgramEnrollmentLifecycleWriter;
 use App\Modules\Academic\Progression\Support\EloquentProgramEnrollmentReader;
 use App\Modules\Academic\Progression\Support\EloquentProgramEnrollmentWriter;
@@ -87,6 +88,7 @@ use App\Shared\Contracts\Academic\ProgramReferenceReader;
 use App\Shared\Contracts\Academic\RetakeRegistrationPaymentSyncer;
 use App\Shared\Contracts\Academic\StudentAcademicHoldReader;
 use App\Shared\Contracts\Academic\StudentAcademicRecordsReader;
+use App\Shared\Contracts\Academic\StudentCompletedUnitsReader;
 use App\Shared\Contracts\Academic\StudentDashboardReader;
 use App\Shared\Contracts\Academic\StudentDeferLifecycleReader;
 use App\Shared\Contracts\Academic\StudentDirectoryFormOptionsReader;
@@ -113,6 +115,7 @@ class AcademicServiceProvider extends ServiceProvider
         $this->app->bind(AdmissionsIntentReader::class, EloquentAdmissionsIntentReader::class);
         $this->app->bind(AcademicPeriodReader::class, SemesterAcademicPeriodReader::class);
         $this->app->bind(AcademicReportReader::class, GetAcademicReportQuery::class);
+        $this->app->bind(StudentCompletedUnitsReader::class, GetStudentCompletedUnitsQuery::class);
         $this->app->bind(AssessmentGradeWorkbook::class, AssessmentGradeExcelService::class);
         $this->app->bind(AssessmentDefinitionWriter::class, DeliveryAssessmentDefinitionWriter::class);
         $this->app->bind(AcademicSpaceOccupancyReader::class, EloquentAcademicSpaceOccupancyReader::class);

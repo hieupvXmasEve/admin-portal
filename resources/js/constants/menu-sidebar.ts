@@ -307,6 +307,12 @@ export const mainNavGroups: NavGroup[] = [
                         icon: FileText,
                         requiredPermissions: ['view_grade'],
                     },
+                    {
+                        title: 'Student Completed Units',
+                        href: academicSummaryRoutes.studentCompletedUnits(),
+                        icon: FileText,
+                        requiredPermissions: ['view_academic_report'],
+                    },
                 ],
             },
         ],

@@ -40,6 +40,7 @@ use App\Modules\Academic\Delivery\Http\Web\RecordClassSessionAttendanceControlle
 use App\Modules\Academic\Delivery\Http\Web\RetakeCourseRegistrationController;
 use App\Modules\Academic\Delivery\Http\Web\UnitStatisticsController;
 use App\Modules\Academic\Http\Web\AcademicReportController;
+use App\Modules\Academic\Http\Web\StudentCompletedUnitsController;
 use App\Modules\Academic\Http\Web\CampusDetailController;
 use App\Modules\Academic\Http\Web\CourseRankingController;
 use App\Modules\Academic\Http\Web\GpaManagementController;
@@ -712,6 +713,16 @@ Route::middleware(['auth', 'verified'])->prefix('academic')->name('academic.')->
     Route::get('/report', [AcademicReportController::class, 'index'])
         ->middleware('can:view_academic_report')
         ->name('report.index');
+
+    Route::prefix('reports/student-units')->name('reports.student-units.')->group(function () {
+        Route::get('/', [StudentCompletedUnitsController::class, 'index'])
+            ->middleware('can:view_academic_report')
+            ->name('index');
+
+        Route::get('/export', [StudentCompletedUnitsController::class, 'export'])
+            ->middleware('can:view_academic_report')
+            ->name('export');
+    });
 
     Route::get('/course-ranking', [CourseRankingController::class, 'index'])
         ->middleware('can:view_academic_report')
