@@ -575,6 +575,41 @@ controllers/services/routes and frontend debt with each migrated workflow.
      class-name string literal in PHP source is double-escaped
      (`'App\\Modules\\...'`) and is missed — `AI\Support\MetricCatalog` pins two
      source-query FQNs that way, caught by `AiMetricCatalogQueryPlanTest`.
+   - [x] Delivery reference reads, first pass. Claimed `CanvasCourseMapping`
+     and `CanvasIntegration` for Delivery: both models exist only for the
+     Canvas integration Delivery owns, and outside Delivery only
+     `SyncAcademicRecordsCommand` reads one. That claim alone cleared 16
+     findings with no code change.
+     Then replaced the clean reference reads around it with owner seams:
+     `Canvas/CanvasCourseController` takes its semester and unit pickers from
+     Catalog (`GetSemesterFilterOptionsQuery::semesters()`, new, with `handle()`
+     refactored to call it, and the existing `GetUnitReferenceOptionsQuery`);
+     `ListAvailableCanvasCourseOfferingsRequest` validates the semester through
+     `AcademicPeriodReader`; `PublishCourseStageChangedNotificationAction` takes
+     its semester label from the same reader. Also removed an unused `Student`
+     import in `AssessmentExportService` and gave
+     `StoreAssessmentDetailRequest` a normal import for the
+     `AssessmentComponent` it was reaching by inline FQN.
+     Coverage: extended `tests/Feature/Canvas/CanvasCourseIndexTest.php` with
+     the picker payloads the seams must reproduce (archived semesters excluded,
+     both lists keeping column selection and ordering). Green before the change.
+     Ratchet: `shared_model_imports` 331 -> 309; `cross_context_concrete_imports`
+     held at 0.
+     Deliberately left for a follow-up, because each needs a contract rather
+     than a seam call:
+     `AcademicRecord` (15) and `Student` (13) are the real block — they are
+     domain reads inside eligibility, gradebook, transcript, and attendance
+     logic, not reference lookups, so they need Progression/StudentRegistry
+     reader contracts with DTOs, not a picker query.
+     `Room` (2) needs `SpaceReferenceReader` to grow a bookable-for-campus and
+     an excluding-ids method with the same eager-loaded building payload.
+     `Lecture` (3) and `Unit` (2) are type dependencies (`instanceof Lecture`,
+     `?Unit` return type), so they need DTOs from FacultyWorkforce and Catalog
+     rather than a different call.
+     `Semester` (3) inside `LecturerDashboardService`, `StudentAttendanceService`,
+     and the lecturer `DashboardController` passes the Eloquent model deep into
+     private query helpers; converting to `AcademicPeriodReference` is a real
+     refactor of those services.
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
    - [x] Ratchet tighten: earlier slices lowered the frozen-* ceilings per
      move but left incidental headroom on the other rules. Re-pinned every
@@ -594,13 +629,13 @@ controllers/services/routes and frontend debt with each migrated workflow.
 ## Remaining Scope
 
 Measured 2026-07-28 from `migration-debt:inventory --format=json`, filtered to
-work packages tagged `phase-04:academic`, after the reporting/placement slice.
+work packages tagged `phase-04:academic`, after the Delivery reference-read pass.
 Route retirement is complete: Academic owns zero frozen routes and zero frozen
 controllers.
 
 | Rule | Count | Concentration |
 |---|---|---|
-| `shared_model_imports` | 98 | 27 in unassigned generic dirs, 70 Delivery, 1 Catalog |
+| `shared_model_imports` | 76 | 27 in unassigned generic dirs, 48 Delivery, 1 Catalog |
 | `inline_request_validation` | 2 | `Delivery/Http/Api/Lecturer/{Student,Timetable}Controller` |
 | `direct_json_responses` | 1 | `Catalog/Http/Web/SpecializationController` |
 
@@ -625,8 +660,11 @@ The remaining 8 are one-offs: the two student-action FormRequests, the
 Academic service provider, `GetCampusDetailQuery`, `CampusBuildingCountReader`,
 and `FailureReasonClassifier`.
 
-The larger remaining block is not unassigned at all: 70 shared imports sit
-inside Delivery and need seams, not moves.
+The larger remaining block is not unassigned at all: 48 shared imports sit
+inside Delivery. After the reference-read pass those are concentrated in
+`AcademicRecord` (15) and `Student` (13), which are domain reads needing reader
+contracts, plus small tails of `SyllabusTemplate`/`Lecture`/`User`/`Semester`
+(3 each), `Unit`/`Room` (2 each), and 4 one-offs.
 
 Explicitly not phase-04 scope, tagged to later phases by the scanner:
 `AcademicRecordGenerationServiceOptimized` (frozen service) and
