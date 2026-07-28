@@ -9,7 +9,7 @@ use App\Models\CourseRetakeRegistration;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
-use App\Modules\Academic\Queries\ListRetakeCourseRegistrationsQuery;
+use App\Modules\Academic\Delivery\Queries\ListRetakeCourseRegistrationsQuery;
 use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Actions\CreateFinanceChargeAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;

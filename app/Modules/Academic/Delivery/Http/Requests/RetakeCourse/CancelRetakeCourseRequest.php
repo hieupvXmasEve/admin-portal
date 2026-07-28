@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Http\Requests\RetakeCourse;
+namespace App\Modules\Academic\Delivery\Http\Requests\RetakeCourse;
 
 use Illuminate\Foundation\Http\FormRequest;
 

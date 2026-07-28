@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Queries;
+namespace App\Modules\Academic\Delivery\Queries;
 
 use App\Models\AcademicRecord;
 use App\Models\CourseOffering;

@@ -2,20 +2,21 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Http\Web;
+namespace App\Modules\Academic\Delivery\Http\Web;
 
 use App\Http\Controllers\Controller;
-use App\Models\Campus;
 use App\Models\CourseRetakeRegistration;
-use App\Models\Semester;
-use App\Modules\Academic\Actions\CancelRetakeCourseRegistrationAction;
-use App\Modules\Academic\Actions\CreateRetakeCourseRegistrationAction;
-use App\Modules\Academic\Actions\SyncPaidRetakeRegistrationsAction;
-use App\Modules\Academic\Http\Requests\RetakeCourse\CancelRetakeCourseRequest;
-use App\Modules\Academic\Http\Requests\RetakeCourse\ListRetakeCourseRequest;
-use App\Modules\Academic\Http\Requests\RetakeCourse\StoreRetakeCourseRequest;
-use App\Modules\Academic\Queries\ListRetakeCourseEligibleStudentsQuery;
-use App\Modules\Academic\Queries\ListRetakeCourseRegistrationsQuery;
+use App\Modules\Academic\Delivery\Actions\CancelRetakeCourseRegistrationAction;
+use App\Modules\Academic\Delivery\Actions\CreateRetakeCourseRegistrationAction;
+use App\Modules\Academic\Delivery\Actions\SyncPaidRetakeRegistrationsAction;
+use App\Modules\Academic\Delivery\Http\Requests\RetakeCourse\CancelRetakeCourseRequest;
+use App\Modules\Academic\Delivery\Http\Requests\RetakeCourse\ListRetakeCourseRequest;
+use App\Modules\Academic\Delivery\Http\Requests\RetakeCourse\StoreRetakeCourseRequest;
+use App\Modules\Academic\Catalog\Queries\GetSemesterReferenceOptionsQuery;
+use App\Modules\Academic\Delivery\Queries\ListRetakeCourseEligibleStudentsQuery;
+use App\Modules\Academic\Delivery\Queries\ListRetakeCourseRegistrationsQuery;
+use App\Shared\Contracts\Institution\CampusReferenceReader;
+use App\Shared\Contracts\Institution\DTO\CampusReference;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -25,6 +26,8 @@ class RetakeCourseRegistrationController extends Controller
     public function __construct(
         private readonly ListRetakeCourseEligibleStudentsQuery $eligibilityQuery,
         private readonly ListRetakeCourseRegistrationsQuery $registrationsQuery,
+        private readonly GetSemesterReferenceOptionsQuery $semesters,
+        private readonly CampusReferenceReader $campuses,
     ) {}
 
     /**
@@ -54,7 +57,7 @@ class RetakeCourseRegistrationController extends Controller
             'registrations' => $result['registrations'],
             'summary' => $result['summary'],
             'filters' => $filters,
-            'semesters' => Semester::orderByDesc('start_date')->get(['id', 'name', 'code']),
+            'semesters' => $this->semesters->options(),
         ]);
     }
 
@@ -78,8 +81,11 @@ class RetakeCourseRegistrationController extends Controller
             'eligible_students' => $eligibleStudents,
             'total_eligible_students' => $totalEligibleStudents,
             'filters' => $request->only(['search', 'semester_id', 'campus_id', 'unit_id']),
-            'semesters' => Semester::orderByDesc('start_date')->get(['id', 'name', 'code']),
-            'campuses' => Campus::orderBy('name')->get(['id', 'name', 'code']),
+            'semesters' => $this->semesters->options(),
+            'campuses' => array_map(
+                static fn (CampusReference $campus): array => $campus->toArray(),
+                $this->campuses->all(),
+            ),
         ]);
     }
 

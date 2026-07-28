@@ -10,7 +10,7 @@ use App\Models\CourseRetakeRegistration;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
-use App\Modules\Academic\Actions\SyncPaidRetakeRegistrationsAction;
+use App\Modules\Academic\Delivery\Actions\SyncPaidRetakeRegistrationsAction;
 use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Actions\CreateFinanceChargeAction;
 use App\Modules\Finance\Models\FinanceCharge;

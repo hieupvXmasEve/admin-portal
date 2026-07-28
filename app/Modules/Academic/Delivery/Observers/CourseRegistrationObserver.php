@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Observers;
+namespace App\Modules\Academic\Delivery\Observers;
 
 use App\Models\CourseRegistration;
-use App\Modules\Academic\Actions\LinkPaidRetakeRegistrationToCourseRegistrationAction;
+use App\Modules\Academic\Delivery\Actions\LinkPaidRetakeRegistrationToCourseRegistrationAction;
 use Illuminate\Support\Facades\Log;
 
 class CourseRegistrationObserver

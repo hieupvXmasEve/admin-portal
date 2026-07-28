@@ -451,6 +451,27 @@ controllers/services/routes and frontend debt with each migrated workflow.
      `AssignExamResitInvigilatorAction`). Unlike the controller dropdowns these
      sit inside eligibility and record-writing logic, so they need real
      owner-side queries rather than a picker seam.
+   - [x] Retake Course assigned to Delivery: claimed `CourseRetakeRegistration`
+     for `owned_shared_models.Academic.Delivery` — it had no owner, and outside
+     the retake cluster it is read by
+     `Delivery/Support/EloquentStudentLifecycleCourseRegistrationGateway`
+     (exempted by the claim) and the three finance Support files that stay
+     behind. Moved 12 classes into Delivery: 5 retake actions, 2 list queries,
+     the 3 `RetakeCourse` FormRequests, `RetakeCourseRegistrationController`,
+     and `CourseRegistrationObserver` (`Academic/Observers` was left empty and
+     removed; its `CourseRegistration::observe()` registration in
+     `AcademicServiceProvider` still points at the moved class). Applied the
+     same dropdown seams as the exam-resit controller —
+     `GetSemesterReferenceOptionsQuery` and `CampusReferenceReader`. One
+     same-namespace reference broke and was re-imported:
+     `CancelRetakeCourseRegistrationAction` calls
+     `RecordAcademicFinanceCancellationHandoffAction`, the same finance-handoff
+     class the exam-resit cancel action needed. Ratchet:
+     `shared_model_imports` 389 → 371; `cross_context_concrete_imports` held at
+     0; 155 retake and exam-resit tests green.
+     Left behind: 5 domain-logic reads — `AcademicRecord` (2), `Student` (2),
+     and `Unit`, all inside retake eligibility and registration logic. These
+     join the exam-resit residue in the pending seam follow-up.
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
    - [x] Ratchet tighten: earlier slices lowered the frozen-* ceilings per
      move but left incidental headroom on the other rules. Re-pinned every
@@ -476,20 +497,18 @@ controllers.
 
 | Rule | Count | Concentration |
 |---|---|---|
-| `shared_model_imports` | 161 | 101 in unassigned generic dirs, 59 Delivery, 1 Catalog |
+| `shared_model_imports` | 143 | 79 in unassigned generic dirs, 63 Delivery, 1 Catalog |
 | `inline_request_validation` | 6 | `Http/Web` (Gpa, Placement, ProgressionAudit, PerformanceDashboard) and `Delivery/Http/Api/Lecturer/*` |
 | `direct_json_responses` | 1 | `Catalog/Http/Web/SpecializationController` |
 
 Requirement 1 (assign every generic Academic class to one logical context) is the
-dominant remainder. The unassigned findings sit in `Academic/Actions` (28),
-`Academic/Http` (28), `Academic/Support` (23), `Academic/Queries` (19), and
-`Exports`/`Observers`/`Providers` (3).
+dominant remainder. The unassigned findings sit in `Academic/Http` (25),
+`Academic/Support` (23), `Academic/Actions` (16), `Academic/Queries` (13), and
+`Exports`/`Providers` (2).
 
-The generic remainder now clusters into three coherent verticals, each of which
+The generic remainder now clusters into two coherent verticals, each of which
 can be assigned as one slice:
 
-- **Retake Course** (~18): the `*RetakeCourse*`/`*RetakeRegistration*` actions
-  and queries, plus `RetakeCourseRegistrationController`.
 - **Course offering and grading** (~15): the course-offering write actions,
   operational-state and survey queries, `CourseRegistrationObserver`, and the
   `Support/Grading` presenters — all Delivery.
