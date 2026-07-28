@@ -12,8 +12,8 @@ use App\Models\StudentActionLog;
 use App\Models\User;
 use App\Modules\Academic\Progression\Actions\MaterializeProgramEnrollmentAction;
 use App\Modules\Academic\Progression\Actions\RecordStudentActionAction;
-use App\Modules\Academic\Queries\ExportStudentsQuery;
-use App\Modules\Academic\Queries\ListStudentsQuery;
+use App\Modules\StudentRegistry\Queries\ExportStudentsQuery;
+use App\Modules\StudentRegistry\Queries\ListStudentsQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -38,7 +38,7 @@ it('filters lifecycle status from Program Enrollment after the Student snapshot 
         'changed_by_user_id' => $user->id,
     ]);
 
-    $students = (new ListStudentsQuery)->handle(['status' => 'dropout'], $campus->id);
+    $students = app(ListStudentsQuery::class)->handle(['status' => 'dropout'], $campus->id);
 
     expect(collect($students->items())->pluck('id')->all())->toBe([$student->id])
         ->and($student->fresh()->status)->toBe('intake_course');
@@ -75,7 +75,7 @@ it('keeps normalized Program Enrollment lifecycle subtypes exact in staff filter
     ]));
 
     foreach ($students as $status => $student) {
-        $filtered = (new ListStudentsQuery)->handle(['status' => $status], $campus->id);
+        $filtered = app(ListStudentsQuery::class)->handle(['status' => $status], $campus->id);
 
         expect(collect($filtered->items())->pluck('id')->all())->toBe([$student->id]);
     }
@@ -102,8 +102,8 @@ it('prefers the backfill snapshot over lifecycle history recorded before materia
     $historicalLog->saveQuietly();
     MaterializeProgramEnrollmentAction::run(['student_id' => $student->id]);
 
-    $transferStudents = (new ListStudentsQuery)->handle(['status' => 'dropout_transfer'], $campus->id);
-    $dropoutStudents = (new ListStudentsQuery)->handle(['status' => 'dropout'], $campus->id);
+    $transferStudents = app(ListStudentsQuery::class)->handle(['status' => 'dropout_transfer'], $campus->id);
+    $dropoutStudents = app(ListStudentsQuery::class)->handle(['status' => 'dropout'], $campus->id);
 
     expect(collect($transferStudents->items())->pluck('id')->all())->toBe([$student->id])
         ->and(collect($dropoutStudents->items())->pluck('id')->all())->toBe([]);
@@ -131,7 +131,7 @@ it('filters exact student codes within the current campus', function () {
         'intake_semester_id' => $semester->id,
     ]);
 
-    $students = (new ListStudentsQuery)->handle([
+    $students = app(ListStudentsQuery::class)->handle([
         'student_ids' => ['SE100001', 'SE200001'],
     ], $campus->id);
 
@@ -167,7 +167,7 @@ it('combines student codes with the existing search program and status filters',
         'intake_semester_id' => $semester->id,
     ]);
 
-    $students = (new ListStudentsQuery)->handle([
+    $students = app(ListStudentsQuery::class)->handle([
         'student_ids' => ['SE300001', 'SE300002', 'SE300003'],
         'search' => 'Included',
         'program_id' => $program->id,
@@ -251,7 +251,7 @@ it('combines advanced multi-select filters within the current campus', function 
         'intake_semester_id' => $firstSemester->id,
     ]);
 
-    $students = (new ListStudentsQuery)->handle([
+    $students = app(ListStudentsQuery::class)->handle([
         'program_ids' => [$firstProgram->id, $secondProgram->id],
         'specialization_ids' => [$firstSpecialization->id, $secondSpecialization->id],
         'statuses' => ['graduated', 'pending'],

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Http\Web;
+namespace App\Modules\StudentRegistry\Http\Web;
 
 use App\Constants\StudentRoutes;
 use App\Exports\StudentExport;
@@ -12,14 +12,14 @@ use App\Http\Requests\Student\UpdateStudentRequest;
 use App\Http\Resources\Student\StudentResource;
 use App\Http\Responses\ApiResponse;
 use App\Models\Student;
-use App\Modules\Academic\Catalog\Queries\GetStudentDirectoryFormOptionsQuery;
-use App\Modules\Academic\Http\Requests\Student\ExportStudentsRequest;
-use App\Modules\Academic\Http\Requests\Student\GetStudentsByCodesRequest;
-use App\Modules\Academic\Http\Requests\Student\ListStudentsRequest;
-use App\Modules\Academic\Http\Requests\Student\SearchStudentsRequest;
-use App\Modules\Academic\Queries\ExportStudentsQuery;
-use App\Modules\Academic\Queries\ListStudentsQuery;
+use App\Modules\StudentRegistry\Http\Requests\Student\ExportStudentsRequest;
+use App\Modules\StudentRegistry\Http\Requests\Student\GetStudentsByCodesRequest;
+use App\Modules\StudentRegistry\Http\Requests\Student\ListStudentsRequest;
+use App\Modules\StudentRegistry\Http\Requests\Student\SearchStudentsRequest;
+use App\Modules\StudentRegistry\Queries\ExportStudentsQuery;
+use App\Modules\StudentRegistry\Queries\ListStudentsQuery;
 use App\Services\StudentService;
+use App\Shared\Contracts\Academic\StudentDirectoryFormOptionsReader;
 use App\Shared\Contracts\Identity\GuardianAccessGrantReader;
 use App\Shared\Contracts\Institution\CampusReferenceReader;
 use App\Shared\Contracts\Institution\DTO\CampusReference;
@@ -40,7 +40,7 @@ class StudentController extends Controller
         private StudentService $studentService,
         private StudentGuardianRelationshipReader $guardianRelationshipReader,
         private GuardianAccessGrantReader $guardianAccessGrantReader,
-        private GetStudentDirectoryFormOptionsQuery $formOptions,
+        private StudentDirectoryFormOptionsReader $formOptions,
         private CampusReferenceReader $campuses,
     ) {}
 

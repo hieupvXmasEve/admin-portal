@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Shared\Contracts\Academic;
+namespace App\Shared\Contracts\StudentRegistry;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 

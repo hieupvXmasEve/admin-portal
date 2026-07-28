@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Progression\Queries;
 
 use App\Modules\Academic\Progression\Models\ProgramEnrollment;
+use App\Shared\Contracts\Academic\ProgramEnrollmentStatusFilter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 
-final class FilterStudentsByProgramEnrollmentStatus
+final class FilterStudentsByProgramEnrollmentStatus implements ProgramEnrollmentStatusFilter
 {
     /**
      * @param  list<string>  $statuses

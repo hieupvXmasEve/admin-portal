@@ -371,8 +371,26 @@ controllers/services/routes and frontend debt with each migrated workflow.
      web middleware stack redirects to campus selection first.
      Ratchets: `shared_model_imports` 459 → 455,
      `direct_json_responses` 27 → 26, `inline_request_validation` 41 → 40.
-     The controller still lives in the unassigned `Academic/Http/Web` —
-     its context assignment is an open question (see below).
+   - [x] Student directory moved to StudentRegistry: product owner confirmed
+     the directory is a Registry surface, not an Academic one, so
+     `StudentController`, `ListStudentsQuery`, `ExportStudentsQuery`, and the
+     new directory FormRequests moved into `App\Modules\StudentRegistry`,
+     which already owns `Student` in the ownership contract. Relocated
+     `StudentDirectoryReader` from `Shared\Contracts\Academic` to
+     `Shared\Contracts\StudentRegistry` and moved its binding from the
+     Academic provider to the StudentRegistry one. Because
+     `cross_context_concrete_imports` is zero-tolerance, the two remaining
+     reach-ins into Academic became Shared contracts implemented by their
+     Academic owners: `ProgramEnrollmentStatusFilter` (Progression's
+     `FilterStudentsByProgramEnrollmentStatus`, which owns the
+     enrollment-before-legacy-status precedence) and
+     `StudentDirectoryFormOptionsReader` (Catalog's
+     `GetStudentDirectoryFormOptionsQuery`, now returning plain arrays —
+     identical JSON, since the props serialized those models anyway).
+     `ListStudentsQuery` took the status filter as a constructor dependency
+     instead of instantiating it inline. Moved `ListStudentsQueryTest` to
+     `tests/Feature/Registry`. Ratchet: `shared_model_imports` 455 → 451;
+     `cross_context_concrete_imports` held at 0.
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
    - [x] Ratchet tighten: earlier slices lowered the frozen-* ceilings per
      move but left incidental headroom on the other rules. Re-pinned every
@@ -398,36 +416,17 @@ controllers.
 
 | Rule | Count | Concentration |
 |---|---|---|
-| `shared_model_imports` | 231 | 173 in unassigned generic dirs, 57 Delivery, 1 Catalog |
-| `inline_request_validation` | 7 | `Http/Web` (Gpa, Placement, ProgressionAudit, PerformanceDashboard, Student), `Delivery/Http/Api/Lecturer/*` |
-| `direct_json_responses` | 2 | `Catalog/Http/Web/SpecializationController`, `Http/Web/StudentController` |
+| `shared_model_imports` | 223 | 165 in unassigned generic dirs, 57 Delivery, 1 Catalog |
+| `inline_request_validation` | 6 | `Http/Web` (Gpa, Placement, ProgressionAudit, PerformanceDashboard) and `Delivery/Http/Api/Lecturer/*` |
+| `direct_json_responses` | 1 | `Catalog/Http/Web/SpecializationController` |
 
 Requirement 1 (assign every generic Academic class to one logical context) is the
 dominant remainder. The unassigned findings sit in `Academic/Actions` (47),
-`Academic/Http` (42), `Academic/Queries` (41), `Academic/Support` (35),
+`Academic/Queries` (39), `Academic/Http` (36), `Academic/Support` (35),
 `Academic/Services` (4), and `Exports`/`Observers`/`Providers` (4).
 
-### Open question: who owns the student directory?
-
-`StudentController` (now 405 lines, HTTP debt cleared) still sits in the
-unassigned `Academic/Http/Web`. Its remaining `App\Models\Student` imports can
-only be exempted by moving it to `App\Modules\StudentRegistry`, which already
-owns `Student` in the ownership contract. That move is not mechanical:
-
-- `ListStudentsQuery` and `ExportStudentsQuery` (both pure `Student` queries,
-  today under the unassigned `Academic\Queries`) would have to move with it, or
-  the controller would take a `cross_context_concrete_imports` hit — a
-  zero-tolerance rule.
-- `ListStudentsQuery` is bound as `StudentDirectoryReader`, a contract filed
-  under `Shared\Contracts\Academic`. If the implementation moves to
-  StudentRegistry, either the contract moves too (touching `StudentService`) or
-  StudentRegistry implements an Academic-namespaced contract.
-
-Deciding this needs a product/architecture call on whether the student directory
-is an Academic surface or a Registry one; it is not derivable from the repo.
-
-After that, the generic `Actions`/`Queries`/`Support` trio is the bulk of what is
-left.
+Next highest-yield vertical: the generic `Actions`/`Queries`/`Support` trio,
+which is the bulk of what is left.
 
 Explicitly not phase-04 scope, tagged to later phases by the scanner:
 `AcademicRecordGenerationServiceOptimized` (frozen service) and

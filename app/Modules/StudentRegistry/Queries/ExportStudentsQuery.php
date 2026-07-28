@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Queries;
+namespace App\Modules\StudentRegistry\Queries;
 
 use App\Models\Student;
 use Illuminate\Database\Eloquent\Builder;

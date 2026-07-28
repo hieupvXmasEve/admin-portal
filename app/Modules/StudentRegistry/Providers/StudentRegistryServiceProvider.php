@@ -6,6 +6,7 @@ namespace App\Modules\StudentRegistry\Providers;
 
 use App\Models\Student;
 use App\Modules\StudentRegistry\Observers\PublishStudentRegistered;
+use App\Modules\StudentRegistry\Queries\ListStudentsQuery;
 use App\Modules\StudentRegistry\Support\EloquentCurriculumStudentSummaryReader;
 use App\Modules\StudentRegistry\Support\EloquentSemesterEnrollmentEligibilityReader;
 use App\Modules\StudentRegistry\Support\EloquentStudentCollectionEligibilityReader;
@@ -21,6 +22,7 @@ use App\Modules\StudentRegistry\Support\EloquentStudentRegistryStore;
 use App\Shared\Contracts\StudentRegistry\CurriculumStudentSummaryReader;
 use App\Shared\Contracts\StudentRegistry\SemesterEnrollmentEligibilityReader;
 use App\Shared\Contracts\StudentRegistry\StudentCollectionEligibilityReader;
+use App\Shared\Contracts\StudentRegistry\StudentDirectoryReader;
 use App\Shared\Contracts\StudentRegistry\StudentGuardianRelationshipReader;
 use App\Shared\Contracts\StudentRegistry\StudentGuardianRelationshipWriter;
 use App\Shared\Contracts\StudentRegistry\StudentIdentityWriter;
@@ -39,6 +41,7 @@ class StudentRegistryServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->bind(StudentDirectoryReader::class, ListStudentsQuery::class);
         $this->app->bind(StudentReferenceReader::class, EloquentStudentRegistryStore::class);
         $this->app->bind(StudentSerializedReferenceReader::class, EloquentStudentRegistryStore::class);
         $this->app->bind(CurriculumStudentSummaryReader::class, EloquentCurriculumStudentSummaryReader::class);

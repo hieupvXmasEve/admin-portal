@@ -61,7 +61,7 @@ it('keeps Guardian authentication and Student context decisions on Identity gran
 });
 
 it('reads the staff edit form primary Guardian through the Registry contract', function (): void {
-    $contents = file_get_contents(base_path('app/Modules/Academic/Http/Web/StudentController.php')) ?: '';
+    $contents = file_get_contents(base_path('app/Modules/StudentRegistry/Http/Web/StudentController.php')) ?: '';
 
     expect($contents)
         ->toContain('StudentGuardianRelationshipReader')

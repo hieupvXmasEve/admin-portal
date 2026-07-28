@@ -2,16 +2,20 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Queries;
+namespace App\Modules\StudentRegistry\Queries;
 
 use App\Models\Student;
-use App\Modules\Academic\Progression\Queries\FilterStudentsByProgramEnrollmentStatus;
-use App\Shared\Contracts\Academic\StudentDirectoryReader;
+use App\Shared\Contracts\Academic\ProgramEnrollmentStatusFilter;
+use App\Shared\Contracts\StudentRegistry\StudentDirectoryReader;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 
 class ListStudentsQuery implements StudentDirectoryReader
 {
+    public function __construct(
+        private readonly ProgramEnrollmentStatusFilter $statusFilter,
+    ) {}
+
     /**
      * @param  array<string, mixed>  $filters
      */
@@ -81,9 +85,9 @@ class ListStudentsQuery implements StudentDirectoryReader
         }
 
         if (! empty($filters['statuses'])) {
-            (new FilterStudentsByProgramEnrollmentStatus)->apply($query, array_values($filters['statuses']));
+            $this->statusFilter->apply($query, array_values($filters['statuses']));
         } elseif (! empty($filters['status'])) {
-            (new FilterStudentsByProgramEnrollmentStatus)->apply($query, [(string) $filters['status']]);
+            $this->statusFilter->apply($query, [(string) $filters['status']]);
         }
 
         if (! empty($filters['intake_semester_ids'])) {

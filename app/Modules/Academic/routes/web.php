@@ -47,7 +47,6 @@ use App\Modules\Academic\Http\Web\PerformanceDashboardController;
 use App\Modules\Academic\Http\Web\RecalculateApplyController;
 use App\Modules\Academic\Http\Web\RecalculatePreviewController;
 use App\Modules\Academic\Http\Web\RetakeCourseRegistrationController;
-use App\Modules\Academic\Http\Web\StudentController;
 use App\Modules\Academic\Http\Web\WarningCenterController;
 use App\Modules\Academic\Progression\Http\Web\SemesterEnrollmentController;
 use App\Modules\Academic\Progression\Http\Web\StudentAcademicSummaryController;
@@ -56,6 +55,7 @@ use App\Modules\Academic\Progression\Http\Web\StudentActionController;
 use App\Modules\Academic\Progression\Http\Web\StudentDecisionController;
 use App\Modules\Academic\Progression\Http\Web\StudentLifecycleYearlyAnalysisController;
 use App\Modules\Academic\Progression\Http\Web\StudentStatusController;
+use App\Modules\StudentRegistry\Http\Web\StudentController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
