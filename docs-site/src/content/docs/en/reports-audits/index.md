@@ -11,6 +11,9 @@ source:
   - resources/js/pages/Admin/Academic/Performance/Dashboard.vue
   - resources/js/pages/Academic/CourseRanking/Index.vue
   - resources/js/pages/Academic/Report/Index.vue
+  - resources/js/pages/Admin/Reports/StudentLifecycleYearlyAnalysis/Index.vue
+  - resources/js/pages/Admin/Reports/StudentLifecycleYearlyAnalysis/StudentStatusTable.vue
+  - resources/js/pages/Academic/Report/StudentUnits/Index.vue
 ---
 
 **Reports & Audits** is the management area: university-wide figures, and the gaps where data is missing.
@@ -38,15 +41,26 @@ Two groups: **Lifecycle & Decisions** and **Academic Performance**.
 
 ### Lifecycle Yearly Analysis
 
-**What it is for.** Following each intake year by year: how many continue, defer, or leave.
+**What it is for.** Following each intake year by year: how many continue, defer, leave, or graduate. Click any figure in the tables to see the students behind it.
 
 **Who can open it.** Anyone with permission to view student actions.
+
+**On screen**
+
+- **Students by cohort and semester** — one matrix table per intake: rows are statuses (enrolled, deferred, dropped, graduated...), columns are semesters. Any cell greater than zero is clickable; the selected cell is highlighted.
+- **Movement by semester** — how many students entered fresh each semester and how many changed status.
+- **Current status by cohort** — headcount, NE (not yet determined) count, and defer/drop/graduation rates for each intake as of the current semester.
+- **Student list by semester** — the detail table, filterable by semester and status; it stays in sync with whichever matrix cell was clicked.
 
 **Steps**
 
 1. Go to **Reports & Audits → Lifecycle & Decisions → Lifecycle Yearly Analysis**.
-2. Choose the year or period to analyse.
-3. Export the data if it is going into a report.
+2. Click a cell in the matrix (for example, the deferred count for cohort X in semester Y). The **Student list** dialog opens with exactly that list.
+3. Or set **Semester** and **Status** manually in the **Student list by semester** panel below if you don't need a cohort filter.
+4. Click **Clear cohort filter** to see all students in the semester, without the cohort restriction.
+5. Click **Export Excel** to download the list currently shown (with the semester / status / cohort filters applied).
+
+**Note.** A cohort's column only counts from the semester it actually entered; earlier semesters show `-`, not zero.
 
 ### Academic Progression
 
@@ -124,6 +138,21 @@ Two groups: **Lifecycle & Decisions** and **Academic Performance**.
 2. Filter by term, program, or unit.
 3. Click **Clear Filters** to see everything again.
 
+### Student Completed Units
+
+**What it is for.** Every student who has passed units, split into **GC** (general core) and **Major** groups, with unit and credit counts.
+
+**Who can open it.** Anyone with permission to view academic reports.
+
+**Steps**
+
+1. Go to **Reports & Audits → Academic Performance → Student Completed Units**.
+2. Search by **Student ID / Name** or filter by **Program**.
+3. Read the **GC Units** and **Major Units** columns — each unit shows as a code chip; `—` means no units in that group yet.
+4. Click **Export Excel** to download the list currently shown (with the active filters applied).
+
+**Note.** The list only counts **passed** units; units still in progress or failed do not appear here.
+
 ## Common situations
 
 | Situation | Page to use |
@@ -132,3 +161,4 @@ Two groups: **Lifecycle & Decisions** and **Academic Performance**.
 | Preparing the end-of-term review | Performance Dashboard → Academic Report → Course Ranking |
 | Cleaning records before a progression review | Missing Documents → Missing Decisions → Academic Progression |
 | Attrition figures by intake | Lifecycle Yearly Analysis |
+| Checking which units a student has passed, GC or Major | Student Completed Units |

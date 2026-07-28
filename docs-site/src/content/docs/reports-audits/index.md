@@ -11,6 +11,9 @@ source:
   - resources/js/pages/Admin/Academic/Performance/Dashboard.vue
   - resources/js/pages/Academic/CourseRanking/Index.vue
   - resources/js/pages/Academic/Report/Index.vue
+  - resources/js/pages/Admin/Reports/StudentLifecycleYearlyAnalysis/Index.vue
+  - resources/js/pages/Admin/Reports/StudentLifecycleYearlyAnalysis/StudentStatusTable.vue
+  - resources/js/pages/Academic/Report/StudentUnits/Index.vue
 ---
 
 **Reports & Audits** dành cho cấp quản lý: nhìn số liệu toàn trường và phát hiện chỗ dữ liệu bị thiếu.
@@ -38,15 +41,26 @@ Hai nhóm: **Lifecycle & Decisions** (vòng đời và quyết định) và **Ac
 
 ### Lifecycle Yearly Analysis — Phân tích vòng đời theo năm
 
-**Dùng để làm gì.** Xem diễn biến của các khóa sinh viên qua từng năm: bao nhiêu người học tiếp, bảo lưu, thôi học.
+**Dùng để làm gì.** Xem diễn biến của các khóa sinh viên qua từng năm: bao nhiêu người học tiếp, bảo lưu, thôi học, tốt nghiệp. Bấm thẳng vào một con số trong bảng để xem danh sách sinh viên đứng sau con số đó.
 
 **Ai vào được.** Người có quyền xem tác động sinh viên.
+
+**Nội dung màn hình**
+
+- **Sinh viên theo khoá và kỳ** — một bảng ma trận cho mỗi khoá tuyển sinh: hàng là trạng thái (đang học, bảo lưu, thôi học, tốt nghiệp...), cột là kỳ học. Ô nào có số > 0 bấm được để xem danh sách; ô đang chọn tô nổi bật.
+- **Biến động theo kỳ** — mỗi kỳ có bao nhiêu sinh viên nhập học mới và bao nhiêu người đổi trạng thái.
+- **Hiện trạng từng khoá** — sĩ số, số NE (chưa xác định), tỷ lệ bảo lưu / thôi học / tốt nghiệp của từng khoá tính đến kỳ hiện tại.
+- **Danh sách sinh viên theo kỳ** — bảng chi tiết, lọc theo kỳ học và trạng thái; đồng bộ với ô vừa bấm ở ma trận.
 
 **Các bước**
 
 1. Vào **Reports & Audits → Lifecycle & Decisions → Lifecycle Yearly Analysis**.
-2. Chọn năm hoặc khoảng thời gian cần phân tích.
-3. Xuất dữ liệu nếu cần đưa vào báo cáo.
+2. Bấm vào một ô số trong bảng ma trận (ví dụ: số sinh viên bảo lưu của khoá X tại kỳ Y). Hộp thoại **Danh sách sinh viên** mở ra đúng danh sách đó.
+3. Hoặc chọn thủ công **Kỳ học** và **Trạng thái** ở khung **Danh sách sinh viên theo kỳ** phía dưới nếu không cần lọc theo khoá.
+4. Bấm **Bỏ lọc khoá** để xem lại toàn bộ sinh viên trong kỳ, không giới hạn theo khoá đã chọn.
+5. Bấm **Xuất Excel** để tải danh sách đang xem (đã áp dụng bộ lọc kỳ / trạng thái / khoá hiện tại).
+
+**Lưu ý.** Ma trận chỉ tính một khoá vào cột kỳ học kể từ kỳ khoá đó thực sự nhập học; các kỳ trước đó hiển thị `-`, không phải 0.
 
 ### Academic Progression — Đối chiếu tiến độ học tập
 
@@ -124,6 +138,21 @@ Hai nhóm: **Lifecycle & Decisions** (vòng đời và quyết định) và **Ac
 2. Lọc theo kỳ, chương trình hoặc môn.
 3. Bấm **Clear Filters** khi cần xem lại toàn bộ.
 
+### Student Completed Units — Môn đã hoàn thành
+
+**Dùng để làm gì.** Xem toàn bộ sinh viên đã qua môn, tách riêng nhóm môn **GC** (đại cương) và **Major** (chuyên ngành), kèm số môn và số tín chỉ đã tích lũy.
+
+**Ai vào được.** Người có quyền xem báo cáo học vụ.
+
+**Các bước**
+
+1. Vào **Reports & Audits → Academic Performance → Student Completed Units**.
+2. Tìm theo **Student ID / Name** hoặc lọc theo **Program** (chương trình đào tạo).
+3. Xem cột **GC Units** và **Major Units** — mỗi môn hiển thị dạng thẻ mã môn; `—` nghĩa là chưa có môn nào ở nhóm đó.
+4. Bấm **Export Excel** để tải danh sách đang xem (đã áp dụng bộ lọc hiện tại).
+
+**Lưu ý.** Danh sách chỉ tính môn đã **qua** (passed); môn đang học hoặc đã rớt không xuất hiện ở đây.
+
 ## Việc thường gặp
 
 | Tình huống | Trang dùng |
@@ -132,3 +161,4 @@ Hai nhóm: **Lifecycle & Decisions** (vòng đời và quyết định) và **Ac
 | Chuẩn bị họp tổng kết kỳ | Performance Dashboard → Academic Report → Course Ranking |
 | Rà soát hồ sơ trước mốc xét tiến độ | Missing Documents → Missing Decisions → Academic Progression |
 | Thống kê tỉ lệ bỏ học theo khóa | Lifecycle Yearly Analysis |
+| Xem sinh viên đã qua môn nào, GC hay Major | Student Completed Units |

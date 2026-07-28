@@ -11,6 +11,9 @@ source:
   - resources/js/pages/Admin/Academic/Performance/Dashboard.vue
   - resources/js/pages/Academic/CourseRanking/Index.vue
   - resources/js/pages/Academic/Report/Index.vue
+  - resources/js/pages/Admin/Reports/StudentLifecycleYearlyAnalysis/Index.vue
+  - resources/js/pages/Admin/Reports/StudentLifecycleYearlyAnalysis/StudentStatusTable.vue
+  - resources/js/pages/Academic/Report/StudentUnits/Index.vue
 ---
 
 **Reports & Audits**는 관리자용 영역입니다. 전교 단위 수치를 보고, 자료가 빠진 곳을 찾아냅니다.
@@ -38,15 +41,26 @@ source:
 
 ### Lifecycle Yearly Analysis — 연도별 학적 분석
 
-**용도.** 입학 연도별로 학생이 해마다 어떻게 되었는지 봅니다. 계속 재학, 휴학, 중도 이탈 인원을 확인합니다.
+**용도.** 입학 연도별로 학생이 해마다 어떻게 되었는지 봅니다. 계속 재학, 휴학, 중도 이탈, 졸업 인원을 확인합니다. 표의 숫자를 바로 눌러 그 뒤에 있는 학생 명단을 볼 수 있습니다.
 
 **접근 권한.** 학생 처리 이력 조회 권한이 있는 사용자.
+
+**화면 내용**
+
+- **입학 연도·학기별 학생 수** — 입학 기수마다 행렬 표 하나. 행은 상태(재학, 휴학, 중도 이탈, 졸업 등), 열은 학기입니다. 0보다 큰 칸은 클릭할 수 있고, 선택한 칸은 강조 표시됩니다.
+- **학기별 변동** — 학기마다 신규 입학 인원과 상태가 바뀐 인원을 보여줍니다.
+- **기수별 현재 상태** — 각 기수의 인원 수, NE(미확정) 수, 현재 학기 기준 휴학/이탈/졸업 비율을 보여줍니다.
+- **학기별 학생 명단** — 학기와 상태로 걸러볼 수 있는 상세 표. 행렬 표에서 방금 클릭한 칸과 자동으로 맞춰집니다.
 
 **절차**
 
 1. **Reports & Audits → Lifecycle & Decisions → Lifecycle Yearly Analysis**로 이동합니다.
-2. 분석할 연도나 기간을 선택합니다.
-3. 보고서에 넣을 자료는 내보내기합니다.
+2. 행렬 표에서 숫자 칸을 클릭합니다(예: 기수 X의 학기 Y 휴학 인원). **학생 명단** 대화상자에 정확히 그 명단이 열립니다.
+3. 기수로 좁힐 필요가 없다면 아래 **학기별 학생 명단** 영역에서 **학기**와 **상태**를 직접 선택합니다.
+4. **기수 필터 해제**를 누르면 선택한 기수 제한 없이 해당 학기 전체 학생을 다시 봅니다.
+5. **엑셀 내보내기**를 누르면 현재 보고 있는 명단(적용된 학기 / 상태 / 기수 필터 포함)을 내려받습니다.
+
+**유의 사항.** 행렬의 한 기수는 실제로 입학한 학기부터만 열에 집계됩니다. 그 이전 학기는 0이 아니라 `-`로 표시됩니다.
 
 ### Academic Progression — 학업 진행 대조
 
@@ -124,6 +138,21 @@ source:
 2. 학기, 학위과정, 교과목으로 좁힙니다.
 3. **Clear Filters**를 누르면 전체가 다시 표시됩니다.
 
+### Student Completed Units — 이수 교과목
+
+**용도.** 과목을 이수(pass)한 모든 학생을 **GC**(교양)와 **Major**(전공) 그룹으로 나눠 보여주고, 이수 과목 수와 누적 학점을 함께 표시합니다.
+
+**접근 권한.** 학사 보고서 조회 권한이 있는 사용자.
+
+**절차**
+
+1. **Reports & Audits → Academic Performance → Student Completed Units**로 이동합니다.
+2. **Student ID / Name**으로 검색하거나 **Program**으로 좁힙니다.
+3. **GC Units**, **Major Units** 열을 확인합니다. 각 과목은 과목 코드 배지로 표시되며, `—`는 해당 그룹에 이수 과목이 없다는 뜻입니다.
+4. **Export Excel**을 누르면 현재 보고 있는 명단(적용된 필터 포함)을 내려받습니다.
+
+**유의 사항.** 이 명단은 **이수(pass)** 처리된 과목만 집계합니다. 수강 중이거나 낙제한 과목은 표시되지 않습니다.
+
 ## 자주 있는 상황
 
 | 상황 | 사용할 화면 |
@@ -132,3 +161,4 @@ source:
 | 학기 결산 회의 준비 | Performance Dashboard → Academic Report → Course Ranking |
 | 진급 심사 전 기록 정리 | Missing Documents → Missing Decisions → Academic Progression |
 | 입학 연도별 이탈률 집계 | Lifecycle Yearly Analysis |
+| 학생이 이수한 과목이 GC인지 전공인지 확인 | Student Completed Units |
