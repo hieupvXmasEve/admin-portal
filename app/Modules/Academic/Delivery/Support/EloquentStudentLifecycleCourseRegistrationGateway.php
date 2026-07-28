@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Academic\Delivery\Support;
 
+use App\Models\AcademicRecord;
 use App\Models\CourseRegistration;
 use App\Models\CourseRetakeRegistration;
 use App\Shared\Contracts\Academic\AcademicFinanceSourceKeys;
@@ -89,8 +90,23 @@ final class EloquentStudentLifecycleCourseRegistrationGateway implements Student
             return;
         }
 
+        $registrations = CourseRegistration::query()
+            ->whereKey($registrationIds)
+            ->get(['id', 'student_id', 'course_offering_id']);
+
         CourseRegistration::query()
             ->whereKey($registrationIds)
             ->update(['registration_status' => 'defer']);
+
+        // Stale academic_records for the deferred course must not survive the
+        // defer — finalize-course reads academic_records unscoped by
+        // registration_status, so a leftover row here is what let a later
+        // finalize silently flip a deferred registration back to 'completed'.
+        $registrations->groupBy('student_id')->each(
+            static fn ($group, int $studentId) => AcademicRecord::query()
+                ->where('student_id', $studentId)
+                ->whereIn('course_offering_id', $group->pluck('course_offering_id'))
+                ->delete()
+        );
     }
 }

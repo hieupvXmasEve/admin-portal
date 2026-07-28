@@ -482,8 +482,12 @@ class CourseCompletionService
             ->get();
 
         foreach ($records as $record) {
+            // Only flip registrations still in an active state (registered/confirmed).
+            // Deferred/dropped/withdrawn students must keep their status untouched
+            // even if an AcademicRecord row exists for them from before the defer.
             CourseRegistration::where('course_offering_id', $courseOffering->id)
                 ->where('student_id', $record->student_id)
+                ->whereIn('registration_status', ['registered', 'confirmed'])
                 ->update([
                     'registration_status' => 'completed',
                     'final_grade' => $record->final_letter_grade,
