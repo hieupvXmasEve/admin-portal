@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Academic\Delivery\Support\Grading;
 
-use App\Models\AcademicRecord;
 use App\Modules\Academic\Delivery\Support\Grading\Contracts\GradingCalculator;
+use App\Shared\Support\Academic\CourseGradeScale;
 
 /**
  * Preserves the existing weighted-average model.
@@ -20,8 +20,8 @@ class DefaultWeightedPercentageCalculator implements GradingCalculator
     public function calculate(array $componentScores, ?array $scheme): GradingResult
     {
         $finalPercentage = (float) ($componentScores['__weighted_average__'] ?? 0.0);
-        $letterGrade = AcademicRecord::calculateLetterGrade($finalPercentage);
-        $gradePoints = AcademicRecord::calculateGradePoints($finalPercentage);
+        $letterGrade = CourseGradeScale::letterGrade($finalPercentage);
+        $gradePoints = CourseGradeScale::gradePoints($finalPercentage);
         $passed = $finalPercentage >= ($scheme['passing_threshold'] ?? 60.0);
 
         return new GradingResult(

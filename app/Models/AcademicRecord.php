@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Shared\Support\Academic\CourseGradeScale;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -12,20 +13,17 @@ class AcademicRecord extends AuditableModel
 {
     use HasFactory, SoftDeletes;
 
-    public const FAILURE_GRADE_FAILED = 'grade_failed';
+    // The scale and the failure vocabulary live in CourseGradeScale so callers
+    // that only need the policy do not have to reach for the record model.
+    public const FAILURE_GRADE_FAILED = CourseGradeScale::FAILURE_GRADE_FAILED;
 
-    public const FAILURE_ATTENDANCE_FAILED = 'attendance_failed';
+    public const FAILURE_ATTENDANCE_FAILED = CourseGradeScale::FAILURE_ATTENDANCE_FAILED;
 
-    public const FAILURE_BOTH_FAILED = 'both_failed';
+    public const FAILURE_BOTH_FAILED = CourseGradeScale::FAILURE_BOTH_FAILED;
 
-    public const FAILURE_MANUAL_FAILED = 'manual_failed';
+    public const FAILURE_MANUAL_FAILED = CourseGradeScale::FAILURE_MANUAL_FAILED;
 
-    public const FAILURE_REASONS = [
-        self::FAILURE_GRADE_FAILED,
-        self::FAILURE_ATTENDANCE_FAILED,
-        self::FAILURE_BOTH_FAILED,
-        self::FAILURE_MANUAL_FAILED,
-    ];
+    public const FAILURE_REASONS = CourseGradeScale::FAILURE_REASONS;
 
     protected $fillable = [
         'student_id',
@@ -324,15 +322,7 @@ class AcademicRecord extends AuditableModel
      */
     public static function calculateGradePoints(float $percentage): float
     {
-        // Map percentage to 4.0 scale:
-        // A common accurate formula for continuous GPA is (Percentage / 100) * 4
-        // However, many systems cap 4.0 at 90% or 95%.
-        // We will use min(4.0, (percentage / 25)) if we want 100% = 4.0 linear
-        // Or min(4.0, round(($percentage * 4) / 100, 2)) for a direct ratio.
-
-        $gpa = ($percentage * 4) / 100;
-
-        return round(max(0, min(4.0, $gpa)), 2);
+        return CourseGradeScale::gradePoints($percentage);
     }
 
     /**
@@ -340,17 +330,6 @@ class AcademicRecord extends AuditableModel
      */
     public static function calculateLetterGrade(float $percentage): string
     {
-        return match (true) {
-            $percentage >= 90 => 'A+',
-            $percentage >= 85 => 'A',
-            $percentage >= 80 => 'A-',
-            $percentage >= 75 => 'B+',
-            $percentage >= 70 => 'B',
-            $percentage >= 65 => 'B-',
-            $percentage >= 60 => 'C+',
-            $percentage >= 55 => 'C',
-            $percentage >= 50 => 'C-',
-            default => 'F',
-        };
+        return CourseGradeScale::letterGrade($percentage);
     }
 }

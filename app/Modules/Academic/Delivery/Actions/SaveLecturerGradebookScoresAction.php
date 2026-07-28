@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Academic\Delivery\Actions;
 
-use App\Models\AcademicRecord;
 use App\Models\AssessmentComponentDetail;
 use App\Models\AssessmentComponentDetailScore;
 use App\Models\CourseOffering;
 use App\Services\CourseCompletionService;
+use App\Shared\Support\Academic\CourseGradeScale;
 use Illuminate\Support\Facades\DB;
 
 final class SaveLecturerGradebookScoresAction
@@ -44,7 +44,7 @@ final class SaveLecturerGradebookScoresAction
                 $score->fill([
                     'points_earned' => $scoreData['points_earned'],
                     'percentage_score' => $percentageScore,
-                    'letter_grade' => AcademicRecord::calculateLetterGrade($percentageScore),
+                    'letter_grade' => CourseGradeScale::letterGrade($percentageScore),
                     'status' => 'graded',
                     'graded_by_lecture_id' => $data['lecturer_id'],
                     'graded_at' => now(),

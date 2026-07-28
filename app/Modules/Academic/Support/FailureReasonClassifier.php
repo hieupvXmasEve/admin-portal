@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Academic\Support;
 
-use App\Models\AcademicRecord;
+use App\Shared\Support\Academic\CourseGradeScale;
 
 /**
  * Pure classifier that decides, at course finalization, whether a student passed
@@ -78,14 +78,14 @@ final class FailureReasonClassifier
 
         if ($overridePass) {
             $isPassed = $overrideIsPassed;
-            $failureReason = $isPassed ? null : AcademicRecord::FAILURE_MANUAL_FAILED;
+            $failureReason = $isPassed ? null : CourseGradeScale::FAILURE_MANUAL_FAILED;
         } else {
             $isPassed = ! ($gradeFailed || $attendanceFailed);
             $failureReason = match (true) {
                 $isPassed => null,
-                $gradeFailed && $attendanceFailed => AcademicRecord::FAILURE_BOTH_FAILED,
-                $gradeFailed => AcademicRecord::FAILURE_GRADE_FAILED,
-                default => AcademicRecord::FAILURE_ATTENDANCE_FAILED,
+                $gradeFailed && $attendanceFailed => CourseGradeScale::FAILURE_BOTH_FAILED,
+                $gradeFailed => CourseGradeScale::FAILURE_GRADE_FAILED,
+                default => CourseGradeScale::FAILURE_ATTENDANCE_FAILED,
             };
         }
 
