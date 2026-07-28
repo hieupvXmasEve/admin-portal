@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 it('keeps the migrated Student Hub overview on the Program Enrollment reader', function (): void {
     $service = file_get_contents(base_path('app/Services/StudentAcademicSummaryService.php')) ?: '';
-    $controller = file_get_contents(base_path('app/Modules/Academic/Http/Web/StudentAcademicSummaryController.php')) ?: '';
+    $controller = file_get_contents(base_path('app/Modules/Academic/Progression/Http/Web/StudentAcademicSummaryController.php')) ?: '';
 
     preg_match('/private function getStudentOverview\(.*?^    }\n\n    \/\*\*/ms', $service, $overviewMethod);
     preg_match('/private function hubStudentContext\(.*?^    }\n\n    \/\*\*/ms', $controller, $hubContextMethod);

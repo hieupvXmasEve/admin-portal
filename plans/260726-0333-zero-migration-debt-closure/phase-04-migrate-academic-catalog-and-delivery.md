@@ -309,6 +309,41 @@ controllers/services/routes and frontend debt with each migrated workflow.
      ownership move (it spans Progression/Delivery/StudentRegistry model
      boundaries, tracked under phase 9). Lowered the frozen-controller and
      frozen-route ratchets accordingly.
+   - [x] Student lifecycle controllers assigned to Progression: claimed
+     `StudentActionLog` and `StudentDecision` for
+     `owned_shared_models.Academic.Progression` — both models are already
+     read almost exclusively from inside `Academic/Progression/*`, so the
+     claim retroactively exempted 18 pre-existing findings on its own
+     (matching the `Lecture`/FacultyWorkforce precedent). Added first-time
+     characterization coverage for the three uncovered surfaces (student
+     enrollments overview incl. campus scoping and filters, lifecycle
+     yearly analysis incl. default-semester selection and export, and the
+     student-actions import page/template), then moved
+     `StudentStatusController`, `StudentActionController`,
+     `StudentActionAuditController`, `StudentDecisionController`,
+     `StudentLifecycleYearlyAnalysisController`, and
+     `StudentAcademicSummaryController` out of the unassigned
+     `Academic/Http/Web` into `App\Modules\Academic\Progression\Http\Web`.
+     Replaced all 9 inline `$request->validate()` calls with Progression
+     FormRequests and the 3 raw `response()->json()` calls with
+     `ApiResponse::compatible()` (byte-identical passthrough, so the
+     frontend envelope is unchanged). Extracted the remaining non-owned
+     model reads into seams: a new
+     `Catalog\Queries\GetSemesterReferenceOptionsQuery` (deliberately
+     separate from `GetSemesterFilterOptionsQuery` — audit and lifecycle
+     reports must keep archived semesters selectable, which that seam
+     filters out), the existing `CampusReferenceReader` for campus codes,
+     and a new `UserDirectoryReader::staffMembers()` for the actor filter.
+     One accepted behavior delta: `StudentStatusController`'s
+     no-campus-selected redirect now runs after FormRequest validation
+     instead of before it, so a request that both lacks a campus and
+     carries an invalid filter returns validation errors rather than the
+     campus-selection redirect. Two `App\Models\Student` imports remain
+     (`StudentAcademicSummaryController`, `StudentActionController`) —
+     they are route-model bindings, and removing them needs a
+     StudentRegistry binding contract that is out of this slice's scope.
+     Net ratchet effect: `shared_model_imports` 485 → 459,
+     `direct_json_responses` 29 → 27, `inline_request_validation` 46 → 41.
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
    - [x] Ratchet tighten: earlier slices lowered the frozen-* ceilings per
      move but left incidental headroom on the other rules. Re-pinned every
@@ -328,22 +363,25 @@ controllers/services/routes and frontend debt with each migrated workflow.
 ## Remaining Scope
 
 Measured 2026-07-28 from `migration-debt:inventory --format=json`, filtered to
-work packages tagged `phase-04:academic`. Route retirement is complete: Academic
-owns zero frozen routes and zero frozen controllers.
+work packages tagged `phase-04:academic`, after the Progression lifecycle slice.
+Route retirement is complete: Academic owns zero frozen routes and zero frozen
+controllers.
 
 | Rule | Count | Concentration |
 |---|---|---|
-| `shared_model_imports` | 241 | 180 in unassigned generic dirs, 57 Delivery, 1 Catalog |
-| `inline_request_validation` | 12 | `Http/Web/Student*`, `Gpa`, `Placement`, `Delivery/Http/Api/Lecturer/*` |
-| `direct_json_responses` | 4 | `Catalog/Http/Web/SpecializationController`, 3x `Http/Web/Student*` |
+| `shared_model_imports` | 231 | 173 in unassigned generic dirs, 57 Delivery, 1 Catalog |
+| `inline_request_validation` | 7 | `Http/Web` (Gpa, Placement, ProgressionAudit, PerformanceDashboard, Student), `Delivery/Http/Api/Lecturer/*` |
+| `direct_json_responses` | 2 | `Catalog/Http/Web/SpecializationController`, `Http/Web/StudentController` |
 
 Requirement 1 (assign every generic Academic class to one logical context) is the
-dominant remainder. The unassigned findings sit in `Academic/Http` (52),
-`Academic/Actions` (47), `Academic/Queries` (41), `Academic/Support` (35),
+dominant remainder. The unassigned findings sit in `Academic/Actions` (47),
+`Academic/Http` (42), `Academic/Queries` (41), `Academic/Support` (35),
 `Academic/Services` (4), and `Exports`/`Observers`/`Providers` (4).
-`Academic/Http/Web` alone carries 46 shared-model imports plus 9 of the 16
-HTTP-debt files, clustered on the `Student*` controllers — the highest-yield
-next vertical.
+
+Next highest-yield vertical: `Academic/Http/Web/StudentController` (537 lines, 6
+shared-model imports plus both remaining HTTP-debt rules) belongs in
+`App\Modules\StudentRegistry`, which already owns `Student`. After that, the
+generic `Actions`/`Queries`/`Support` trio is the bulk of what is left.
 
 Explicitly not phase-04 scope, tagged to later phases by the scanner:
 `AcademicRecordGenerationServiceOptimized` (frozen service) and

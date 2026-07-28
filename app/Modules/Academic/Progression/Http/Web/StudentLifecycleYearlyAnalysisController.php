@@ -2,16 +2,17 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Http\Web;
+namespace App\Modules\Academic\Progression\Http\Web;
 
 use App\Http\Controllers\Controller;
-use App\Models\Semester;
+use App\Modules\Academic\Catalog\Queries\GetSemesterReferenceOptionsQuery;
 use App\Modules\Academic\Exports\StudentLifecycleStatusExport;
+use App\Modules\Academic\Progression\Http\Requests\ExportStudentLifecycleYearlyRequest;
+use App\Modules\Academic\Progression\Http\Requests\ListStudentLifecycleYearlyRequest;
 use App\Modules\Academic\Queries\Reporting\GetStudentLifecycleYearlyAnalysisQuery;
 use App\Modules\Academic\Queries\Reporting\GetStudentStatusBySemesterQuery;
 use App\Services\ExcelExportService;
 use App\Shared\Contracts\Academic\AcademicPeriodReader;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -22,29 +23,22 @@ class StudentLifecycleYearlyAnalysisController extends Controller
         private readonly GetStudentLifecycleYearlyAnalysisQuery $yearlyQuery,
         private readonly GetStudentStatusBySemesterQuery $statusBySemesterQuery,
         private readonly AcademicPeriodReader $academicPeriods,
+        private readonly GetSemesterReferenceOptionsQuery $semesterOptions,
     ) {}
 
-    public function index(Request $request): Response
+    public function index(ListStudentLifecycleYearlyRequest $request): Response
     {
-        $validated = $request->validate([
-            'selected_semester_id' => ['nullable', 'integer', 'exists:semesters,id'],
-            'current_status' => ['nullable', 'string', 'max:50'],
-            'status_per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
-            'page' => ['nullable', 'integer', 'min:1'],
-        ]);
+        $validated = $request->validated();
 
         $currentCampusId = session('current_campus_id');
         $rows = $this->yearlyQuery->handle($currentCampusId);
 
-        $semesterOptions = Semester::query()
-            ->select('id', 'name', 'code', 'start_date', 'is_active')
-            ->orderBy('start_date', 'desc')
-            ->get();
+        $semesterOptions = $this->semesterOptions->lifecycleOptions();
 
         $defaultSemesterId = $this->academicPeriods->current()?->id;
 
         if (! $defaultSemesterId) {
-            $defaultSemesterId = Semester::query()->orderByDesc('start_date')->value('id');
+            $defaultSemesterId = $this->semesterOptions->latestId();
         }
 
         $selectedSemesterId = (int) ($validated['selected_semester_id'] ?? $defaultSemesterId ?? 0);
@@ -87,14 +81,11 @@ class StudentLifecycleYearlyAnalysisController extends Controller
         ]);
     }
 
-    public function export(Request $request, ExcelExportService $excelService): BinaryFileResponse
+    public function export(ExportStudentLifecycleYearlyRequest $request, ExcelExportService $excelService): BinaryFileResponse
     {
-        $validated = $request->validate([
-            'selected_semester_id' => ['required', 'integer', 'exists:semesters,id'],
-            'current_status' => ['nullable', 'string', 'max:50'],
-        ]);
+        $validated = $request->validated();
 
-        $selectedSemester = Semester::query()->select('id', 'code')->findOrFail($validated['selected_semester_id']);
+        $selectedSemesterCode = $this->semesterOptions->codeOrFail((int) $validated['selected_semester_id']);
         $currentCampusId = session('current_campus_id');
         $currentStatus = $validated['current_status'] ?? null;
 
@@ -106,7 +97,7 @@ class StudentLifecycleYearlyAnalysisController extends Controller
 
         $filename = sprintf(
             'student_lifecycle_status_%s_%s',
-            $selectedSemester->code,
+            $selectedSemesterCode,
             now()->format('Y-m-d_H-i')
         );
 

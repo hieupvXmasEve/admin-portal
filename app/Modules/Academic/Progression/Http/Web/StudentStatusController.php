@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Http\Web;
+namespace App\Modules\Academic\Progression\Http\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Enrollment;
+use App\Modules\Academic\Progression\Http\Requests\ListStudentEnrollmentsRequest;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -16,7 +16,7 @@ class StudentStatusController extends Controller
     /**
      * Display student enrollments overview
      */
-    public function enrollmentsIndex(Request $request): Response|RedirectResponse
+    public function enrollmentsIndex(ListStudentEnrollmentsRequest $request): Response|RedirectResponse
     {
         $campusId = session()->get('current_campus_id');
 
@@ -25,10 +25,7 @@ class StudentStatusController extends Controller
                 ->with('error', 'Please select a campus first');
         }
 
-        $validated = $request->validate([
-            'semester_id' => 'nullable|exists:semesters,id',
-            'search' => 'nullable|string|max:255',
-        ]);
+        $validated = $request->validated();
 
         // Get enrollments for current campus
         $enrollmentsQuery = Enrollment::with(['student', 'semester'])

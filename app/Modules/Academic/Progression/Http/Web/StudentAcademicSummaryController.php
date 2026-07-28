@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Http\Web;
+namespace App\Modules\Academic\Progression\Http\Web;
 
 use App\Http\Controllers\Api\GoldTransactionController;
 use App\Http\Controllers\Api\StudentWalletController;
@@ -18,6 +18,8 @@ use App\Modules\Academic\Delivery\Queries\GetStudentHubCourseScoresQuery;
 use App\Modules\Academic\Delivery\Queries\GetStudentHubScoreDetailsQuery;
 use App\Modules\Academic\Exports\StudentAcademicSummaryExport;
 use App\Modules\Academic\Progression\Actions\AttachDecisionToTransitionAction;
+use App\Modules\Academic\Progression\Http\Requests\AttachDecisionToTransitionRequest;
+use App\Modules\Academic\Progression\Http\Requests\GetStudentHubAttendanceDetailsRequest;
 use App\Modules\Academic\Progression\Queries\GetStudentAcademicSummaryExportQuery;
 use App\Modules\Academic\Progression\Queries\GetStudentGraduationProgressQuery;
 use App\Modules\Academic\Progression\Queries\GetStudentHubOverviewQuery;
@@ -283,13 +285,9 @@ class StudentAcademicSummaryController extends Controller
      * later clears its missing-decision flag and adds the student to the
      * Decision's coverage roster.
      */
-    public function attachDecision(Student $student, Request $request): RedirectResponse
+    public function attachDecision(Student $student, AttachDecisionToTransitionRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'source' => ['required', 'in:action,progression'],
-            'source_id' => ['required', 'integer'],
-            'decision_id' => ['required', 'integer', 'exists:student_decisions,id'],
-        ]);
+        $validated = $request->validated();
 
         AttachDecisionToTransitionAction::run([
             'student_id' => $student->id,
@@ -418,13 +416,9 @@ class StudentAcademicSummaryController extends Controller
      * @param  Request  $request  Request containing unit filter
      * @return JsonResponse Detailed attendance data
      */
-    public function getAttendanceDetails(Student $student, Request $request, GetStudentAcademicAttendanceDetailsQuery $query): JsonResponse
+    public function getAttendanceDetails(Student $student, GetStudentHubAttendanceDetailsRequest $request, GetStudentAcademicAttendanceDetailsQuery $query): JsonResponse
     {
-        $validated = $request->validate([
-            'unit_id' => 'required|exists:units,id',
-            'semester_id' => 'nullable|exists:semesters,id',
-            'course_offering_id' => 'nullable|exists:course_offerings,id',
-        ]);
+        $validated = $request->validated();
 
         $attendanceDetails = $query->execute(
             $student->id,
@@ -433,7 +427,7 @@ class StudentAcademicSummaryController extends Controller
             isset($validated['course_offering_id']) ? (int) $validated['course_offering_id'] : null
         );
 
-        return response()->json([
+        return ApiResponse::compatible([
             'success' => true,
             'data' => $attendanceDetails,
         ]);

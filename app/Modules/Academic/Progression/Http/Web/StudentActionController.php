@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Http\Web;
+namespace App\Modules\Academic\Progression\Http\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Student;

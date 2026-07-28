@@ -2,22 +2,26 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Http\Web;
+namespace App\Modules\Academic\Progression\Http\Web;
 
 use App\Enums\StudentActionType;
 use App\Http\Controllers\Controller;
-use App\Models\Campus;
-use App\Models\Semester;
-use App\Models\User;
+use App\Http\Responses\ApiResponse;
 use App\Modules\Academic\Actions\ImportStudentActionsFromExcelAction;
+use App\Modules\Academic\Catalog\Queries\GetSemesterReferenceOptionsQuery;
 use App\Modules\Academic\Exports\StudentActionImportTemplateExport;
 use App\Modules\Academic\Exports\StudentActionLogsExport;
 use App\Modules\Academic\Http\Requests\ExecuteStudentActionsImportRequest;
 use App\Modules\Academic\Http\Requests\PreviewStudentActionsImportRequest;
+use App\Modules\Academic\Progression\Http\Requests\ExportStudentActionAuditRequest;
+use App\Modules\Academic\Progression\Http\Requests\ListStudentActionAuditRequest;
 use App\Modules\Academic\Queries\ListStudentActionLogsQuery;
 use App\Services\ExcelExportService;
+use App\Shared\Contracts\Identity\DTO\UserDirectoryEntry;
+use App\Shared\Contracts\Identity\UserDirectoryReader;
+use App\Shared\Contracts\Institution\CampusReferenceReader;
+use App\Shared\Contracts\Institution\DTO\CampusReference;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -26,6 +30,12 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class StudentActionAuditController extends Controller
 {
+    public function __construct(
+        private readonly GetSemesterReferenceOptionsQuery $semesterOptions,
+        private readonly CampusReferenceReader $campuses,
+        private readonly UserDirectoryReader $userDirectory,
+    ) {}
+
     public function importPage(): Response
     {
         return Inertia::render('Admin/Reports/StudentActionsImport');
@@ -38,18 +48,11 @@ class StudentActionAuditController extends Controller
             ->map(fn (StudentActionType $type) => $type->value)
             ->values()
             ->all();
-        $semesterCodes = Semester::query()
-            ->whereNotNull('code')
-            ->orderBy('start_date', 'desc')
-            ->pluck('code')
-            ->values()
-            ->all();
-        $campusCodes = Campus::query()
-            ->whereNotNull('code')
-            ->orderBy('name')
-            ->pluck('code')
-            ->values()
-            ->all();
+        $semesterCodes = $this->semesterOptions->codes();
+        $campusCodes = array_values(array_filter(array_map(
+            static fn (CampusReference $campus): string => $campus->code,
+            $this->campuses->all(),
+        ), static fn (string $code): bool => $code !== ''));
 
         return $excelService->download(
             new StudentActionImportTemplateExport(
@@ -82,7 +85,7 @@ class StudentActionAuditController extends Controller
             now()->addMinutes(10)
         );
 
-        return response()->json([
+        return ApiResponse::compatible([
             'success' => true,
             'data' => [
                 ...$result,
@@ -106,7 +109,7 @@ class StudentActionAuditController extends Controller
         if (! $cachedPreview
             || ($cachedPreview['shared_upload_record_id'] ?? null) !== $sharedUploadRecordId
             || ($cachedPreview['file_hash'] ?? null) !== $currentHash) {
-            return response()->json([
+            return ApiResponse::compatible([
                 'success' => false,
                 'message' => 'Preview token is invalid or file does not match preview.',
             ], 422);
@@ -119,7 +122,7 @@ class StudentActionAuditController extends Controller
         );
         Cache::forget($cacheKey);
 
-        return response()->json([
+        return ApiResponse::compatible([
             'success' => true,
             'data' => $result,
         ]);
@@ -128,27 +131,9 @@ class StudentActionAuditController extends Controller
     /**
      * Display the audit listing page.
      */
-    public function index(Request $request, ListStudentActionLogsQuery $query): Response
+    public function index(ListStudentActionAuditRequest $request, ListStudentActionLogsQuery $query): Response
     {
-        $validated = $request->validate([
-            'action_type' => ['nullable', 'string'],
-            'date_from' => ['nullable', 'date'],
-            'date_to' => ['nullable', 'date'],
-            'signed_date_from' => ['nullable', 'date'],
-            'signed_date_to' => ['nullable', 'date'],
-            'semester_id' => ['nullable', 'integer', 'exists:semesters,id'],
-            'from_semester_id' => ['nullable', 'integer', 'exists:semesters,id'],
-            'egc_defer_from_block_number' => ['nullable', 'integer', 'in:1,2'],
-            'return_semester_id' => ['nullable', 'integer', 'exists:semesters,id'],
-            'dropout_semester_id' => ['nullable', 'integer', 'exists:semesters,id'],
-            'effective_semester_id' => ['nullable', 'integer', 'exists:semesters,id'],
-            'actor_id' => ['nullable', 'integer', 'exists:users,id'],
-            'missing_documents' => ['nullable', 'string'],
-            'search' => ['nullable', 'string', 'max:255'],
-            'sort' => ['nullable', 'string'],
-            'direction' => ['nullable', 'string', 'in:asc,desc'],
-            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
-        ]);
+        $validated = $request->validated();
 
         $currentCampusId = session('current_campus_id');
         $filters = array_merge([
@@ -179,15 +164,11 @@ class StudentActionAuditController extends Controller
             ],
             'options' => [
                 'actionTypes' => StudentActionType::options(),
-                'semesters' => Semester::query()
-                    ->select('id', 'name', 'code')
-                    ->orderBy('start_date', 'desc')
-                    ->get(),
-                'actors' => User::query()
-                    ->select('id', 'name', 'email')
-                    ->where('type', 'staff')
-                    ->orderBy('name')
-                    ->get(),
+                'semesters' => $this->semesterOptions->options(),
+                'actors' => array_map(
+                    static fn (UserDirectoryEntry $actor): array => $actor->toArray(),
+                    $this->userDirectory->staffMembers(),
+                ),
                 'egcDeferBlocks' => [
                     ['value' => 1, 'label' => 'Block 1'],
                     ['value' => 2, 'label' => 'Block 2'],
@@ -199,24 +180,9 @@ class StudentActionAuditController extends Controller
     /**
      * Export the audit log as Excel/CSV.
      */
-    public function export(Request $request, ListStudentActionLogsQuery $query, ExcelExportService $excelService): BinaryFileResponse
+    public function export(ExportStudentActionAuditRequest $request, ListStudentActionLogsQuery $query, ExcelExportService $excelService): BinaryFileResponse
     {
-        $validated = $request->validate([
-            'action_type' => ['nullable', 'string'],
-            'date_from' => ['nullable', 'date'],
-            'date_to' => ['nullable', 'date'],
-            'signed_date_from' => ['nullable', 'date'],
-            'signed_date_to' => ['nullable', 'date'],
-            'semester_id' => ['nullable', 'integer'],
-            'from_semester_id' => ['nullable', 'integer'],
-            'egc_defer_from_block_number' => ['nullable', 'integer', 'in:1,2'],
-            'return_semester_id' => ['nullable', 'integer'],
-            'dropout_semester_id' => ['nullable', 'integer'],
-            'effective_semester_id' => ['nullable', 'integer'],
-            'actor_id' => ['nullable', 'integer'],
-            'missing_documents' => ['nullable', 'string'],
-            'search' => ['nullable', 'string'],
-        ]);
+        $validated = $request->validated();
 
         $filters = array_merge(
             array_filter($validated, fn ($v) => $v !== null && $v !== ''),

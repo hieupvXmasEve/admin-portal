@@ -13,4 +13,11 @@ interface UserDirectoryReader
      * @return list<UserDirectoryEntry>
      */
     public function excludingIds(array $excludedUserIds): array;
+
+    /**
+     * Staff accounts, name-ordered, for actor filter dropdowns.
+     *
+     * @return list<UserDirectoryEntry>
+     */
+    public function staffMembers(): array;
 }

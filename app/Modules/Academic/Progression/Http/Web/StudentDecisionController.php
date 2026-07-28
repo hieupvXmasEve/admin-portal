@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Http\Web;
+namespace App\Modules\Academic\Progression\Http\Web;
 
 use App\Enums\StudentActionType;
 use App\Http\Controllers\Controller;
@@ -16,12 +16,13 @@ use App\Modules\Academic\Progression\Actions\BulkLinkStudentsToDecisionAction;
 use App\Modules\Academic\Progression\Actions\CreateStudentDecisionAction;
 use App\Modules\Academic\Progression\Actions\UnlinkStudentFromDecisionAction;
 use App\Modules\Academic\Progression\Actions\UpdateStudentDecisionAction;
+use App\Modules\Academic\Progression\Http\Requests\ListStudentDecisionsRequest;
+use App\Modules\Academic\Progression\Http\Requests\ShowStudentDecisionRequest;
 use App\Modules\Academic\Queries\GetStudentDecisionDetailQuery;
 use App\Modules\Academic\Queries\ListStudentDecisionsQuery;
 use App\Modules\Academic\Queries\PreviewStudentDecisionBulkLinkQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -32,17 +33,9 @@ class StudentDecisionController extends Controller
         private readonly GetStudentDecisionDetailQuery $detailQuery
     ) {}
 
-    public function index(Request $request): Response
+    public function index(ListStudentDecisionsRequest $request): Response
     {
-        $validated = $request->validate([
-            'search' => ['nullable', 'string', 'max:255'],
-            'issued_from' => ['nullable', 'date'],
-            'issued_to' => ['nullable', 'date'],
-            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
-            'page' => ['nullable', 'integer', 'min:1'],
-            'sort' => ['nullable', 'string', 'max:50'],
-            'direction' => ['nullable', 'string', 'max:10'],
-        ]);
+        $validated = $request->validated();
 
         $sortInput = (string) ($validated['sort'] ?? 'issued_at');
         $sort = in_array($sortInput, ['decision_number', 'decision_signer', 'issued_at', 'expires_at'], true)
@@ -147,14 +140,9 @@ class StudentDecisionController extends Controller
         return ApiResponse::success($result, message: $message);
     }
 
-    public function show(Request $request, StudentDecision $studentDecision): Response
+    public function show(ShowStudentDecisionRequest $request, StudentDecision $studentDecision): Response
     {
-        $validated = $request->validate([
-            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
-            'page' => ['nullable', 'integer', 'min:1'],
-            'linked_per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
-            'linked_page' => ['nullable', 'integer', 'min:1'],
-        ]);
+        $validated = $request->validated();
 
         $campusId = session('current_campus_id');
 

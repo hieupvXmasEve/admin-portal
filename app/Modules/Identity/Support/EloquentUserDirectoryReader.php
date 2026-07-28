@@ -23,4 +23,18 @@ final class EloquentUserDirectoryReader implements UserDirectoryReader
             ))
             ->all();
     }
+
+    public function staffMembers(): array
+    {
+        return User::query()
+            ->where('type', 'staff')
+            ->orderBy('name')
+            ->get(['id', 'name', 'email'])
+            ->map(static fn (User $user): UserDirectoryEntry => new UserDirectoryEntry(
+                id: (int) $user->id,
+                name: (string) $user->name,
+                email: (string) $user->email,
+            ))
+            ->all();
+    }
 }
