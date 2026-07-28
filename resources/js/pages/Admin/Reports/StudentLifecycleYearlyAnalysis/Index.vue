@@ -195,15 +195,15 @@ const handleExport = () => {
         <div class="flex items-center justify-between">
             <div>
                 <h1 class="text-3xl font-bold tracking-tight">Phân tích vòng đời sinh viên</h1>
-                <p class="text-muted-foreground mt-1">Theo dõi từng khoá nhập học qua các kỳ, tính đến kỳ hiện tại.</p>
+                <p class="text-muted-foreground mt-1">Theo dõi sinh viên từng khoá qua các kỳ học.</p>
             </div>
             <Badge variant="outline">Generated {{ new Date(meta.generated_at).toLocaleString('vi-VN') }}</Badge>
         </div>
 
         <Card>
             <CardHeader>
-                <CardTitle>Khoá × Kỳ học</CardTitle>
-                <CardDescription> Mỗi khoá là một kỳ nhập học. Mỗi cột luôn cộng đủ sĩ số khoá, nên không sinh viên nào lọt ra ngoài các cột trạng thái. Bấm vào một ô để xem danh sách sinh viên của ô đó. </CardDescription>
+                <CardTitle>Sinh viên theo khoá và kỳ</CardTitle>
+                <CardDescription>Bấm vào một con số để xem danh sách sinh viên.</CardDescription>
             </CardHeader>
             <CardContent>
                 <div v-if="matrix.cohorts.length === 0" class="text-muted-foreground py-8 text-center">Chưa có dữ liệu vòng đời sinh viên.</div>
@@ -263,7 +263,7 @@ const handleExport = () => {
 
                     <div class="space-y-2">
                         <h3 class="text-lg font-semibold">Biến động theo kỳ</h3>
-                        <p class="text-muted-foreground text-sm">Suy ra từ chênh lệch giữa các cột liền kề ở trên, nên không bao giờ lệch với ma trận.</p>
+                        <p class="text-muted-foreground text-sm">Mỗi kỳ có bao nhiêu sinh viên nhập học mới và bao nhiêu người đổi trạng thái.</p>
                         <div class="overflow-x-auto">
                             <table class="w-full border-collapse text-sm">
                                 <thead>
@@ -288,7 +288,7 @@ const handleExport = () => {
 
                     <div class="space-y-2">
                         <h3 class="text-lg font-semibold">Hiện trạng từng khoá</h3>
-                        <p class="text-muted-foreground text-sm">Tính đến kỳ hiện tại. Sinh viên có quyết định hiệu lực ở kỳ sau vẫn được tính theo trạng thái đang giữ hôm nay.</p>
+                        <p class="text-muted-foreground text-sm">Tình hình mỗi khoá tính đến kỳ đang học.</p>
                         <div class="overflow-x-auto">
                             <table class="w-full border-collapse text-sm">
                                 <thead>
@@ -341,8 +341,8 @@ const handleExport = () => {
                     <div>
                         <CardTitle>Danh sách sinh viên theo kỳ</CardTitle>
                         <CardDescription>
-                            <template v-if="activeCohortLabel"> Khoá {{ activeCohortLabel }} · trạng thái tại kỳ {{ selectedSemesterLabel }} </template>
-                            <template v-else> Sinh viên nhập học từ kỳ {{ selectedSemesterLabel }} trở về trước </template>
+                            <template v-if="activeCohortLabel"> Sinh viên khoá {{ activeCohortLabel }} trong kỳ {{ selectedSemesterLabel }} </template>
+                            <template v-else> Sinh viên trong kỳ {{ selectedSemesterLabel }} </template>
                         </CardDescription>
                     </div>
                     <div class="flex items-center gap-2">
@@ -369,7 +369,7 @@ const handleExport = () => {
                     </div>
 
                     <div class="space-y-2">
-                        <Label>Trạng thái tại kỳ đã chọn</Label>
+                        <Label>Trạng thái</Label>
                         <Select :model-value="filters.current_status ?? 'all'" @update:model-value="(val) => applyFilters({ current_status: val === 'all' ? null : String(val), page: 1 })">
                             <SelectTrigger>
                                 <SelectValue placeholder="Tất cả trạng thái" />
@@ -396,7 +396,7 @@ const handleExport = () => {
                                     <th class="px-3 py-2 text-left font-semibold">Chương trình</th>
                                     <th class="px-3 py-2 text-left font-semibold">Kỳ nhập học</th>
                                     <th class="px-3 py-2 text-right font-semibold">Năm nhập học</th>
-                                    <th class="px-3 py-2 text-left font-semibold">Trạng thái tại kỳ đã chọn</th>
+                                    <th class="px-3 py-2 text-left font-semibold">Trạng thái trong kỳ</th>
                                     <th class="px-3 py-2 text-left font-semibold">Trạng thái hiện tại</th>
                                     <th class="px-3 py-2 text-left font-semibold">Quyết định gần nhất</th>
                                     <th class="px-3 py-2 text-left font-semibold">Kỳ hiệu lực</th>
