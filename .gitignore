@@ -36,7 +36,6 @@ public/.user.ini
 /tasks
 # /prd
 # .augment
-.claude
 .opencode
 .agents
 .khuym
@@ -55,3 +54,5 @@ docs-site/node_modules/
 docs-site/dist/
 docs-site/.astro/
 engineer/
+.claude/hooks/.log
+.claude/hooks/.logs/
