@@ -7,6 +7,7 @@ namespace App\Modules\Academic\Delivery\Queries;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
 use App\Modules\Academic\Delivery\Support\CourseRegistrationPresenter;
+use App\Services\V1\Student\PrerequisiteValidationService;
 use App\Shared\Contracts\Academic\CourseOfferingCatalogReader;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -17,6 +18,7 @@ final readonly class GetAvailableCourseRegistrationsQuery
         private StudentReferenceReader $students,
         private CourseOfferingCatalogReader $catalog,
         private CourseRegistrationPresenter $presenter,
+        private PrerequisiteValidationService $prerequisites,
     ) {}
 
     /**
@@ -50,47 +52,24 @@ final readonly class GetAvailableCourseRegistrationsQuery
             ->whereNotIn('id', $registeredCourseIds)
             ->get()
             ->map(function (CourseOffering $offering) use ($student): array {
-                $eligibility = $this->eligibility($student->id, $offering);
+                $eligibility = $this->prerequisites->getPrerequisiteValidation($student->id, $offering);
+                $reasons = collect($eligibility['missing_groups'])
+                    ->flatMap(fn (array $group): array => collect($group['conditions'])
+                        ->where('met', false)
+                        ->map(fn (array $c): string => $c['unit']['code'] ?? $c['type'])
+                        ->all())
+                    ->map(fn (string $code): string => "Missing prerequisite: {$code}")
+                    ->values()
+                    ->all();
 
                 return [
                     'offering' => $this->presenter->offering($offering),
-                    'eligible' => $eligibility['eligible'],
-                    'reasons' => $eligibility['reasons'],
+                    'eligible' => $eligibility['all_met'],
+                    'reasons' => $reasons,
                     'available_spots' => $offering->getAvailableSpots(),
                 ];
             })
             ->values()
             ->all();
-    }
-
-    /** @return array{eligible: bool, reasons: list<string>} */
-    private function eligibility(int $studentId, CourseOffering $courseOffering): array
-    {
-        $reasons = [];
-        if ($courseOffering->prerequisites) {
-            $completedCourseCodes = CourseRegistration::query()
-                ->where('student_id', $studentId)
-                ->where('registration_status', 'completed')
-                ->passing()
-                ->get()
-                ->pluck('course_offering_id')
-                ->all();
-
-            $completedCourseCodes = CourseOffering::query()
-                ->whereIn('id', $completedCourseCodes)
-                ->get()
-                ->map(fn (CourseOffering $offering): ?string => $this->catalog->offeringUnit((int) $offering->unit_id)?->code)
-                ->filter()
-                ->values()
-                ->all();
-
-            foreach ($courseOffering->prerequisites as $prerequisite) {
-                if (! in_array($prerequisite, $completedCourseCodes, true)) {
-                    $reasons[] = "Missing prerequisite: {$prerequisite}";
-                }
-            }
-        }
-
-        return ['eligible' => $reasons === [], 'reasons' => $reasons];
     }
 }

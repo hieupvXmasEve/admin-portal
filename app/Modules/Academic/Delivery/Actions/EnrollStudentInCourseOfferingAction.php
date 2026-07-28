@@ -6,6 +6,7 @@ namespace App\Modules\Academic\Delivery\Actions;
 
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
+use App\Services\V1\Student\PrerequisiteValidationService;
 use App\Shared\Contracts\Academic\CourseOfferingCatalogReader;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Support\Facades\DB;
@@ -59,6 +60,12 @@ final class EnrollStudentInCourseOfferingAction
             $forceRegistration = (bool) ($data['force_registration'] ?? false);
             $hasCapacity = ! $offering->isFull();
             self::assertOfferingIsEnrollable($offering, $forceRegistration);
+
+            if (! $forceRegistration && ! app(PrerequisiteValidationService::class)->hasMetPrerequisites($student->id, $offering)) {
+                throw ValidationException::withMessages([
+                    'student_id' => "Student has not met the prerequisites for {$unit->code}.",
+                ]);
+            }
 
             $duplicate = CourseRegistration::query()
                 ->where('student_id', $student->id)
