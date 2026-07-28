@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Progression\Queries;
+namespace App\Modules\Academic\Delivery\Queries;
 
 use App\Models\AcademicRecord;
 use Illuminate\Support\Collection;
@@ -10,9 +10,11 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Final-grade outcome aggregates (grade distribution, pass/fail, attendance
- * buckets, per-offering pass rates) for a unit, so non-Progression Academic
- * reporting pages reach AcademicRecord through a Progression-owned seam
- * instead of importing the shared model directly.
+ * buckets, per-offering pass rates) for a unit.
+ *
+ * Lived in Progression while AcademicRecord was mapped there. Delivery writes
+ * the record and owns it, so this aggregate sits with its data instead of
+ * reaching back across the boundary.
  */
 class GetUnitAcademicOutcomesQuery
 {

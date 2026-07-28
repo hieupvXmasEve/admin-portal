@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Progression\Support;
+namespace App\Modules\Academic\Delivery\Support;
 
 use App\Models\AcademicRecord;
 use App\Shared\Contracts\Academic\CourseOfferingAttemptWriter;

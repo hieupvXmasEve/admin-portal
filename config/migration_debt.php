@@ -69,7 +69,7 @@ return [
             'reason' => 'Module consumers still use transitional shared Eloquent models.',
             'canonical_replacement' => 'Shared Contract, neutral reference, Domain Event, or Read Projection.',
             'retirement_condition' => 'The consumer is cut over and the shared-model read is removed.',
-            'baseline' => 306,
+            'baseline' => 295,
             'mode' => 'max',
         ],
         'cross_context_concrete_imports' => [

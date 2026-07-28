@@ -6,7 +6,7 @@ namespace App\Modules\Academic\Delivery\Actions;
 
 use App\Models\CourseOffering;
 use App\Modules\Academic\Catalog\Queries\GetUnitGradingThresholdsQuery;
-use App\Modules\Academic\Progression\Queries\GetUnitAcademicOutcomesQuery;
+use App\Modules\Academic\Delivery\Queries\GetUnitAcademicOutcomesQuery;
 
 class GetUnitStatisticsAction
 {

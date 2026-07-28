@@ -22,6 +22,7 @@ use App\Modules\Academic\Delivery\Support\AssessmentGradeExcelService;
 use App\Modules\Academic\Delivery\Support\DeliveryAssessmentDefinitionWriter;
 use App\Modules\Academic\Delivery\Support\DeliveryInstructorAssignmentWriter;
 use App\Modules\Academic\Delivery\Support\EloquentAcademicSpaceOccupancyReader;
+use App\Modules\Academic\Delivery\Support\EloquentCourseOfferingAttemptWriter;
 use App\Modules\Academic\Delivery\Support\EloquentCourseOfferingSurveyContextReader;
 use App\Modules\Academic\Delivery\Support\EloquentCourseResultProgressionReader;
 use App\Modules\Academic\Delivery\Support\EloquentCourseRosterReader;
@@ -39,7 +40,6 @@ use App\Modules\Academic\Progression\Queries\FilterStudentsByProgramEnrollmentSt
 use App\Modules\Academic\Progression\Queries\GetStudentAcademicRecordsQuery;
 use App\Modules\Academic\Progression\Queries\GetStudentGpaTrendQuery;
 use App\Modules\Academic\Progression\Queries\Reporting\GetAcademicReportQuery;
-use App\Modules\Academic\Progression\Support\EloquentCourseOfferingAttemptWriter;
 use App\Modules\Academic\Progression\Support\EloquentProgramEnrollmentLifecycleWriter;
 use App\Modules\Academic\Progression\Support\EloquentProgramEnrollmentReader;
 use App\Modules\Academic\Progression\Support\EloquentProgramEnrollmentWriter;
