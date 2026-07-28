@@ -610,6 +610,37 @@ controllers/services/routes and frontend debt with each migrated workflow.
      and the lecturer `DashboardController` passes the Eloquent model deep into
      private query helpers; converting to `AcademicPeriodReference` is a real
      refactor of those services.
+   - [x] AcademicRecord block cleared in two moves.
+     First, extracted the policy the model was carrying. `AcademicRecord` held
+     the percentage-to-grade scale (`calculateLetterGrade`,
+     `calculateGradePoints`) and the `FAILURE_*` vocabulary as statics, so a
+     weighted-percentage calculator or a pass/fail classifier had to import the
+     record model to reach a rule that never touches a record. Both now live in
+     `App\Shared\Support\Academic\CourseGradeScale`, with `AcademicRecord`
+     delegating so persisted values cannot drift.
+     `SaveLecturerGradebookScoresAction`, `Delivery\Support\Grading\DefaultWeightedPercentageCalculator`,
+     and `Academic\Support\FailureReasonClassifier` now depend on the scale
+     alone. Covered by `tests/Unit/Academic/CourseGradeScaleTest.php`, including
+     the band boundaries and the model's delegation.
+     Second, moved ownership of `AcademicRecord` from Progression to Delivery,
+     with the user's agreement. Delivery writes the course result — Canvas grade
+     sync creates records, exam-resit completion, the lecturer gradebook, and
+     EGC remediation update them — while Progression only reads, and reads
+     through `CourseResultProgressionReader`, which `Delivery/Support` already
+     implements. The map had the direction backwards, which is why Delivery
+     carried 13 findings against a model it owns in practice.
+     Two classes moved back with it: `GetUnitAcademicOutcomesQuery` (grade
+     aggregates per unit and offering, feeding Delivery's course statistics) and
+     `EloquentCourseOfferingAttemptWriter` (moves attempts between offerings).
+     Both were written as Progression-owned seams in the CourseStatistics slice
+     *only because* the model was mapped to Progression; with the map corrected,
+     that seam pointed the wrong way. This reverses that earlier slice's
+     boundary call deliberately, on new evidence.
+     Still findings, deliberately: `Progression\Queries\Reporting\GetAcademicReportQuery`
+     and `Progression\Queries\GetCourseRankingQuery` read the model directly and
+     stay red until they take a Delivery reader contract.
+     Ratchet: `shared_model_imports` 309 -> 295; `cross_context_concrete_imports`
+     held at 0.
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
    - [x] Ratchet tighten: earlier slices lowered the frozen-* ceilings per
      move but left incidental headroom on the other rules. Re-pinned every
@@ -629,18 +660,18 @@ controllers/services/routes and frontend debt with each migrated workflow.
 ## Remaining Scope
 
 Measured 2026-07-28 from `migration-debt:inventory --format=json`, filtered to
-work packages tagged `phase-04:academic`, after the Delivery reference-read pass.
+work packages tagged `phase-04:academic`, after the AcademicRecord ownership fix.
 Route retirement is complete: Academic owns zero frozen routes and zero frozen
 controllers.
 
 | Rule | Count | Concentration |
 |---|---|---|
-| `shared_model_imports` | 76 | 27 in unassigned generic dirs, 48 Delivery, 1 Catalog |
+| `shared_model_imports` | 60 | 26 in unassigned generic dirs, 33 Delivery, 1 Catalog |
 | `inline_request_validation` | 2 | `Delivery/Http/Api/Lecturer/{Student,Timetable}Controller` |
 | `direct_json_responses` | 1 | `Catalog/Http/Web/SpecializationController` |
 
 Requirement 1 (assign every generic Academic class to one logical context) is the
-dominant remainder. The unassigned findings sit in `Academic/Support` (17),
+dominant remainder. The unassigned findings sit in `Academic/Support` (16),
 `Academic/Http/Requests` (2), `Academic/Actions` (2), `Academic/Queries` (1),
 and `Providers` (1).
 
@@ -660,11 +691,13 @@ The remaining 8 are one-offs: the two student-action FormRequests, the
 Academic service provider, `GetCampusDetailQuery`, `CampusBuildingCountReader`,
 and `FailureReasonClassifier`.
 
-The larger remaining block is not unassigned at all: 48 shared imports sit
-inside Delivery. After the reference-read pass those are concentrated in
-`AcademicRecord` (15) and `Student` (13), which are domain reads needing reader
-contracts, plus small tails of `SyllabusTemplate`/`Lecture`/`User`/`Semester`
-(3 each), `Unit`/`Room` (2 each), and 4 one-offs.
+The larger remaining block is not unassigned at all: 33 shared imports sit
+inside Delivery. `Student` (13) is now the only concentration and needs a
+StudentRegistry reader contract with a DTO, since these are domain reads inside
+attendance, roster, and eligibility logic rather than reference lookups. The
+tail is `SyllabusTemplate`/`Lecture`/`User`/`Semester` (3 each), `Unit`/`Room`
+(2 each), and 4 one-offs; the `Lecture` and `Unit` ones are type dependencies
+(`instanceof`, return types) that need DTOs rather than a different call.
 
 Explicitly not phase-04 scope, tagged to later phases by the scanner:
 `AcademicRecordGenerationServiceOptimized` (frozen service) and
