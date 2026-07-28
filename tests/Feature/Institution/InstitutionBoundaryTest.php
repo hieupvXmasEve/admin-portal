@@ -10,7 +10,7 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\RolePermission;
 use App\Models\User;
-use App\Modules\Academic\Support\LifecycleFormOptions;
+use App\Modules\Academic\Progression\Support\LifecycleFormOptions;
 use App\Modules\Institution\Actions\AddDepartmentMemberAction;
 use App\Modules\Institution\Actions\CreateCampusAction;
 use App\Modules\Institution\Actions\RemoveDepartmentMemberAction;

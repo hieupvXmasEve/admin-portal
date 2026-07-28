@@ -10,7 +10,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Campus;
 use App\Models\Semester;
 use App\Modules\Academic\Progression\Queries\GetMissingDecisionReportQuery;
-use App\Modules\Academic\Queries\Placement\GetAcademicProgressionAuditQuery;
+use App\Modules\Academic\Progression\Queries\Placement\GetAcademicProgressionAuditQuery;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;

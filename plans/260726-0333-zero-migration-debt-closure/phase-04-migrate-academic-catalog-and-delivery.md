@@ -391,6 +391,38 @@ controllers/services/routes and frontend debt with each migrated workflow.
      instead of instantiating it inline. Moved `ListStudentsQueryTest` to
      `tests/Feature/Registry`. Ratchet: `shared_model_imports` 455 → 451;
      `cross_context_concrete_imports` held at 0.
+   - [x] Lifecycle actions, queries, and support assigned to Progression:
+     claimed `AcademicProgressionEvent` and `IeltsCertificate` for
+     `owned_shared_models.Academic.Progression` — both are read only from
+     inside Academic and almost entirely from Progression, so the claim
+     retroactively exempted 12 findings on its own. Then moved 17 classes
+     out of the unassigned `Academic/{Actions,Queries,Support,Exports}`
+     into their Progression equivalents: the student-action import chain
+     (`ImportStudentActionsFromExcelAction`,
+     `StudentActionExcelRowMapper`, `StudentActionExcelReferenceResolver`,
+     `StudentActionImportConflictValidator`,
+     `UploadActionAttachmentAction`, `StudentActionLogsExport`), the
+     action/decision read side (`GetStudentActionHistoryQuery`,
+     `ListStudentActionLogsQuery`, `ListStudentDecisionsQuery`,
+     `GetStudentDecisionDetailQuery`,
+     `PreviewStudentDecisionBulkLinkQuery`), the lifecycle reporting and
+     placement queries (`ExportStudentLifecycleReportQuery`,
+     `Placement\GetAcademicProgressionAuditQuery`,
+     `Placement\GetAcademicProgressionHistoryQuery`), and the lifecycle
+     support classes (`AcademicLifecycleEventFactory`,
+     `LifecycleFormOptions`, `StudentLifecycleStatusReader`).
+     `StudentActionExcelRowMapper` carried no shared-model import of its
+     own but had to move with the resolver it depends on through an
+     unqualified same-namespace reference — the container failed to
+     resolve it until it did. Ratchet: `shared_model_imports` 451 → 421;
+     `cross_context_concrete_imports` held at 0.
+     Not yet done in these files: 12 reads of `Student` (5 files),
+     `Semester` (3), `Campus` (1), `CourseOffering` (1), and
+     `StudentWarningLog` (1) still import shared models directly. Most map
+     onto the existing `StudentReferenceReader` and `AcademicPeriodReader`
+     contracts, but `StudentActionExcelReferenceResolver` returns Eloquent
+     models straight to its row mapper, so contract-ising it means
+     reshaping that consumer too — a follow-up slice, not a rename.
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
    - [x] Ratchet tighten: earlier slices lowered the frozen-* ceilings per
      move but left incidental headroom on the other rules. Re-pinned every
@@ -416,17 +448,32 @@ controllers.
 
 | Rule | Count | Concentration |
 |---|---|---|
-| `shared_model_imports` | 223 | 165 in unassigned generic dirs, 57 Delivery, 1 Catalog |
+| `shared_model_imports` | 193 | 135 in unassigned generic dirs, 57 Delivery, 1 Catalog |
 | `inline_request_validation` | 6 | `Http/Web` (Gpa, Placement, ProgressionAudit, PerformanceDashboard) and `Delivery/Http/Api/Lecturer/*` |
 | `direct_json_responses` | 1 | `Catalog/Http/Web/SpecializationController` |
 
 Requirement 1 (assign every generic Academic class to one logical context) is the
-dominant remainder. The unassigned findings sit in `Academic/Actions` (47),
-`Academic/Queries` (39), `Academic/Http` (36), `Academic/Support` (35),
-`Academic/Services` (4), and `Exports`/`Observers`/`Providers` (4).
+dominant remainder. The unassigned findings sit in `Academic/Actions` (45),
+`Academic/Http` (36), `Academic/Queries` (24), `Academic/Support` (23),
+`Academic/Services` (4), and `Exports`/`Observers`/`Providers` (3).
 
-Next highest-yield vertical: the generic `Actions`/`Queries`/`Support` trio,
-which is the bulk of what is left.
+The generic remainder now clusters into four coherent verticals, each of which
+can be assigned as one slice:
+
+- **Exam Resit** (~26): the `*ExamResit*`/`*ExamRoomSlot*` actions and queries
+  plus `ExamScheduleConflictChecker`, and their two `Http/Web` controllers.
+- **Retake Course** (~18): the `*RetakeCourse*`/`*RetakeRegistration*` actions
+  and queries, plus `RetakeCourseRegistrationController`.
+- **Course offering and grading** (~15): the course-offering write actions,
+  operational-state and survey queries, `CourseRegistrationObserver`, and the
+  `Support/Grading` presenters — all Delivery.
+- **Warnings** (~11): `Actions/Warnings/*` and `ListWarningCenterQuery`. Owner
+  is not obvious: `StudentWarningLog` is read from Progression-flavoured code
+  and from `Delivery/Actions/SendAttendanceWarningAction`, so this one needs an
+  ownership call before the move.
+
+The rest (~25) is the Finance charge/obligation gateway, the AI academic
+readers, and small one-offs, none of which form a vertical on their own.
 
 Explicitly not phase-04 scope, tagged to later phases by the scanner:
 `AcademicRecordGenerationServiceOptimized` (frozen service) and

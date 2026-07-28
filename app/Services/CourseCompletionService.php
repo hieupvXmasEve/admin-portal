@@ -11,7 +11,7 @@ use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
 use App\Models\Student;
 use App\Modules\Academic\Progression\Actions\ProcessEgcCourseResultsAction;
-use App\Modules\Academic\Support\AcademicLifecycleEventFactory;
+use App\Modules\Academic\Progression\Support\AcademicLifecycleEventFactory;
 use App\Modules\Academic\Support\FailureReasonClassifier;
 use App\Modules\Academic\Support\Grading\GradingCalculatorResolver;
 use App\Modules\Engagement\Actions\ProvisionCourseSurveyAction;

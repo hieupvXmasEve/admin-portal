@@ -26,7 +26,7 @@ use App\Modules\Academic\Progression\Queries\GetStudentHubOverviewQuery;
 use App\Modules\Academic\Progression\Queries\GetStudentHubScoresQuery;
 use App\Modules\Academic\Progression\Queries\GetStudentLifecycleTimelineQuery;
 use App\Modules\Academic\Progression\Queries\GetStudentRegistrationsQuery;
-use App\Modules\Academic\Support\LifecycleFormOptions;
+use App\Modules\Academic\Progression\Support\LifecycleFormOptions;
 use App\Services\ExcelExportService;
 use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use App\Shared\Contracts\Finance\HubStudentFinanceSummaryReader;

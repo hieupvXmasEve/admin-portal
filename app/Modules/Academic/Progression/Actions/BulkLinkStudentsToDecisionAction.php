@@ -6,7 +6,7 @@ namespace App\Modules\Academic\Progression\Actions;
 
 use App\Models\StudentActionLog;
 use App\Models\StudentDecision;
-use App\Modules\Academic\Queries\PreviewStudentDecisionBulkLinkQuery;
+use App\Modules\Academic\Progression\Queries\PreviewStudentDecisionBulkLinkQuery;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Modules\Academic\Queries\ExportStudentLifecycleReportQuery;
+use App\Modules\Academic\Progression\Queries\ExportStudentLifecycleReportQuery;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 

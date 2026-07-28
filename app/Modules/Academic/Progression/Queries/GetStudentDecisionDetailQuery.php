@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Queries;
+namespace App\Modules\Academic\Progression\Queries;
 
 use App\Models\StudentActionLog;
 use App\Models\StudentDecision;

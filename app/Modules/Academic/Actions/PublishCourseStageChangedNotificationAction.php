@@ -6,7 +6,7 @@ namespace App\Modules\Academic\Actions;
 
 use App\Models\Semester;
 use App\Models\Student;
-use App\Modules\Academic\Support\AcademicLifecycleEventFactory;
+use App\Modules\Academic\Progression\Support\AcademicLifecycleEventFactory;
 use App\Shared\Contracts\DomainEvents\DomainEventPublisher;
 
 class PublishCourseStageChangedNotificationAction

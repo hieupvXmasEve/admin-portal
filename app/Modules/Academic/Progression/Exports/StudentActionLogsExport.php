@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Exports;
+namespace App\Modules\Academic\Progression\Exports;
 
 use App\Models\StudentActionLog;
 use Illuminate\Database\Eloquent\Builder;

@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Actions;
+namespace App\Modules\Academic\Progression\Actions;
 
 use App\Models\StudentActionLog;
-use App\Modules\Academic\Support\StudentActionExcelRowMapper;
-use App\Modules\Academic\Support\StudentActionImportConflictValidator;
+use App\Modules\Academic\Progression\Support\StudentActionExcelRowMapper;
+use App\Modules\Academic\Progression\Support\StudentActionImportConflictValidator;
 use App\Modules\Academic\Support\StudentActionPreservePreviewResolver;
 use App\Shared\Contracts\Finance\StudentLifecycleFinanceEvidenceWriter;
 use Illuminate\Http\UploadedFile;

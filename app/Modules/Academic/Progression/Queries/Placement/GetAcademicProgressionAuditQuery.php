@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Queries\Placement;
+namespace App\Modules\Academic\Progression\Queries\Placement;
 
 use App\Enums\AcademicProgressionEventType;
 use App\Models\AcademicProgressionEvent;

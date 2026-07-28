@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Support;
+namespace App\Modules\Academic\Progression\Support;
 
 use App\Models\Campus;
 use App\Models\Semester;

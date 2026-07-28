@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Support;
+namespace App\Modules\Academic\Progression\Support;
 
 use App\Models\Student;
 use App\Modules\Academic\Progression\Models\ProgramEnrollment;
