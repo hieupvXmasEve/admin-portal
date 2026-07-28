@@ -73,7 +73,6 @@ return [
     ],
     'frozen_controllers' => [
         'app/Http/Controllers/Admin/EmailMonitoringController.php',
-        'app/Http/Controllers/Api/Admin/AcademicReportController.php',
         'app/Http/Controllers/Api/AdminScheduleController.php',
         'app/Http/Controllers/Api/AuthController.php',
         'app/Http/Controllers/Api/ElectiveController.php',
@@ -111,7 +110,6 @@ return [
     ],
     'frozen_routes' => [
         'routes/api/admin.php',
-        'routes/api/admin/academic.php',
         'routes/api/admin/notification.php',
         'routes/api/modules.php',
         'routes/api/v1/admissions.php',

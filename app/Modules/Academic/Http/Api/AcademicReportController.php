@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Api\Admin;
+namespace App\Modules\Academic\Http\Api;
 
 use App\Exports\AcademicReportExport;
 use App\Http\Controllers\Controller;

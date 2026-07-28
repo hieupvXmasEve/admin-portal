@@ -90,7 +90,7 @@ Route::middleware(['web', 'auth'])->name('api.admin.')->group(function () {
     });
 
     // API for Web Modals
-    require __DIR__.'/admin/academic.php';
+    require base_path('app/Modules/Academic/routes/api.php');
 });
 
 // Dashboard API routes - Separated for performance

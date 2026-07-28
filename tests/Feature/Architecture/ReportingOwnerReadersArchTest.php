@@ -46,7 +46,7 @@ it('keeps reporting adapters free of state-changing application calls', function
         base_path('app/Http/Controllers/Web/DashboardController.php'),
         base_path('app/Http/Controllers/Api/V1/Student/DashboardController.php'),
         base_path('app/Modules/Academic/Http/Web/AcademicReportController.php'),
-        base_path('app/Http/Controllers/Api/Admin/AcademicReportController.php'),
+        base_path('app/Modules/Academic/Http/Api/AcademicReportController.php'),
     ];
 
     $violations = collect($files)
@@ -58,7 +58,7 @@ it('keeps reporting adapters free of state-changing application calls', function
 });
 
 it('protects report exports and fails closed for missing dashboard campus scope', function (): void {
-    $reportRoute = file_get_contents(base_path('routes/api/admin/academic.php')) ?: '';
+    $reportRoute = file_get_contents(base_path('app/Modules/Academic/routes/api.php')) ?: '';
     $reportRequest = file_get_contents(base_path('app/Http/Requests/Academic/GetAcademicReportRequest.php')) ?: '';
     $dashboardController = file_get_contents(base_path('app/Http/Controllers/Web/DashboardController.php')) ?: '';
     $dashboardStats = file_get_contents(base_path('app/Services/DashboardStatsService.php')) ?: '';
