@@ -641,6 +641,38 @@ controllers/services/routes and frontend debt with each migrated workflow.
      stay red until they take a Delivery reader contract.
      Ratchet: `shared_model_imports` 309 -> 295; `cross_context_concrete_imports`
      held at 0.
+   - [x] Student block, first pass, plus the architecture tests that had gone
+     quiet. Three Delivery classes came off the model:
+     `GetStudentAcademicAttendanceSummaryQuery` only ever used
+     `$student->id`, so it takes an `int` — no DTO needed where a scalar is the
+     real dependency. `RemediateEgcAttendanceFailuresAction` resolves its
+     hand-typed `--student` argument (a code or a raw id) through
+     `StudentReferenceReader`; `RemediateEgcAttendanceFailuresIdentifierTest`
+     covers it and passes against the old query too, so the parity is proven
+     rather than assumed. `PublishCourseStageChangedNotificationAction` moved to
+     Progression: a course-stage change is a progression event, both callers are
+     Progression actions, and it only forwarded the student to a Progression
+     event factory.
+     Ratchet: `shared_model_imports` 295 -> 293 (phase-04 scope drops by 3; the
+     moved action re-tags to phase-05).
+     Also repointed six architecture tests that still named pre-move paths.
+     `file_get_contents` on a moved file raises, so those boundary assertions had
+     not actually run since phase-04 started moving classes:
+     `StudentLifecycleProgressionFinanceBoundaryArchTest`,
+     `CourseDeliveryAssessmentBoundaryArchTest`,
+     `CourseOfferingCatalogBoundaryArchTest`, `CourseRosterDeliveryBoundaryArchTest`,
+     `FacilitiesDeliveryBoundaryArchTest`, and
+     `TeachingEligibilityAssignmentBoundaryTest`. Worth remembering: a path-based
+     arch test fails open when the path moves, so a move can silence the very
+     guard meant to police it.
+     Two of them are now legitimately red and left that way:
+     `CourseRosterDeliveryBoundaryArchTest` scans all of `Delivery/` for
+     `Student`/`Unit`/`Semester` persistence, and
+     `TeachingEligibilityAssignmentBoundaryTest` scans it for `Lecture`. They
+     were green only because those classes used to sit in generic `Academic/`
+     directories the recursive scan never reached. They now assert exactly the
+     remaining Delivery work, so they are the acceptance signal for it — do not
+     weaken them to get green.
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
    - [x] Ratchet tighten: earlier slices lowered the frozen-* ceilings per
      move but left incidental headroom on the other rules. Re-pinned every
@@ -660,13 +692,13 @@ controllers/services/routes and frontend debt with each migrated workflow.
 ## Remaining Scope
 
 Measured 2026-07-28 from `migration-debt:inventory --format=json`, filtered to
-work packages tagged `phase-04:academic`, after the AcademicRecord ownership fix.
+work packages tagged `phase-04:academic`, after the first Student pass.
 Route retirement is complete: Academic owns zero frozen routes and zero frozen
 controllers.
 
 | Rule | Count | Concentration |
 |---|---|---|
-| `shared_model_imports` | 60 | 26 in unassigned generic dirs, 33 Delivery, 1 Catalog |
+| `shared_model_imports` | 57 | 26 in unassigned generic dirs, 30 Delivery, 1 Catalog |
 | `inline_request_validation` | 2 | `Delivery/Http/Api/Lecturer/{Student,Timetable}Controller` |
 | `direct_json_responses` | 1 | `Catalog/Http/Web/SpecializationController` |
 
@@ -691,8 +723,8 @@ The remaining 8 are one-offs: the two student-action FormRequests, the
 Academic service provider, `GetCampusDetailQuery`, `CampusBuildingCountReader`,
 and `FailureReasonClassifier`.
 
-The larger remaining block is not unassigned at all: 33 shared imports sit
-inside Delivery. `Student` (13) is now the only concentration and needs a
+The larger remaining block is not unassigned at all: 30 shared imports sit
+inside Delivery. `Student` (10) is now the only concentration and needs a
 StudentRegistry reader contract with a DTO, since these are domain reads inside
 attendance, roster, and eligibility logic rather than reference lookups. The
 tail is `SyllabusTemplate`/`Lecture`/`User`/`Semester` (3 each), `Unit`/`Room`
