@@ -76,7 +76,11 @@ class DngClient
      */
     public function buildInsertNewRecordPayload(array $data): array
     {
-        $amount = (string) $data['amount'];
+        // DNG recomputes the checksum from the Amount it receives, so the value
+        // signed here and the value transmitted below must be identical. Callers
+        // that read a decimal-cast attribute hand us "17780000.00" while the
+        // payload sends 17780000 — normalise once and use it for both.
+        $amount = is_numeric($data['amount']) ? $data['amount'] + 0 : $data['amount'];
         $studentId = (string) $data['student_code'];
         $campusCode = $data['campus_code'];
         $itemId = $data['item_id'];
@@ -84,7 +88,7 @@ class DngClient
         $checksumString = $this->accessCode
             .$this->apiCode
             .$campusCode
-            .$amount
+            .(string) $amount
             .$itemId
             .mb_strtolower($studentId, 'UTF-8');
 
@@ -93,7 +97,7 @@ class DngClient
             'StudentId' => $studentId,
             'CampusCode' => $campusCode,
             'Type' => $data['type'],
-            'Amount' => is_numeric($data['amount']) ? $data['amount'] + 0 : $data['amount'],
+            'Amount' => $amount,
             'ItemId' => $itemId,
             'Login' => $this->login,
             'CheckSum' => $this->checksumService->generate($checksumString),
