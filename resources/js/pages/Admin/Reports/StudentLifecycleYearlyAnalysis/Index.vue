@@ -1,16 +1,18 @@
 <script setup lang="ts">
-import DataPagination from '@/components/DataPagination.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogDescription, DialogHeader, DialogScrollContent, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTableFilters } from '@/composables/useFilters';
 import type { PaginatedResponse } from '@/types';
 import { getStudentStatusBadgeClass, getStudentStatusLabel } from '@/types/student';
 import { studentRoutes } from '@/utils/routes';
-import { Head, router } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { Head } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
+import StudentStatusTable from './StudentStatusTable.vue';
+import type { StatusRow } from './types';
 
 interface MatrixSemester {
     id: number;
@@ -62,24 +64,6 @@ interface Matrix {
     };
 }
 
-interface StatusRow {
-    id: number;
-    student_id: string;
-    full_name: string;
-    program_name: string | null;
-    intake_semester: string | null;
-    intake_year: number | null;
-    current_campus: string | null;
-    status_at_selected_semester: string;
-    current_status: string;
-    latest_action_type: string | null;
-    latest_action_effective_semester: string | null;
-    ne: boolean;
-    defer_start_semester: string | null;
-    dropout_semester: string | null;
-    updated_at: string | null;
-}
-
 interface SemesterOption {
     id: number;
     name: string;
@@ -113,8 +97,6 @@ interface Props {
 const props = defineProps<Props>();
 
 const formatRate = (value: number): string => `${value.toFixed(2)}%`;
-const formatDateTime = (value: string | null): string => (value ? new Date(value).toLocaleString('vi-VN') : '-');
-const formatActionType = (value: string | null): string => (value ? value.replaceAll('_', ' ') : '-');
 
 const cellCount = (cohort: Cohort, semesterId: number, status: string): number => cohort.cells[semesterId]?.[status] ?? 0;
 
@@ -128,6 +110,14 @@ const columnTotal = (cohort: Cohort, semesterId: number): number => Object.value
  * table below rather than opening a second list, so the count and the names
  * behind it always come from the same query.
  */
+const isDrillOpen = ref(false);
+
+const drillTitle = computed(() => {
+    const cohort = activeCohortLabel.value;
+    const status = filters.value.current_status;
+    return cohort === null || status === null ? 'Danh sách sinh viên' : `${getStudentStatusLabel(status)} · khoá ${cohort}`;
+});
+
 const drillDown = (cohort: Cohort, semester: MatrixSemester, status: string): void => {
     if (cellCount(cohort, semester.id, status) === 0) {
         return;
@@ -140,7 +130,7 @@ const drillDown = (cohort: Cohort, semester: MatrixSemester, status: string): vo
         page: 1,
     });
 
-    document.getElementById('student-status-table')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    isDrillOpen.value = true;
 };
 
 const isDrilledInto = (cohort: Cohort, semester: MatrixSemester, status: string): boolean =>
@@ -384,61 +374,19 @@ const handleExport = () => {
                     </div>
                 </div>
 
-                <div v-if="!statusTable || statusTable.data.length === 0" class="text-muted-foreground py-8 text-center">Không tìm thấy sinh viên nào khớp bộ lọc.</div>
-
-                <div v-else class="space-y-3">
-                    <div class="overflow-x-auto">
-                        <table class="w-full min-w-[1600px] border-collapse text-sm">
-                            <thead>
-                                <tr class="bg-muted/40 border-b">
-                                    <th class="px-3 py-2 text-left font-semibold">Mã SV</th>
-                                    <th class="px-3 py-2 text-left font-semibold">Họ tên</th>
-                                    <th class="px-3 py-2 text-left font-semibold">Chương trình</th>
-                                    <th class="px-3 py-2 text-left font-semibold">Kỳ nhập học</th>
-                                    <th class="px-3 py-2 text-right font-semibold">Năm nhập học</th>
-                                    <th class="px-3 py-2 text-left font-semibold">Trạng thái trong kỳ</th>
-                                    <th class="px-3 py-2 text-left font-semibold">Trạng thái hiện tại</th>
-                                    <th class="px-3 py-2 text-left font-semibold">Quyết định gần nhất</th>
-                                    <th class="px-3 py-2 text-left font-semibold">Kỳ hiệu lực</th>
-                                    <th class="px-3 py-2 text-left font-semibold">Kỳ bắt đầu bảo lưu</th>
-                                    <th class="px-3 py-2 text-left font-semibold">Kỳ thôi học</th>
-                                    <th class="px-3 py-2 text-left font-semibold">Cơ sở</th>
-                                    <th class="px-3 py-2 text-center font-semibold text-blue-500">NE</th>
-                                    <th class="px-3 py-2 text-left font-semibold">Cập nhật lúc</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="row in statusTable.data" :key="`${row.student_id}-${row.intake_semester}`" class="hover:bg-muted/50 cursor-pointer border-b" @click="router.visit(studentRoutes.hub.lifecycle(row.id))">
-                                    <td class="px-3 py-2 font-medium text-blue-600 hover:underline">{{ row.student_id }}</td>
-                                    <td class="px-3 py-2">{{ row.full_name }}</td>
-                                    <td class="px-3 py-2">{{ row.program_name ?? '-' }}</td>
-                                    <td class="px-3 py-2">{{ row.intake_semester ?? '-' }}</td>
-                                    <td class="px-3 py-2 text-right">{{ row.intake_year ?? '-' }}</td>
-                                    <td class="px-3 py-2">
-                                        <span class="rounded px-2 py-1 text-xs font-medium" :class="getStudentStatusBadgeClass(row.status_at_selected_semester)">
-                                            {{ getStudentStatusLabel(row.status_at_selected_semester) }}
-                                        </span>
-                                    </td>
-                                    <td class="px-3 py-2">
-                                        <span class="rounded px-2 py-1 text-xs font-medium" :class="getStudentStatusBadgeClass(row.current_status)">
-                                            {{ getStudentStatusLabel(row.current_status) }}
-                                        </span>
-                                    </td>
-                                    <td class="px-3 py-2">{{ formatActionType(row.latest_action_type) }}</td>
-                                    <td class="px-3 py-2">{{ row.latest_action_effective_semester ?? '-' }}</td>
-                                    <td class="px-3 py-2">{{ row.defer_start_semester ?? '-' }}</td>
-                                    <td class="px-3 py-2">{{ row.dropout_semester ?? '-' }}</td>
-                                    <td class="px-3 py-2">{{ row.current_campus ?? '-' }}</td>
-                                    <td class="px-3 py-2 text-center font-semibold text-blue-500">{{ row.ne ? 'Yes' : 'No' }}</td>
-                                    <td class="px-3 py-2">{{ formatDateTime(row.updated_at) }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <DataPagination :pagination-data="statusTable" @navigate="handlePaginationNavigate" @page-size-change="(size) => applyFilters({ status_per_page: size, page: 1 })" />
-                </div>
+                <StudentStatusTable :status-table="statusTable" @navigate="handlePaginationNavigate" @page-size-change="(size) => applyFilters({ status_per_page: size, page: 1 })" />
             </CardContent>
         </Card>
+
+        <Dialog v-model:open="isDrillOpen">
+            <DialogScrollContent class="max-w-[95vw] sm:max-w-[95vw]">
+                <DialogHeader>
+                    <DialogTitle>{{ drillTitle }}</DialogTitle>
+                    <DialogDescription>Kỳ {{ selectedSemesterLabel }} · bấm một dòng để mở hồ sơ sinh viên.</DialogDescription>
+                </DialogHeader>
+
+                <StudentStatusTable :status-table="statusTable" @navigate="handlePaginationNavigate" @page-size-change="(size) => applyFilters({ status_per_page: size, page: 1 })" />
+            </DialogScrollContent>
+        </Dialog>
     </div>
 </template>
