@@ -44,9 +44,10 @@ class StudentLifecycleYearlyAnalysisController extends Controller
         $selectedSemesterId = (int) ($validated['selected_semester_id'] ?? $defaultSemesterId ?? 0);
         $currentStatus = $validated['current_status'] ?? null;
         $statusPerPage = (int) ($validated['status_per_page'] ?? 25);
+        $cohortSemesterId = isset($validated['cohort_semester_id']) ? (int) $validated['cohort_semester_id'] : null;
 
         $statusTable = $selectedSemesterId > 0
-            ? $this->statusBySemesterQuery->handle($selectedSemesterId, $currentCampusId, $currentStatus, $statusPerPage)
+            ? $this->statusBySemesterQuery->handle($selectedSemesterId, $currentCampusId, $currentStatus, $statusPerPage, $cohortSemesterId)
             : null;
 
         return Inertia::render('Admin/Reports/StudentLifecycleYearlyAnalysis/Index', [
@@ -55,6 +56,7 @@ class StudentLifecycleYearlyAnalysisController extends Controller
             'statusFilters' => [
                 'selected_semester_id' => $selectedSemesterId > 0 ? $selectedSemesterId : null,
                 'current_status' => $currentStatus,
+                'cohort_semester_id' => $cohortSemesterId,
                 'status_per_page' => $statusPerPage,
                 'page' => (int) ($validated['page'] ?? 1),
             ],
@@ -92,7 +94,8 @@ class StudentLifecycleYearlyAnalysisController extends Controller
         $rows = $this->statusBySemesterQuery->handleExport(
             (int) $validated['selected_semester_id'],
             $currentCampusId,
-            $currentStatus
+            $currentStatus,
+            isset($validated['cohort_semester_id']) ? (int) $validated['cohort_semester_id'] : null,
         );
 
         $filename = sprintf(

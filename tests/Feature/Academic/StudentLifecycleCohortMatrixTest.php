@@ -237,3 +237,65 @@ it('counts a returning student as ever deferred while showing them back in class
         ->and($cohort['ever_deferred'])->toBe(1)
         ->and($cohort['current']['intake_course'])->toBe(1);
 });
+
+it('drills a matrix cell down to exactly the students it counts', function () {
+    // The number in a cell and the list behind it must come from the same
+    // replay, otherwise clicking a cell shows a different set than it promised.
+    $campus = Campus::factory()->create();
+    $sem = matrixSemesters();
+
+    $deferring = matrixStudent($campus, $sem['fall2025']);
+    $staying = matrixStudent($campus, $sem['fall2025']);
+    matrixAction($deferring, StudentActionType::STUDENT_MAJOR_ENROLLMENT, $sem['fall2025'], 'pending', 'intake_course');
+    matrixAction($staying, StudentActionType::STUDENT_MAJOR_ENROLLMENT, $sem['fall2025'], 'pending', 'intake_course');
+    matrixAction($deferring, StudentActionType::ACADEMIC_DEFER, $sem['summer2026'], 'intake_course', 'deferred');
+
+    $cohort = app(GetStudentLifecycleCohortMatrixQuery::class)->handle()['cohorts'][0];
+    $cellCount = $cohort['cells'][$sem['summer2026']->id]['deferred'];
+
+    $rows = app(App\Modules\Academic\Progression\Queries\Reporting\GetStudentStatusBySemesterQuery::class)
+        ->handle($sem['summer2026']->id, null, 'deferred', 25, $sem['fall2025']->id);
+
+    expect($cellCount)->toBe(1)
+        ->and($rows->total())->toBe($cellCount)
+        ->and($rows->items()[0]['student_id'])->toBe($deferring->student_id);
+});
+
+it('finds a student by the status they held then, not the one they hold now', function () {
+    // The student is back in class today, but the SPRING2026 cell counts them as
+    // deferred — filtering on students.status would return nobody.
+    $campus = Campus::factory()->create();
+    $sem = matrixSemesters();
+
+    $student = matrixStudent($campus, $sem['fall2025']);
+    matrixAction($student, StudentActionType::STUDENT_MAJOR_ENROLLMENT, $sem['fall2025'], 'pending', 'intake_course');
+    matrixAction($student, StudentActionType::ACADEMIC_DEFER, $sem['spring2026'], 'intake_course', 'deferred');
+    matrixLog($student, StudentActionType::ACADEMIC_RESUME, [
+        'return_semester_id' => $sem['summer2026']->id,
+        'previous_status' => 'deferred',
+        'new_status' => 'intake_course',
+    ]);
+    $student->update(['status' => 'intake_course']);
+
+    $query = app(App\Modules\Academic\Progression\Queries\Reporting\GetStudentStatusBySemesterQuery::class);
+
+    expect($query->handle($sem['spring2026']->id, null, 'deferred', 25)->total())->toBe(1)
+        ->and($query->handle($sem['summer2026']->id, null, 'deferred', 25)->total())->toBe(0)
+        ->and($query->handle($sem['summer2026']->id, null, 'intake_course', 25)->total())->toBe(1);
+});
+
+it('scopes the drill-down to one cohort', function () {
+    $campus = Campus::factory()->create();
+    $sem = matrixSemesters();
+
+    $fallStudent = matrixStudent($campus, $sem['fall2025']);
+    $springStudent = matrixStudent($campus, $sem['spring2026']);
+    matrixAction($fallStudent, StudentActionType::ACADEMIC_DEFER, $sem['summer2026'], 'intake_course', 'deferred');
+    matrixAction($springStudent, StudentActionType::ACADEMIC_DEFER, $sem['summer2026'], 'intake_course', 'deferred');
+
+    $query = app(App\Modules\Academic\Progression\Queries\Reporting\GetStudentStatusBySemesterQuery::class);
+
+    expect($query->handle($sem['summer2026']->id, null, 'deferred', 25)->total())->toBe(2)
+        ->and($query->handle($sem['summer2026']->id, null, 'deferred', 25, $sem['fall2025']->id)->total())->toBe(1)
+        ->and($query->handle($sem['summer2026']->id, null, 'deferred', 25, $sem['spring2026']->id)->total())->toBe(1);
+});

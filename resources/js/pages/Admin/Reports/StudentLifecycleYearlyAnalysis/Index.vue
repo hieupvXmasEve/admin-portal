@@ -91,6 +91,7 @@ interface SemesterOption {
 interface StatusFilters {
     selected_semester_id: number | null;
     current_status: string | null;
+    cohort_semester_id: number | null;
     status_per_page: number;
     page: number;
 }
@@ -122,6 +123,38 @@ const cohortHasEntered = (cohort: Cohort, semester: MatrixSemester): boolean => 
 
 const columnTotal = (cohort: Cohort, semesterId: number): number => Object.values(cohort.cells[semesterId] ?? {}).reduce((sum, n) => sum + n, 0);
 
+/**
+ * A cell is a (cohort, semester, status) slice. Clicking it drives the student
+ * table below rather than opening a second list, so the count and the names
+ * behind it always come from the same query.
+ */
+const drillDown = (cohort: Cohort, semester: MatrixSemester, status: string): void => {
+    if (cellCount(cohort, semester.id, status) === 0) {
+        return;
+    }
+
+    applyFilters({
+        selected_semester_id: semester.id,
+        current_status: status,
+        cohort_semester_id: cohort.intake_semester_id,
+        page: 1,
+    });
+
+    document.getElementById('student-status-table')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+
+const isDrilledInto = (cohort: Cohort, semester: MatrixSemester, status: string): boolean =>
+    filters.value.cohort_semester_id === cohort.intake_semester_id && filters.value.selected_semester_id === semester.id && filters.value.current_status === status;
+
+const drillLabel = (cohort: Cohort, semester: MatrixSemester, status: string): string => `Xem ${cellCount(cohort, semester.id, status)} sinh viên ${getStudentStatusLabel(status)} của khoá ${cohort.intake_semester_code} tại ${semester.code}`;
+
+const activeCohortLabel = computed(() => {
+    const id = filters.value.cohort_semester_id;
+    return id === null ? null : (props.matrix.cohorts.find((c) => c.intake_semester_id === id)?.intake_semester_code ?? null);
+});
+
+const clearDrillDown = (): void => applyFilters({ cohort_semester_id: null, current_status: null, page: 1 });
+
 const movedInLabel = (event: SemesterEvent): string => {
     const parts = Object.entries(event.moved_in).filter(([, n]) => n > 0);
     return parts.length === 0 ? '-' : parts.map(([status, n]) => `${getStudentStatusLabel(status)} +${n}`).join(', ');
@@ -147,36 +180,40 @@ const handleExport = () => {
         params.set('current_status', filters.value.current_status);
     }
 
+    if (filters.value.cohort_semester_id) {
+        params.set('cohort_semester_id', String(filters.value.cohort_semester_id));
+    }
+
     window.location.href = `${studentRoutes.studentLifecycleYearlyAnalysisExport()}?${params.toString()}`;
 };
 </script>
 
 <template>
-    <Head title="Student Lifecycle Analysis" />
+    <Head title="Phân tích vòng đời sinh viên" />
 
     <div class="space-y-6">
         <div class="flex items-center justify-between">
             <div>
-                <h1 class="text-3xl font-bold tracking-tight">Student Lifecycle Analysis</h1>
-                <p class="text-muted-foreground mt-1">Cohort retention by intake semester, up to the current semester.</p>
+                <h1 class="text-3xl font-bold tracking-tight">Phân tích vòng đời sinh viên</h1>
+                <p class="text-muted-foreground mt-1">Theo dõi từng khoá nhập học qua các kỳ, tính đến kỳ hiện tại.</p>
             </div>
             <Badge variant="outline">Generated {{ new Date(meta.generated_at).toLocaleString('vi-VN') }}</Badge>
         </div>
 
         <Card>
             <CardHeader>
-                <CardTitle>Cohort × Semester</CardTitle>
-                <CardDescription> One cohort per intake semester. Every column accounts for the whole cohort, so a student can never fall between the status columns. </CardDescription>
+                <CardTitle>Khoá × Kỳ học</CardTitle>
+                <CardDescription> Mỗi khoá là một kỳ nhập học. Mỗi cột luôn cộng đủ sĩ số khoá, nên không sinh viên nào lọt ra ngoài các cột trạng thái. Bấm vào một ô để xem danh sách sinh viên của ô đó. </CardDescription>
             </CardHeader>
             <CardContent>
-                <div v-if="matrix.cohorts.length === 0" class="text-muted-foreground py-8 text-center">No lifecycle data yet.</div>
+                <div v-if="matrix.cohorts.length === 0" class="text-muted-foreground py-8 text-center">Chưa có dữ liệu vòng đời sinh viên.</div>
 
                 <div v-else class="space-y-8">
                     <div v-for="cohort in matrix.cohorts" :key="cohort.intake_semester_id" class="space-y-2">
                         <div class="flex flex-wrap items-baseline gap-x-4 gap-y-1">
                             <h3 class="text-lg font-semibold">{{ cohort.intake_semester_code }}</h3>
                             <span class="text-muted-foreground text-sm">
-                                {{ cohort.size }} students · NE {{ cohort.ne }} · DF {{ formatRate(cohort.df_rate) }} · DO {{ formatRate(cohort.do_rate) }} · Graduated {{ formatRate(cohort.graduated_rate) }}
+                                {{ cohort.size }} sinh viên · NE {{ cohort.ne }} · Bảo lưu {{ formatRate(cohort.df_rate) }} · Thôi học {{ formatRate(cohort.do_rate) }} · Tốt nghiệp {{ formatRate(cohort.graduated_rate) }}
                             </span>
                         </div>
 
@@ -184,7 +221,7 @@ const handleExport = () => {
                             <table class="w-full border-collapse text-sm">
                                 <thead>
                                     <tr class="bg-muted/40 border-b">
-                                        <th class="px-3 py-2 text-left font-semibold">Status</th>
+                                        <th class="px-3 py-2 text-left font-semibold">Trạng thái</th>
                                         <th v-for="semester in matrix.semesters" :key="semester.id" class="px-3 py-2 text-right font-semibold">
                                             {{ semester.code }}
                                         </th>
@@ -197,12 +234,24 @@ const handleExport = () => {
                                                 {{ getStudentStatusLabel(status) }}
                                             </span>
                                         </td>
-                                        <td v-for="semester in matrix.semesters" :key="semester.id" class="px-3 py-2 text-right tabular-nums" :class="cellCount(cohort, semester.id, status) === 0 ? 'text-muted-foreground' : ''">
-                                            {{ cohortHasEntered(cohort, semester) ? cellCount(cohort, semester.id, status) : '-' }}
+                                        <td v-for="semester in matrix.semesters" :key="semester.id" class="px-1 py-1 text-right tabular-nums">
+                                            <span v-if="!cohortHasEntered(cohort, semester)" class="text-muted-foreground px-2 py-1">-</span>
+                                            <span v-else-if="cellCount(cohort, semester.id, status) === 0" class="text-muted-foreground px-2 py-1">0</span>
+                                            <button
+                                                v-else
+                                                type="button"
+                                                class="hover:bg-muted focus-visible:ring-ring w-full rounded px-2 py-1 text-right tabular-nums underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-none"
+                                                :class="isDrilledInto(cohort, semester, status) ? 'bg-primary/10 text-primary font-semibold' : ''"
+                                                :aria-label="drillLabel(cohort, semester, status)"
+                                                :title="drillLabel(cohort, semester, status)"
+                                                @click="drillDown(cohort, semester, status)"
+                                            >
+                                                {{ cellCount(cohort, semester.id, status) }}
+                                            </button>
                                         </td>
                                     </tr>
                                     <tr class="bg-muted/30 border-b-2 font-semibold">
-                                        <td class="px-3 py-2">Total</td>
+                                        <td class="px-3 py-2">Tổng</td>
                                         <td v-for="semester in matrix.semesters" :key="semester.id" class="px-3 py-2 text-right tabular-nums">
                                             {{ cohortHasEntered(cohort, semester) ? columnTotal(cohort, semester.id) : '-' }}
                                         </td>
@@ -213,15 +262,15 @@ const handleExport = () => {
                     </div>
 
                     <div class="space-y-2">
-                        <h3 class="text-lg font-semibold">Movements per semester</h3>
-                        <p class="text-muted-foreground text-sm">Derived from the difference between consecutive columns above, so these counts cannot disagree with the matrix.</p>
+                        <h3 class="text-lg font-semibold">Biến động theo kỳ</h3>
+                        <p class="text-muted-foreground text-sm">Suy ra từ chênh lệch giữa các cột liền kề ở trên, nên không bao giờ lệch với ma trận.</p>
                         <div class="overflow-x-auto">
                             <table class="w-full border-collapse text-sm">
                                 <thead>
                                     <tr class="bg-muted/40 border-b">
-                                        <th class="px-3 py-2 text-left font-semibold">Semester</th>
-                                        <th class="px-3 py-2 text-right font-semibold">New intake</th>
-                                        <th class="px-3 py-2 text-left font-semibold">Moved into</th>
+                                        <th class="px-3 py-2 text-left font-semibold">Kỳ học</th>
+                                        <th class="px-3 py-2 text-right font-semibold">Nhập học mới</th>
+                                        <th class="px-3 py-2 text-left font-semibold">Chuyển sang</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -238,20 +287,21 @@ const handleExport = () => {
                     </div>
 
                     <div class="space-y-2">
-                        <h3 class="text-lg font-semibold">Where every cohort stands now</h3>
+                        <h3 class="text-lg font-semibold">Hiện trạng từng khoá</h3>
+                        <p class="text-muted-foreground text-sm">Tính đến kỳ hiện tại. Sinh viên có quyết định hiệu lực ở kỳ sau vẫn được tính theo trạng thái đang giữ hôm nay.</p>
                         <div class="overflow-x-auto">
                             <table class="w-full border-collapse text-sm">
                                 <thead>
                                     <tr class="bg-muted/40 border-b">
-                                        <th class="px-3 py-2 text-left font-semibold">Cohort</th>
-                                        <th class="px-3 py-2 text-right font-semibold">Size</th>
+                                        <th class="px-3 py-2 text-left font-semibold">Khoá</th>
+                                        <th class="px-3 py-2 text-right font-semibold">Sĩ số</th>
                                         <th class="px-3 py-2 text-right font-semibold text-blue-500">NE</th>
                                         <th v-for="status in matrix.statuses" :key="status" class="px-3 py-2 text-right font-semibold">
                                             {{ getStudentStatusLabel(status) }}
                                         </th>
-                                        <th class="px-3 py-2 text-right font-semibold">DF rate</th>
-                                        <th class="px-3 py-2 text-right font-semibold">DO rate</th>
-                                        <th class="px-3 py-2 text-right font-semibold">Graduated rate</th>
+                                        <th class="px-3 py-2 text-right font-semibold">Tỷ lệ bảo lưu</th>
+                                        <th class="px-3 py-2 text-right font-semibold">Tỷ lệ thôi học</th>
+                                        <th class="px-3 py-2 text-right font-semibold">Tỷ lệ tốt nghiệp</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -267,7 +317,7 @@ const handleExport = () => {
                                         <td class="px-3 py-2 text-right">{{ formatRate(cohort.graduated_rate) }}</td>
                                     </tr>
                                     <tr class="bg-muted/30 font-semibold">
-                                        <td class="px-3 py-2">All cohorts</td>
+                                        <td class="px-3 py-2">Tất cả khoá</td>
                                         <td class="px-3 py-2 text-right tabular-nums">{{ matrix.totals.size }}</td>
                                         <td class="px-3 py-2 text-right text-blue-500 tabular-nums">{{ matrix.totals.ne }}</td>
                                         <td v-for="status in matrix.statuses" :key="status" class="px-3 py-2 text-right tabular-nums">
@@ -289,22 +339,28 @@ const handleExport = () => {
             <CardHeader>
                 <div class="flex items-start justify-between gap-3">
                     <div>
-                        <CardTitle>Student Status by Semester</CardTitle>
-                        <CardDescription> Cumulative students up to selected semester. Current filter: {{ selectedSemesterLabel }} </CardDescription>
+                        <CardTitle>Danh sách sinh viên theo kỳ</CardTitle>
+                        <CardDescription>
+                            <template v-if="activeCohortLabel"> Khoá {{ activeCohortLabel }} · trạng thái tại kỳ {{ selectedSemesterLabel }} </template>
+                            <template v-else> Sinh viên nhập học từ kỳ {{ selectedSemesterLabel }} trở về trước </template>
+                        </CardDescription>
                     </div>
-                    <Button variant="outline" :disabled="!filters.selected_semester_id" @click="handleExport"> Export Excel </Button>
+                    <div class="flex items-center gap-2">
+                        <Button v-if="activeCohortLabel" variant="ghost" size="sm" @click="clearDrillDown">Bỏ lọc khoá</Button>
+                        <Button variant="outline" :disabled="!filters.selected_semester_id" @click="handleExport">Xuất Excel</Button>
+                    </div>
                 </div>
             </CardHeader>
             <CardContent class="space-y-4">
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div class="space-y-2">
-                        <Label>Semester</Label>
+                        <Label>Kỳ học</Label>
                         <Select :model-value="filters.selected_semester_id ? String(filters.selected_semester_id) : 'none'" @update:model-value="(val) => applyFilters({ selected_semester_id: val === 'none' ? null : Number(val), page: 1 })">
                             <SelectTrigger>
-                                <SelectValue placeholder="Select semester" />
+                                <SelectValue placeholder="Chọn kỳ học" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="none">Select semester</SelectItem>
+                                <SelectItem value="none">Chọn kỳ học</SelectItem>
                                 <SelectItem v-for="semester in statusOptions.semesters" :key="semester.id" :value="String(semester.id)">
                                     {{ semester.code }}
                                 </SelectItem>
@@ -313,13 +369,13 @@ const handleExport = () => {
                     </div>
 
                     <div class="space-y-2">
-                        <Label>Current Status</Label>
+                        <Label>Trạng thái tại kỳ đã chọn</Label>
                         <Select :model-value="filters.current_status ?? 'all'" @update:model-value="(val) => applyFilters({ current_status: val === 'all' ? null : String(val), page: 1 })">
                             <SelectTrigger>
-                                <SelectValue placeholder="All statuses" />
+                                <SelectValue placeholder="Tất cả trạng thái" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">All statuses</SelectItem>
+                                <SelectItem value="all">Tất cả trạng thái</SelectItem>
                                 <SelectItem v-for="status in statusOptions.statuses" :key="status.value" :value="status.value">
                                     {{ status.label }}
                                 </SelectItem>
@@ -328,27 +384,27 @@ const handleExport = () => {
                     </div>
                 </div>
 
-                <div v-if="!statusTable || statusTable.data.length === 0" class="text-muted-foreground py-8 text-center">No students found for selected semester.</div>
+                <div v-if="!statusTable || statusTable.data.length === 0" class="text-muted-foreground py-8 text-center">Không tìm thấy sinh viên nào khớp bộ lọc.</div>
 
                 <div v-else class="space-y-3">
                     <div class="overflow-x-auto">
                         <table class="w-full min-w-[1600px] border-collapse text-sm">
                             <thead>
                                 <tr class="bg-muted/40 border-b">
-                                    <th class="px-3 py-2 text-left font-semibold">Student ID</th>
-                                    <th class="px-3 py-2 text-left font-semibold">Full Name</th>
-                                    <th class="px-3 py-2 text-left font-semibold">Program</th>
-                                    <th class="px-3 py-2 text-left font-semibold">Intake Semester</th>
-                                    <th class="px-3 py-2 text-right font-semibold">Intake Year</th>
-                                    <th class="px-3 py-2 text-left font-semibold">Status @ Selected Semester</th>
-                                    <th class="px-3 py-2 text-left font-semibold">Current Status</th>
-                                    <th class="px-3 py-2 text-left font-semibold">Latest Action Type</th>
-                                    <th class="px-3 py-2 text-left font-semibold">Latest Action Semester</th>
-                                    <th class="px-3 py-2 text-left font-semibold">Defer Start Semester</th>
-                                    <th class="px-3 py-2 text-left font-semibold">Dropout Semester</th>
-                                    <th class="px-3 py-2 text-left font-semibold">Campus</th>
+                                    <th class="px-3 py-2 text-left font-semibold">Mã SV</th>
+                                    <th class="px-3 py-2 text-left font-semibold">Họ tên</th>
+                                    <th class="px-3 py-2 text-left font-semibold">Chương trình</th>
+                                    <th class="px-3 py-2 text-left font-semibold">Kỳ nhập học</th>
+                                    <th class="px-3 py-2 text-right font-semibold">Năm nhập học</th>
+                                    <th class="px-3 py-2 text-left font-semibold">Trạng thái tại kỳ đã chọn</th>
+                                    <th class="px-3 py-2 text-left font-semibold">Trạng thái hiện tại</th>
+                                    <th class="px-3 py-2 text-left font-semibold">Quyết định gần nhất</th>
+                                    <th class="px-3 py-2 text-left font-semibold">Kỳ hiệu lực</th>
+                                    <th class="px-3 py-2 text-left font-semibold">Kỳ bắt đầu bảo lưu</th>
+                                    <th class="px-3 py-2 text-left font-semibold">Kỳ thôi học</th>
+                                    <th class="px-3 py-2 text-left font-semibold">Cơ sở</th>
                                     <th class="px-3 py-2 text-center font-semibold text-blue-500">NE</th>
-                                    <th class="px-3 py-2 text-left font-semibold">Updated At</th>
+                                    <th class="px-3 py-2 text-left font-semibold">Cập nhật lúc</th>
                                 </tr>
                             </thead>
                             <tbody>

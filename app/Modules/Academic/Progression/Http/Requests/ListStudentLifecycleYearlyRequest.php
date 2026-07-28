@@ -20,6 +20,7 @@ class ListStudentLifecycleYearlyRequest extends FormRequest
     {
         return [
             'selected_semester_id' => ['nullable', 'integer', 'exists:semesters,id'],
+            'cohort_semester_id' => ['nullable', 'integer', 'exists:semesters,id'],
             'current_status' => ['nullable', 'string', 'max:50'],
             'status_per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
             'page' => ['nullable', 'integer', 'min:1'],

@@ -8,7 +8,7 @@ use App\Enums\StudentActionType;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentActionLog;
-use App\Modules\Academic\Progression\Queries\FilterStudentsByProgramEnrollmentStatus;
+use App\Modules\Academic\Progression\Support\LifecycleStatusTimeline;
 use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -17,16 +17,21 @@ use Illuminate\Support\Collection;
 
 class GetStudentStatusBySemesterQuery
 {
+    public function __construct(
+        private readonly LifecycleStatusTimeline $timeline,
+    ) {}
+
     public function handle(
         int $selectedSemesterId,
         ?int $campusId = null,
         ?string $currentStatus = null,
-        int $perPage = 25
+        int $perPage = 25,
+        ?int $cohortSemesterId = null,
     ): LengthAwarePaginator {
         $selectedSemester = Semester::query()->findOrFail($selectedSemesterId);
         $selectedStart = Carbon::parse($selectedSemester->start_date)->startOfDay();
 
-        $studentsQuery = $this->buildStudentsQuery($selectedStart, $campusId, $currentStatus)
+        $studentsQuery = $this->buildStudentsQuery($selectedStart, $campusId, $currentStatus, $selectedSemester, $cohortSemesterId)
             ->orderBy('intake_semester_id')
             ->orderBy('student_id');
 
@@ -39,12 +44,13 @@ class GetStudentStatusBySemesterQuery
     public function handleExport(
         int $selectedSemesterId,
         ?int $campusId = null,
-        ?string $currentStatus = null
+        ?string $currentStatus = null,
+        ?int $cohortSemesterId = null,
     ): Collection {
         $selectedSemester = Semester::query()->findOrFail($selectedSemesterId);
         $selectedStart = Carbon::parse($selectedSemester->start_date)->startOfDay();
 
-        $students = $this->buildStudentsQuery($selectedStart, $campusId, $currentStatus)
+        $students = $this->buildStudentsQuery($selectedStart, $campusId, $currentStatus, $selectedSemester, $cohortSemesterId)
             ->orderBy('intake_semester_id')
             ->orderBy('student_id')
             ->get();
@@ -52,8 +58,19 @@ class GetStudentStatusBySemesterQuery
         return $this->mapStudents($students, $selectedStart);
     }
 
-    private function buildStudentsQuery(Carbon $selectedStart, ?int $campusId, ?string $currentStatus): Builder
-    {
+    /**
+     * The status filter matches where a student stood **in the selected
+     * semester**, not their live status: `students.status` jumps ahead the
+     * moment a future-dated action is recorded, so filtering on it would hide
+     * students the cohort matrix counts in that term.
+     */
+    private function buildStudentsQuery(
+        Carbon $selectedStart,
+        ?int $campusId,
+        ?string $currentStatus,
+        Semester $selectedSemester,
+        ?int $cohortSemesterId,
+    ): Builder {
         return Student::query()
             ->with(['intakeSemester:id,code,name,start_date', 'campus:id,name,code', 'program:id,name'])
             ->select([
@@ -76,9 +93,25 @@ class GetStudentStatusBySemesterQuery
             ->when($campusId, function ($query, $currentCampusId) {
                 $query->where('campus_id', $currentCampusId);
             })
-            ->when($currentStatus, function ($query, $status) {
-                (new FilterStudentsByProgramEnrollmentStatus)->apply($query, [(string) $status]);
+            ->when($cohortSemesterId, function ($query, $cohortId) {
+                $query->where('intake_semester_id', $cohortId);
+            })
+            ->when($currentStatus, function (Builder $query, $status) use ($selectedSemester) {
+                $query->whereIn('id', $this->idsInStatusAt($query, $selectedSemester, (string) $status));
             });
+    }
+
+    /**
+     * Resolve the matching ids by replay, then hand them back to SQL so ordering
+     * and pagination stay in the database.
+     *
+     * @return list<int>
+     */
+    private function idsInStatusAt(Builder $query, Semester $selectedSemester, string $status): array
+    {
+        $candidateIds = (clone $query)->reorder()->pluck('id')->map(static fn ($id): int => (int) $id)->all();
+
+        return $this->timeline->idsInStatusAt($candidateIds, $selectedSemester, $status);
     }
 
     private function mapStudents(Collection $students, Carbon $selectedStart): Collection

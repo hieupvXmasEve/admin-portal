@@ -20,6 +20,7 @@ class ExportStudentLifecycleYearlyRequest extends FormRequest
     {
         return [
             'selected_semester_id' => ['required', 'integer', 'exists:semesters,id'],
+            'cohort_semester_id' => ['nullable', 'integer', 'exists:semesters,id'],
             'current_status' => ['nullable', 'string', 'max:50'],
         ];
     }

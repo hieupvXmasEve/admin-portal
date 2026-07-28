@@ -6,8 +6,7 @@ namespace App\Modules\Academic\Progression\Queries\Reporting;
 
 use App\Models\Semester;
 use App\Models\Student;
-use App\Models\StudentActionLog;
-use App\Modules\Academic\Progression\Support\LifecycleSemesterAnchor;
+use App\Modules\Academic\Progression\Support\LifecycleStatusTimeline;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -33,10 +32,10 @@ use Illuminate\Support\Collection;
 class GetStudentLifecycleCohortMatrixQuery
 {
     /** Status a student holds before any lifecycle action is recorded. */
-    private const STATUS_PENDING = 'pending';
+    private const STATUS_PENDING = LifecycleStatusTimeline::STATUS_PENDING;
 
     public function __construct(
-        private readonly LifecycleSemesterAnchor $anchor,
+        private readonly LifecycleStatusTimeline $timeline,
     ) {}
 
     /**
@@ -68,7 +67,7 @@ class GetStudentLifecycleCohortMatrixQuery
             ];
         }
 
-        $timelines = $this->replayTimelines($students, $semesters);
+        $timelines = $this->timeline->forStudents($students, $semesters);
         $statuses = $this->statusesPresent($timelines);
 
         $cohorts = $students
@@ -123,76 +122,6 @@ class GetStudentLifecycleCohortMatrixQuery
                     ->orWhereHas('actionLogs', fn ($logs) => $logs->where('from_campus_id', $id));
             }))
             ->get(['id', 'campus_id', 'user_id', 'status', 'intake_semester_id']);
-    }
-
-    /**
-     * Replay every student's action log into a per-semester status series.
-     *
-     * @param  Collection<int, Student>  $students
-     * @param  Collection<int, Semester>  $semesters
-     * @return array<int, array<int, string>> [student_id => [semester_id => status]]
-     */
-    private function replayTimelines(Collection $students, Collection $semesters): array
-    {
-        $logs = StudentActionLog::query()
-            ->whereIn('student_id', $students->pluck('id'))
-            ->with(LifecycleSemesterAnchor::RELATIONS)
-            ->orderBy('id')
-            ->get()
-            ->groupBy('student_id');
-
-        $timelines = [];
-
-        foreach ($students as $student) {
-            $transitions = $this->transitionsBySemesterStart($logs->get($student->id) ?? collect());
-            $status = self::STATUS_PENDING;
-            $series = [];
-
-            foreach ($semesters as $semester) {
-                $start = Carbon::parse($semester->start_date)->startOfDay();
-
-                foreach ($transitions as $transition) {
-                    if ($transition['start']->lte($start)) {
-                        $status = $transition['status'];
-                    }
-                }
-
-                $series[(int) $semester->id] = $status;
-            }
-
-            $timelines[(int) $student->id] = $series;
-        }
-
-        return $timelines;
-    }
-
-    /**
-     * @param  Collection<int, StudentActionLog>  $logs
-     * @return list<array{start: Carbon, status: string}>
-     */
-    private function transitionsBySemesterStart(Collection $logs): array
-    {
-        $transitions = [];
-
-        foreach ($logs as $log) {
-            $semester = $this->anchor->forAction($log);
-            $newStatus = $log->new_status;
-
-            // An action that changed nothing, or that never got anchored to a
-            // semester, cannot be placed on the timeline.
-            if ($semester?->start_date === null || $newStatus === null || $newStatus === '') {
-                continue;
-            }
-
-            $transitions[] = [
-                'start' => Carbon::parse($semester->start_date)->startOfDay(),
-                'status' => (string) $newStatus,
-            ];
-        }
-
-        usort($transitions, fn (array $a, array $b) => $a['start'] <=> $b['start']);
-
-        return $transitions;
     }
 
     /**
