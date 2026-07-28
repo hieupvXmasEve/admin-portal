@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Actions\Warnings;
+namespace App\Modules\Academic\Progression\Actions\Warnings;
 
 use App\Models\Student;
 use App\Models\StudentWarningLog;

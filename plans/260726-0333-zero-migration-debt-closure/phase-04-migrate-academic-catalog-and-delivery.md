@@ -501,6 +501,34 @@ controllers/services/routes and frontend debt with each migrated workflow.
      results are trusted after any move — two apparent regressions in this
      slice were stale-classmap artifacts that vanished once the autoloader was
      regenerated.
+   - [x] Warnings assigned to Progression: `StudentWarningLog` and
+     `AcademicWarningSetting` claimed for Progression. The ownership call was
+     between Progression and Delivery — Progression wins on weight (3 warning
+     actions, `ListWarningCenterQuery`, `WarningCenterController`, and the
+     academic-standing threshold logic) and on meaning (academic standing is a
+     progression concept). `Delivery/Actions/SendAttendanceWarningAction` keeps
+     reading both models and therefore keeps 2 findings; that is the correct
+     residue — Delivery *emits* an attendance warning into a record Progression
+     owns. Moved 8 classes: `Actions/Warnings/*` (3),
+     `Queries/ListWarningCenterQuery`, `Http/Web/WarningCenterController`, and
+     `Http/Requests/Warnings/*` (3). `WarningDedupe` stays in
+     `Academic/Support` on purpose: it is shared by the Progression query and
+     the Delivery action and carries no model imports.
+     New coverage first: `tests/Feature/Academic/Progression/WarningCenterWebRoutesTest.php`
+     (8 tests) — the warning centre had no HTTP coverage at all. Green against
+     the old code before the move. Two fixture notes worth keeping: there is no
+     `GpaCalculationFactory` (build via `GpaCalculation::query()->create()` with
+     the decimal columns filled), and the controller/FormRequest gate on
+     `send_manual_notification` via in-body `abort_unless`/`authorize()`, which
+     `withoutMiddleware(Authorize::class)` does not bypass — the test uses
+     `Gate::before`.
+     Ratchet: `shared_model_imports` 354 → 344; `cross_context_concrete_imports`
+     held at 0.
+     Process note: the namespace-prefix sweep rewrites *references* but not the
+     `namespace` line of a single-file move, because the declaration
+     (`namespace App\Modules\Academic\Queries;`) does not contain the class
+     name. Both single-file moves in this slice needed their namespace fixed by
+     hand; whole-directory moves did not.
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
    - [x] Ratchet tighten: earlier slices lowered the frozen-* ceilings per
      move but left incidental headroom on the other rules. Re-pinned every
@@ -520,29 +548,22 @@ controllers/services/routes and frontend debt with each migrated workflow.
 ## Remaining Scope
 
 Measured 2026-07-28 from `migration-debt:inventory --format=json`, filtered to
-work packages tagged `phase-04:academic`, after the Progression lifecycle slice.
+work packages tagged `phase-04:academic`, after the Warnings slice.
 Route retirement is complete: Academic owns zero frozen routes and zero frozen
 controllers.
 
 | Rule | Count | Concentration |
 |---|---|---|
-| `shared_model_imports` | 126 | 55 in unassigned generic dirs, 70 Delivery, 1 Catalog |
+| `shared_model_imports` | 111 | 40 in unassigned generic dirs, 70 Delivery, 1 Catalog |
 | `inline_request_validation` | 6 | `Http/Web` (Gpa, Placement, ProgressionAudit, PerformanceDashboard) and `Delivery/Http/Api/Lecturer/*` |
 | `direct_json_responses` | 1 | `Catalog/Http/Web/SpecializationController` |
 
 Requirement 1 (assign every generic Academic class to one logical context) is the
 dominant remainder. The unassigned findings sit in `Academic/Support` (21),
-`Academic/Http` (15), `Academic/Actions` (10), `Academic/Queries` (7), and
+`Academic/Http` (11), `Academic/Queries` (4), `Academic/Actions` (2), and
 `Exports`/`Providers` (2).
 
-One coherent vertical remains:
-
-- **Warnings** (~11): `Actions/Warnings/*` and `ListWarningCenterQuery`. Owner
-  is not obvious: `StudentWarningLog` is read from Progression-flavoured code
-  and from `Delivery/Actions/SendAttendanceWarningAction`, so this one needs an
-  ownership call before the move.
-
-After Warnings, the ~44 remaining unassigned findings are the Finance
+No coherent vertical remains. The 40 remaining unassigned findings are the Finance
 charge/obligation gateway (10), the AI academic readers (9), the GPA/performance
 reporting surfaces (10), placement and progression-audit controllers (5), and
 small one-offs. None form a vertical on their own; each needs an owner decision

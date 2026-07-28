@@ -2,21 +2,21 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Http\Web;
+namespace App\Modules\Academic\Progression\Http\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\AcademicWarningSetting;
 use App\Models\CourseOffering;
 use App\Models\GpaCalculation;
 use App\Models\Student;
-use App\Modules\Academic\Actions\Warnings\SendAcademicStandingWarningAction;
-use App\Modules\Academic\Actions\Warnings\UpdateWarningSettingsAction;
+use App\Modules\Academic\Progression\Actions\Warnings\SendAcademicStandingWarningAction;
+use App\Modules\Academic\Progression\Actions\Warnings\UpdateWarningSettingsAction;
 use App\Modules\Academic\Delivery\Actions\SendAttendanceWarningAction;
 use App\Modules\Academic\Delivery\Http\Requests\Warnings\SendAttendanceWarningRequest;
-use App\Modules\Academic\Http\Requests\Warnings\ListWarningCenterRequest;
-use App\Modules\Academic\Http\Requests\Warnings\SendAcademicStandingWarningRequest;
-use App\Modules\Academic\Http\Requests\Warnings\UpdateWarningSettingsRequest;
-use App\Modules\Academic\Queries\ListWarningCenterQuery;
+use App\Modules\Academic\Progression\Http\Requests\Warnings\ListWarningCenterRequest;
+use App\Modules\Academic\Progression\Http\Requests\Warnings\SendAcademicStandingWarningRequest;
+use App\Modules\Academic\Progression\Http\Requests\Warnings\UpdateWarningSettingsRequest;
+use App\Modules\Academic\Progression\Queries\ListWarningCenterQuery;
 use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;

@@ -9,7 +9,7 @@ use App\Models\CourseOffering;
 use App\Models\Student;
 use App\Models\StudentWarningLog;
 use App\Models\User;
-use App\Modules\Academic\Queries\ListWarningCenterQuery;
+use App\Modules\Academic\Progression\Queries\ListWarningCenterQuery;
 use App\Modules\Academic\Support\WarningDedupe;
 use App\Modules\Academic\Support\WarningMessageRenderer;
 use App\Shared\Contracts\Academic\AcademicPeriodReader;

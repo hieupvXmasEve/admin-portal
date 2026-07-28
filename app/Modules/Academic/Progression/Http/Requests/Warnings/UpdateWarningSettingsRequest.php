@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Http\Requests\Warnings;
+namespace App\Modules\Academic\Progression\Http\Requests\Warnings;
 
 use Illuminate\Foundation\Http\FormRequest;
 

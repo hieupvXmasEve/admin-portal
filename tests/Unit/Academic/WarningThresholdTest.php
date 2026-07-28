@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Modules\Academic\Queries\ListWarningCenterQuery;
+use App\Modules\Academic\Progression\Queries\ListWarningCenterQuery;
 use App\Modules\Academic\Support\WarningDedupe;
 
 it('converts syllabus attendance percentage thresholds into absence milestones', function (): void {
