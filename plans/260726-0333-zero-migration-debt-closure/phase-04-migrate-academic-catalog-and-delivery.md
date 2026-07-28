@@ -694,6 +694,25 @@ controllers/services/routes and frontend debt with each migrated workflow.
      too, so a fix has to reshape the read, not just the where clause. The test
      pins the current behaviour explicitly as current, not intended.
      Ratchet: `shared_model_imports` 293 -> 290.
+   - [x] Retake registration resolved through StudentRegistry.
+     `CreateRetakeCourseRegistrationAction` needed three fields off the student:
+     `status`, program id, and curriculum version id. `StudentReference` already
+     carried the first two, so it gained one nullable `curriculumVersionId`
+     rather than the action keeping the whole model for a single column — the
+     DTO is the right place for a field the registry owns and other consumers
+     will want.
+     `PrerequisiteValidationService` now takes a student id. It only ever used
+     `$student->academicRecords()`, and `AcademicRecord` is Delivery's own model
+     since the ownership fix, so it queries that directly; both call sites pass
+     the id. Behaviour delta, deliberate: a student the registry cannot resolve
+     fails validation on `student_id` instead of raising model-not-found, which
+     matches how the action reports every other bad input.
+     Ratchet: `shared_model_imports` 290 -> 289. The frozen service swapped a
+     `Student` import for an `AcademicRecord` one, so the count moves by the
+     action alone; the boundary still improved, since the service now reads a
+     model its own context owns.
+     The `course-attendance` defect found in the previous slice is recorded in
+     the plan index under Deferred defects, at the user's direction.
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
    - [x] Ratchet tighten: earlier slices lowered the frozen-* ceilings per
      move but left incidental headroom on the other rules. Re-pinned every
@@ -713,13 +732,13 @@ controllers/services/routes and frontend debt with each migrated workflow.
 ## Remaining Scope
 
 Measured 2026-07-28 from `migration-debt:inventory --format=json`, filtered to
-work packages tagged `phase-04:academic`, after the attendance-chain pass.
+work packages tagged `phase-04:academic`, after the retake-registration pass.
 Route retirement is complete: Academic owns zero frozen routes and zero frozen
 controllers.
 
 | Rule | Count | Concentration |
 |---|---|---|
-| `shared_model_imports` | 54 | 26 in unassigned generic dirs, 27 Delivery, 1 Catalog |
+| `shared_model_imports` | 53 | 26 in unassigned generic dirs, 26 Delivery, 1 Catalog |
 | `inline_request_validation` | 2 | `Delivery/Http/Api/Lecturer/{Student,Timetable}Controller` |
 | `direct_json_responses` | 1 | `Catalog/Http/Web/SpecializationController` |
 
@@ -744,17 +763,15 @@ The remaining 8 are one-offs: the two student-action FormRequests, the
 Academic service provider, `GetCampusDetailQuery`, `CampusBuildingCountReader`,
 and `FailureReasonClassifier`.
 
-The larger remaining block is not unassigned at all: 27 shared imports sit
-inside Delivery. `Student` is down to 7 files: `LecturerStudentService` and
-`AssessmentReportService`/`AssessmentGradeExcelService` (roster and report
-reads), the two eligibility queries, `SendAttendanceWarningAction` (needs an
-attendance-warning fixture before its signature can change), and
-`CreateRetakeCourseRegistrationAction`, which reads `curriculum_version_id` —
-a field `StudentReference` does not carry, so that one needs the DTO extended.
-The
-tail is `SyllabusTemplate`/`Lecture`/`User`/`Semester` (3 each), `Unit`/`Room`
-(2 each), and 4 one-offs; the `Lecture` and `Unit` ones are type dependencies
-(`instanceof`, return types) that need DTOs rather than a different call.
+The larger remaining block is not unassigned at all: 26 shared imports sit
+inside Delivery. `Student` is down to 6 files: `LecturerStudentService`,
+`AssessmentReportService` and `AssessmentGradeExcelService` (roster and report
+reads), the two eligibility queries, and `SendAttendanceWarningAction`, which
+needs an attendance-warning fixture before its signature can change.
+The tail is `SyllabusTemplate`/`Lecture`/`User`/`Semester` (3 each),
+`Unit`/`Room` (2 each), and 4 one-offs; the `Lecture` and `Unit` ones are type
+dependencies (`instanceof`, return types) that need DTOs rather than a
+different call.
 
 Explicitly not phase-04 scope, tagged to later phases by the scanner:
 `AcademicRecordGenerationServiceOptimized` (frozen service) and

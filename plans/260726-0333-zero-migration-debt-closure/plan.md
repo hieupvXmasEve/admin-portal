@@ -71,6 +71,16 @@ after its reader/writer count and unexplained data exceptions are both zero.
 - Portal impact is declared per slice and nested repository checks remain separate.
 - Research basis: [research summary](./research/research-summary.md).
 
+## Deferred defects
+
+Defects this program uncovered but did not fix, because fixing them is product
+work rather than migration work. Each is pinned by a test that records current
+behaviour explicitly as current, not intended.
+
+| Found | Defect | Evidence |
+|---|---|---|
+| 2026-07-28, phase 4 | `v1.student.attendance.course-attendance` has never worked for an enrolled student. `StudentAttendanceService::getCourseAttendance` filters `attendances.course_offering_id` and orders by `attendances.session_date`; neither is a column on `attendances` — both live on `class_sessions`. Every enrolled request returns 422 with a SQL error. `formatAttendanceRecords` also reads `$record->session_date`, so the fix has to reshape the read, not just the where clause. | `tests/Feature/Api/V1/Student/AttendanceControllerTest.php` |
+
 ## Success Criteria
 
 - [ ] The immutable set of 14 rule IDs and required runtime roots is present; every
