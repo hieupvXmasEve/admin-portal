@@ -2,7 +2,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogDescription, DialogHeader, DialogScrollContent, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTableFilters } from '@/composables/useFilters';
@@ -379,14 +379,14 @@ const handleExport = () => {
         </Card>
 
         <Dialog v-model:open="isDrillOpen">
-            <DialogScrollContent class="max-w-[95vw] sm:max-w-[95vw]">
-                <DialogHeader>
+            <DialogContent class="flex h-[85vh] w-[95vw] max-w-[95vw] flex-col gap-4 overflow-hidden sm:max-w-[95vw]">
+                <DialogHeader class="shrink-0">
                     <DialogTitle>{{ drillTitle }}</DialogTitle>
                     <DialogDescription>Kỳ {{ selectedSemesterLabel }} · bấm một dòng để mở hồ sơ sinh viên.</DialogDescription>
                 </DialogHeader>
 
-                <StudentStatusTable :status-table="statusTable" @navigate="handlePaginationNavigate" @page-size-change="(size) => applyFilters({ status_per_page: size, page: 1 })" />
-            </DialogScrollContent>
+                <StudentStatusTable fill-height :status-table="statusTable" @navigate="handlePaginationNavigate" @page-size-change="(size) => applyFilters({ status_per_page: size, page: 1 })" />
+            </DialogContent>
         </Dialog>
     </div>
 </template>

@@ -6,10 +6,18 @@ import { studentRoutes } from '@/utils/routes';
 import { router } from '@inertiajs/vue3';
 import type { StatusRow } from './types';
 
-defineProps<{
-    statusTable: PaginatedResponse<StatusRow> | null;
-    emptyMessage?: string;
-}>();
+withDefaults(
+    defineProps<{
+        statusTable: PaginatedResponse<StatusRow> | null;
+        emptyMessage?: string;
+        /**
+         * Fill the parent's height and scroll the rows internally, so the page
+         * count stays put instead of moving with every change of row count.
+         */
+        fillHeight?: boolean;
+    }>(),
+    { emptyMessage: undefined, fillHeight: false },
+);
 
 const emit = defineEmits<{
     navigate: [url: string];
@@ -21,12 +29,12 @@ const formatActionType = (value: string | null): string => (value ? value.replac
 </script>
 
 <template>
-    <div v-if="!statusTable || statusTable.data.length === 0" class="text-muted-foreground py-8 text-center">
+    <div v-if="!statusTable || statusTable.data.length === 0" class="text-muted-foreground py-8 text-center" :class="fillHeight ? 'flex flex-1 items-center justify-center' : ''">
         {{ emptyMessage ?? 'Không tìm thấy sinh viên nào khớp bộ lọc.' }}
     </div>
 
-    <div v-else class="space-y-3">
-        <div class="overflow-x-auto">
+    <div v-else :class="fillHeight ? 'flex min-h-0 flex-1 flex-col gap-3' : 'space-y-3'">
+        <div class="overflow-x-auto" :class="fillHeight ? 'min-h-0 flex-1 overflow-y-auto' : ''">
             <table class="w-full min-w-[1600px] border-collapse text-sm">
                 <thead>
                     <tr class="bg-muted/40 border-b">
@@ -75,6 +83,6 @@ const formatActionType = (value: string | null): string => (value ? value.replac
             </table>
         </div>
 
-        <DataPagination :pagination-data="statusTable" @navigate="(url: string) => emit('navigate', url)" @page-size-change="(size: number) => emit('pageSizeChange', size)" />
+        <DataPagination :class="fillHeight ? 'shrink-0' : ''" :pagination-data="statusTable" @navigate="(url: string) => emit('navigate', url)" @page-size-change="(size: number) => emit('pageSizeChange', size)" />
     </div>
 </template>
