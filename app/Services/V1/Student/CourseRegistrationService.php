@@ -246,7 +246,7 @@ class CourseRegistrationService
         }
 
         // Check prerequisites
-        if (! $this->prerequisiteService->hasMetPrerequisites($student, $courseOffering)) {
+        if (! $this->prerequisiteService->hasMetPrerequisites((int) $student->id, $courseOffering)) {
             throw new BusinessLogicException('Prerequisites not met for this course');
         }
 
@@ -330,7 +330,7 @@ class CourseRegistrationService
             ],
             //            'registration_eligibility' => [
             //                'can_register' => $this->canRegisterForCourse($student, $offering),
-            //                'prerequisites_met' => $this->prerequisiteService->hasMetPrerequisites($student, $offering),
+            //                'prerequisites_met' => $this->prerequisiteService->hasMetPrerequisites((int) $student->id, $offering),
             //                'has_conflicts' => ! $this->conflictDetectionService->detectConflicts($student, $offering)->isEmpty(),
             //                'capacity_available' => $availableSpots > 0,
             //            ],

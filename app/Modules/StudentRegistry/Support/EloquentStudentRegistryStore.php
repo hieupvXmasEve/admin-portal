@@ -289,6 +289,7 @@ final class EloquentStudentRegistryStore implements StudentProfilePersistenceWri
             statusLabel: $student->status_label,
             intakeSemesterId: $student->intake_semester_id === null ? null : (int) $student->intake_semester_id,
             cohort: $student->intake === null ? null : (int) $student->intake,
+            curriculumVersionId: $student->curriculum_version_id === null ? null : (int) $student->curriculum_version_id,
         );
     }
 
@@ -315,6 +316,7 @@ final class EloquentStudentRegistryStore implements StudentProfilePersistenceWri
             statusLabel: $student->status_label,
             intakeSemesterId: $student->intake_semester_id === null ? null : (int) $student->intake_semester_id,
             cohort: $student->intake === null ? null : (int) $student->intake,
+            curriculumVersionId: $student->curriculum_version_id === null ? null : (int) $student->curriculum_version_id,
         );
     }
 
@@ -338,6 +340,7 @@ final class EloquentStudentRegistryStore implements StudentProfilePersistenceWri
             'gc_current_level',
             'intake_semester_id',
             'intake',
+            'curriculum_version_id',
         ];
     }
 }

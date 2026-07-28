@@ -27,6 +27,7 @@ final readonly class StudentReference
         public ?string $statusLabel = null,
         public ?int $intakeSemesterId = null,
         public ?int $cohort = null,
+        public ?int $curriculumVersionId = null,
     ) {}
 
     /**

@@ -7,13 +7,13 @@ namespace App\Modules\Academic\Delivery\Actions;
 use App\Models\AcademicRecord;
 use App\Models\CourseOffering;
 use App\Models\CourseRetakeRegistration;
-use App\Models\Student;
 use App\Models\Unit;
 use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Services\V1\Student\PrerequisiteValidationService;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
 use App\Shared\Contracts\Finance\Enums\FinancialEffect;
 use App\Shared\Contracts\Finance\FinanceIntakeContract;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -40,7 +40,13 @@ class CreateRetakeCourseRegistrationAction
     public static function run(array $data): CourseRetakeRegistration
     {
         return DB::transaction(function () use ($data) {
-            $student = Student::findOrFail($data['student_id']);
+            $student = app(StudentReferenceReader::class)->find((int) $data['student_id']);
+
+            if ($student === null) {
+                throw ValidationException::withMessages([
+                    'student_id' => ['Không tìm thấy sinh viên.'],
+                ]);
+            }
             $unit = Unit::findOrFail($data['unit_id']);
             $courseOffering = isset($data['course_offering_id']) && $data['course_offering_id'] !== null
                 ? CourseOffering::findOrFail($data['course_offering_id'])
@@ -112,10 +118,10 @@ class CreateRetakeCourseRegistrationAction
             // a target class now, keep the existing prerequisite guard.
             if ($courseOffering) {
                 $prereqMet = app(PrerequisiteValidationService::class)
-                    ->hasMetPrerequisites($student, $courseOffering);
+                    ->hasMetPrerequisites($student->id, $courseOffering);
                 if (! $prereqMet) {
                     $prereqDetails = app(PrerequisiteValidationService::class)
-                        ->getPrerequisiteValidation($student, $courseOffering);
+                        ->getPrerequisiteValidation($student->id, $courseOffering);
                     $missingCodes = collect($prereqDetails['missing_groups'])
                         ->flatMap(fn ($g) => collect($g['conditions'])
                             ->where('met', false)
@@ -186,8 +192,8 @@ class CreateRetakeCourseRegistrationAction
                     'operation_semester_id' => $registration->operation_semester_id,
                     'charge_semester_id' => $registration->charge_semester_id,
                     'attempt_number' => $registration->attempt_number,
-                    'student_program_id' => $student->program_id ?? null,
-                    'student_curriculum_version_id' => $student->curriculum_version_id ?? null,
+                    'student_program_id' => $student->programId,
+                    'student_curriculum_version_id' => $student->curriculumVersionId,
                     'description' => "Phí học lại: {$unit->code} - {$unit->name}",
                 ],
             ));

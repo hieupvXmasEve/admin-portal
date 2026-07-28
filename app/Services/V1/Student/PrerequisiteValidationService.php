@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\V1\Student;
 
+use App\Models\AcademicRecord;
 use App\Models\CourseOffering;
-use App\Models\Student;
 use App\Models\Unit;
 use App\Models\UnitPrerequisiteCondition;
 use App\Models\UnitPrerequisiteGroup;
@@ -17,7 +17,7 @@ class PrerequisiteValidationService
     /**
      * Check if student has met all prerequisites for a course offering
      */
-    public function hasMetPrerequisites(Student $student, CourseOffering $courseOffering): bool
+    public function hasMetPrerequisites(int $studentId, CourseOffering $courseOffering): bool
     {
         $unit = $courseOffering->unit;
         $prerequisiteGroups = $this->getPrerequisiteGroups($unit);
@@ -26,13 +26,13 @@ class PrerequisiteValidationService
             return true;
         }
 
-        return $this->validatePrerequisiteGroups($student, $prerequisiteGroups);
+        return $this->validatePrerequisiteGroups($studentId, $prerequisiteGroups);
     }
 
     /**
      * Get detailed prerequisite validation results
      */
-    public function getPrerequisiteValidation(Student $student, CourseOffering $courseOffering): array
+    public function getPrerequisiteValidation(int $studentId, CourseOffering $courseOffering): array
     {
         $unit = $courseOffering->unit;
         $prerequisiteGroups = $this->getPrerequisiteGroups($unit);
@@ -50,7 +50,7 @@ class PrerequisiteValidationService
         $missingGroups = [];
 
         foreach ($prerequisiteGroups as $group) {
-            $result = $this->validateSingleGroup($student, $group);
+            $result = $this->validateSingleGroup($studentId, $group);
             $validationResults[] = $result;
 
             if (! $result['met']) {
@@ -84,10 +84,10 @@ class PrerequisiteValidationService
     /**
      * Validate all prerequisite groups for a student
      */
-    protected function validatePrerequisiteGroups(Student $student, Collection $prerequisiteGroups): bool
+    protected function validatePrerequisiteGroups(int $studentId, Collection $prerequisiteGroups): bool
     {
         foreach ($prerequisiteGroups as $group) {
-            $result = $this->validateSingleGroup($student, $group);
+            $result = $this->validateSingleGroup($studentId, $group);
             if (! $result['met']) {
                 return false;
             }
@@ -99,14 +99,14 @@ class PrerequisiteValidationService
     /**
      * Validate a single prerequisite group
      */
-    protected function validateSingleGroup(Student $student, UnitPrerequisiteGroup $group): array
+    protected function validateSingleGroup(int $studentId, UnitPrerequisiteGroup $group): array
     {
         $conditions = $group->conditions;
         $metConditions = 0;
         $conditionResults = [];
 
         foreach ($conditions as $condition) {
-            $result = $this->validateSingleCondition($student, $condition);
+            $result = $this->validateSingleCondition($studentId, $condition);
             $conditionResults[] = $result;
 
             if ($result['met']) {
@@ -140,7 +140,7 @@ class PrerequisiteValidationService
     /**
      * Validate a single prerequisite condition
      */
-    protected function validateSingleCondition(Student $student, UnitPrerequisiteCondition $condition): array
+    protected function validateSingleCondition(int $studentId, UnitPrerequisiteCondition $condition): array
     {
         $met = false;
         $gradeAchieved = null;
@@ -151,7 +151,7 @@ class PrerequisiteValidationService
             $unit = $condition->requiredUnit;
 
             // Find any record where student passed: is_passed=true or override_pass=true
-            $academicRecord = $student->academicRecords()
+            $academicRecord = AcademicRecord::query()->where('student_id', $studentId)
                 ->where('unit_id', $unit->id)
                 ->where(function ($q) {
                     $q->where('is_passed', true)
@@ -167,7 +167,7 @@ class PrerequisiteValidationService
             }
         } elseif ($condition->type === 'credit_requirement') {
             // Check if student has required credit points
-            $totalCredits = $student->academicRecords()
+            $totalCredits = AcademicRecord::query()->where('student_id', $studentId)
                 ->where('completion_status', 'completed')
                 ->sum('credit_points');
 
@@ -293,7 +293,7 @@ class PrerequisiteValidationService
     /**
      * Check concurrent enrollment eligibility
      */
-    public function canEnrollConcurrently(Student $student, CourseOffering $courseOffering, CourseOffering $prerequisiteCourseOffering): bool
+    public function canEnrollConcurrently(int $studentId, CourseOffering $courseOffering, CourseOffering $prerequisiteCourseOffering): bool
     {
         $unit = $courseOffering->unit;
         $prerequisiteUnit = $prerequisiteCourseOffering->unit;
@@ -314,10 +314,10 @@ class PrerequisiteValidationService
     /**
      * Get recommended study sequence based on prerequisites
      */
-    public function getRecommendedSequence(Student $student, Collection $units): array
+    public function getRecommendedSequence(int $studentId, Collection $units): array
     {
         $sequence = [];
-        $completed = $this->getCompletedUnits($student);
+        $completed = $this->getCompletedUnits($studentId);
         $remaining = $units->reject(function ($unit) use ($completed) {
             return $completed->contains('id', $unit->id);
         });
@@ -381,9 +381,9 @@ class PrerequisiteValidationService
     /**
      * Get completed units for a student
      */
-    protected function getCompletedUnits(Student $student): Collection
+    protected function getCompletedUnits(int $studentId): Collection
     {
-        return $student->academicRecords()
+        return AcademicRecord::query()->where('student_id', $studentId)
             ->where('completion_status', 'completed')
             ->with('unit')
             ->get()
