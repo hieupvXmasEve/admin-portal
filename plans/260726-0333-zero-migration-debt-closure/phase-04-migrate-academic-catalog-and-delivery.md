@@ -673,6 +673,27 @@ controllers/services/routes and frontend debt with each migrated workflow.
      directories the recursive scan never reached. They now assert exactly the
      remaining Delivery work, so they are the acceptance signal for it — do not
      weaken them to get green.
+   - [x] Student attendance chain, second Student pass. `route:list` showed only
+     two of `Delivery/Http/Api/Student/AttendanceController`'s four methods are
+     registered, so the unrouted `index` and `statistics` went, along with their
+     query methods, the FormRequest only `index` used, and the 20
+     `StudentAttendanceService` methods left with no caller once those were gone
+     — 993 lines down to about 500. The dead-code cascade was done by repeatedly
+     removing any method with zero remaining `$this->` references, never by eye.
+     The surviving chain (`course`, `report`) takes an `int`. The one non-id use
+     of the model was `$student->courseRegistrations()`, and `CourseRegistration`
+     is Delivery's own model, so the service queries it directly.
+     Coverage: `tests/Feature/Api/V1/Student/AttendanceControllerTest.php` over
+     both live endpoints, green before the change.
+     Defect found and recorded, not fixed here: the enrolled path of
+     `v1.student.attendance.course-attendance` filters
+     `attendances.course_offering_id` and orders by `attendances.session_date`,
+     and neither is a column on `attendances` — both live on `class_sessions`.
+     Every enrolled request returns a 422 carrying a SQL error, so that endpoint
+     has never worked. `formatAttendanceRecords` reads `$record->session_date`
+     too, so a fix has to reshape the read, not just the where clause. The test
+     pins the current behaviour explicitly as current, not intended.
+     Ratchet: `shared_model_imports` 293 -> 290.
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
    - [x] Ratchet tighten: earlier slices lowered the frozen-* ceilings per
      move but left incidental headroom on the other rules. Re-pinned every
@@ -692,13 +713,13 @@ controllers/services/routes and frontend debt with each migrated workflow.
 ## Remaining Scope
 
 Measured 2026-07-28 from `migration-debt:inventory --format=json`, filtered to
-work packages tagged `phase-04:academic`, after the first Student pass.
+work packages tagged `phase-04:academic`, after the attendance-chain pass.
 Route retirement is complete: Academic owns zero frozen routes and zero frozen
 controllers.
 
 | Rule | Count | Concentration |
 |---|---|---|
-| `shared_model_imports` | 57 | 26 in unassigned generic dirs, 30 Delivery, 1 Catalog |
+| `shared_model_imports` | 54 | 26 in unassigned generic dirs, 27 Delivery, 1 Catalog |
 | `inline_request_validation` | 2 | `Delivery/Http/Api/Lecturer/{Student,Timetable}Controller` |
 | `direct_json_responses` | 1 | `Catalog/Http/Web/SpecializationController` |
 
@@ -723,10 +744,14 @@ The remaining 8 are one-offs: the two student-action FormRequests, the
 Academic service provider, `GetCampusDetailQuery`, `CampusBuildingCountReader`,
 and `FailureReasonClassifier`.
 
-The larger remaining block is not unassigned at all: 30 shared imports sit
-inside Delivery. `Student` (10) is now the only concentration and needs a
-StudentRegistry reader contract with a DTO, since these are domain reads inside
-attendance, roster, and eligibility logic rather than reference lookups. The
+The larger remaining block is not unassigned at all: 27 shared imports sit
+inside Delivery. `Student` is down to 7 files: `LecturerStudentService` and
+`AssessmentReportService`/`AssessmentGradeExcelService` (roster and report
+reads), the two eligibility queries, `SendAttendanceWarningAction` (needs an
+attendance-warning fixture before its signature can change), and
+`CreateRetakeCourseRegistrationAction`, which reads `curriculum_version_id` —
+a field `StudentReference` does not carry, so that one needs the DTO extended.
+The
 tail is `SyllabusTemplate`/`Lecture`/`User`/`Semester` (3 each), `Unit`/`Room`
 (2 each), and 4 one-offs; the `Lecture` and `Unit` ones are type dependencies
 (`instanceof`, return types) that need DTOs rather than a different call.
