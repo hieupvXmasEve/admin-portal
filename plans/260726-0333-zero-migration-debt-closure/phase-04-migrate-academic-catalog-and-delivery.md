@@ -529,6 +529,52 @@ controllers/services/routes and frontend debt with each migrated workflow.
      (`namespace App\Modules\Academic\Queries;`) does not contain the class
      name. Both single-file moves in this slice needed their namespace fixed by
      hand; whole-directory moves did not.
+   - [x] GPA history, performance dashboard, progression audit, and placement
+     assigned to Progression. No new ownership claim was needed: the models
+     these classes read are already owned elsewhere, so the win came from
+     seams, not exemptions. Moved 14 classes: `GpaHistoryController`,
+     `PerformanceDashboardController`, `AcademicProgressionAuditController`,
+     `AcademicPlacementController`, `Http/Requests/Placement/*` (4),
+     `ListGpaHistoryQuery`, `GetPerformanceDashboardQuery`,
+     `Queries/Reporting/GetStudentStatusBySemesterQuery`,
+     `Queries/Reporting/GetAcademicReportQuery`, and `Exports/GpaHistoryExport`.
+     Replaced the Campus/Semester/Program reads in the three reporting
+     controllers with owner-side seams: the existing
+     `Institution\CampusReferenceReader`, a new
+     `Catalog\Queries\GetProgramReferenceOptionsQuery`, and two new methods on
+     `Catalog\Queries\GetSemesterReferenceOptionsQuery` — `records()` (full
+     model rows, for the pickers that render more than the reference triple)
+     and `auditOptions()` (adds `end_date`). The audit CSV filename now uses
+     the existing `codeOrFail()`. Those three controllers now import zero
+     shared models.
+     Accepted payload delta: the campus dropdowns on the GPA-history and
+     performance pages are now name-ordered and carry a `code` key, because
+     `CampusReferenceReader::all()` is the shared shape. Both were previously
+     `Campus::select('id','name')->get()` in id order. The progression-audit
+     picker already matched the shared shape exactly.
+     Fixed two defects found on the way, both pre-existing and both proven by
+     `git stash` on a clean tree:
+     `DomainBoundaryArchitectureTest` was red on dev — the Academic route file
+     still referenced `StudentRegistry\Http\Web\StudentController` after the
+     student directory moved. The student CRUD and photo-capture routes now
+     live in a new `app/Modules/StudentRegistry/routes/web.php` loaded by
+     `StudentRegistryServiceProvider::boot()`; all 7 route names, URIs, and
+     middleware stacks verified unchanged via `route:list --json`.
+     `Progression\Support\LifecycleFormOptions` referenced
+     `StudentStatusTransitionPolicy` unqualified from a namespace with no such
+     class, so that branch would fatal at runtime; added the import.
+     New coverage first: `tests/Feature/Academic/Progression/ProgressionReportingWebRoutesTest.php`
+     (13 tests) — none of these four surfaces had HTTP coverage. Green against
+     the old code before the move. Recorded behaviour worth keeping: the
+     placement `show` route is an ADR-0049 redirect to the Hub lifecycle tab,
+     not a page; GPA history lists only `is_finalized` calculations; filter
+     state echoed from the query string stays a string, not an int.
+     Ratchet: `shared_model_imports` 344 -> 331; `cross_context_concrete_imports`
+     held at 0.
+     Process note: the FQN sweep only rewrites unescaped namespaces. A
+     class-name string literal in PHP source is double-escaped
+     (`'App\\Modules\\...'`) and is missed — `AI\Support\MetricCatalog` pins two
+     source-query FQNs that way, caught by `AiMetricCatalogQueryPlanTest`.
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
    - [x] Ratchet tighten: earlier slices lowered the frozen-* ceilings per
      move but left incidental headroom on the other rules. Re-pinned every
@@ -548,33 +594,48 @@ controllers/services/routes and frontend debt with each migrated workflow.
 ## Remaining Scope
 
 Measured 2026-07-28 from `migration-debt:inventory --format=json`, filtered to
-work packages tagged `phase-04:academic`, after the Warnings slice.
+work packages tagged `phase-04:academic`, after the reporting/placement slice.
 Route retirement is complete: Academic owns zero frozen routes and zero frozen
 controllers.
 
 | Rule | Count | Concentration |
 |---|---|---|
-| `shared_model_imports` | 111 | 40 in unassigned generic dirs, 70 Delivery, 1 Catalog |
-| `inline_request_validation` | 6 | `Http/Web` (Gpa, Placement, ProgressionAudit, PerformanceDashboard) and `Delivery/Http/Api/Lecturer/*` |
+| `shared_model_imports` | 98 | 27 in unassigned generic dirs, 70 Delivery, 1 Catalog |
+| `inline_request_validation` | 2 | `Delivery/Http/Api/Lecturer/{Student,Timetable}Controller` |
 | `direct_json_responses` | 1 | `Catalog/Http/Web/SpecializationController` |
 
 Requirement 1 (assign every generic Academic class to one logical context) is the
-dominant remainder. The unassigned findings sit in `Academic/Support` (21),
-`Academic/Http` (11), `Academic/Queries` (4), `Academic/Actions` (2), and
-`Exports`/`Providers` (2).
+dominant remainder. The unassigned findings sit in `Academic/Support` (17),
+`Academic/Http/Requests` (2), `Academic/Actions` (2), `Academic/Queries` (1),
+and `Providers` (1).
 
-No coherent vertical remains. The 40 remaining unassigned findings are the Finance
-charge/obligation gateway (10), the AI academic readers (9), the GPA/performance
-reporting surfaces (10), placement and progression-audit controllers (5), and
-small one-offs. None form a vertical on their own; each needs an owner decision
-or a seam rather than a move.
+No coherent vertical remains. The 27 unassigned findings are two clusters plus
+one-offs, and both clusters need an architecture decision rather than a move:
+
+- **Finance charge/obligation gateway** (10): `AcademicFinanceChargeSourceGateway`
+  (6), `AcademicFinanceObligationSource` (2), `AcademicObligationSettlement` (2),
+  plus `CompleteFinanceCancellationOperationAction` (2). This is the
+  Academic-Finance boundary and is governed by ADR-0026.
+- **AI academic readers** (9): `AiAcademicStudentProfileReader` (5) and
+  `AiAcademicEntitySearchReader` (4). Both read across Catalog, Delivery, and
+  Progression, so they belong to no single submodule; the likely answer is a
+  contract rather than an owner.
+
+The remaining 8 are one-offs: the two student-action FormRequests, the
+Academic service provider, `GetCampusDetailQuery`, `CampusBuildingCountReader`,
+and `FailureReasonClassifier`.
+
+The larger remaining block is not unassigned at all: 70 shared imports sit
+inside Delivery and need seams, not moves.
 
 Explicitly not phase-04 scope, tagged to later phases by the scanner:
 `AcademicRecordGenerationServiceOptimized` (frozen service) and
 `routes/api/v1/lecturer.php` (frozen route) belong to phase 9; the 18
 `literal_frontend_urls` and 8 `legacy_filter_stacks` under Academic-adjacent
-page owners belong to phase 8; 4 migration commands belong to phase 10; a
-further 48 shared-model imports belong to phase 5.
+page owners belong to phase 8; 4 migration commands belong to phase 10; and the
+shared-model imports plus inline validation now inside `Academic/Progression`
+re-tag to phase 5, which is why phase-04's counts drop faster than the global
+ratchet does.
 
 ## Test Scenario Matrix
 
