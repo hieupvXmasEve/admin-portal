@@ -13,9 +13,9 @@ use Illuminate\Support\Facades\File;
 it('keeps Academic lifecycle flows behind Progression and Finance owner boundaries', function (): void {
     $academicLifecycleFiles = [
         'app/Modules/Academic/Progression/Actions/RecordStudentActionAction.php',
-        'app/Modules/Academic/Actions/ImportStudentActionsFromExcelAction.php',
+        'app/Modules/Academic/Progression/Actions/ImportStudentActionsFromExcelAction.php',
         'app/Modules/Academic/Http/Requests/StoreStudentActionRequest.php',
-        'app/Modules/Academic/Support/LifecycleFormOptions.php',
+        'app/Modules/Academic/Progression/Support/LifecycleFormOptions.php',
         'app/Modules/Academic/Support/StudentActionPreservePreviewResolver.php',
     ];
 
@@ -47,7 +47,7 @@ it('keeps Academic lifecycle flows behind Progression and Finance owner boundari
 
     expect($directFinanceConsumers)->toBeEmpty();
 
-    $remediationAction = file_get_contents(base_path('app/Modules/Academic/Actions/RemediateEgcAttendanceFailuresAction.php')) ?: '';
+    $remediationAction = file_get_contents(base_path('app/Modules/Academic/Delivery/Actions/RemediateEgcAttendanceFailuresAction.php')) ?: '';
 
     expect($remediationAction)->toContain('EgcBlockResultReconciler');
 });

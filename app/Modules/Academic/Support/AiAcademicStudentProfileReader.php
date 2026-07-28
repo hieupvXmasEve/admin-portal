@@ -172,7 +172,7 @@ class AiAcademicStudentProfileReader implements AiAcademicStudentProfileReaderCo
             ];
         }
 
-        $attendance = $this->attendanceQuery->execute($student);
+        $attendance = $this->attendanceQuery->execute((int) $student->id);
         $courses = collect($attendance['data'] ?? [])
             ->take($limit)
             ->map(fn (array $course): array => [

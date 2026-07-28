@@ -13,8 +13,8 @@ it('routes Delivery operations through Delivery-owned boundaries', function (): 
         base_path('app/Modules/Academic/Delivery/Http/Web/RecordClassSessionAttendanceController.php'),
         base_path('app/Modules/Academic/Delivery/Http/Web/Canvas/PreviewCanvasGradeSyncController.php'),
         base_path('app/Modules/Academic/Delivery/Http/Web/Canvas/SyncCanvasGradeController.php'),
-        base_path('app/Modules/Academic/Http/Web/RecalculateApplyController.php'),
-        base_path('app/Modules/Academic/Http/Web/RecalculatePreviewController.php'),
+        base_path('app/Modules/Academic/Delivery/Http/Web/RecalculateApplyController.php'),
+        base_path('app/Modules/Academic/Delivery/Http/Web/RecalculatePreviewController.php'),
     ];
     $legacyImports = [];
 

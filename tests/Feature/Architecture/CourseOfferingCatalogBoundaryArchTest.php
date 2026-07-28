@@ -5,10 +5,10 @@ declare(strict_types=1);
 it('keeps course offering creation and editing catalog persistence behind the catalog contract', function (): void {
     $workspace = dirname(__DIR__, 3);
     $files = [
-        $workspace.'/app/Modules/Academic/Http/Web/Admin/CourseOfferingCatalogFormController.php',
-        $workspace.'/app/Modules/Academic/Http/Requests/CourseDelivery/StoreCourseOfferingRequest.php',
-        $workspace.'/app/Modules/Academic/Http/Requests/CourseDelivery/UpdateCourseOfferingRequest.php',
-        $workspace.'/app/Modules/Academic/Queries/GetCourseOfferingCatalogFormQuery.php',
+        $workspace.'/app/Modules/Academic/Delivery/Http/Web/Admin/CourseOfferingCatalogFormController.php',
+        $workspace.'/app/Modules/Academic/Delivery/Http/Requests/CourseDelivery/StoreCourseOfferingRequest.php',
+        $workspace.'/app/Modules/Academic/Delivery/Http/Requests/CourseDelivery/UpdateCourseOfferingRequest.php',
+        $workspace.'/app/Modules/Academic/Delivery/Queries/GetCourseOfferingCatalogFormQuery.php',
     ];
     $forbiddenReferences = [
         'App\\Models\\Program',

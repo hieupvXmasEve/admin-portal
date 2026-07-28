@@ -217,7 +217,7 @@ class StudentAcademicSummaryController extends Controller
      */
     public function attendance(Student $student, GetStudentAcademicAttendanceSummaryQuery $query): Response
     {
-        $attendanceData = $query->execute($student);
+        $attendanceData = $query->execute((int) $student->id);
 
         return Inertia::render('Students/AcademicSummary/Attendance', [
             'student' => $this->hubStudentContext($student),

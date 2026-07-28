@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Delivery\Actions;
+namespace App\Modules\Academic\Progression\Actions;
 
 use App\Models\Student;
 use App\Modules\Academic\Progression\Support\AcademicLifecycleEventFactory;

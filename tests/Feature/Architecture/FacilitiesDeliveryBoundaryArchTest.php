@@ -32,9 +32,9 @@ it('keeps Facilities availability off Delivery persistence and implementation ty
 });
 
 it('keeps Delivery exam scheduling on the Facilities reservation contract', function (): void {
-    $action = file_get_contents(dirname(__DIR__, 3).'/app/Modules/Academic/Actions/CreateExamRoomSlotAction.php') ?: '';
-    $controller = file_get_contents(dirname(__DIR__, 3).'/app/Modules/Academic/Http/Web/ExamScheduleController.php') ?: '';
-    $request = file_get_contents(dirname(__DIR__, 3).'/app/Modules/Academic/Http/Requests/ExamResit/StoreExamRoomSlotRequest.php') ?: '';
+    $action = file_get_contents(dirname(__DIR__, 3).'/app/Modules/Academic/Delivery/Actions/CreateExamRoomSlotAction.php') ?: '';
+    $controller = file_get_contents(dirname(__DIR__, 3).'/app/Modules/Academic/Delivery/Http/Web/ExamScheduleController.php') ?: '';
+    $request = file_get_contents(dirname(__DIR__, 3).'/app/Modules/Academic/Delivery/Http/Requests/ExamResit/StoreExamRoomSlotRequest.php') ?: '';
 
     expect($action)->toContain('App\\Shared\\Contracts\\Facilities\\SpaceReservationContract')
         ->not->toContain('App\\Models\\Room')

@@ -8,10 +8,10 @@ use App\Models\AcademicRecord;
 use App\Models\Attendance;
 use App\Models\ClassSession;
 use App\Models\CourseOffering;
-use App\Models\Student;
 use App\Modules\Academic\Delivery\Support\OperationalAttendanceService;
 use App\Modules\Academic\Support\FailureReasonClassifier;
 use App\Shared\Contracts\Finance\EgcBlockResultReconciler;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -127,15 +127,34 @@ final class RemediateEgcAttendanceFailuresAction
         }
 
         if ($studentIdentifier !== null) {
-            $studentIds = Student::query()
-                ->where('student_id', $studentIdentifier)
-                ->when(is_numeric($studentIdentifier), fn (Builder $q) => $q->orWhere('id', (int) $studentIdentifier))
-                ->pluck('id');
-
-            $query->whereIn('academic_records.student_id', $studentIds);
+            $query->whereIn('academic_records.student_id', self::studentIdsFor($studentIdentifier));
         }
 
         return $query;
+    }
+
+    /**
+     * Resolve the operator-supplied identifier, which may be a student code or a
+     * raw id, to the ids it can mean. Both are accepted because the command is
+     * driven by hand.
+     *
+     * @return list<int>
+     */
+    private static function studentIdsFor(string $studentIdentifier): array
+    {
+        $registry = app(StudentReferenceReader::class);
+
+        $ids = [];
+
+        if (($byCode = $registry->findByStudentCodeAnywhere($studentIdentifier)) !== null) {
+            $ids[] = $byCode->id;
+        }
+
+        if (is_numeric($studentIdentifier) && ($byId = $registry->find((int) $studentIdentifier)) !== null) {
+            $ids[] = $byId->id;
+        }
+
+        return array_values(array_unique($ids));
     }
 
     /**

@@ -4,12 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Academic\Delivery\Queries;
 
-use App\Models\Student;
 use Illuminate\Support\Facades\DB;
 
 final class GetStudentAcademicAttendanceSummaryQuery
 {
-    public function execute(Student $student): array
+    public function execute(int $studentId): array
     {
         // Get attendance records with related data
         // Fixed: Joined directly to units instead of via curriculum_units
@@ -18,13 +17,13 @@ final class GetStudentAcademicAttendanceSummaryQuery
             ->join('course_offerings', 'class_sessions.course_offering_id', '=', 'course_offerings.id')
             ->join('units', 'course_offerings.unit_id', '=', 'units.id')
             ->join('semesters', 'course_offerings.semester_id', '=', 'semesters.id')
-            ->leftJoin('course_registrations', function ($join) use ($student) {
+            ->leftJoin('course_registrations', function ($join) use ($studentId) {
                 $join->on('course_registrations.course_offering_id', '=', 'course_offerings.id')
                     ->on('course_registrations.semester_id', '=', 'course_offerings.semester_id')
-                    ->where('course_registrations.student_id', '=', $student->id)
+                    ->where('course_registrations.student_id', '=', $studentId)
                     ->whereNull('course_registrations.deleted_at');
             })
-            ->where('attendances.student_id', $student->id)
+            ->where('attendances.student_id', $studentId)
             ->select([
                 'units.id as unit_id',
                 'units.name as unit_name',

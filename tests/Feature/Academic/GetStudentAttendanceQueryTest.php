@@ -91,7 +91,7 @@ it('separates retake attendance attempts for the same unit', function () {
         ['2026-05-30', 'present'],
     ]);
 
-    $summary = app(GetStudentAcademicAttendanceSummaryQuery::class)->execute($student);
+    $summary = app(GetStudentAcademicAttendanceSummaryQuery::class)->execute($student->id);
 
     expect($summary['data'])->toHaveCount(2)
         ->and($summary['summary']['total_units'])->toBe(1)
