@@ -69,7 +69,7 @@ return [
             'reason' => 'Module consumers still use transitional shared Eloquent models.',
             'canonical_replacement' => 'Shared Contract, neutral reference, Domain Event, or Read Projection.',
             'retirement_condition' => 'The consumer is cut over and the shared-model read is removed.',
-            'baseline' => 494,
+            'baseline' => 485,
             'mode' => 'max',
         ],
         'cross_context_concrete_imports' => [
@@ -85,7 +85,7 @@ return [
             'reason' => 'Legacy JSON response sites remain while API envelopes are migrated.',
             'canonical_replacement' => 'ApiResponse::success(), error(), paginated(), or validationError().',
             'retirement_condition' => 'The endpoint uses the canonical envelope and its contract test passes.',
-            'baseline' => 34,
+            'baseline' => 29,
             'mode' => 'max',
         ],
         'inline_request_validation' => [
@@ -93,7 +93,7 @@ return [
             'reason' => 'Legacy controllers still validate inline during staged extraction.',
             'canonical_replacement' => 'A typed FormRequest owned by the endpoint context.',
             'retirement_condition' => 'The controller delegates validation to the FormRequest.',
-            'baseline' => 50,
+            'baseline' => 46,
             'mode' => 'max',
         ],
         'missing_strict_types' => [
@@ -109,7 +109,7 @@ return [
             'reason' => 'Older split route files predate the strict-types standard.',
             'canonical_replacement' => 'declare(strict_types=1) at the top of every application route PHP file.',
             'retirement_condition' => 'The route file is migrated or receives strict types with route behavior unchanged.',
-            'baseline' => 16,
+            'baseline' => 13,
             'mode' => 'max',
         ],
         'legacy_filter_stacks' => [
@@ -117,7 +117,7 @@ return [
             'reason' => 'Existing pages still use transitional filter composables.',
             'canonical_replacement' => 'useDataTable with the shared server-table workflow.',
             'retirement_condition' => 'The page preserves query/pagination behavior on useDataTable.',
-            'baseline' => 25,
+            'baseline' => 22,
             'mode' => 'max',
         ],
         'literal_frontend_urls' => [
@@ -125,7 +125,7 @@ return [
             'reason' => 'Existing router/fetch navigation calls contain literal application paths; this scanner covers all resources/js files, so its baseline is intentionally scanner-specific.',
             'canonical_replacement' => 'Ziggy route() or an established typed route helper.',
             'retirement_condition' => 'The touched flow uses a helper and its route contract remains green.',
-            'baseline' => 55,
+            'baseline' => 43,
             'mode' => 'max',
         ],
         'legacy_page_directories' => [

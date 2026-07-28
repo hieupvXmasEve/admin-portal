@@ -295,11 +295,62 @@ controllers/services/routes and frontend debt with each migrated workflow.
      `GpaHistoryController` (untouched, outside this session's scope)
      still shows archived semesters — a leftover inconsistency for a
      future slice, not a regression from this work.
+   - [x] API Academic Report retirement: moved the frozen
+     `app/Http/Controllers/Api/Admin/AcademicReportController` into
+     `App\Modules\Academic\Http\Api` (already clean — FormRequest plus
+     `ApiResponse`, zero `App\Models\*` imports), retiring both the frozen
+     controller and its single-route `routes/api/admin/academic.php` split
+     file in one move. Fixed `ReportingOwnerReadersArchTest`'s stale path
+     references and added `AcademicReportApiTest` coverage. Also removed
+     the dead `syncAcademicRecords()`/`processSyncChunk()` pair from
+     `AcademicRecordGenerationServiceOptimized` (808 → 600 lines),
+     unreferenced by its only caller `GenerateAcademicRecordsCommand` or
+     anywhere else; the service itself stays frozen pending a separate
+     ownership move (it spans Progression/Delivery/StudentRegistry model
+     boundaries, tracked under phase 9). Lowered the frozen-controller and
+     frozen-route ratchets accordingly.
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
+   - [x] Ratchet tighten: earlier slices lowered the frozen-* ceilings per
+     move but left incidental headroom on the other rules. Re-pinned every
+     baseline to the measured current count in both
+     `config/migration_debt.php` and
+     `MigrationDebtContract::BASELINE_CEILINGS`:
+     `shared_model_imports` 494 → 485, `direct_json_responses` 34 → 29,
+     `inline_request_validation` 50 → 46, `missing_route_strict_types`
+     16 → 13, `legacy_filter_stacks` 25 → 22, `literal_frontend_urls`
+     55 → 43. Every rule now sits at its ceiling, so any regression fails
+     `migration-debt:inventory --check` immediately.
 7. Review import/export parity, scheduler entries, permissions, and campus scoping.
    - [x] Done for this session's four route retirements (see above). The
      remaining Catalog/Delivery/assessment slices from earlier phase-04
      work are not yet re-reviewed under this step.
+
+## Remaining Scope
+
+Measured 2026-07-28 from `migration-debt:inventory --format=json`, filtered to
+work packages tagged `phase-04:academic`. Route retirement is complete: Academic
+owns zero frozen routes and zero frozen controllers.
+
+| Rule | Count | Concentration |
+|---|---|---|
+| `shared_model_imports` | 241 | 180 in unassigned generic dirs, 57 Delivery, 1 Catalog |
+| `inline_request_validation` | 12 | `Http/Web/Student*`, `Gpa`, `Placement`, `Delivery/Http/Api/Lecturer/*` |
+| `direct_json_responses` | 4 | `Catalog/Http/Web/SpecializationController`, 3x `Http/Web/Student*` |
+
+Requirement 1 (assign every generic Academic class to one logical context) is the
+dominant remainder. The unassigned findings sit in `Academic/Http` (52),
+`Academic/Actions` (47), `Academic/Queries` (41), `Academic/Support` (35),
+`Academic/Services` (4), and `Exports`/`Observers`/`Providers` (4).
+`Academic/Http/Web` alone carries 46 shared-model imports plus 9 of the 16
+HTTP-debt files, clustered on the `Student*` controllers — the highest-yield
+next vertical.
+
+Explicitly not phase-04 scope, tagged to later phases by the scanner:
+`AcademicRecordGenerationServiceOptimized` (frozen service) and
+`routes/api/v1/lecturer.php` (frozen route) belong to phase 9; the 18
+`literal_frontend_urls` and 8 `legacy_filter_stacks` under Academic-adjacent
+page owners belong to phase 8; 4 migration commands belong to phase 10; a
+further 48 shared-model imports belong to phase 5.
 
 ## Test Scenario Matrix
 
