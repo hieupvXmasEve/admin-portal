@@ -12,7 +12,6 @@ export const STUDENT_ROUTE_NAMES = {
     SHOW: 'students.academic-summary.overview',
     EDIT: 'students.edit',
     UPDATE: 'students.update',
-    DESTROY: 'students.destroy',
 } as const;
 
 // Route Paths - for frontend routing and navigation

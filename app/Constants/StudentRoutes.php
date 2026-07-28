@@ -25,7 +25,6 @@ class StudentRoutes
 
     public const UPDATE = 'students.update';
 
-    public const DESTROY = 'students.destroy';
 
     // Student Management Actions
     public const ASSIGN_PROGRAM = 'students.assign-program';

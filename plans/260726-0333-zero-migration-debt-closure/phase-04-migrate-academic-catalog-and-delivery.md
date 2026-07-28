@@ -344,6 +344,35 @@ controllers/services/routes and frontend debt with each migrated workflow.
      StudentRegistry binding contract that is out of this slice's scope.
      Net ratchet effect: `shared_model_imports` 485 → 459,
      `direct_json_responses` 29 → 27, `inline_request_validation` 46 → 41.
+   - [x] Student directory HTTP cleanup (destination-independent half of the
+     `StudentController` slice): added first-time characterization coverage
+     for the create form, export, and the three API endpoints
+     (`apiSearch`, `apiShow`, `getByStudentIds`) — `index`/`edit`/`update`
+     were already covered by `StudentDirectoryFilterTest` and
+     `StudentUpdateTest`. Replaced the 4 inline `$request->validate()`
+     calls with FormRequests under
+     `Academic\Http\Requests\Student`, sharing the directory filter
+     vocabulary through a `ChecksStudentDirectoryFilters` trait so the
+     listing and its export cannot drift. Replaced all 8 raw
+     `response()->json()` calls with `ApiResponse::compatible()`.
+     Extracted the Catalog reads (`Program`, `Specialization`,
+     `CurriculumVersion`, `Semester`) into a new
+     `Catalog\Queries\GetStudentDirectoryFormOptionsQuery` returning the
+     same model collections the Inertia props already carried, and the
+     `Campus` reads into the existing `CampusReferenceReader`.
+     Deleted two unregistered dead methods found via `route:list`
+     (`apiIndex`, superseded by `Api\StudentController@index`; and
+     `destroy`, which has no route at all), plus the dead references they
+     left behind: `StudentRoutes::DESTROY`, `STUDENT_ROUTE_NAMES.DESTROY`,
+     and the `studentRoutes.destroy`/`.update` TS helpers, both of which
+     resolved to routes that do not exist and would have thrown if ever
+     called. Recorded one unreachable branch rather than deleting it:
+     `getByStudentIds`' "No campus selected" 400 never fires because the
+     web middleware stack redirects to campus selection first.
+     Ratchets: `shared_model_imports` 459 → 455,
+     `direct_json_responses` 27 → 26, `inline_request_validation` 41 → 40.
+     The controller still lives in the unassigned `Academic/Http/Web` —
+     its context assignment is an open question (see below).
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
    - [x] Ratchet tighten: earlier slices lowered the frozen-* ceilings per
      move but left incidental headroom on the other rules. Re-pinned every
@@ -378,10 +407,27 @@ dominant remainder. The unassigned findings sit in `Academic/Actions` (47),
 `Academic/Http` (42), `Academic/Queries` (41), `Academic/Support` (35),
 `Academic/Services` (4), and `Exports`/`Observers`/`Providers` (4).
 
-Next highest-yield vertical: `Academic/Http/Web/StudentController` (537 lines, 6
-shared-model imports plus both remaining HTTP-debt rules) belongs in
-`App\Modules\StudentRegistry`, which already owns `Student`. After that, the
-generic `Actions`/`Queries`/`Support` trio is the bulk of what is left.
+### Open question: who owns the student directory?
+
+`StudentController` (now 405 lines, HTTP debt cleared) still sits in the
+unassigned `Academic/Http/Web`. Its remaining `App\Models\Student` imports can
+only be exempted by moving it to `App\Modules\StudentRegistry`, which already
+owns `Student` in the ownership contract. That move is not mechanical:
+
+- `ListStudentsQuery` and `ExportStudentsQuery` (both pure `Student` queries,
+  today under the unassigned `Academic\Queries`) would have to move with it, or
+  the controller would take a `cross_context_concrete_imports` hit — a
+  zero-tolerance rule.
+- `ListStudentsQuery` is bound as `StudentDirectoryReader`, a contract filed
+  under `Shared\Contracts\Academic`. If the implementation moves to
+  StudentRegistry, either the contract moves too (touching `StudentService`) or
+  StudentRegistry implements an Academic-namespaced contract.
+
+Deciding this needs a product/architecture call on whether the student directory
+is an Academic surface or a Registry one; it is not derivable from the repo.
+
+After that, the generic `Actions`/`Queries`/`Support` trio is the bulk of what is
+left.
 
 Explicitly not phase-04 scope, tagged to later phases by the scanner:
 `AcademicRecordGenerationServiceOptimized` (frozen service) and

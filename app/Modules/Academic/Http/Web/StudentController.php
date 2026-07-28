@@ -10,26 +10,25 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Student\StoreStudentRequest;
 use App\Http\Requests\Student\UpdateStudentRequest;
 use App\Http\Resources\Student\StudentResource;
-use App\Models\Campus;
-use App\Models\CurriculumVersion;
-use App\Models\Program;
-use App\Models\Semester;
-use App\Models\Specialization;
+use App\Http\Responses\ApiResponse;
 use App\Models\Student;
+use App\Modules\Academic\Catalog\Queries\GetStudentDirectoryFormOptionsQuery;
+use App\Modules\Academic\Http\Requests\Student\ExportStudentsRequest;
+use App\Modules\Academic\Http\Requests\Student\GetStudentsByCodesRequest;
+use App\Modules\Academic\Http\Requests\Student\ListStudentsRequest;
+use App\Modules\Academic\Http\Requests\Student\SearchStudentsRequest;
 use App\Modules\Academic\Queries\ExportStudentsQuery;
 use App\Modules\Academic\Queries\ListStudentsQuery;
 use App\Services\StudentService;
 use App\Shared\Contracts\Identity\GuardianAccessGrantReader;
+use App\Shared\Contracts\Institution\CampusReferenceReader;
+use App\Shared\Contracts\Institution\DTO\CampusReference;
 use App\Shared\Contracts\StudentRegistry\DTO\GuardianRelationship;
 use App\Shared\Contracts\StudentRegistry\StudentGuardianRelationshipReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 use Maatwebsite\Excel\Facades\Excel;
@@ -41,9 +40,11 @@ class StudentController extends Controller
         private StudentService $studentService,
         private StudentGuardianRelationshipReader $guardianRelationshipReader,
         private GuardianAccessGrantReader $guardianAccessGrantReader,
+        private GetStudentDirectoryFormOptionsQuery $formOptions,
+        private CampusReferenceReader $campuses,
     ) {}
 
-    public function index(Request $request, ListStudentsQuery $listStudentsQuery): Response|RedirectResponse
+    public function index(ListStudentsRequest $request, ListStudentsQuery $listStudentsQuery): Response|RedirectResponse
     {
         $campusId = session()->get('current_campus_id');
         Log::info('Current campus ID: '.$campusId);
@@ -52,15 +53,9 @@ class StudentController extends Controller
                 ->with('error', 'Please select a campus first');
         }
 
-        $validated = $request->validate([
-            ...$this->studentFilterRules(),
-            'sort' => 'nullable|string|in:student_id,full_name,email,admission_date,created_at,gc_starting_level,gc_current_level,gc_total_levels',
-            'direction' => 'nullable|string|in:asc,desc',
-            'per_page' => 'nullable|integer|min:5|max:100',
-            'page' => 'nullable|integer|min:1',
-        ]);
+        $validated = $request->validated();
         $filters = [
-            ...$this->normalizeStudentFilters($validated),
+            ...$request->normalizedStudentFilters(),
             'sort' => $validated['sort'] ?? null,
             'direction' => $validated['direction'] ?? null,
             'per_page' => (int) ($validated['per_page'] ?? 15),
@@ -69,13 +64,8 @@ class StudentController extends Controller
 
         $students = $listStudentsQuery->handle($filters, (int) $campusId);
 
-        // Get all programs since they are not campus-specific
-        $programs = Program::orderBy('name')->get(['id', 'name']);
-        $specializations = Specialization::active()
-            ->orderBy('name')
-            ->get(['id', 'program_id', 'name', 'code']);
-        $intakeSemesters = Semester::orderByDesc('start_date')
-            ->get(['id', 'name', 'code', 'start_date', 'end_date']);
+        ['programs' => $programs, 'specializations' => $specializations, 'intake_semesters' => $intakeSemesters] =
+            $this->formOptions->filterOptions();
 
         // Get statistics for current campus
         $statistics = $this->studentService->getStudentStatistics($campusId);
@@ -91,27 +81,6 @@ class StudentController extends Controller
         ]);
     }
 
-    /**
-     * API Index - Get paginated students collection for API consumers
-     */
-    public function apiIndex(Request $request): AnonymousResourceCollection
-    {
-        $query = Student::query()->with(['campus', 'program']);
-
-        if ($request->filled('search')) {
-            $searchTerm = $request->search;
-            $query->where(function ($q) use ($searchTerm) {
-                $q->where('full_name', 'like', "%{$searchTerm}%")
-                    ->orWhere('student_id', 'like', "%{$searchTerm}%")
-                    ->orWhere('email', 'like', "%{$searchTerm}%");
-            });
-        }
-
-        $students = $query->paginate($request->input('per_page', 15));
-
-        return StudentResource::collection($students);
-    }
-
     public function create(): Response|RedirectResponse
     {
         $campusId = session()->get('current_campus_id');
@@ -121,26 +90,8 @@ class StudentController extends Controller
                 ->with('error', 'Please select a campus first');
         }
 
-        // Get all programs since they are not campus-specific
-        $programs = Program::with('specializations')
-            ->orderBy('name')
-            ->get();
-
-        // Get specializations for these programs
-        $programIds = $programs->pluck('id')->toArray();
-        $specializations = Specialization::whereIn('program_id', $programIds)
-            ->orderBy('name')
-            ->get();
-
-        // Get curriculum versions for these programs
-        $curriculumVersions = CurriculumVersion::whereIn('program_id', $programIds)
-            ->orderBy('version_code', 'desc')
-            ->get();
-
         return Inertia::render('Students/Create', [
-            'programs' => $programs,
-            'specializations' => $specializations,
-            'curriculumVersions' => $curriculumVersions,
+            ...$this->formOptions->createOptions(),
             'current_campus_id' => $campusId,
         ]);
     }
@@ -162,7 +113,7 @@ class StudentController extends Controller
             ]);
 
             if ($request->expectsJson()) {
-                return response()->json([
+                return ApiResponse::compatible([
                     'error' => $e->getMessage(),
                 ], 422);
             }
@@ -177,16 +128,14 @@ class StudentController extends Controller
     {
         $student->load(['campus', 'program', 'specialization']);
 
-        $campuses = Campus::orderBy('name')->get(['id', 'name', 'code']);
-        $programs = Program::with('specializations')->orderBy('name')->get();
-
-        // Get curriculum versions for the student's program
-        $curriculumVersions = CurriculumVersion::where('program_id', $student->program_id)
-            ->when($student->specialization_id, function ($query) use ($student) {
-                $query->where('specialization_id', $student->specialization_id);
-            })
-            ->orderBy('created_at', 'desc')
-            ->get(['id', 'version_code']);
+        $campuses = array_map(
+            static fn (CampusReference $campus): array => $campus->toArray(),
+            $this->campuses->all(),
+        );
+        ['programs' => $programs, 'curriculumVersions' => $curriculumVersions] = $this->formOptions->editOptions(
+            $student->program_id === null ? null : (int) $student->program_id,
+            $student->specialization_id === null ? null : (int) $student->specialization_id,
+        );
 
         $primaryGuardian = collect($this->guardianRelationshipReader->forStudent((int) $student->id))
             ->first(static fn (GuardianRelationship $relationship): bool => $relationship->isPrimary);
@@ -236,50 +185,12 @@ class StudentController extends Controller
         ]);
     }
 
-    public function destroy(Student $student, Request $request): RedirectResponse|\Illuminate\Http\Response|JsonResponse
-    {
-        try {
-            DB::transaction(function () use ($student) {
-                // Use service to soft delete the student and all related data
-                $this->studentService->deleteStudent($student);
-            });
-
-            // Return JSON response for API requests
-            if ($request->expectsJson()) {
-                return response()->noContent();
-            }
-
-            // Return redirect for web requests
-            Inertia::flash('success', 'Student and all related data have been permanently deleted from database');
-
-            return redirect()->route(StudentRoutes::INDEX);
-        } catch (\Exception $e) {
-            Log::error('Failed to delete student', [
-                'student_id' => $student->id,
-                'error' => $e->getMessage(),
-            ]);
-
-            if ($request->expectsJson()) {
-                return response()->json([
-                    'error' => $e->getMessage(),
-                ], 422);
-            }
-
-            return back()->withErrors(['error' => $e->getMessage()]);
-        }
-    }
-
     /**
      * Search students (API endpoint)
      */
-    public function apiSearch(Request $request)
+    public function apiSearch(SearchStudentsRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'query' => 'nullable|string|max:255',
-            'status' => 'nullable|string|in:active,inactive,suspended,graduated',
-            'page' => 'nullable|integer|min:1',
-            'limit' => 'nullable|integer|min:1|max:50',
-        ]);
+        $validated = $request->validated();
 
         $query = Student::query()
             ->with(['campus', 'program', 'specialization'])
@@ -306,7 +217,7 @@ class StudentController extends Controller
             ->limit($limit)
             ->get();
 
-        return response()->json([
+        return ApiResponse::compatible([
             'success' => true,
             'message' => 'Students retrieved successfully',
             'data' => [
@@ -342,11 +253,11 @@ class StudentController extends Controller
     /**
      * Get student by ID (API endpoint)
      */
-    public function apiShow(Student $student)
+    public function apiShow(Student $student): JsonResponse
     {
         $student->load(['campus', 'program', 'specialization']);
 
-        return response()->json([
+        return ApiResponse::compatible([
             'success' => true,
             'message' => 'Student retrieved successfully',
             'data' => [
@@ -370,17 +281,14 @@ class StudentController extends Controller
     /**
      * Get students by student IDs (API endpoint for bulk email)
      */
-    public function getByStudentIds(Request $request)
+    public function getByStudentIds(GetStudentsByCodesRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'student_ids' => 'required|array',
-            'student_ids.*' => 'required|string',
-        ]);
+        $validated = $request->validated();
 
         $campusId = session()->get('current_campus_id');
 
         if (! $campusId) {
-            return response()->json([
+            return ApiResponse::compatible([
                 'success' => false,
                 'message' => 'No campus selected',
             ], 400);
@@ -391,7 +299,7 @@ class StudentController extends Controller
             ->whereIn('student_id', $validated['student_ids'])
             ->get();
 
-        return response()->json([
+        return ApiResponse::compatible([
             'success' => true,
             'message' => 'Students retrieved successfully',
             'data' => [
@@ -427,13 +335,13 @@ class StudentController extends Controller
     /**
      * Export students to Excel or CSV
      */
-    public function export(Request $request, ExportStudentsQuery $exportQuery): BinaryFileResponse|JsonResponse|RedirectResponse
+    public function export(ExportStudentsRequest $request, ExportStudentsQuery $exportQuery): BinaryFileResponse|JsonResponse|RedirectResponse
     {
         $campusId = session()->get('current_campus_id');
 
         if (! $campusId) {
             if ($request->expectsJson()) {
-                return response()->json([
+                return ApiResponse::compatible([
                     'success' => false,
                     'message' => 'Please select a campus first',
                 ], 400);
@@ -442,25 +350,21 @@ class StudentController extends Controller
             return back()->withErrors(['error' => 'Please select a campus first']);
         }
 
-        $validated = $request->validate([
-            'format' => 'required|string|in:xlsx,csv',
-            'scope' => 'required|string|in:all,filtered',
-            // Optional filters when scope is 'filtered'
-            ...$this->studentFilterRules(),
-        ]);
+        $validated = $request->validated();
         $filters = [
             'format' => $validated['format'],
             'scope' => $validated['scope'],
-            ...$this->normalizeStudentFilters($validated),
+            ...$request->normalizedStudentFilters(),
         ];
 
         try {
             $query = $exportQuery->getBuilder($campusId, $filters);
 
             // Get campus info for filename
-            $campus = Campus::findOrFail($campusId);
+            $campus = $this->campuses->find((int) $campusId);
+            $campusCode = $campus?->code ?? '';
             $timestamp = now()->format('Y-m-d_H-i-s');
-            $filename = "students_{$campus->code}_{$timestamp}.{$validated['format']}";
+            $filename = "students_{$campusCode}_{$timestamp}.{$validated['format']}";
 
             // Create export instance
             $export = new StudentExport($query, $filters);
@@ -468,7 +372,7 @@ class StudentController extends Controller
             // Log the export action
             Log::info('Student export initiated', [
                 'campus_id' => $campusId,
-                'campus_code' => $campus->code,
+                'campus_code' => $campusCode,
                 'format' => $validated['format'],
                 'scope' => $validated['scope'],
                 'filters' => $filters,
@@ -486,7 +390,7 @@ class StudentController extends Controller
             ]);
 
             if ($request->expectsJson()) {
-                return response()->json([
+                return ApiResponse::compatible([
                     'success' => false,
                     'message' => 'Export failed: '.$e->getMessage(),
                 ], 500);
@@ -494,44 +398,5 @@ class StudentController extends Controller
 
             return back()->withErrors(['error' => 'Export failed: '.$e->getMessage()]);
         }
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function studentFilterRules(): array
-    {
-        return [
-            'search' => 'nullable|string|max:255',
-            'student_ids' => 'nullable|array|max:100',
-            'student_ids.*' => 'required|string|max:20|distinct',
-            // Keep singular filters for compatibility with existing bookmarks.
-            'program_id' => 'nullable|integer|exists:programs,id',
-            'status' => ['nullable', 'string', Rule::in(Student::STATUSES)],
-            'program_ids' => 'nullable|array|max:100',
-            'program_ids.*' => 'required|integer|distinct|exists:programs,id',
-            'specialization_ids' => 'nullable|array|max:100',
-            'specialization_ids.*' => 'required|integer|distinct|exists:specializations,id',
-            'statuses' => 'nullable|array|max:20',
-            'statuses.*' => ['required', 'string', 'distinct', Rule::in(Student::STATUSES)],
-            'intake_semester_ids' => 'nullable|array|max:100',
-            'intake_semester_ids.*' => 'required|integer|distinct|exists:semesters,id',
-        ];
-    }
-
-    /**
-     * @param  array<string, mixed>  $validated
-     * @return array<string, mixed>
-     */
-    private function normalizeStudentFilters(array $validated): array
-    {
-        return [
-            'search' => $validated['search'] ?? '',
-            'student_ids' => $validated['student_ids'] ?? [],
-            'program_ids' => array_map('intval', $validated['program_ids'] ?? (isset($validated['program_id']) ? [$validated['program_id']] : [])),
-            'specialization_ids' => array_map('intval', $validated['specialization_ids'] ?? []),
-            'statuses' => $validated['statuses'] ?? (isset($validated['status']) ? [$validated['status']] : []),
-            'intake_semester_ids' => array_map('intval', $validated['intake_semester_ids'] ?? []),
-        ];
     }
 }

@@ -192,8 +192,6 @@ export const studentRoutes = {
     index: () => route('api.admin.students.index'),
 
     stats: () => route('api.admin.students.stats'),
-    update: (studentId: number) => route('api.admin.students.update', { student: studentId }),
-    destroy: (studentId: number) => route('api.admin.students.destroy', { student: studentId }),
 
     // Student Management Features - General Access (for menu)
     newStudents: () => route('students.new-students.index'),
