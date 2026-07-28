@@ -15,7 +15,7 @@ use App\Models\AcademicRecord;
 use App\Models\AssessmentComponentDetailScore;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
-use App\Modules\Academic\Support\Grading\Presenters\GradeDisplayPresenter;
+use App\Modules\Academic\Delivery\Support\Grading\Presenters\GradeDisplayPresenter;
 use App\Services\V1\Student\CourseRegistrationService;
 use App\Shared\Contracts\Academic\CourseRosterReader;
 use Illuminate\Http\JsonResponse;

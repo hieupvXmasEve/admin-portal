@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\AcademicRecord;
-use App\Modules\Academic\Support\Grading\Presenters\GradeDisplayPresenter;
+use App\Modules\Academic\Delivery\Support\Grading\Presenters\GradeDisplayPresenter;
 
 /**
  * Build an in-memory AcademicRecord (no DB) with the given attributes so the

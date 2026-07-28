@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\SyllabusTemplate\Concerns;
 
-use App\Modules\Academic\Support\Grading\GradingSchemeValidator;
+use App\Modules\Academic\Delivery\Support\Grading\GradingSchemeValidator;
 use Illuminate\Validation\Validator;
 
 /**

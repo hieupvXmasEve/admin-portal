@@ -10,7 +10,7 @@ use App\Models\CourseOffering;
 use App\Modules\Academic\Delivery\Actions\SplitCourseOfferingAction;
 use App\Modules\Academic\Delivery\Exceptions\CourseOfferingSplitException;
 use App\Modules\Academic\Delivery\Exceptions\InstructorAssignmentException;
-use App\Modules\Academic\Http\Requests\CourseDelivery\SplitCourseOfferingRequest;
+use App\Modules\Academic\Delivery\Http\Requests\CourseDelivery\SplitCourseOfferingRequest;
 use App\Shared\Contracts\Identity\AvailableLecturerReader;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Redirect;

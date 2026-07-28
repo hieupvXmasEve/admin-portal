@@ -8,7 +8,7 @@ use App\Models\AssessmentComponent;
 use App\Models\AssessmentComponentDetailScore;
 use App\Models\CourseOffering;
 use App\Models\Student;
-use App\Modules\Academic\Support\Grading\Presenters\GradeDisplayPresenter;
+use App\Modules\Academic\Delivery\Support\Grading\Presenters\GradeDisplayPresenter;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 

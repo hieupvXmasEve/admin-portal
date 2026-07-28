@@ -10,7 +10,7 @@ use App\Models\CourseRegistration;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
-use App\Modules\Academic\Actions\MarkCourseOfferingCompletedAction;
+use App\Modules\Academic\Delivery\Actions\MarkCourseOfferingCompletedAction;
 use App\Modules\Academic\Progression\Models\TranscriptEntry;
 use App\Shared\Contracts\Academic\CourseResultTranscriptWriter;
 use Illuminate\Foundation\Testing\RefreshDatabase;

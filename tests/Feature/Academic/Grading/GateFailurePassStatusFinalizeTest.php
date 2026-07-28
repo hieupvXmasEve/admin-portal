@@ -15,7 +15,7 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\SyllabusTemplate;
 use App\Models\Unit;
-use App\Modules\Academic\Actions\MarkCourseOfferingCompletedAction;
+use App\Modules\Academic\Delivery\Actions\MarkCourseOfferingCompletedAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

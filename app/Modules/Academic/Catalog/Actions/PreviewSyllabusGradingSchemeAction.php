@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Academic\Catalog\Actions;
 
-use App\Modules\Academic\Support\Grading\GradingCalculatorResolver;
-use App\Modules\Academic\Support\Grading\GradingSchemeValidator;
+use App\Modules\Academic\Delivery\Support\Grading\GradingCalculatorResolver;
+use App\Modules\Academic\Delivery\Support\Grading\GradingSchemeValidator;
 use Throwable;
 
 /**

@@ -472,6 +472,35 @@ controllers/services/routes and frontend debt with each migrated workflow.
      Left behind: 5 domain-logic reads — `AcademicRecord` (2), `Student` (2),
      and `Unit`, all inside retake eligibility and registration logic. These
      join the exam-resit residue in the pending seam follow-up.
+   - [x] Course offering and grading assigned to Delivery: no ownership claim
+     was needed — `CourseOffering` was already Delivery-owned, so 14 of the
+     cluster's findings cleared on the move alone. Moved 34 classes: 5
+     course-offering/grading actions, 3 queries, the whole
+     `Http/Requests/CourseDelivery` directory (12 FormRequests) plus
+     `RecalculateCourseOfferingRequest`, all 8 `Http/Web/Admin/CourseOffering*`
+     controllers, `Finalize`/`RecalculateApply`/`RecalculatePreview`
+     controllers, and the whole `Support/Grading` tree (10 files, of which only
+     2 carried findings — the rest had to move to keep the namespace coherent).
+     `Academic/Http/Web/Admin` and `Academic/Support/Grading` were left empty
+     and removed. Deleted a deprecated duplicate found on the way:
+     `Academic\Queries\GetCourseOfferingOperationalStateQuery` was an 18-line
+     `@deprecated` static shim delegating to the live Delivery query of the
+     same name, with one caller (a test), now pointed at the real query.
+     Extended `FacultyWorkforce\Queries\GetLecturerReferenceOptionsQuery` with
+     an `availableForAssignment()` method so the catalog-form query drops its
+     `Lecture` import. Ratchet: `shared_model_imports` 371 → 354;
+     `cross_context_concrete_imports` held at 0.
+     Left behind: 6 domain reads — `AcademicRecord` (2, in the grading
+     calculator and presenter), `Semester`/`Student` (notification recipients),
+     `SyllabusTemplate`, and `FormTarget` (Engagement-owned, read by the
+     offering survey query).
+     Process note: a whole-directory move must rewrite the *namespace prefix*,
+     not a hand-listed set of class names. Listing classes missed 7 sibling
+     FormRequests in `Http/Requests/CourseDelivery` and produced 500s until the
+     prefix sweep ran. Equally, `composer dump-autoload` must run before test
+     results are trusted after any move — two apparent regressions in this
+     slice were stale-classmap artifacts that vanished once the autoloader was
+     regenerated.
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
    - [x] Ratchet tighten: earlier slices lowered the frozen-* ceilings per
      move but left incidental headroom on the other rules. Re-pinned every
@@ -497,28 +526,27 @@ controllers.
 
 | Rule | Count | Concentration |
 |---|---|---|
-| `shared_model_imports` | 143 | 79 in unassigned generic dirs, 63 Delivery, 1 Catalog |
+| `shared_model_imports` | 126 | 55 in unassigned generic dirs, 70 Delivery, 1 Catalog |
 | `inline_request_validation` | 6 | `Http/Web` (Gpa, Placement, ProgressionAudit, PerformanceDashboard) and `Delivery/Http/Api/Lecturer/*` |
 | `direct_json_responses` | 1 | `Catalog/Http/Web/SpecializationController` |
 
 Requirement 1 (assign every generic Academic class to one logical context) is the
-dominant remainder. The unassigned findings sit in `Academic/Http` (25),
-`Academic/Support` (23), `Academic/Actions` (16), `Academic/Queries` (13), and
+dominant remainder. The unassigned findings sit in `Academic/Support` (21),
+`Academic/Http` (15), `Academic/Actions` (10), `Academic/Queries` (7), and
 `Exports`/`Providers` (2).
 
-The generic remainder now clusters into two coherent verticals, each of which
-can be assigned as one slice:
+One coherent vertical remains:
 
-- **Course offering and grading** (~15): the course-offering write actions,
-  operational-state and survey queries, `CourseRegistrationObserver`, and the
-  `Support/Grading` presenters — all Delivery.
 - **Warnings** (~11): `Actions/Warnings/*` and `ListWarningCenterQuery`. Owner
   is not obvious: `StudentWarningLog` is read from Progression-flavoured code
   and from `Delivery/Actions/SendAttendanceWarningAction`, so this one needs an
   ownership call before the move.
 
-The rest (~25) is the Finance charge/obligation gateway, the AI academic
-readers, and small one-offs, none of which form a vertical on their own.
+After Warnings, the ~44 remaining unassigned findings are the Finance
+charge/obligation gateway (10), the AI academic readers (9), the GPA/performance
+reporting surfaces (10), placement and progression-audit controllers (5), and
+small one-offs. None form a vertical on their own; each needs an owner decision
+or a seam rather than a move.
 
 Explicitly not phase-04 scope, tagged to later phases by the scanner:
 `AcademicRecordGenerationServiceOptimized` (frozen service) and

@@ -19,7 +19,7 @@ use App\Models\Student;
 use App\Models\SyllabusTemplate;
 use App\Models\Unit;
 use App\Models\User;
-use App\Modules\Academic\Actions\MarkCourseOfferingCompletedAction;
+use App\Modules\Academic\Delivery\Actions\MarkCourseOfferingCompletedAction;
 use App\Modules\Academic\Delivery\Support\Canvas\CanvasApiService;
 use App\Shared\Contracts\DomainEvents\DomainEvent;
 use App\Shared\Contracts\DomainEvents\DomainEventPublisher;

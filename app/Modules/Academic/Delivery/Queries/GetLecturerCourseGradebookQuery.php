@@ -8,7 +8,7 @@ use App\Models\AcademicRecord;
 use App\Models\AssessmentComponent;
 use App\Models\AssessmentComponentDetailScore;
 use App\Models\CourseOffering;
-use App\Modules\Academic\Support\Grading\Presenters\GradeDisplayPresenter;
+use App\Modules\Academic\Delivery\Support\Grading\Presenters\GradeDisplayPresenter;
 use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Support\Collection;

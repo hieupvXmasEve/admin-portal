@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-use App\Modules\Academic\Support\Grading\GradingCalculatorResolver;
-use App\Modules\Academic\Support\Grading\GradingSchemeValidator;
-use App\Modules\Academic\Support\Grading\MetropoliaSchemeCatalog;
+use App\Modules\Academic\Delivery\Support\Grading\GradingCalculatorResolver;
+use App\Modules\Academic\Delivery\Support\Grading\GradingSchemeValidator;
+use App\Modules\Academic\Delivery\Support\Grading\MetropoliaSchemeCatalog;
 
 it('loads every metropolia scheme key from the canonical pack', function () {
     $catalog = app(MetropoliaSchemeCatalog::class);

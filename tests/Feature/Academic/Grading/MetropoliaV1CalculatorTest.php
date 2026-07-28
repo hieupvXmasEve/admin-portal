@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Modules\Academic\Support\Grading\MetropoliaV1Calculator;
+use App\Modules\Academic\Delivery\Support\Grading\MetropoliaV1Calculator;
 
 // Helpers
 function programmingScheme(): array

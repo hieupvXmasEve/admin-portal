@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-use App\Modules\Academic\Support\Grading\DefaultWeightedPercentageCalculator;
-use App\Modules\Academic\Support\Grading\GradingCalculatorResolver;
-use App\Modules\Academic\Support\Grading\MetropoliaV1Calculator;
-use App\Modules\Academic\Support\Grading\MetropoliaV2Calculator;
+use App\Modules\Academic\Delivery\Support\Grading\DefaultWeightedPercentageCalculator;
+use App\Modules\Academic\Delivery\Support\Grading\GradingCalculatorResolver;
+use App\Modules\Academic\Delivery\Support\Grading\MetropoliaV1Calculator;
+use App\Modules\Academic\Delivery\Support\Grading\MetropoliaV2Calculator;
 
 test('resolver returns default calculator for null scheme', function () {
     $resolver = app(GradingCalculatorResolver::class);

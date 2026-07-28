@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands\Academic;
 
-use App\Modules\Academic\Actions\ApplyGradingSchemePackAction;
+use App\Modules\Academic\Delivery\Actions\ApplyGradingSchemePackAction;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use JsonException;

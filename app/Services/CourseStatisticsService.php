@@ -8,7 +8,7 @@ use App\Models\AcademicRecord;
 use App\Models\CourseOffering;
 use App\Models\Student;
 use App\Modules\Academic\Delivery\Queries\GetCourseOfferingAttendanceReportQuery;
-use App\Modules\Academic\Support\Grading\Presenters\GradeDisplayPresenter;
+use App\Modules\Academic\Delivery\Support\Grading\Presenters\GradeDisplayPresenter;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 

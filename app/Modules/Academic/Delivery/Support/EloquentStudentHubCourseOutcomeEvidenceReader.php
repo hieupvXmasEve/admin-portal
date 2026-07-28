@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Delivery\Support;
 
 use App\Models\AcademicRecord;
-use App\Modules\Academic\Support\Grading\Presenters\GradeDisplayPresenter;
+use App\Modules\Academic\Delivery\Support\Grading\Presenters\GradeDisplayPresenter;
 use App\Shared\Contracts\Academic\DTO\StudentHubCourseOutcomeEvidence;
 use App\Shared\Contracts\Academic\StudentHubCourseOutcomeEvidenceReader;
 

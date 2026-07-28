@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Modules\Academic\Support\Grading\SafeArithmeticEvaluator;
+use App\Modules\Academic\Delivery\Support\Grading\SafeArithmeticEvaluator;
 
 it('evaluates arithmetic with precedence and parentheses', function () {
     $evaluator = new SafeArithmeticEvaluator;

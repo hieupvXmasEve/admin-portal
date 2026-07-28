@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Modules\Academic\Support\Grading\DefaultWeightedPercentageCalculator;
+use App\Modules\Academic\Delivery\Support\Grading\DefaultWeightedPercentageCalculator;
 
 test('passing student gets correct grade and passed=true', function () {
     $calculator = app(DefaultWeightedPercentageCalculator::class);

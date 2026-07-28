@@ -12,7 +12,7 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
 use App\Models\User;
-use App\Modules\Academic\Queries\GetCourseOfferingOperationalStateQuery;
+use App\Modules\Academic\Delivery\Queries\GetCourseOfferingOperationalStateQuery;
 use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -226,14 +226,14 @@ it('clears the sessions_missing_attendance blocker once attendance is recorded f
         ['student_id' => $student->id, 'status' => 'present'],
     ])->assertRedirect(route(CourseOfferingRoutes::SHOW, $offering));
 
-    $stateAfterFirst = GetCourseOfferingOperationalStateQuery::handle($offering->fresh(), $this->user);
+    $stateAfterFirst = app(GetCourseOfferingOperationalStateQuery::class)->handle($offering->fresh(), $this->user);
     expect(array_column($stateAfterFirst['readiness_blockers'], 'code'))->toContain('sessions_missing_attendance');
 
     postRecordAttendance($this, $offering, $second, [
         ['student_id' => $student->id, 'status' => 'present'],
     ])->assertRedirect(route(CourseOfferingRoutes::SHOW, $offering));
 
-    $stateAfterSecond = GetCourseOfferingOperationalStateQuery::handle($offering->fresh(), $this->user);
+    $stateAfterSecond = app(GetCourseOfferingOperationalStateQuery::class)->handle($offering->fresh(), $this->user);
     expect(array_column($stateAfterSecond['readiness_blockers'], 'code'))->not->toContain('sessions_missing_attendance');
     expect(array_column($stateAfterSecond['available_actions'], 'allowed'))->toBe([true]);
 });

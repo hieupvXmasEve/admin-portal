@@ -11,7 +11,7 @@ use App\Models\AcademicProgressionEvent;
 use App\Models\IeltsCertificate;
 use App\Models\Student;
 use App\Models\StudentActionLog;
-use App\Modules\Academic\Actions\PublishCourseStageChangedNotificationAction;
+use App\Modules\Academic\Delivery\Actions\PublishCourseStageChangedNotificationAction;
 use App\Modules\Academic\Progression\Actions\MaterializeProgramEnrollmentAction;
 use App\Modules\Academic\Progression\Exceptions\InvalidProgressionState;
 use App\Modules\Academic\Progression\Models\ProgramEnrollment;

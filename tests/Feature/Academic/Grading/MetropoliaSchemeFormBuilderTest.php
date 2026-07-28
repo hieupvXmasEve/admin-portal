@@ -6,7 +6,7 @@ use App\Models\Campus;
 use App\Models\SyllabusTemplate;
 use App\Models\Unit;
 use App\Models\User;
-use App\Modules\Academic\Support\Grading\GradingSchemeValidator;
+use App\Modules\Academic\Delivery\Support\Grading\GradingSchemeValidator;
 use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 

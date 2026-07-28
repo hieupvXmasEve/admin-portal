@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Modules\Academic\Support\Grading\MetropoliaV2Calculator;
+use App\Modules\Academic\Delivery\Support\Grading\MetropoliaV2Calculator;
 
 function v2Calculator(): MetropoliaV2Calculator
 {

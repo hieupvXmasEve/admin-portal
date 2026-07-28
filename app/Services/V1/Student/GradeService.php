@@ -8,7 +8,7 @@ use App\Models\AssessmentComponentDetailScore;
 use App\Models\GpaCalculation;
 use App\Models\Semester;
 use App\Models\Student;
-use App\Modules\Academic\Support\Grading\Presenters\GradeDisplayPresenter;
+use App\Modules\Academic\Delivery\Support\Grading\Presenters\GradeDisplayPresenter;
 use App\Services\ModuleGradeCalculator;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
