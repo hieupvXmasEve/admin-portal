@@ -10,7 +10,7 @@ use App\Models\ExamRoomSlotInvigilator;
 use App\Models\Lecture;
 use App\Models\Room;
 use App\Models\User;
-use App\Modules\Academic\Actions\AssignExamResitInvigilatorAction;
+use App\Modules\Academic\Delivery\Actions\AssignExamResitInvigilatorAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 

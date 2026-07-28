@@ -7,7 +7,6 @@ namespace App\Modules\Academic\Providers;
 use App\Models\CourseRegistration;
 use App\Modules\Academic\Actions\CompleteFinanceCancellationOperationAction;
 use App\Modules\Academic\Actions\MarkCourseOfferingCompletedAction;
-use App\Modules\Academic\Actions\SyncPaidExamResitAttemptsAction;
 use App\Modules\Academic\Actions\SyncPaidRetakeRegistrationsAction;
 use App\Modules\Academic\Catalog\Queries\GetStudentDirectoryFormOptionsQuery;
 use App\Modules\Academic\Catalog\Support\EloquentAdmissionsIntentReader;
@@ -17,6 +16,7 @@ use App\Modules\Academic\Catalog\Support\EloquentCurriculumModuleCompositionRead
 use App\Modules\Academic\Catalog\Support\EloquentProgramReferenceReader;
 use App\Modules\Academic\Catalog\Support\SemesterAcademicPeriodReader;
 use App\Modules\Academic\Delivery\Actions\CommitCourseResultsAndTranscriptEntriesAction;
+use App\Modules\Academic\Delivery\Actions\SyncPaidExamResitAttemptsAction;
 use App\Modules\Academic\Delivery\Support\AssessmentGradeExcelService;
 use App\Modules\Academic\Delivery\Support\DeliveryAssessmentDefinitionWriter;
 use App\Modules\Academic\Delivery\Support\DeliveryInstructorAssignmentWriter;

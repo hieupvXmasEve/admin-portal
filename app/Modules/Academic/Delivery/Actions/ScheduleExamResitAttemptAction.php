@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Actions;
+namespace App\Modules\Academic\Delivery\Actions;
 
 use App\Models\ExamResitAttempt;
 use App\Models\ExamResitSession;
-use App\Modules\Academic\Services\ExamScheduleConflictChecker;
+use App\Modules\Academic\Delivery\Support\ExamScheduleConflictChecker;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;

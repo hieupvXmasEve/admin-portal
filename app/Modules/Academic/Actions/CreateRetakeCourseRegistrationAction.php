@@ -87,7 +87,7 @@ class CreateRetakeCourseRegistrationAction
             // the explicit grade-only reason: attendance/both/manual stay eligible, and
             // legacy un-backfilled records (failure_reason = null) keep their historical
             // eligibility so current staff workflows are not broken. This mirrors, in
-            // reverse, the exam-resit gate in CreateExamResitAttemptAction.
+            // reverse, the exam-resit gate in Delivery\Actions\CreateExamResitAttemptAction.
             if ($academicRecord->failure_reason === AcademicRecord::FAILURE_GRADE_FAILED) {
                 throw ValidationException::withMessages([
                     'failure_reason' => ['Sinh viên fail do điểm phải đi luồng thi lại, không đủ điều kiện học lại.'],

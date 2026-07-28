@@ -23,6 +23,8 @@ use App\Modules\Academic\Delivery\Http\Web\ClassSessionController as DeliveryCla
 use App\Modules\Academic\Delivery\Http\Web\CourseOfferingSplitController;
 use App\Modules\Academic\Delivery\Http\Web\CourseOfferingStatisticsController;
 use App\Modules\Academic\Delivery\Http\Web\CourseStatisticsController;
+use App\Modules\Academic\Delivery\Http\Web\ExamResitAttemptController;
+use App\Modules\Academic\Delivery\Http\Web\ExamScheduleController;
 use App\Modules\Academic\Delivery\Http\Web\RecordClassSessionAttendanceController;
 use App\Modules\Academic\Delivery\Http\Web\UnitStatisticsController;
 use App\Modules\Academic\Http\Web\AcademicPlacementController;
@@ -38,8 +40,6 @@ use App\Modules\Academic\Http\Web\Admin\CourseOfferingRegistrationController;
 use App\Modules\Academic\Http\Web\Admin\CourseOfferingRoomController;
 use App\Modules\Academic\Http\Web\CampusDetailController;
 use App\Modules\Academic\Http\Web\CourseRankingController;
-use App\Modules\Academic\Http\Web\ExamResitAttemptController;
-use App\Modules\Academic\Http\Web\ExamScheduleController;
 use App\Modules\Academic\Http\Web\FinalizeCourseOfferingController;
 use App\Modules\Academic\Http\Web\GpaHistoryController;
 use App\Modules\Academic\Http\Web\GpaManagementController;

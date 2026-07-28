@@ -10,8 +10,9 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
 use App\Models\User;
-use App\Modules\Academic\Queries\ListExamResitEligibleStudentsQuery;
+use App\Modules\Academic\Delivery\Queries\ListExamResitEligibleStudentsQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 
 uses(RefreshDatabase::class);
 
@@ -51,7 +52,7 @@ function failedGradeRecord(Student $student, Campus $campus, Semester $semester,
     ], $overrides));
 }
 
-function eligibleExamResit(array $filters = []): \Illuminate\Support\Collection
+function eligibleExamResit(array $filters = []): Collection
 {
     return app(ListExamResitEligibleStudentsQuery::class)->handle(array_merge([
         'campus_id' => test()->campus->id,

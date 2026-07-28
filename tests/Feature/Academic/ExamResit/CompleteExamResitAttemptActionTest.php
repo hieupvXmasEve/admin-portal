@@ -11,7 +11,7 @@ use App\Models\Student;
 use App\Models\SyllabusTemplate;
 use App\Models\Unit;
 use App\Models\User;
-use App\Modules\Academic\Actions\CompleteExamResitAttemptAction;
+use App\Modules\Academic\Delivery\Actions\CompleteExamResitAttemptAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 

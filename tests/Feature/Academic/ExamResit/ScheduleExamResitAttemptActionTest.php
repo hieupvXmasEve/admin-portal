@@ -14,7 +14,7 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
 use App\Models\User;
-use App\Modules\Academic\Actions\ScheduleExamResitAttemptAction;
+use App\Modules\Academic\Delivery\Actions\ScheduleExamResitAttemptAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 

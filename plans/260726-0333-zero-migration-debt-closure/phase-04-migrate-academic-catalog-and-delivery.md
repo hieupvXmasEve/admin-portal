@@ -423,6 +423,34 @@ controllers/services/routes and frontend debt with each migrated workflow.
      contracts, but `StudentActionExcelReferenceResolver` returns Eloquent
      models straight to its row mapper, so contract-ising it means
      reshaping that consumer too — a follow-up slice, not a rename.
+   - [x] Exam Resit assigned to Delivery: claimed `ExamResitAttempt`,
+     `ExamResitSession`, `ExamRoomSlot`, and `ExamRoomSlotInvigilator` for
+     `owned_shared_models.Academic.Delivery` — none of the four had an owner,
+     and outside the exam cluster they are read only by
+     `Delivery/Support/{EloquentAcademicSpaceOccupancyReader,InvigilationDutyQuery}`,
+     which the claim exempted immediately. Then moved 23 classes out of the
+     unassigned `Academic/{Actions,Queries,Services,Http}` into Delivery: 9
+     exam-resit/room-slot actions, 3 list queries, `ExamScheduleConflictChecker`
+     (`Services` → `Delivery/Support`), the 8 `ExamResit` FormRequests, and
+     both `Http/Web` controllers. Replaced the controllers' dropdown reads with
+     seams: the existing `GetSemesterReferenceOptionsQuery` (its `options()`
+     was already the identical query) and `CampusReferenceReader`, plus two new
+     owner-side queries, `Catalog\Queries\GetUnitReferenceOptionsQuery` and
+     `FacultyWorkforce\Queries\GetLecturerReferenceOptionsQuery`.
+     Two same-namespace references broke on the move and had to be re-imported
+     explicitly — `CancelExamResitAttemptAction` calls
+     `RecordAcademicFinanceCancellationHandoffAction`, which stays behind with
+     the rest of the finance-handoff cluster, and
+     `CompleteFinanceCancellationOperationAction` injects
+     `SendExamResitCancellationNoticeAction`, which moved. Three `@see`
+     docblocks pointing at the retake equivalents were fully qualified for the
+     same reason. Ratchet: `shared_model_imports` 421 → 389;
+     `cross_context_concrete_imports` held at 0; 100 exam-resit tests green.
+     Left behind: 6 domain-logic reads in 4 files — `AcademicRecord` (3),
+     `Student`, `SyllabusTemplate`, and `Lecture` (in
+     `AssignExamResitInvigilatorAction`). Unlike the controller dropdowns these
+     sit inside eligibility and record-writing logic, so they need real
+     owner-side queries rather than a picker seam.
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
    - [x] Ratchet tighten: earlier slices lowered the frozen-* ceilings per
      move but left incidental headroom on the other rules. Re-pinned every
@@ -448,20 +476,18 @@ controllers.
 
 | Rule | Count | Concentration |
 |---|---|---|
-| `shared_model_imports` | 193 | 135 in unassigned generic dirs, 57 Delivery, 1 Catalog |
+| `shared_model_imports` | 161 | 101 in unassigned generic dirs, 59 Delivery, 1 Catalog |
 | `inline_request_validation` | 6 | `Http/Web` (Gpa, Placement, ProgressionAudit, PerformanceDashboard) and `Delivery/Http/Api/Lecturer/*` |
 | `direct_json_responses` | 1 | `Catalog/Http/Web/SpecializationController` |
 
 Requirement 1 (assign every generic Academic class to one logical context) is the
-dominant remainder. The unassigned findings sit in `Academic/Actions` (45),
-`Academic/Http` (36), `Academic/Queries` (24), `Academic/Support` (23),
-`Academic/Services` (4), and `Exports`/`Observers`/`Providers` (3).
+dominant remainder. The unassigned findings sit in `Academic/Actions` (28),
+`Academic/Http` (28), `Academic/Support` (23), `Academic/Queries` (19), and
+`Exports`/`Observers`/`Providers` (3).
 
-The generic remainder now clusters into four coherent verticals, each of which
+The generic remainder now clusters into three coherent verticals, each of which
 can be assigned as one slice:
 
-- **Exam Resit** (~26): the `*ExamResit*`/`*ExamRoomSlot*` actions and queries
-  plus `ExamScheduleConflictChecker`, and their two `Http/Web` controllers.
 - **Retake Course** (~18): the `*RetakeCourse*`/`*RetakeRegistration*` actions
   and queries, plus `RetakeCourseRegistrationController`.
 - **Course offering and grading** (~15): the course-offering write actions,

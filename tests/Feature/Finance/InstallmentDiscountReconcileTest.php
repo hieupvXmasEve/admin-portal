@@ -18,6 +18,8 @@ use App\Modules\Finance\Models\FinanceCreditEntitlement;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceDiscount;
 use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\Payment;
+use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\InvoiceGenerationService;
 use App\Modules\Finance\Support\Entitlement\FinanceEntitlementType;
@@ -173,6 +175,53 @@ it('blocks reconciliation when committed installments already exceed the new net
         ->and(DiscountAllocation::query()
             ->whereIn('invoice_line_id', InvoiceLine::where('charge_id', $charge->id)->pluck('id'))
             ->count())->toBe(0);
+});
+
+it('does not subtract a paid installment twice when reconciling against canonical remaining', function (): void {
+    [$charge] = makeReconcileCharge(20_000_000);
+
+    app(SplitChargeIntoInstallmentsAction::class)->handle($charge->id, [
+        ['installment_no' => 1, 'amount' => 10_000_000, 'due_date' => now()->addDays(30)->toDateString()],
+        ['installment_no' => 2, 'amount' => 10_000_000, 'due_date' => now()->addDays(60)->toDateString()],
+    ]);
+
+    $line = InvoiceLine::query()->where('charge_id', $charge->id)->firstOrFail();
+
+    // Installment 1 collected: the row is paid AND its cash sits in the ledger,
+    // so canonical remaining is already net of it.
+    FinanceChargeInstallment::query()
+        ->where('finance_charge_id', $charge->id)
+        ->where('installment_no', 1)
+        ->update(['status' => FinanceChargeInstallment::STATUS_PAID]);
+
+    $payment = Payment::query()->create([
+        'student_id' => $charge->student_id,
+        'amount' => 12_000_000,
+        'method' => Payment::METHOD_GATEWAY,
+        'status' => Payment::STATUS_COMPLETED,
+        'paid_at' => now(),
+    ]);
+
+    // 10,000,000 settles installment 1; the extra 2,000,000 lands on the same
+    // charge, so only 8,000,000 is still collectible.
+    PaymentApplication::query()->create([
+        'payment_id' => $payment->id,
+        'invoice_line_id' => $line->id,
+        'amount' => 12_000_000,
+        'entry_type' => 'application',
+        'applied_at' => now(),
+    ]);
+
+    app(ReconcileChargeInstallmentsAction::class)->handle($charge);
+
+    $rows = FinanceChargeInstallment::query()
+        ->where('finance_charge_id', $charge->id)
+        ->orderBy('installment_no')
+        ->get();
+
+    expect($rows[0]->status)->toBe(FinanceChargeInstallment::STATUS_PAID)
+        ->and((float) $rows[0]->amount)->toBe(10_000_000.0)
+        ->and((float) $rows[1]->amount)->toBe(8_000_000.0);
 });
 
 it('reconciles only pending installments from canonical remaining after credit is applied', function (): void {

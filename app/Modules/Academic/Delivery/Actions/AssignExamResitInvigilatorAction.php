@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Actions;
+namespace App\Modules\Academic\Delivery\Actions;
 
 use App\Models\ExamRoomSlot;
 use App\Models\ExamRoomSlotInvigilator;
 use App\Models\Lecture;
-use App\Modules\Academic\Services\ExamScheduleConflictChecker;
+use App\Modules\Academic\Delivery\Support\ExamScheduleConflictChecker;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 

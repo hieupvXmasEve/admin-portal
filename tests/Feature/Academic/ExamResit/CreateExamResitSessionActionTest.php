@@ -9,7 +9,7 @@ use App\Models\Room;
 use App\Models\Semester;
 use App\Models\Unit;
 use App\Models\User;
-use App\Modules\Academic\Actions\CreateExamResitSessionAction;
+use App\Modules\Academic\Delivery\Actions\CreateExamResitSessionAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 

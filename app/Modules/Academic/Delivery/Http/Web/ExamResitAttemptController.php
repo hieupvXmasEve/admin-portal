@@ -2,24 +2,25 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Http\Web;
+namespace App\Modules\Academic\Delivery\Http\Web;
 
 use App\Http\Controllers\Controller;
-use App\Models\Campus;
 use App\Models\ExamResitAttempt;
 use App\Models\ExamResitSession;
-use App\Models\Semester;
-use App\Modules\Academic\Actions\CancelExamResitAttemptAction;
-use App\Modules\Academic\Actions\CompleteExamResitAttemptAction;
-use App\Modules\Academic\Actions\CreateExamResitAttemptAction;
-use App\Modules\Academic\Actions\ScheduleExamResitAttemptAction;
-use App\Modules\Academic\Http\Requests\ExamResit\CancelExamResitRequest;
-use App\Modules\Academic\Http\Requests\ExamResit\CompleteExamResitRequest;
-use App\Modules\Academic\Http\Requests\ExamResit\ListExamResitRequest;
-use App\Modules\Academic\Http\Requests\ExamResit\ScheduleExamResitRequest;
-use App\Modules\Academic\Http\Requests\ExamResit\StoreExamResitRequest;
-use App\Modules\Academic\Queries\ListExamResitAttemptsQuery;
-use App\Modules\Academic\Queries\ListExamResitEligibleStudentsQuery;
+use App\Modules\Academic\Catalog\Queries\GetSemesterReferenceOptionsQuery;
+use App\Modules\Academic\Delivery\Actions\CancelExamResitAttemptAction;
+use App\Modules\Academic\Delivery\Actions\CompleteExamResitAttemptAction;
+use App\Modules\Academic\Delivery\Actions\CreateExamResitAttemptAction;
+use App\Modules\Academic\Delivery\Actions\ScheduleExamResitAttemptAction;
+use App\Modules\Academic\Delivery\Http\Requests\ExamResit\CancelExamResitRequest;
+use App\Modules\Academic\Delivery\Http\Requests\ExamResit\CompleteExamResitRequest;
+use App\Modules\Academic\Delivery\Http\Requests\ExamResit\ListExamResitRequest;
+use App\Modules\Academic\Delivery\Http\Requests\ExamResit\ScheduleExamResitRequest;
+use App\Modules\Academic\Delivery\Http\Requests\ExamResit\StoreExamResitRequest;
+use App\Modules\Academic\Delivery\Queries\ListExamResitAttemptsQuery;
+use App\Modules\Academic\Delivery\Queries\ListExamResitEligibleStudentsQuery;
+use App\Shared\Contracts\Institution\CampusReferenceReader;
+use App\Shared\Contracts\Institution\DTO\CampusReference;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -29,6 +30,8 @@ class ExamResitAttemptController extends Controller
     public function __construct(
         private readonly ListExamResitAttemptsQuery $attemptsQuery,
         private readonly ListExamResitEligibleStudentsQuery $eligibilityQuery,
+        private readonly GetSemesterReferenceOptionsQuery $semesters,
+        private readonly CampusReferenceReader $campuses,
     ) {}
 
     /**
@@ -58,7 +61,7 @@ class ExamResitAttemptController extends Controller
             'attempts' => $result['attempts'],
             'summary' => $result['summary'],
             'filters' => $filters,
-            'semesters' => Semester::orderByDesc('start_date')->get(['id', 'name', 'code']),
+            'semesters' => $this->semesters->options(),
         ]);
     }
 
@@ -80,8 +83,11 @@ class ExamResitAttemptController extends Controller
             'eligible_students' => $eligibleStudents->values(),
             'total_eligible' => $eligibleStudents->count(),
             'filters' => $request->only(['search', 'semester_id', 'campus_id', 'unit_id']),
-            'semesters' => Semester::orderByDesc('start_date')->get(['id', 'name', 'code']),
-            'campuses' => Campus::orderBy('name')->get(['id', 'name', 'code']),
+            'semesters' => $this->semesters->options(),
+            'campuses' => array_map(
+                static fn (CampusReference $campus): array => $campus->toArray(),
+                $this->campuses->all(),
+            ),
         ]);
     }
 

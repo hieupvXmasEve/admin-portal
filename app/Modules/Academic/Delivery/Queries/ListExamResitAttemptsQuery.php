@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Queries;
+namespace App\Modules\Academic\Delivery\Queries;
 
 use App\Models\ExamResitAttempt;
 use App\Modules\Academic\Support\AcademicObligationSettlement;
@@ -13,7 +13,7 @@ use Illuminate\Pagination\LengthAwarePaginator as Paginator;
 /**
  * Exam-resit (thi lại) staff worklist (ACAD-RET-001 slice 7).
  *
- * Mirrors {@see ListRetakeCourseRegistrationsQuery}: campus/semester/status-scoped,
+ * Mirrors {@see \App\Modules\Academic\Queries\ListRetakeCourseRegistrationsQuery}: campus/semester/status-scoped,
  * paginated in the database, with derived display badges (payment / schedule /
  * result / operation state) and the staff actions available on each row. Payment
  * state is derived from canonical Finance evidence, never a local manual flag.

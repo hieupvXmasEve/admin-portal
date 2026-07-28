@@ -2,19 +2,19 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Queries;
+namespace App\Modules\Academic\Delivery\Queries;
 
 use App\Models\AcademicRecord;
 use App\Models\ExamResitAttempt;
 use App\Models\Student;
-use App\Modules\Academic\Actions\CreateExamResitAttemptAction;
+use App\Modules\Academic\Delivery\Actions\CreateExamResitAttemptAction;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 /**
  * Eligible students/records for exam-resit (thi lại) registration (ACAD-RET-001 slice 7).
  *
- * The exam-resit lane is the inverse of {@see ListRetakeCourseEligibleStudentsQuery}:
+ * The exam-resit lane is the inverse of {@see \App\Modules\Academic\Queries\ListRetakeCourseEligibleStudentsQuery}:
  * only GRADE-only failures (`failure_reason = grade_failed`) qualify. Attendance/both
  * failures route to course retake, and `not_recorded` attendance blocks eligibility
  * until resolved. Unlike the retake list, no curriculum-membership join is needed: a

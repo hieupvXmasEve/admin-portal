@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Actions;
+namespace App\Modules\Academic\Delivery\Actions;
 
 use App\Models\ExamResitAttempt;
 use App\Modules\Academic\Support\AcademicObligationSettlement;
@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Log;
 /**
  * Derive exam-resit (thi lại) HQ paid state from Finance settlement (source triple).
  *
- * @see SyncPaidRetakeRegistrationsAction for the retake equivalent.
+ * @see \App\Modules\Academic\Actions\SyncPaidRetakeRegistrationsAction for the retake equivalent.
  */
 class SyncPaidExamResitAttemptsAction implements ExamResitAttemptPaymentSyncer
 {

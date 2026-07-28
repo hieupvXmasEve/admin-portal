@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Http\Requests\ExamResit;
+namespace App\Modules\Academic\Delivery\Http\Requests\ExamResit;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class CompleteExamResitRequest extends FormRequest
+class ScheduleExamResitRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -19,9 +19,7 @@ class CompleteExamResitRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'resit_score' => ['required', 'numeric', 'min:0', 'max:100'],
-            'resit_grade' => ['nullable', 'string', 'max:10'],
-            'sat_at' => ['nullable', 'date'],
+            'exam_resit_session_id' => ['required', 'integer', 'exists:exam_resit_sessions,id'],
             'unpaid_sitting_reason' => ['nullable', 'string', 'max:1000'],
             'notes' => ['nullable', 'string', 'max:1000'],
         ];

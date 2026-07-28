@@ -7,7 +7,7 @@ use App\Models\ExamResitAttempt;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
-use App\Modules\Academic\Actions\SyncPaidExamResitAttemptsAction;
+use App\Modules\Academic\Delivery\Actions\SyncPaidExamResitAttemptsAction;
 use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Actions\AllocatePaymentAction;
 use App\Modules\Finance\Actions\CreateExamResitChargeSimpleAction;

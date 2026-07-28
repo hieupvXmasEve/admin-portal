@@ -20,10 +20,15 @@ use Illuminate\Support\Facades\DB;
  * At split time sum(installments) == net due. A discount applied *after* the
  * split lowers (or raises) net due without touching the installment rows, so the
  * plan silently drifts. This action recomputes the pending rows to absorb the
- * delta, preserving installment_no and due_date, and never touches committed
- * (awaiting_payment / paid) rows. When committed rows alone already exceed the
- * new net due it throws, surfacing the case for human review instead of rewriting
- * an already-pushed DNG amount.
+ * delta, preserving installment_no and due_date, and never rewrites an
+ * awaiting_payment or paid row.
+ *
+ * The reconciliation target is the canonical remaining balance, which is already
+ * net of every payment applied to the charge. So only awaiting_payment rows —
+ * pushed to the provider but not yet collected — are subtracted on top of it;
+ * paid rows are represented by the payments themselves. When the rows still
+ * awaiting collection alone exceed the remaining balance it throws, surfacing the
+ * case for human review instead of rewriting an already-pushed DNG amount.
  */
 class ReconcileChargeInstallmentsAction
 {
@@ -51,11 +56,12 @@ class ReconcileChargeInstallmentsAction
                 ->where('status', FinanceChargeInstallment::STATUS_PENDING)
                 ->values();
 
+            // Only awaiting_payment counts as committed-but-uncollected. A paid
+            // installment's cash is already deducted from the canonical remaining
+            // below, so counting it here would subtract the same money twice and
+            // drive the pending target negative on any plan with a settled row.
             $committedCents = $installments
-                ->whereIn('status', [
-                    FinanceChargeInstallment::STATUS_AWAITING_PAYMENT,
-                    FinanceChargeInstallment::STATUS_PAID,
-                ])
+                ->where('status', FinanceChargeInstallment::STATUS_AWAITING_PAYMENT)
                 ->sum(fn (FinanceChargeInstallment $i) => $this->toCents($i->amount));
 
             $collectibleCents = $this->canonicalCollectible($charge);

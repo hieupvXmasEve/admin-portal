@@ -2,19 +2,19 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Http\Web;
+namespace App\Modules\Academic\Delivery\Http\Web;
 
 use App\Http\Controllers\Controller;
-use App\Models\Lecture;
-use App\Models\Semester;
-use App\Models\Unit;
-use App\Modules\Academic\Actions\AssignExamResitInvigilatorAction;
-use App\Modules\Academic\Actions\CreateExamResitSessionAction;
-use App\Modules\Academic\Actions\CreateExamRoomSlotAction;
-use App\Modules\Academic\Http\Requests\ExamResit\AssignInvigilatorRequest;
-use App\Modules\Academic\Http\Requests\ExamResit\StoreExamResitSessionRequest;
-use App\Modules\Academic\Http\Requests\ExamResit\StoreExamRoomSlotRequest;
-use App\Modules\Academic\Queries\ListExamRoomSlotsQuery;
+use App\Modules\Academic\Catalog\Queries\GetSemesterReferenceOptionsQuery;
+use App\Modules\Academic\Catalog\Queries\GetUnitReferenceOptionsQuery;
+use App\Modules\Academic\Delivery\Actions\AssignExamResitInvigilatorAction;
+use App\Modules\Academic\Delivery\Actions\CreateExamResitSessionAction;
+use App\Modules\Academic\Delivery\Actions\CreateExamRoomSlotAction;
+use App\Modules\Academic\Delivery\Http\Requests\ExamResit\AssignInvigilatorRequest;
+use App\Modules\Academic\Delivery\Http\Requests\ExamResit\StoreExamResitSessionRequest;
+use App\Modules\Academic\Delivery\Http\Requests\ExamResit\StoreExamRoomSlotRequest;
+use App\Modules\Academic\Delivery\Queries\ListExamRoomSlotsQuery;
+use App\Modules\Academic\FacultyWorkforce\Queries\GetLecturerReferenceOptionsQuery;
 use App\Shared\Contracts\Facilities\SpaceReferenceReader;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -30,6 +30,9 @@ class ExamScheduleController extends Controller
     public function __construct(
         private readonly ListExamRoomSlotsQuery $slotsQuery,
         private readonly SpaceReferenceReader $spaceReferences,
+        private readonly GetUnitReferenceOptionsQuery $units,
+        private readonly GetLecturerReferenceOptionsQuery $lecturers,
+        private readonly GetSemesterReferenceOptionsQuery $semesters,
     ) {}
 
     public function index(): Response
@@ -44,13 +47,9 @@ class ExamScheduleController extends Controller
             'rooms' => collect($this->spaceReferences->forCampus($campusId ? (int) $campusId : null))
                 ->map(fn ($room) => $room->toArray())
                 ->all(),
-            'units' => Unit::orderBy('code')->get(['id', 'code', 'name']),
-            'lecturers' => Lecture::query()
-                ->when($campusId, fn ($q) => $q->where('campus_id', $campusId))
-                ->orderBy('last_name')
-                ->orderBy('first_name')
-                ->get(['id', 'first_name', 'last_name']),
-            'semesters' => Semester::orderByDesc('start_date')->get(['id', 'name', 'code']),
+            'units' => $this->units->options(),
+            'lecturers' => $this->lecturers->forCampus($campusId ? (int) $campusId : null),
+            'semesters' => $this->semesters->options(),
         ]);
     }
 

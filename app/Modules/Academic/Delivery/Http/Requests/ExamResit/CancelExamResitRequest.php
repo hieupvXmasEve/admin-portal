@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Http\Requests\ExamResit;
+namespace App\Modules\Academic\Delivery\Http\Requests\ExamResit;
 
 use App\Models\ExamResitAttempt;
 use App\Modules\Academic\Support\AcademicObligationSettlement;

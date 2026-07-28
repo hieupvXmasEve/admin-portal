@@ -9,7 +9,7 @@ use App\Models\ExamRoomSlot;
 use App\Models\Room;
 use App\Models\RoomBooking;
 use App\Models\User;
-use App\Modules\Academic\Actions\CreateExamRoomSlotAction;
+use App\Modules\Academic\Delivery\Actions\CreateExamRoomSlotAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 

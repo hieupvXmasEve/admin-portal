@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Services;
+namespace App\Modules\Academic\Delivery\Support;
 
 use App\Models\ClassSession;
 use App\Models\ExamResitAttempt;

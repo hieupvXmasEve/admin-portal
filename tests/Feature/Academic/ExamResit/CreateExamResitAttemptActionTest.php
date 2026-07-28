@@ -11,7 +11,7 @@ use App\Models\Student;
 use App\Models\SyllabusTemplate;
 use App\Models\Unit;
 use App\Models\User;
-use App\Modules\Academic\Actions\CreateExamResitAttemptAction;
+use App\Modules\Academic\Delivery\Actions\CreateExamResitAttemptAction;
 use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;

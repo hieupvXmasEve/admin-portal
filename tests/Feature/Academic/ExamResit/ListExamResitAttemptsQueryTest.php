@@ -11,7 +11,7 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
 use App\Models\User;
-use App\Modules\Academic\Queries\ListExamResitAttemptsQuery;
+use App\Modules\Academic\Delivery\Queries\ListExamResitAttemptsQuery;
 use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Actions\CreateExamResitChargeSimpleAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;

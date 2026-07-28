@@ -11,7 +11,7 @@ use App\Models\Room;
 use App\Models\Semester;
 use App\Models\Unit;
 use App\Models\User;
-use App\Modules\Academic\Queries\ListExamRoomSlotsQuery;
+use App\Modules\Academic\Delivery\Queries\ListExamRoomSlotsQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
