@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Academic\Delivery\Http\Requests\Assessment;
 
+use App\Models\AssessmentComponent;
 use App\Models\AssessmentComponentDetail;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -105,7 +106,7 @@ class StoreAssessmentDetailRequest extends FormRequest
         }
 
         // Get the parent assessment component
-        $assessmentComponent = \App\Models\AssessmentComponent::find($assessmentComponentId);
+        $assessmentComponent = AssessmentComponent::find($assessmentComponentId);
 
         if (! $assessmentComponent) {
             return;
