@@ -386,3 +386,74 @@ it('filters block results by campus', function () {
 
     expect(collect($results->items())->pluck('student.id')->all())->toBe([$visibleStudent->id]);
 });
+
+it('writes the fail when the next block is optimistically levelled up but registered at the same level', function () {
+    $semester = Semester::factory()->create();
+    $student = makeSyncStudent();
+    $unit = makeEgcUnit(4);
+
+    $failedOffering = makeSyncCourseOffering($semester->id, $unit->id);
+    $retakeOffering = makeSyncCourseOffering($semester->id, $unit->id);
+
+    foreach ([$failedOffering, $retakeOffering] as $offering) {
+        CourseRegistration::create([
+            'student_id' => $student->id,
+            'course_offering_id' => $offering->id,
+            'semester_id' => $semester->id,
+            'registration_status' => 'confirmed',
+            'registration_date' => now(),
+            'registration_method' => 'admin_override',
+            'credit_hours' => 3,
+            'credit_points' => 3,
+            'attempt_number' => 1,
+        ]);
+    }
+
+    $blockOne = EgcBlock::factory()->state([
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'block_number' => 1,
+        'level_number' => 4,
+        'result' => EgcBlock::RESULT_PENDING,
+    ])->create();
+
+    // Provisioned optimistically as the next level before block 1's result was known.
+    $blockTwo = EgcBlock::factory()->state([
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'block_number' => 2,
+        'level_number' => 5,
+        'result' => EgcBlock::RESULT_PENDING,
+    ])->create();
+
+    AcademicRecord::factory()->state([
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'unit_id' => $unit->id,
+        'course_offering_id' => $failedOffering->id,
+        'enrollment_date' => now()->toDateString(),
+        'completion_status' => 'completed',
+        'is_passed' => false,
+        'override_pass' => false,
+        'attendance_percentage' => 85.71,
+    ])->create();
+
+    AcademicRecord::factory()->state([
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'unit_id' => $unit->id,
+        'course_offering_id' => $retakeOffering->id,
+        'enrollment_date' => now()->toDateString(),
+        'completion_status' => 'in_progress',
+        'is_passed' => null,
+        'override_pass' => false,
+        'attendance_percentage' => 58.82,
+    ])->create();
+
+    $summary = SyncEgcBlockResultsAction::run($semester->id);
+
+    expect($summary['skipped'])->toBeEmpty()
+        ->and($blockOne->fresh()->result)->toBe(EgcBlock::RESULT_FAIL)
+        ->and((float) $blockOne->fresh()->attendance_rate)->toBe(85.71)
+        ->and($blockTwo->fresh()->result)->toBe(EgcBlock::RESULT_PENDING);
+});

@@ -682,9 +682,16 @@ final class AcademicFinanceChargeSourceGateway implements AcademicFinanceChargeS
         }
 
         $nextBlock = $this->immediateNextEgcBlock($block);
+        if (! $nextBlock instanceof EgcBlock) {
+            return false;
+        }
 
-        return $nextBlock instanceof EgcBlock
-            && (int) $nextBlock->level_number > (int) $block->level_number;
+        // egc_blocks.level_number is provisioned optimistically (block N+1 = level N+1) before
+        // results are known, so it alone never proves progression. Trust the level the student
+        // is actually registered into when that evidence exists.
+        $nextLevel = $this->registeredEgcLevelForBlock($nextBlock) ?? (int) $nextBlock->level_number;
+
+        return $nextLevel > (int) $block->level_number;
     }
 
     public function egcBlockHasMatchedRegistration(int $blockId): bool
@@ -996,19 +1003,7 @@ final class AcademicFinanceChargeSourceGateway implements AcademicFinanceChargeS
      */
     private function resolveEgcResultsForStudent(int $studentId, int $semesterId, Collection $blocks): array
     {
-        $registrations = DB::table('course_registrations')
-            ->join('course_offerings', 'course_registrations.course_offering_id', '=', 'course_offerings.id')
-            ->join('units', 'course_offerings.unit_id', '=', 'units.id')
-            ->where('course_registrations.student_id', $studentId)
-            ->where('course_offerings.semester_id', $semesterId)
-            ->where('units.unit_type', 'egc')
-            ->orderBy('course_registrations.id')
-            ->select([
-                'course_registrations.id as registration_id',
-                'course_offerings.id as course_offering_id',
-            ])
-            ->get()
-            ->values();
+        $registrations = $this->egcRegistrationsForStudentSemester($studentId, $semesterId);
 
         $resolvedByBlock = [];
 
@@ -1025,6 +1020,56 @@ final class AcademicFinanceChargeSourceGateway implements AcademicFinanceChargeS
         }
 
         return $resolvedByBlock;
+    }
+
+    /**
+     * EGC registrations of a student in a semester, ordered so index N pairs with block N+1.
+     *
+     * @return Collection<int, object{registration_id:int, course_offering_id:int, unit_level:int|null}>
+     */
+    private function egcRegistrationsForStudentSemester(int $studentId, int $semesterId): Collection
+    {
+        return DB::table('course_registrations')
+            ->join('course_offerings', 'course_registrations.course_offering_id', '=', 'course_offerings.id')
+            ->join('units', 'course_offerings.unit_id', '=', 'units.id')
+            ->where('course_registrations.student_id', $studentId)
+            ->where('course_offerings.semester_id', $semesterId)
+            ->where('units.unit_type', 'egc')
+            ->orderBy('course_registrations.id')
+            ->select([
+                'course_registrations.id as registration_id',
+                'course_offerings.id as course_offering_id',
+                'units.level as unit_level',
+            ])
+            ->get()
+            ->values();
+    }
+
+    /**
+     * The EGC level the student is actually registered into for this block, or null when the
+     * block has no matching registration yet.
+     */
+    private function registeredEgcLevelForBlock(EgcBlock $block): ?int
+    {
+        $registrations = $this->egcRegistrationsForStudentSemester(
+            (int) $block->student_id,
+            (int) $block->semester_id,
+        );
+
+        $blockIndex = EgcBlock::query()
+            ->where('student_id', $block->student_id)
+            ->where('semester_id', $block->semester_id)
+            ->orderBy('block_number')
+            ->pluck('id')
+            ->search((int) $block->id);
+
+        if ($blockIndex === false) {
+            return null;
+        }
+
+        $level = $registrations->get($blockIndex)?->unit_level;
+
+        return $level === null ? null : (int) $level;
     }
 
     /**
