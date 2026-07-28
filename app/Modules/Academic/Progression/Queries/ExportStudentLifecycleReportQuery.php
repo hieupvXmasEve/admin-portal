@@ -8,7 +8,7 @@ use App\Enums\AcademicProgressionEventType;
 use App\Models\AcademicProgressionEvent;
 use App\Models\Semester;
 use App\Models\Student;
-use App\Modules\Academic\Queries\Reporting\GetStudentStatusBySemesterQuery;
+use App\Modules\Academic\Progression\Queries\Reporting\GetStudentStatusBySemesterQuery;
 use Generator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;

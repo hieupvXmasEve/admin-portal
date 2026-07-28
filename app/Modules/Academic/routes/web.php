@@ -39,14 +39,14 @@ use App\Modules\Academic\Delivery\Http\Web\RecalculatePreviewController;
 use App\Modules\Academic\Delivery\Http\Web\RecordClassSessionAttendanceController;
 use App\Modules\Academic\Delivery\Http\Web\RetakeCourseRegistrationController;
 use App\Modules\Academic\Delivery\Http\Web\UnitStatisticsController;
-use App\Modules\Academic\Http\Web\AcademicPlacementController;
-use App\Modules\Academic\Http\Web\AcademicProgressionAuditController;
 use App\Modules\Academic\Http\Web\AcademicReportController;
 use App\Modules\Academic\Http\Web\CampusDetailController;
 use App\Modules\Academic\Http\Web\CourseRankingController;
-use App\Modules\Academic\Http\Web\GpaHistoryController;
 use App\Modules\Academic\Http\Web\GpaManagementController;
-use App\Modules\Academic\Http\Web\PerformanceDashboardController;
+use App\Modules\Academic\Progression\Http\Web\AcademicPlacementController;
+use App\Modules\Academic\Progression\Http\Web\AcademicProgressionAuditController;
+use App\Modules\Academic\Progression\Http\Web\GpaHistoryController;
+use App\Modules\Academic\Progression\Http\Web\PerformanceDashboardController;
 use App\Modules\Academic\Progression\Http\Web\SemesterEnrollmentController;
 use App\Modules\Academic\Progression\Http\Web\StudentAcademicSummaryController;
 use App\Modules\Academic\Progression\Http\Web\StudentActionAuditController;
@@ -55,7 +55,6 @@ use App\Modules\Academic\Progression\Http\Web\StudentDecisionController;
 use App\Modules\Academic\Progression\Http\Web\StudentLifecycleYearlyAnalysisController;
 use App\Modules\Academic\Progression\Http\Web\StudentStatusController;
 use App\Modules\Academic\Progression\Http\Web\WarningCenterController;
-use App\Modules\StudentRegistry\Http\Web\StudentController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -327,42 +326,6 @@ Route::middleware(['auth', 'verified', 'campus.selected'])->group(function () {
         ->middleware('can:view_campus')
         ->name('campuses.show');
 
-    /**
-     * ==========================================================
-     * Students (CRUD / Profile)
-     * ==========================================================
-     */
-    Route::prefix('students')->group(function () {
-
-        Route::get('/', [StudentController::class, 'index'])
-            ->middleware('can:view_student')
-            ->name(StudentRoutes::INDEX);
-
-        Route::get('export', [StudentController::class, 'export'])
-            ->middleware('can:view_student')
-            ->name(StudentRoutes::EXPORT);
-
-        Route::get('create', [StudentController::class, 'create'])
-            ->middleware('can:create_student')
-            ->name(StudentRoutes::CREATE);
-
-        Route::post('students', [StudentController::class, 'store'])
-            ->middleware('can:create_student')
-            ->name(StudentRoutes::STORE);
-
-        Route::get('{student}/edit', [StudentController::class, 'edit'])
-            ->middleware('can:edit_student')
-            ->name(StudentRoutes::EDIT);
-
-        Route::put('{student}', [StudentController::class, 'update'])
-            ->middleware('can:edit_student')
-            ->name(StudentRoutes::UPDATE);
-    });
-
-    // Photo capture routes
-    Route::get('students/{student}/photo-capture', [StudentController::class, 'photoCapture'])
-        ->middleware('can:edit_student')
-        ->name('students.photo-capture');
     // Student Academic Summary routes
     Route::prefix('students/{student}/academic-summary')->group(function () {
 

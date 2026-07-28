@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Http\Requests\Placement;
+namespace App\Modules\Academic\Progression\Http\Requests\Placement;
 
 use App\Enums\ProgressionTriggerSource;
 use Illuminate\Foundation\Http\FormRequest;

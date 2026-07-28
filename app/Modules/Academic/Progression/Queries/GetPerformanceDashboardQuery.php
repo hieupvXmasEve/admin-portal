@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Queries;
+namespace App\Modules\Academic\Progression\Queries;
 
 use App\Models\GpaCalculation;
 use App\Models\Semester;
@@ -16,7 +16,7 @@ class GetPerformanceDashboardQuery
         $stats = GpaCalculation::query()
             ->where('semester_id', $semesterId)
             ->where('is_finalized', true)
-            ->whereHas('student', fn($q) => $q->where('campus_id', $campusId))
+            ->whereHas('student', fn ($q) => $q->where('campus_id', $campusId))
             ->selectRaw('
                 AVG(semester_gpa) as avg_semester_gpa,
                 AVG(cumulative_gpa) as avg_cumulative_gpa,
@@ -30,11 +30,11 @@ class GetPerformanceDashboardQuery
         $standingDistribution = GpaCalculation::query()
             ->where('semester_id', $semesterId)
             ->where('is_finalized', true)
-            ->whereHas('student', fn($q) => $q->where('campus_id', $campusId))
+            ->whereHas('student', fn ($q) => $q->where('campus_id', $campusId))
             ->select('academic_standing', DB::raw('count(*) as count'))
             ->groupBy('academic_standing')
             ->get()
-            ->map(fn($item) => [
+            ->map(fn ($item) => [
                 'name' => ucfirst($item->academic_standing),
                 'value' => $item->count,
                 'color' => $this->getStandingColor($item->academic_standing),
@@ -52,16 +52,16 @@ class GetPerformanceDashboardQuery
         $trend = GpaCalculation::query()
             ->whereIn('semester_id', $semesterIds)
             ->where('is_finalized', true)
-            ->whereHas('student', fn($q) => $q->where('campus_id', $campusId))
+            ->whereHas('student', fn ($q) => $q->where('campus_id', $campusId))
             ->join('semesters', 'gpa_calculations.semester_id', '=', 'semesters.id')
             ->select('semesters.code as semester_code', 'semesters.start_date')
             ->selectRaw('AVG(semester_gpa) as avg_gpa')
             ->groupBy('semesters.code', 'semesters.start_date')
             ->orderBy('semesters.start_date', 'asc')
             ->get()
-            ->map(fn($item) => [
+            ->map(fn ($item) => [
                 'semester' => $item->semester_code,
-                'gpa' => round((float)$item->avg_gpa, 2),
+                'gpa' => round((float) $item->avg_gpa, 2),
             ]);
 
         // 4. Top Performing Students (by Semester GPA)
@@ -69,11 +69,11 @@ class GetPerformanceDashboardQuery
             ->with(['student'])
             ->where('semester_id', $semesterId)
             ->where('is_finalized', true)
-            ->whereHas('student', fn($q) => $q->where('campus_id', $campusId))
+            ->whereHas('student', fn ($q) => $q->where('campus_id', $campusId))
             ->orderByDesc('semester_gpa')
             ->limit(5)
             ->get()
-            ->map(fn($item) => [
+            ->map(fn ($item) => [
                 'id' => $item->student->id,
                 'name' => $item->student->full_name,
                 'student_id' => $item->student->student_id,
@@ -86,15 +86,15 @@ class GetPerformanceDashboardQuery
             ->with(['student'])
             ->where('semester_id', $semesterId)
             ->where('is_finalized', true)
-            ->whereHas('student', fn($q) => $q->where('campus_id', $campusId))
+            ->whereHas('student', fn ($q) => $q->where('campus_id', $campusId))
             ->where(function ($q) {
                 $q->whereIn('academic_standing', ['warning', 'probation', 'suspension'])
-                  ->orWhere('cumulative_gpa', '<', 2.0);
+                    ->orWhere('cumulative_gpa', '<', 2.0);
             })
             ->orderBy('cumulative_gpa', 'asc')
             ->limit(5)
             ->get()
-            ->map(fn($item) => [
+            ->map(fn ($item) => [
                 'id' => $item->student->id,
                 'name' => $item->student->full_name,
                 'student_id' => $item->student->student_id,
@@ -104,11 +104,11 @@ class GetPerformanceDashboardQuery
 
         return [
             'overview' => [
-                'avg_semester_gpa' => round((float)($stats->avg_semester_gpa ?? 0), 2),
-                'avg_cumulative_gpa' => round((float)($stats->avg_cumulative_gpa ?? 0), 2),
-                'total_students' => (int)($stats->total_students ?? 0),
-                'at_risk_count' => (int)($stats->at_risk_count ?? 0),
-                'avg_completion_rate' => round((float)($stats->avg_completion_rate ?? 0), 1),
+                'avg_semester_gpa' => round((float) ($stats->avg_semester_gpa ?? 0), 2),
+                'avg_cumulative_gpa' => round((float) ($stats->avg_cumulative_gpa ?? 0), 2),
+                'total_students' => (int) ($stats->total_students ?? 0),
+                'at_risk_count' => (int) ($stats->at_risk_count ?? 0),
+                'avg_completion_rate' => round((float) ($stats->avg_completion_rate ?? 0), 1),
             ],
             'distribution' => $standingDistribution,
             'trend' => $trend,

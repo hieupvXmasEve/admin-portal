@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Queries\Reporting;
+namespace App\Modules\Academic\Progression\Queries\Reporting;
 
 use App\Enums\StudentActionType;
 use App\Models\Semester;

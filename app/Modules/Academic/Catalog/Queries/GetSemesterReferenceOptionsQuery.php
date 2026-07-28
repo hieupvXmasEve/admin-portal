@@ -46,6 +46,32 @@ class GetSemesterReferenceOptionsQuery
     }
 
     /**
+     * Newest-first rows carrying every semester column, for the reporting
+     * pages whose pickers render fields beyond the reference triple.
+     *
+     * @return Collection<int, Semester>
+     */
+    public function records(): Collection
+    {
+        return Semester::query()
+            ->orderBy('start_date', 'desc')
+            ->get();
+    }
+
+    /**
+     * Newest-first rows with the date range the progression-audit filter shows.
+     *
+     * @return Collection<int, Semester>
+     */
+    public function auditOptions(): Collection
+    {
+        return Semester::query()
+            ->select('id', 'name', 'code', 'start_date', 'end_date')
+            ->orderBy('start_date', 'desc')
+            ->get();
+    }
+
+    /**
      * Newest-first semester codes, skipping semesters that have none.
      *
      * @return list<string>

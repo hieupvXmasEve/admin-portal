@@ -35,6 +35,7 @@ use App\Shared\Contracts\StudentRegistry\StudentProfileReader;
 use App\Shared\Contracts\StudentRegistry\StudentProfileWriter;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use App\Shared\Contracts\StudentRegistry\StudentSerializedReferenceReader;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
 class StudentRegistryServiceProvider extends ServiceProvider
@@ -62,5 +63,8 @@ class StudentRegistryServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Student::observe(PublishStudentRegistered::class);
+
+        Route::middleware('web')
+            ->group(__DIR__.'/../routes/web.php');
     }
 }

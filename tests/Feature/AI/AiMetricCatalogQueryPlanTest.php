@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Models\Campus;
 use App\Models\Semester;
 use App\Models\User;
-use App\Modules\Academic\Queries\Reporting\GetStudentStatusBySemesterQuery;
+use App\Modules\Academic\Progression\Queries\Reporting\GetStudentStatusBySemesterQuery;
 use App\Modules\AI\Models\AiEvaluationCase;
 use App\Modules\AI\Support\BusinessGlossary;
 use App\Modules\AI\Support\MetricCatalog;

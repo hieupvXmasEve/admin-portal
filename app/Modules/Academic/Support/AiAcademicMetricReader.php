@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Academic\Support;
 
-use App\Modules\Academic\Queries\Reporting\GetStudentStatusBySemesterQuery;
+use App\Modules\Academic\Progression\Queries\Reporting\GetStudentStatusBySemesterQuery;
 use App\Shared\Contracts\Academic\AiAcademicMetricReader as AiAcademicMetricReaderContract;
 use Illuminate\Support\Collection;
 

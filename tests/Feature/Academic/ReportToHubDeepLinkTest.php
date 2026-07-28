@@ -9,7 +9,7 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
 use App\Modules\Academic\Progression\Actions\RecordStudentActionAction;
-use App\Modules\Academic\Queries\Reporting\GetStudentStatusBySemesterQuery;
+use App\Modules\Academic\Progression\Queries\Reporting\GetStudentStatusBySemesterQuery;
 use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia;

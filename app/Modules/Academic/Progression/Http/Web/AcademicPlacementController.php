@@ -2,20 +2,20 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Http\Web;
+namespace App\Modules\Academic\Progression\Http\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\IeltsCertificate;
 use App\Models\Student;
-use App\Modules\Academic\Http\Requests\Placement\InitializePlacementRequest;
-use App\Modules\Academic\Http\Requests\Placement\RecordIeltsRequest;
-use App\Modules\Academic\Http\Requests\Placement\TransitionToIntakeCourseRequest;
-use App\Modules\Academic\Http\Requests\Placement\UpdateEnglishLevelRequest;
 use App\Modules\Academic\Progression\Actions\Placement\InitializeStudentPlacementAction;
 use App\Modules\Academic\Progression\Actions\Placement\RecordIeltsCertificateAction;
 use App\Modules\Academic\Progression\Actions\Placement\TransitionToIntakeCourseAction;
 use App\Modules\Academic\Progression\Actions\Placement\UpdateStudentEnglishLevelAction;
 use App\Modules\Academic\Progression\Exceptions\InvalidProgressionState;
+use App\Modules\Academic\Progression\Http\Requests\Placement\InitializePlacementRequest;
+use App\Modules\Academic\Progression\Http\Requests\Placement\RecordIeltsRequest;
+use App\Modules\Academic\Progression\Http\Requests\Placement\TransitionToIntakeCourseRequest;
+use App\Modules\Academic\Progression\Http\Requests\Placement\UpdateEnglishLevelRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 

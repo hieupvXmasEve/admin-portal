@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Academic;
 
-use App\Modules\Academic\Queries\Reporting\GetAcademicReportQuery;
+use App\Modules\Academic\Progression\Queries\Reporting\GetAcademicReportQuery;
 
 class GetAcademicReportAction
 {

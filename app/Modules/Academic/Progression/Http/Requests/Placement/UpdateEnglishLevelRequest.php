@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Http\Requests\Placement;
+namespace App\Modules\Academic\Progression\Http\Requests\Placement;
 
+use App\Enums\ProgressionTriggerSource;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rules\Enum;
 
-class RecordIeltsRequest extends FormRequest
+class UpdateEnglishLevelRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -17,11 +19,9 @@ class RecordIeltsRequest extends FormRequest
     {
         return [
             'student_id' => ['required', 'integer', 'exists:students,id'],
-            'overall_score' => ['required', 'numeric', 'min:0', 'max:9'],
+            'new_level' => ['required', 'integer', 'min:0', 'max:5'],
             'semester_id' => ['required', 'integer', 'exists:semesters,id'],
-            'upload_record_id' => ['nullable', 'integer', 'exists:upload_records,id'],
-            'missing_documents' => ['nullable', 'boolean'],
-            'issue_date' => ['nullable', 'date'],
+            'trigger_source' => ['nullable', 'string', new Enum(ProgressionTriggerSource::class)],
             'notes' => ['nullable', 'string', 'max:2000'],
         ];
     }
@@ -31,9 +31,9 @@ class RecordIeltsRequest extends FormRequest
         return [
             'student_id.required' => 'Student is required.',
             'student_id.exists' => 'Student not found.',
-            'overall_score.required' => 'IELTS overall score is required.',
-            'overall_score.min' => 'IELTS score must be at least 0.',
-            'overall_score.max' => 'IELTS score cannot exceed 9.',
+            'new_level.required' => 'New English level is required.',
+            'new_level.min' => 'English level must be at least 0.',
+            'new_level.max' => 'English level cannot exceed 5.',
             'semester_id.required' => 'Semester is required.',
             'semester_id.exists' => 'Semester not found.',
         ];

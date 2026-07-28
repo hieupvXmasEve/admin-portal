@@ -2,15 +2,16 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Http\Web;
+namespace App\Modules\Academic\Progression\Http\Web;
 
 use App\Enums\AcademicProgressionEventType;
 use App\Enums\ProgressionTriggerSource;
 use App\Http\Controllers\Controller;
-use App\Models\Campus;
-use App\Models\Semester;
+use App\Modules\Academic\Catalog\Queries\GetSemesterReferenceOptionsQuery;
 use App\Modules\Academic\Progression\Queries\GetMissingDecisionReportQuery;
 use App\Modules\Academic\Progression\Queries\Placement\GetAcademicProgressionAuditQuery;
+use App\Shared\Contracts\Institution\CampusReferenceReader;
+use App\Shared\Contracts\Institution\DTO\CampusReference;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -19,7 +20,9 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class AcademicProgressionAuditController extends Controller
 {
     public function __construct(
-        private readonly GetAcademicProgressionAuditQuery $auditQuery
+        private readonly GetAcademicProgressionAuditQuery $auditQuery,
+        private readonly CampusReferenceReader $campuses,
+        private readonly GetSemesterReferenceOptionsQuery $semesters,
     ) {}
 
     /**
@@ -130,8 +133,8 @@ class AcademicProgressionAuditController extends Controller
         $filters = array_merge($validated, ['per_page' => 10000]);
         $events = $this->auditQuery->handle($filters);
 
-        $semester = Semester::find($validated['semester_id']);
-        $filename = sprintf('academic_progression_audit_%s_%s.csv', $semester->code, now()->format('Y-m-d'));
+        $semesterCode = $this->semesters->codeOrFail((int) $validated['semester_id']);
+        $filename = sprintf('academic_progression_audit_%s_%s.csv', $semesterCode, now()->format('Y-m-d'));
 
         return response()->streamDownload(function () use ($events) {
             $handle = fopen('php://output', 'w');
@@ -186,14 +189,11 @@ class AcademicProgressionAuditController extends Controller
         return [
             'eventTypes' => AcademicProgressionEventType::options(),
             'triggerSources' => ProgressionTriggerSource::options(),
-            'semesters' => Semester::query()
-                ->select('id', 'name', 'code', 'start_date', 'end_date')
-                ->orderBy('start_date', 'desc')
-                ->get(),
-            'campuses' => Campus::query()
-                ->select('id', 'name', 'code')
-                ->orderBy('name')
-                ->get(),
+            'semesters' => $this->semesters->auditOptions(),
+            'campuses' => array_map(
+                static fn (CampusReference $campus): array => $campus->toArray(),
+                $this->campuses->all(),
+            ),
             'courseStages' => [
                 ['value' => 'intake_pre_uni_gc', 'label' => 'Intake Pre-Uni GC'],
                 ['value' => 'intake_course', 'label' => 'Intake Course'],

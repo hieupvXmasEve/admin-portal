@@ -2,15 +2,16 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Http\Web;
+namespace App\Modules\Academic\Progression\Http\Web;
 
 use App\Http\Controllers\Controller;
-use App\Models\Campus;
-use App\Models\Program;
-use App\Models\Semester;
-use App\Modules\Academic\Exports\GpaHistoryExport;
-use App\Modules\Academic\Queries\ListGpaHistoryQuery;
+use App\Modules\Academic\Catalog\Queries\GetProgramReferenceOptionsQuery;
+use App\Modules\Academic\Catalog\Queries\GetSemesterReferenceOptionsQuery;
+use App\Modules\Academic\Progression\Exports\GpaHistoryExport;
+use App\Modules\Academic\Progression\Queries\ListGpaHistoryQuery;
 use App\Services\ExcelExportService;
+use App\Shared\Contracts\Institution\CampusReferenceReader;
+use App\Shared\Contracts\Institution\DTO\CampusReference;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -18,6 +19,12 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class GpaHistoryController extends Controller
 {
+    public function __construct(
+        private readonly CampusReferenceReader $campuses,
+        private readonly GetSemesterReferenceOptionsQuery $semesters,
+        private readonly GetProgramReferenceOptionsQuery $programs,
+    ) {}
+
     public function index(Request $request, ListGpaHistoryQuery $query): Response
     {
         $validated = $request->validate([
@@ -48,9 +55,12 @@ class GpaHistoryController extends Controller
                 'per_page' => $filters['per_page'],
             ],
             'options' => [
-                'campuses' => Campus::select('id', 'name')->get(),
-                'semesters' => Semester::orderBy('start_date', 'desc')->get(),
-                'programs' => Program::select('id', 'name')->orderBy('name')->get(),
+                'campuses' => array_map(
+                    static fn (CampusReference $campus): array => $campus->toArray(),
+                    $this->campuses->all(),
+                ),
+                'semesters' => $this->semesters->records(),
+                'programs' => $this->programs->options(),
                 'standings' => [
                     ['value' => 'normal', 'label' => 'Normal'],
                     ['value' => 'warning', 'label' => 'Warning'],
@@ -77,7 +87,7 @@ class GpaHistoryController extends Controller
         $builder = $query->getBuilder($filters);
 
         $export = new GpaHistoryExport($builder);
-        $filename = 'gpa_history_' . date('Y-m-d_H-i');
+        $filename = 'gpa_history_'.date('Y-m-d_H-i');
 
         return $excelService->download($export, $filename);
     }

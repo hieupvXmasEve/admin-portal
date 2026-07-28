@@ -38,6 +38,7 @@ use App\Modules\Academic\Progression\Actions\CommitCourseResultsToTranscriptActi
 use App\Modules\Academic\Progression\Queries\FilterStudentsByProgramEnrollmentStatus;
 use App\Modules\Academic\Progression\Queries\GetStudentAcademicRecordsQuery;
 use App\Modules\Academic\Progression\Queries\GetStudentGpaTrendQuery;
+use App\Modules\Academic\Progression\Queries\Reporting\GetAcademicReportQuery;
 use App\Modules\Academic\Progression\Support\EloquentCourseOfferingAttemptWriter;
 use App\Modules\Academic\Progression\Support\EloquentProgramEnrollmentLifecycleWriter;
 use App\Modules\Academic\Progression\Support\EloquentProgramEnrollmentReader;
@@ -47,7 +48,6 @@ use App\Modules\Academic\Progression\Support\EloquentStudentDeferLifecycleReader
 use App\Modules\Academic\Progression\Support\EloquentStudentLifecycleActionReader;
 use App\Modules\Academic\Progression\Support\EloquentTranscriptEntryGpaReader;
 use App\Modules\Academic\Progression\Support\StudentLifecycleStatusReader as ModuleStudentLifecycleStatusReader;
-use App\Modules\Academic\Queries\Reporting\GetAcademicReportQuery;
 use App\Modules\Academic\Support\AcademicFinanceChargeSourceGateway as ModuleAcademicFinanceChargeSourceGateway;
 use App\Modules\Academic\Support\AiAcademicEntitySearchReader as ModuleAiAcademicEntitySearchReader;
 use App\Modules\Academic\Support\AiAcademicMetricReader as ModuleAiAcademicMetricReader;

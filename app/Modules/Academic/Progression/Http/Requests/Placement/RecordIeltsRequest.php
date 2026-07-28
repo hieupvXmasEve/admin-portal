@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Http\Requests\Placement;
+namespace App\Modules\Academic\Progression\Http\Requests\Placement;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class TransitionToIntakeCourseRequest extends FormRequest
+class RecordIeltsRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -17,9 +17,11 @@ class TransitionToIntakeCourseRequest extends FormRequest
     {
         return [
             'student_id' => ['required', 'integer', 'exists:students,id'],
+            'overall_score' => ['required', 'numeric', 'min:0', 'max:9'],
             'semester_id' => ['required', 'integer', 'exists:semesters,id'],
-            'ielts_certificate_id' => ['required', 'integer', 'exists:ielts_certificates,id'],
-            'allow_missing_documents' => ['nullable', 'boolean'],
+            'upload_record_id' => ['nullable', 'integer', 'exists:upload_records,id'],
+            'missing_documents' => ['nullable', 'boolean'],
+            'issue_date' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ];
     }
@@ -29,10 +31,11 @@ class TransitionToIntakeCourseRequest extends FormRequest
         return [
             'student_id.required' => 'Student is required.',
             'student_id.exists' => 'Student not found.',
+            'overall_score.required' => 'IELTS overall score is required.',
+            'overall_score.min' => 'IELTS score must be at least 0.',
+            'overall_score.max' => 'IELTS score cannot exceed 9.',
             'semester_id.required' => 'Semester is required.',
             'semester_id.exists' => 'Semester not found.',
-            'ielts_certificate_id.required' => 'IELTS certificate is required for transition.',
-            'ielts_certificate_id.exists' => 'IELTS certificate not found.',
         ];
     }
 
