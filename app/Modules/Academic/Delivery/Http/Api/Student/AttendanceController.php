@@ -7,8 +7,6 @@ namespace App\Modules\Academic\Delivery\Http\Api\Student;
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
 // use App\Http\Resources\Api\V1\Student\CourseAttendanceResource;
-use App\Models\Student;
-use App\Modules\Academic\Delivery\Http\Requests\StudentAttendanceFilterRequest;
 use App\Modules\Academic\Delivery\Http\Requests\StudentAttendanceRequest;
 use App\Modules\Academic\Delivery\Http\Requests\StudentAttendanceSemesterRequest;
 use App\Modules\Academic\Delivery\Http\Resources\Api\V1\Student\AttendanceReportResource;
@@ -19,42 +17,14 @@ use Illuminate\Support\Facades\Log;
 class AttendanceController extends Controller
 {
     /**
-     * Get student's attendance summary
-     */
-    public function index(StudentAttendanceFilterRequest $request, GetStudentAttendanceQuery $query): JsonResponse
-    {
-        /** @var Student $student */
-        $student = $request->user();
-
-        try {
-            $filters = $request->validated();
-            $semesterId = isset($filters['semester_id']) ? (int) $filters['semester_id'] : null;
-            unset($filters['semester_id']);
-
-            $attendance = $query->handle('summary', $student, $semesterId, $filters);
-
-            return ApiResponse::success(
-                $attendance,
-                [],
-                'Attendance summary retrieved successfully'
-            );
-        } catch (\Exception $e) {
-            Log::DEBUG($e->getMessage());
-
-            return ApiResponse::serverError('Failed to retrieve attendance summary');
-        }
-    }
-
-    /**
      * Get attendance for a specific course
      */
     public function courseAttendance(StudentAttendanceRequest $request, int $courseOfferingId, GetStudentAttendanceQuery $query): JsonResponse
     {
-        /** @var Student $student */
-        $student = $request->user();
+        $studentId = (int) $request->user()->id;
 
         try {
-            $courseAttendance = $query->handle('course', $student, $courseOfferingId);
+            $courseAttendance = $query->handle('course', $studentId, $courseOfferingId);
 
             return ApiResponse::success(
                 $courseAttendance,
@@ -67,37 +37,14 @@ class AttendanceController extends Controller
     }
 
     /**
-     * Get attendance statistics
-     */
-    public function statistics(StudentAttendanceSemesterRequest $request, GetStudentAttendanceQuery $query): JsonResponse
-    {
-        /** @var Student $student */
-        $student = $request->user();
-
-        try {
-            $semesterId = $request->validated('semester_id');
-            $statistics = $query->handle('statistics', $student, $semesterId !== null ? (int) $semesterId : null);
-
-            return ApiResponse::success(
-                $statistics,
-                [],
-                'Attendance statistics retrieved successfully'
-            );
-        } catch (\Exception $e) {
-            return ApiResponse::serverError('Failed to retrieve attendance statistics');
-        }
-    }
-
-    /**
      * Get comprehensive attendance report with semester filtering
      */
     public function report(StudentAttendanceSemesterRequest $request, GetStudentAttendanceQuery $query): JsonResponse
     {
-        /** @var Student $student */
-        $student = $request->user();
+        $studentId = (int) $request->user()->id;
         try {
             $requestedSemesterId = $request->validated('semester_id');
-            $report = $query->handle('reportForRequestedPeriod', $student, $requestedSemesterId !== null ? (int) $requestedSemesterId : null);
+            $report = $query->handle('reportForRequestedPeriod', $studentId, $requestedSemesterId !== null ? (int) $requestedSemesterId : null);
             Log::info('Report Data', ['report_data' => $report['report']]);
 
             return ApiResponse::success(
@@ -107,7 +54,7 @@ class AttendanceController extends Controller
             );
         } catch (\Exception $e) {
             Log::error('Failed to retrieve attendance report', [
-                'student_id' => $student->id,
+                'student_id' => $studentId,
                 'semester_id' => $report['semester_id'] ?? null,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
