@@ -8,6 +8,7 @@ use App\Enums\AcademicProgressionEventType;
 use App\Enums\ProgressionTriggerSource;
 use App\Enums\StudentActionType;
 use App\Models\AcademicProgressionEvent;
+use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentActionLog;
 use App\Models\StudentChange;
@@ -15,6 +16,7 @@ use App\Models\StudentDecision;
 use App\Modules\Academic\Progression\Exceptions\InvalidProgressionState;
 use App\Shared\Contracts\Finance\DTO\StudentLifecycleDeferData;
 use App\Shared\Contracts\Finance\StudentLifecycleFinanceCommand;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -72,7 +74,7 @@ class RecordStudentActionAction
                 'egc_defer_from_block_number' => self::resolveEgcDeferBlockNumber($isEgcDefer, $actionType, $data),
                 'intended_intake_semester_id' => $data['intended_intake_semester_id'] ?? null,
                 'dropout_semester_id' => $data['dropout_semester_id'] ?? null,
-                'effective_semester_id' => $data['effective_semester_id'] ?? null,
+                'effective_semester_id' => self::resolveEffectiveSemesterId($actionType, $data),
 
                 // Campus transfer fields
                 'from_campus_id' => $data['from_campus_id'] ?? null,
@@ -198,6 +200,43 @@ class RecordStudentActionAction
     /**
      * Validate CAMPUS_TRANSFER action.
      */
+    /**
+     * A campus transfer is dated (`effective_at`) rather than tied to a semester
+     * field, so it never landed on the lifecycle timeline. Derive its semester
+     * from that date so the transfer can be placed like every other action.
+     */
+    private static function resolveEffectiveSemesterId(StudentActionType $actionType, array $data): ?int
+    {
+        if (! empty($data['effective_semester_id'])) {
+            return (int) $data['effective_semester_id'];
+        }
+
+        if ($actionType !== StudentActionType::CAMPUS_TRANSFER || empty($data['effective_at'])) {
+            return null;
+        }
+
+        $effectiveAt = Carbon::parse($data['effective_at'])->startOfDay();
+
+        $containing = Semester::query()
+            ->whereDate('start_date', '<=', $effectiveAt)
+            ->whereDate('end_date', '>=', $effectiveAt)
+            ->orderBy('start_date')
+            ->value('id');
+
+        if ($containing !== null) {
+            return (int) $containing;
+        }
+
+        // Between terms: attribute the transfer to the term it takes effect in,
+        // i.e. the next one to start.
+        $next = Semester::query()
+            ->whereDate('start_date', '>', $effectiveAt)
+            ->orderBy('start_date')
+            ->value('id');
+
+        return $next === null ? null : (int) $next;
+    }
+
     private static function validateCampusTransferAction(Student $student, array $data): void
     {
         $fromCampusId = $data['from_campus_id'] ?? null;
