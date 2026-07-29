@@ -11,6 +11,6 @@ class StudentAvatarTargetPolicy
 {
     public function upload(User $user, StudentAvatarTarget $target): bool
     {
-        return $user->hasRole('admin');
+        return $user->can('edit_student');
     }
 }

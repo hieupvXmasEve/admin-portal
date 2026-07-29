@@ -146,14 +146,41 @@ const photoPreviewUrl = ref<string | null>(null);
 const uploadedAvatarUrl = ref<string | null>(null);
 const showSuccessMessage = ref(false);
 
-const handlePhotoSelected = (file: File, dataUrl: string) => {
+const handlePhotoSelected = async (file: File, dataUrl: string) => {
     selectedPhoto.value = file;
     photoPreviewUrl.value = dataUrl;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const response = await fetch(`/api/uploads/student-avatar/${props.student.id}`, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            handleAvatarUploaded(result.data);
+        } else {
+            photoPreviewUrl.value = null;
+            selectedPhoto.value = null;
+        }
+    } catch (error) {
+        console.error('Avatar upload failed:', error);
+        photoPreviewUrl.value = null;
+        selectedPhoto.value = null;
+    }
 };
 
 const handleAvatarUploaded = (avatarData: any) => {
     // Update the form field with the new avatar URL
-    setFieldValue('avatar_url', avatarData.url);
+    form.avatar_url = avatarData.url;
 
     // Update preview URL for display
     uploadedAvatarUrl.value = avatarData.url;

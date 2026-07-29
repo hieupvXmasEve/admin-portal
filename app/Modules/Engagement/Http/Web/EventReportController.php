@@ -163,7 +163,7 @@ class EventReportController extends Controller
         $perPage = (int) ($filters['per_page'] ?? 15);
         $offset = ($page - 1) * $perPage;
 
-        $query = Event::forCampus((int) $campus->id)
+        $query = Event::forCampus((int) $campus)
             ->with(['creator', 'participants']);
 
         // Apply filters
