@@ -356,6 +356,12 @@ export const mainNavGroups: NavGroup[] = [
                 requiredPermissions: ['view_finance_reporting'],
             },
             {
+                title: 'Doanh thu',
+                href: financeRoutes.revenue.index(),
+                icon: TrendingUp,
+                requiredPermissions: ['view_finance_revenue_report'],
+            },
+            {
                 title: 'Sinh phí',
                 href: '#',
                 icon: DollarSign,

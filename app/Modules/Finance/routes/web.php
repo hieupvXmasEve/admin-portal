@@ -17,6 +17,7 @@ use App\Modules\Finance\Http\Web\Admin\FinanceChargeController;
 use App\Modules\Finance\Http\Web\Admin\FinanceCockpitController;
 use App\Modules\Finance\Http\Web\Admin\FinanceGlobalSearchController;
 use App\Modules\Finance\Http\Web\Admin\FinanceReportingController;
+use App\Modules\Finance\Http\Web\Admin\FinanceRevenueReportController;
 use App\Modules\Finance\Http\Web\Admin\FinanceStudentOverviewController;
 use App\Modules\Finance\Http\Web\Admin\FinanceStudentPaymentController;
 use App\Modules\Finance\Http\Web\Admin\LifecycleDueExceptionController;
@@ -47,6 +48,12 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
     Route::get('/reporting', [FinanceReportingController::class, 'index'])
         ->middleware('can:view_finance_reporting')
         ->name('reporting.index');
+
+    // Revenue report — school-wide, multi-semester (separate from the
+    // campus-bound Reporting shell above; see FinanceRevenueReportController).
+    Route::get('/revenue', [FinanceRevenueReportController::class, 'index'])
+        ->middleware('can:view_finance_revenue_report')
+        ->name('revenue.index');
 
     // EGC Operations
     Route::prefix('egc')->name('egc.')->group(function () {
