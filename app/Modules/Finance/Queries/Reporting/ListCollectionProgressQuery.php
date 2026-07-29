@@ -4,13 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Reporting;
 
-use App\Modules\Finance\Models\Payment;
-use App\Modules\Finance\Models\PaymentApplication;
-use App\Modules\Finance\Models\PaymentSurplusDisposition;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Support\LifecycleDueItemPredicate;
 use App\Modules\Finance\Support\Reporting\CollectionProgressCatalog as Catalog;
 use App\Modules\Finance\Support\Reporting\CurrentSettlementPositionPresenter;
+use App\Modules\Finance\Support\Reporting\UnappliedCashReader;
 use App\Modules\Finance\Support\SettlementPosition\Money;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionAmounts;
@@ -42,6 +40,7 @@ final class ListCollectionProgressQuery
         private readonly CurrentSettlementPositionPresenter $positionPresenter,
         private readonly StudentReferenceReader $studentReferences,
         private readonly AcademicPeriodReader $academicPeriods,
+        private readonly UnappliedCashReader $unappliedCashReader,
     ) {}
 
     /**
@@ -89,7 +88,7 @@ final class ListCollectionProgressQuery
             ->values();
         $byStudent = $invoices->groupBy('student_id');
         $unappliedByStudent = $asOf === null
-            ? $this->unappliedByStudent($byStudent->keys()->map(fn (mixed $id): int => (int) $id)->all())
+            ? $this->unappliedCashReader->unappliedByStudent($byStudent->keys()->map(fn (mixed $id): int => (int) $id)->all())
             : [];
         $positionsByInvoice = $this->positionsForInvoices($invoices, $filters, $asOf);
 
@@ -407,45 +406,6 @@ final class ListCollectionProgressQuery
         }
 
         return Catalog::STATE_PAID;
-    }
-
-    /** @param list<int> $studentIds */
-    private function unappliedByStudent(array $studentIds): array
-    {
-        if ($studentIds === []) {
-            return [];
-        }
-
-        $payments = Payment::query()
-            ->whereIn('student_id', $studentIds)
-            ->where('status', Payment::STATUS_COMPLETED)
-            ->get(['id', 'student_id', 'amount']);
-
-        if ($payments->isEmpty()) {
-            return [];
-        }
-
-        $appliedByPayment = PaymentApplication::query()
-            ->whereIn('payment_id', $payments->pluck('id'))
-            ->selectRaw('payment_id, SUM(amount) as applied')
-            ->groupBy('payment_id')
-            ->pluck('applied', 'payment_id');
-        $disposedByPayment = PaymentSurplusDisposition::query()
-            ->whereIn('payment_id', $payments->pluck('id'))
-            ->whereIn('type', [PaymentSurplusDisposition::TYPE_REFUND, PaymentSurplusDisposition::TYPE_RETAIN_FORFEIT])
-            ->selectRaw('payment_id, SUM(amount) as amount')
-            ->groupBy('payment_id')
-            ->pluck('amount', 'payment_id');
-
-        $unapplied = [];
-        foreach ($payments as $payment) {
-            $applied = (float) ($appliedByPayment[$payment->id] ?? 0.0);
-            $disposed = (float) ($disposedByPayment[$payment->id] ?? 0.0);
-            $remaining = max(0.0, (float) $payment->amount - $applied - $disposed);
-            $unapplied[(int) $payment->student_id] = ($unapplied[(int) $payment->student_id] ?? 0.0) + $remaining;
-        }
-
-        return $unapplied;
     }
 
     /** @param Collection<int, array<string, mixed>> $rows */

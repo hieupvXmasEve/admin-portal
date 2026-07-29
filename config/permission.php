@@ -415,6 +415,9 @@ return [
             'view_finance_cockpit' => 'view_finance_cockpit',
             // Finance Reporting (FIN-REV-016) — thin shell gate; lens stories own data permissions later
             'view_finance_reporting' => 'view_finance_reporting',
+            // Revenue report — always school-wide (every campus), unlike the
+            // campus-bound view_finance_reporting. Grant deliberately.
+            'view_finance_revenue_report' => 'view_finance_revenue_report',
             // Pricing Operations (obligation v2 wave 1) — catalog rules only; types are code-owned
             'view_finance_pricing_operations' => 'view_finance_pricing_operations',
             'manage_finance_pricing_operations' => 'manage_finance_pricing_operations',
