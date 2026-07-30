@@ -151,7 +151,7 @@ const { filters, hasActiveFilters, clearAllFilters, setFilter, apply, handleSear
         per_page: 15,
         page: 1,
     },
-    only: ['students', 'filters'],
+    only: ['students', 'filters', 'statistics'],
     debounce: 400,
 });
 
