@@ -114,11 +114,13 @@ enum StudentActionType: string
      * Whether a transition of this type needs an authorizing Decision (ADR-0048).
      *
      * The requires-decision set lives entirely on the status actions: academic
-     * defer, resume, dropout, campus transfer, and the enrolment transitions
-     * into the study stages — NE enrolment (→ `intake_pre_uni_gc`) and major
-     * enrolment (→ `intake_course`). The matching EGC progression *events*
-     * (Placement Initialized, Course Stage Changed) are a secondary record of
-     * those same transitions and never carry the requirement.
+     * defer, dropout, campus transfer, and the enrolment transitions into the
+     * study stages — NE enrolment (→ `intake_pre_uni_gc`) and major enrolment
+     * (→ `intake_course`). The matching EGC progression *events* (Placement
+     * Initialized, Course Stage Changed) are a secondary record of those same
+     * transitions and never carry the requirement. Resume (returning from a
+     * defer to continue studying) never requires one either — the original
+     * defer already carries the authorizing decision.
      *
      * Soft rule: the Decision may be attached after the transition is recorded
      * (no creation-time block); the missing-decision report surfaces transitions
@@ -129,7 +131,6 @@ enum StudentActionType: string
     {
         return match ($this) {
             self::ACADEMIC_DEFER,
-            self::ACADEMIC_RESUME,
             self::ACADEMIC_DROPOUT,
             self::CAMPUS_TRANSFER,
             self::STUDENT_ENROLLMENT_NE,

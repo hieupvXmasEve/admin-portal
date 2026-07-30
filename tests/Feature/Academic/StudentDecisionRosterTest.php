@@ -58,7 +58,6 @@ function rosterDecision(User $user, string $number): StudentDecision
 
 it('classifies which transitions require a decision', function () {
     expect(StudentActionType::ACADEMIC_DEFER->requiresDecision())->toBeTrue()
-        ->and(StudentActionType::ACADEMIC_RESUME->requiresDecision())->toBeTrue()
         ->and(StudentActionType::ACADEMIC_DROPOUT->requiresDecision())->toBeTrue()
         ->and(StudentActionType::CAMPUS_TRANSFER->requiresDecision())->toBeTrue()
         // The enrolment transitions into the study stages also require a Decision.
@@ -66,6 +65,8 @@ it('classifies which transitions require a decision', function () {
         ->and(StudentActionType::STUDENT_MAJOR_ENROLLMENT->requiresDecision())->toBeTrue()
         ->and(StudentActionType::ADMISSION_DEFERRAL->requiresDecision())->toBeFalse()
         ->and(StudentActionType::WAITING_COURSE_OPENING->requiresDecision())->toBeFalse()
+        // Resume never requires a Decision — the original defer already carries it.
+        ->and(StudentActionType::ACADEMIC_RESUME->requiresDecision())->toBeFalse()
         // EGC progression events never require a Decision (ADR-0048, revised):
         // they are a secondary record of the enrolment transitions, which carry
         // the requirement on the action side instead.
@@ -76,7 +77,6 @@ it('classifies which transitions require a decision', function () {
         ->and(AcademicProgressionEventType::requiresDecisionValues())->toBe([])
         ->and(StudentActionType::requiresDecisionValues())->toEqualCanonicalizing([
             StudentActionType::ACADEMIC_DEFER->value,
-            StudentActionType::ACADEMIC_RESUME->value,
             StudentActionType::ACADEMIC_DROPOUT->value,
             StudentActionType::CAMPUS_TRANSFER->value,
             StudentActionType::STUDENT_ENROLLMENT_NE->value,

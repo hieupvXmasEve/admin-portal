@@ -69,13 +69,14 @@ it('lists requires-decision status actions that lack a decision', function () {
     $defer = missingDecisionAction($student, $this->user, StudentActionType::ACADEMIC_DEFER);
     $dropout = missingDecisionAction($student, $this->user, StudentActionType::ACADEMIC_DROPOUT);
     $transfer = missingDecisionAction($student, $this->user, StudentActionType::CAMPUS_TRANSFER);
-    $resume = missingDecisionAction($student, $this->user, StudentActionType::ACADEMIC_RESUME);
+    // Resume never requires a Decision — the original defer already carries it.
+    missingDecisionAction($student, $this->user, StudentActionType::ACADEMIC_RESUME);
 
     $result = (new GetMissingDecisionReportQuery)->handle([], $this->campus->id);
 
     $keys = collect($result->items())->pluck('id')->sort()->values()->all();
 
-    expect($keys)->toBe(collect([$defer, $dropout, $transfer, $resume])
+    expect($keys)->toBe(collect([$defer, $dropout, $transfer])
         ->map(fn (StudentActionLog $log): string => 'action-'.$log->id)
         ->sort()
         ->values()
