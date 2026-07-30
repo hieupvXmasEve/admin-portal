@@ -56,3 +56,4 @@ docs-site/.astro/
 engineer/
 .claude/hooks/.log
 .claude/hooks/.logs/
+.pnpm-store
