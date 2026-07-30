@@ -4,7 +4,12 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Http\Export;
 
+use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\Payment;
+use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Models\StudentInvoice;
+use App\Modules\Finance\Support\FinanceSemesterContextResolver;
 use App\Modules\Finance\Support\Reporting\CurrentSettlementPositionPresenter;
 use App\Modules\Finance\Support\Reporting\SettlementReportAsOfContext;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
@@ -25,6 +30,12 @@ final class InvoiceExport implements FromQuery, WithHeadings, WithMapping
     /** @var array<int, StudentReference> */
     private array $studentReferences = [];
 
+    /** @var array<int, list<string>> invoice_id => distinct DNG payment refs */
+    private array $dngRefsByInvoice = [];
+
+    /** @var array<int, list<string>> invoice_id => distinct payment methods */
+    private array $paymentMethodsByInvoice = [];
+
     public function __construct(
         private readonly array $filters,
         private readonly SettlementPositionReader $settlementPositionReader,
@@ -41,10 +52,17 @@ final class InvoiceExport implements FromQuery, WithHeadings, WithMapping
         $search = trim((string) ($this->filters['search'] ?? ''));
         $matchingStudentIds = $search === '' ? [] : $studentReferences->idsMatchingSearch($search, $campusId === null ? null : (int) $campusId);
 
+        // Same fallback as ListStudentInvoicesQuery: an export triggered without an
+        // explicit semester_id (e.g. a direct API call) still scopes to the
+        // operator's currently selected semester instead of dumping every semester.
+        $semesterId = ! empty($this->filters['semester_id'])
+            ? (int) $this->filters['semester_id']
+            : FinanceSemesterContextResolver::selectedId();
+
         return StudentInvoice::query()
             ->with('semester')
             ->when($campusStudentIds !== null, fn (Builder $query) => $query->whereIn('student_id', $campusStudentIds))
-            ->when(! empty($this->filters['semester_id']), fn (Builder $query) => $query->forSemester((int) $this->filters['semester_id']))
+            ->when($semesterId !== null, fn (Builder $query) => $query->forSemester($semesterId))
             ->when($search !== '', fn (Builder $query) => $query->where(fn (Builder $query) => $query
                 ->where('invoice_number', 'like', "%{$search}%")
                 ->orWhereIn('student_id', $matchingStudentIds)))
@@ -88,7 +106,78 @@ final class InvoiceExport implements FromQuery, WithHeadings, WithMapping
             ) === $status)->values();
         }
 
+        $this->loadDngRefsAndPaymentMethods($rows->pluck('id')->map(static fn (int|string $id): int => (int) $id)->all());
+
         return $rows;
+    }
+
+    /**
+     * Reconciliation-facing columns: per invoice, the distinct DNG payment refs
+     * and payment methods (cash/bank_transfer/gateway/...) settling it. An
+     * invoice can be paid across several Payments (PaymentApplication is N:1
+     * invoice_line -> payment), so both are aggregated, not single-valued.
+     *
+     * @param  list<int>  $invoiceIds
+     */
+    private function loadDngRefsAndPaymentMethods(array $invoiceIds): void
+    {
+        $this->dngRefsByInvoice = [];
+        $this->paymentMethodsByInvoice = [];
+
+        if ($invoiceIds === []) {
+            return;
+        }
+
+        $lineToInvoice = InvoiceLine::query()
+            ->whereIn('invoice_id', $invoiceIds)
+            ->pluck('invoice_id', 'id');
+
+        if ($lineToInvoice->isEmpty()) {
+            return;
+        }
+
+        $applications = PaymentApplication::query()
+            ->whereIn('invoice_line_id', $lineToInvoice->keys())
+            ->get(['invoice_line_id', 'payment_id']);
+
+        if ($applications->isEmpty()) {
+            return;
+        }
+
+        $paymentIds = $applications->pluck('payment_id')->unique()->values();
+
+        $methodsByPayment = Payment::query()
+            ->whereIn('id', $paymentIds)
+            ->pluck('method', 'id');
+
+        $dngRefsByPayment = DngPaymentRequest::query()
+            ->whereIn('payment_id', $paymentIds)
+            ->whereNotNull('dng_payment_id')
+            ->get(['payment_id', 'dng_payment_id'])
+            ->groupBy('payment_id')
+            ->map(static fn ($group) => $group->pluck('dng_payment_id')->unique()->values()->all());
+
+        foreach ($applications as $application) {
+            $invoiceId = (int) ($lineToInvoice[$application->invoice_line_id] ?? 0);
+            if ($invoiceId === 0) {
+                continue;
+            }
+
+            $method = $methodsByPayment[$application->payment_id] ?? null;
+            if ($method !== null) {
+                $this->paymentMethodsByInvoice[$invoiceId] ??= [];
+                if (! in_array($method, $this->paymentMethodsByInvoice[$invoiceId], true)) {
+                    $this->paymentMethodsByInvoice[$invoiceId][] = $method;
+                }
+            }
+
+            foreach ($dngRefsByPayment[$application->payment_id] ?? [] as $ref) {
+                $this->dngRefsByInvoice[$invoiceId] ??= [];
+                if (! in_array($ref, $this->dngRefsByInvoice[$invoiceId], true)) {
+                    $this->dngRefsByInvoice[$invoiceId][] = $ref;
+                }
+            }
+        }
     }
 
     public function headings(): array
@@ -103,6 +192,8 @@ final class InvoiceExport implements FromQuery, WithHeadings, WithMapping
             'Cash Received',
             'Credit Applied',
             'Remaining Collectible',
+            'DNG Payment Ref(s)',
+            'Payment Method(s)',
             'Settlement State',
             'Settlement Version',
             'Issue Codes',
@@ -135,6 +226,8 @@ final class InvoiceExport implements FromQuery, WithHeadings, WithMapping
             $valid ? $amounts->cash->amount : null,
             $valid ? $amounts->credit->amount : null,
             $valid ? $amounts->remaining->amount : null,
+            implode(',', $this->dngRefsByInvoice[(int) $invoice->id] ?? []),
+            implode(',', $this->paymentMethodsByInvoice[(int) $invoice->id] ?? []),
             $valid ? $position->settlement_state : SettlementPosition::STATE_INVALID,
             $position?->snapshot_version,
             $position === null ? 'settlement_position.missing_payable_line' : implode(',', array_map(

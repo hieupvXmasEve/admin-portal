@@ -56,25 +56,32 @@ const props = defineProps<{
 
 const permission = usePermission();
 const sel = useLookupSelection();
-const { selectedLabel } = useFinanceSemester();
+const { context: semesterContext } = useFinanceSemester();
 
 const { filters, setFilter, handleSearch, handleSortChange, handlePaginationNavigate, handlePageSizeChange, currentSort, currentDirection } = useDataTable<InvoiceFilters>({
     baseUrl: financeRoutes.lookup.invoices(),
     initialFilters: {
         search: props.filters.search ?? '',
         status: props.filters.status ?? 'all',
+        semester_id: props.filters.semester_id ?? null,
         sort: props.filters.sort ?? null,
         direction: props.filters.direction ?? null,
         per_page: props.filters.per_page ?? 50,
     },
     defaultValues: {
         status: 'all',
+        // Server resolves this to the operator's currently selected semester
+        // (FinanceSemesterContextResolver). Treating it as the default keeps the
+        // URL clean until the operator actually picks a different one.
+        semester_id: props.filters.semester_id ?? null,
         per_page: 50,
         sort: null,
         direction: null,
     },
     only: ['invoices', 'filters'],
 });
+
+const semesterOptions = computed(() => semesterContext.value?.options ?? []);
 
 const canDng = computed(() => permission.can('create_finance_payments'));
 const canRemind = computed(() => permission.can('view_finance_operations_due_calendar'));
@@ -93,6 +100,7 @@ function handleExport(): void {
     const params = new URLSearchParams();
     if (filters.search) params.append('search', filters.search);
     if (filters.status && filters.status !== 'all') params.append('status', filters.status);
+    if (filters.semester_id) params.append('semester_id', String(filters.semester_id));
     window.location.href = `${route('finance.invoices.export')}?${params.toString()}`;
 }
 
@@ -121,7 +129,7 @@ function getStatusBadgeVariant(status: string): 'default' | 'destructive' | 'out
         <div class="flex items-center justify-between">
             <div>
                 <h2 class="text-3xl font-bold tracking-tight">Invoices</h2>
-                <p class="text-muted-foreground">Tra cứu invoice — sort, filter, chọn nhiều dòng để Batch Studio. · {{ selectedLabel }}</p>
+                <p class="text-muted-foreground">Tra cứu invoice — sort, filter, chọn nhiều dòng để Batch Studio.</p>
             </div>
             <Button variant="outline" @click="handleExport">
                 <FileDown class="mr-2 h-4 w-4" />
@@ -152,6 +160,16 @@ function getStatusBadgeVariant(status: string): 'default' | 'destructive' | 'out
                                 <SelectItem value="overdue">Overdue</SelectItem>
                                 <SelectItem value="zero_amount">Zero Amount</SelectItem>
                                 <SelectItem value="invalid">Cần kiểm tra</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div class="w-full md:w-1/4">
+                        <Select :model-value="filters.semester_id != null ? String(filters.semester_id) : ''" @update:model-value="(value) => setFilter('semester_id', value ? Number(value) : null)">
+                            <SelectTrigger>
+                                <SelectValue placeholder="Chọn kỳ học" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem v-for="option in semesterOptions" :key="option.id" :value="String(option.id)"> {{ option.name }}{{ option.is_active ? ' · hiện tại' : '' }} </SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
