@@ -99,12 +99,6 @@ jobs:
           - name: asia-vn
             domain: x.asia-vn.edu.vn
             path: /www/wwwroot/x.asia-vn.edu.vn/public_html
-          - name: gachon
-            domain: x.gachon.edu.vn
-            path: /www/wwwroot/x.gachon.edu.vn/asia-admin-portal
-          - name: jinan
-            domain: x.jinan.edu.vn
-            path: /www/wwwroot/x.jinan.edu.vn/asia-admin-portal
     steps:
       - name: Deploy ${{ matrix.name }} over SSH
         uses: appleboy/ssh-action@v1.0.3
@@ -150,16 +144,32 @@ jobs:
             DEPLOY_RUN_MIGRATIONS="${RUN_MIGRATIONS}" \
             bash scripts/deploy-ubuntu.sh
 
-  deploy-knu-docker:
-    name: Deploy x.knu.edu.vn (Docker)
+  deploy-docker:
+    name: Deploy ${{ matrix.name }} (Docker)
     if: ${{ (github.event_name == 'push' && github.ref_name == 'main') || (github.event_name == 'workflow_dispatch' && inputs.target == 'production') }}
     runs-on: ubuntu-latest
     environment: production
     concurrency:
-      group: swinx-deploy-knu-docker
+      group: swinx-deploy-${{ matrix.name }}-docker
       cancel-in-progress: false
+    strategy:
+      max-parallel: 1
+      matrix:
+        include:
+          - name: knu
+            domain: x.knu.edu.vn
+            path: /www/wwwroot/x.knu.edu.vn/asia-admin-portal
+            project: school-knu
+          - name: gachon
+            domain: x.gachon.edu.vn
+            path: /www/wwwroot/x.gachon.edu.vn/asia-admin-portal
+            project: school-gachon
+          - name: jinan
+            domain: x.jinan.edu.vn
+            path: /www/wwwroot/x.jinan.edu.vn/asia-admin-portal
+            project: school-jinan
     steps:
-      - name: Deploy knu over SSH
+      - name: Deploy ${{ matrix.name }} over SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -169,11 +179,11 @@ jobs:
           script: |
             set -Eeuo pipefail
 
-            TARGET_PATH="/www/wwwroot/x.knu.edu.vn/asia-admin-portal"
+            TARGET_PATH="${{ matrix.path }}"
             DEPLOY_BRANCH="main"
             DEPLOY_SHA="${{ github.event_name == 'push' && github.sha || '' }}"
             RUN_MIGRATIONS="${{ github.event_name == 'workflow_dispatch' && inputs.run_migrations || 'false' }}"
-            PROJECT_NAME="school-knu"
+            PROJECT_NAME="${{ matrix.project }}"
             COMPOSE_FILE="docker/docker-compose.production.yml"
 
             echo "Deploying main branch to ${TARGET_PATH} (docker)"
