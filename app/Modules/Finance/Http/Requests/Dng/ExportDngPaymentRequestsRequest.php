@@ -21,6 +21,7 @@ final class ExportDngPaymentRequestsRequest extends FormRequest
         return [
             'search' => 'nullable|string|max:255',
             'status' => 'nullable|string|max:50',
+            'semester_id' => 'nullable|integer|exists:semesters,id',
             'has_payment' => 'nullable|in:all,yes,no',
             'has_webhook' => 'nullable|in:all,yes,no',
             'created_from' => 'nullable|date',

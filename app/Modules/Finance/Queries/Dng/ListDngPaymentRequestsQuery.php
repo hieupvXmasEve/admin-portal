@@ -27,6 +27,7 @@ class ListDngPaymentRequestsQuery
         $validated = $request->validate([
             'search' => 'nullable|string|max:255',
             'status' => 'nullable|string|max:50',
+            'semester_id' => 'nullable|integer|exists:semesters,id',
             'has_payment' => 'nullable|in:all,yes,no',
             'has_webhook' => 'nullable|in:all,yes,no',
             'created_from' => 'nullable|date',
@@ -121,6 +122,7 @@ class ListDngPaymentRequestsQuery
             'filters' => [
                 'search' => $validated['search'] ?? '',
                 'status' => $validated['status'] ?? '',
+                'semester_id' => $validated['semester_id'] ?? '',
                 'has_payment' => $validated['has_payment'] ?? 'all',
                 'has_webhook' => $validated['has_webhook'] ?? 'all',
                 'created_from' => $validated['created_from'] ?? '',
@@ -157,6 +159,10 @@ class ListDngPaymentRequestsQuery
 
         if (filled($filters['status'] ?? null)) {
             $query->where('status', $filters['status']);
+        }
+
+        if (filled($filters['semester_id'] ?? null)) {
+            $query->where('semester_id', (int) $filters['semester_id']);
         }
 
         if (($filters['has_payment'] ?? 'all') === 'yes') {

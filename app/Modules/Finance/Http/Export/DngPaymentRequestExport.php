@@ -59,6 +59,10 @@ final class DngPaymentRequestExport implements FromQuery, WithHeadings, WithMapp
             $query->where('status', $this->filters['status']);
         }
 
+        if (filled($this->filters['semester_id'] ?? null)) {
+            $query->where('semester_id', (int) $this->filters['semester_id']);
+        }
+
         if (($this->filters['has_payment'] ?? 'all') === 'yes') {
             $query->whereNotNull('payment_id');
         } elseif (($this->filters['has_payment'] ?? 'all') === 'no') {

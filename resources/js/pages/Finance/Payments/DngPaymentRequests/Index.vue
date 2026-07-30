@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useGlobalConfirmDialog } from '@/composables';
 import { useDataTable } from '@/composables/useDataTable';
+import { useFinanceSemester } from '@/composables/useFinanceSemester';
 import { usePermission } from '@/composables/usePermission';
 import type { PaginatedResponse } from '@/types';
 import { formatCurrency, formatDate } from '@/utils/format';
@@ -17,7 +18,7 @@ import { financeRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { ArrowLeft, ArrowRight, Ban, CheckCircle2, Clock3, FileDown, Send, XCircle } from 'lucide-vue-next';
-import { h } from 'vue';
+import { computed, h } from 'vue';
 import { route } from 'ziggy-js';
 
 interface DngPaymentRequestRow {
@@ -63,6 +64,7 @@ interface DngPaymentRequestRow {
 interface Filters {
     search?: string;
     status?: string;
+    semester_id?: string;
     has_payment?: string;
     has_webhook?: string;
     created_from?: string;
@@ -91,6 +93,8 @@ interface Props {
 const props = defineProps<Props>();
 const permission = usePermission();
 const confirmDialog = useGlobalConfirmDialog();
+const { context: semesterContext } = useFinanceSemester();
+const semesterOptions = computed(() => (semesterContext.value?.options ?? []).map((option) => ({ value: String(option.id), label: `${option.name}${option.is_active ? ' · hiện tại' : ''}` })));
 
 const statusOptions = [
     { value: 'pending', label: 'Pending' },
@@ -113,6 +117,7 @@ const { filters, hasActiveFilters, clearAllFilters, setFilter, apply, handleSort
     initialFilters: {
         search: props.filters.search ?? '',
         status: props.filters.status ?? '',
+        semester_id: props.filters.semester_id ?? '',
         has_payment: props.filters.has_payment ?? 'all',
         has_webhook: props.filters.has_webhook ?? 'all',
         created_from: props.filters.created_from ?? '',
@@ -124,6 +129,7 @@ const { filters, hasActiveFilters, clearAllFilters, setFilter, apply, handleSort
     defaultValues: {
         search: '',
         status: '',
+        semester_id: '',
         has_payment: 'all',
         has_webhook: 'all',
         created_from: '',
@@ -134,7 +140,7 @@ const { filters, hasActiveFilters, clearAllFilters, setFilter, apply, handleSort
     },
     only: ['items', 'stats', 'filters'],
     fieldDebounce: { search: 400 },
-    immediateFields: ['status', 'has_payment', 'has_webhook'],
+    immediateFields: ['status', 'semester_id', 'has_payment', 'has_webhook'],
 });
 
 const onDateChange = (from: string, to: string) => {
@@ -145,6 +151,7 @@ function handleExport(): void {
     const params = new URLSearchParams();
     if (filters.search) params.append('search', filters.search);
     if (filters.status) params.append('status', filters.status);
+    if (filters.semester_id) params.append('semester_id', filters.semester_id);
     if (filters.has_payment && filters.has_payment !== 'all') params.append('has_payment', filters.has_payment);
     if (filters.has_webhook && filters.has_webhook !== 'all') params.append('has_webhook', filters.has_webhook);
     if (filters.created_from) params.append('created_from', filters.created_from);
@@ -333,9 +340,10 @@ const columns: ColumnDef<DngPaymentRequestRow>[] = [
                 <CardTitle>Filters</CardTitle>
             </CardHeader>
             <CardContent>
-                <FilterPanel :has-active-filters="hasActiveFilters" :columns="4" @clear="clearAllFilters">
+                <FilterPanel :has-active-filters="hasActiveFilters" :columns="5" @clear="clearAllFilters">
                     <FilterSearchInput :model-value="filters.search ?? ''" placeholder="Search student, item, DNG ID..." :debounce="400" @update:model-value="(value) => setFilter('search', value)" />
                     <FilterSelect :model-value="filters.status ?? ''" :options="statusOptions" placeholder="Request status" all-label="All statuses" @change="(value) => setFilter('status', value)" />
+                    <FilterSelect :model-value="filters.semester_id ?? ''" :options="semesterOptions" placeholder="Semester" all-label="All semesters" @change="(value) => setFilter('semester_id', value)" />
                     <FilterSelect :model-value="filters.has_payment ?? 'all'" :options="yesNoOptions" placeholder="Bridged payment" all-label="All payment states" @change="(value) => setFilter('has_payment', value || 'all')" />
                     <FilterSelect :model-value="filters.has_webhook ?? 'all'" :options="yesNoOptions" placeholder="Webhook received" all-label="All webhook states" @change="(value) => setFilter('has_webhook', value || 'all')" />
                     <FilterDateRange :from-value="filters.created_from ?? ''" :to-value="filters.created_to ?? ''" @change="onDateChange" />

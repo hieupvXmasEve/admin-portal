@@ -167,3 +167,36 @@ it('surfaces the raw webhook ref for a request that never bound (checksum mismat
     expect($row[8])->toBeNull() // never bound onto the request
         ->and($row[10])->toBe('DNGPAY-UNBOUND-003'); // still visible for reconciliation
 });
+
+it('scopes the export query to the requested semester only', function (): void {
+    $otherSemester = Semester::factory()->create();
+
+    $studentInTarget = makeDngExportStudent($this, 'DNGX004');
+    $studentInOther = makeDngExportStudent($this, 'DNGX005');
+
+    $targetRequest = DngPaymentRequest::query()->create([
+        'student_id' => $studentInTarget->id,
+        'campus_code' => $this->campus->code,
+        'student_code' => $studentInTarget->student_id,
+        'fee_type' => 'HP',
+        'item_id' => 'DNGX-ITEM-004',
+        'amount' => 1_000_000,
+        'status' => DngPaymentRequest::STATUS_PENDING,
+        'semester_id' => $this->semester->id,
+    ]);
+    DngPaymentRequest::query()->create([
+        'student_id' => $studentInOther->id,
+        'campus_code' => $this->campus->code,
+        'student_code' => $studentInOther->student_id,
+        'fee_type' => 'HP',
+        'item_id' => 'DNGX-ITEM-005',
+        'amount' => 1_000_000,
+        'status' => DngPaymentRequest::STATUS_PENDING,
+        'semester_id' => $otherSemester->id,
+    ]);
+
+    $export = new DngPaymentRequestExport(['semester_id' => $this->semester->id], app(StudentReferenceReader::class));
+    $ids = $export->query()->pluck('id')->all();
+
+    expect($ids)->toBe([$targetRequest->id]);
+});
