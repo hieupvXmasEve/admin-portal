@@ -28,8 +28,8 @@ class UserController extends Controller
     public function index(ListUsersRequest $request): Response
     {
         $validated = $request->validated();
-        $page = $validated['page'] ?? 1;
-        $perPage = $validated['per_page'] ?? 10;
+        $page = (int) ($validated['page'] ?? 1);
+        $perPage = (int) ($validated['per_page'] ?? 10);
 
         $filters = [
             'search' => $validated['search'] ?? null,

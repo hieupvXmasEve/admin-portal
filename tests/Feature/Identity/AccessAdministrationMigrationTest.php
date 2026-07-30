@@ -132,6 +132,17 @@ it('uses the current request campus for user role filters and edit selections', 
             ->where('userRoleIds', [$role->id]));
 });
 
+it('accepts string pagination query parameters for the users index', function (): void {
+    $this->actingAs($this->administrator)
+        ->withSession(['current_campus_id' => $this->campus->id])
+        ->get(route('identity.users.index', ['page' => '2', 'per_page' => '1']))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Users/Index')
+            ->where('users.current_page', 2)
+            ->where('users.per_page', 1));
+});
+
 it('deletes a role after removing its campus user assignments', function (): void {
     $role = Role::factory()->create();
     $staff = User::factory()->create();
