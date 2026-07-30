@@ -99,6 +99,12 @@ jobs:
           - name: asia-vn
             domain: x.asia-vn.edu.vn
             path: /www/wwwroot/x.asia-vn.edu.vn/public_html
+          - name: gachon
+            domain: x.gachon.edu.vn
+            path: /www/wwwroot/x.gachon.edu.vn/asia-admin-portal
+          - name: jinan
+            domain: x.jinan.edu.vn
+            path: /www/wwwroot/x.jinan.edu.vn/asia-admin-portal
     steps:
       - name: Deploy ${{ matrix.name }} over SSH
         uses: appleboy/ssh-action@v1.0.3
