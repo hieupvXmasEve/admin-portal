@@ -10,6 +10,8 @@ use App\Models\Campus;
 use App\Modules\Finance\Actions\CancelDngPaymentRequestAction;
 use App\Modules\Finance\Actions\ResolveDngReservationOutcomeAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Http\Export\DngPaymentRequestExport;
+use App\Modules\Finance\Http\Requests\Dng\ExportDngPaymentRequestsRequest;
 use App\Modules\Finance\Http\Requests\Dng\ResolveDngReservationOutcomeRequest;
 use App\Modules\Finance\Http\Requests\Student360\ReviewedCancelDngRequest;
 use App\Modules\Finance\Queries\Dng\GetDngPaymentRequestDetailsQuery;
@@ -22,6 +24,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Maatwebsite\Excel\Facades\Excel;
 
 class DngPaymentRequestController extends Controller
 {
@@ -36,6 +39,14 @@ class DngPaymentRequestController extends Controller
             'stats' => $result['stats'],
             'filters' => $result['filters'],
         ]);
+    }
+
+    public function export(ExportDngPaymentRequestsRequest $request, StudentReferenceReader $studentReferences)
+    {
+        return Excel::download(
+            new DngPaymentRequestExport($request->validated(), $studentReferences),
+            'dng-payment-requests.xlsx',
+        );
     }
 
     public function show(DngPaymentRequest $dngPaymentRequest, GetDngPaymentRequestDetailsQuery $query): Response

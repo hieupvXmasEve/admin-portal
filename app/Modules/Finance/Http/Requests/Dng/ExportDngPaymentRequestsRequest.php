@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Finance\Http\Requests\Lookup;
+namespace App\Modules\Finance\Http\Requests\Dng;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-final class ExportStudentInvoicesRequest extends FormRequest
+final class ExportDngPaymentRequestsRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -20,10 +20,11 @@ final class ExportStudentInvoicesRequest extends FormRequest
     {
         return [
             'search' => 'nullable|string|max:255',
-            'semester_id' => 'nullable|integer|exists:semesters,id',
-            'status' => 'nullable|string',
-            'as_of' => 'nullable|date|max:64',
-            'as_of_timezone' => 'nullable|timezone',
+            'status' => 'nullable|string|max:50',
+            'has_payment' => 'nullable|in:all,yes,no',
+            'has_webhook' => 'nullable|in:all,yes,no',
+            'created_from' => 'nullable|date',
+            'created_to' => 'nullable|date',
         ];
     }
 }

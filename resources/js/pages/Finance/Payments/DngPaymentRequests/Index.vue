@@ -16,7 +16,7 @@ import { formatCurrency, formatDate } from '@/utils/format';
 import { financeRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { ArrowLeft, ArrowRight, Ban, CheckCircle2, Clock3, Send, XCircle } from 'lucide-vue-next';
+import { ArrowLeft, ArrowRight, Ban, CheckCircle2, Clock3, FileDown, Send, XCircle } from 'lucide-vue-next';
 import { h } from 'vue';
 import { route } from 'ziggy-js';
 
@@ -52,6 +52,7 @@ interface DngPaymentRequestRow {
     webhook_events_count: number;
     latest_webhook: {
         id: number;
+        dng_payment_id: string | null;
         processing_status: string;
         event_type: string;
         is_valid_checksum: boolean;
@@ -139,6 +140,17 @@ const { filters, hasActiveFilters, clearAllFilters, setFilter, apply, handleSort
 const onDateChange = (from: string, to: string) => {
     apply({ created_from: from, created_to: to, page: 1 });
 };
+
+function handleExport(): void {
+    const params = new URLSearchParams();
+    if (filters.search) params.append('search', filters.search);
+    if (filters.status) params.append('status', filters.status);
+    if (filters.has_payment && filters.has_payment !== 'all') params.append('has_payment', filters.has_payment);
+    if (filters.has_webhook && filters.has_webhook !== 'all') params.append('has_webhook', filters.has_webhook);
+    if (filters.created_from) params.append('created_from', filters.created_from);
+    if (filters.created_to) params.append('created_to', filters.created_to);
+    window.location.href = `${route('finance.dng.payment-requests.export')}?${params.toString()}`;
+}
 
 const canCancelRequest = (request: DngPaymentRequestRow) => {
     return permission.can('create_finance_payments') && ['pending', 'pushed_to_dng'].includes(request.status);
@@ -240,6 +252,11 @@ const columns: ColumnDef<DngPaymentRequestRow>[] = [
         enableSorting: false,
     },
     {
+        id: 'webhook_ref',
+        header: 'Ref (Webhook)',
+        enableSorting: false,
+    },
+    {
         id: 'bridged',
         header: 'Bridged Payment',
         enableSorting: false,
@@ -274,6 +291,10 @@ const columns: ColumnDef<DngPaymentRequestRow>[] = [
                     <p class="text-muted-foreground text-sm">Track DNG request lifecycle, bridge state, and latest webhook outcome.</p>
                 </div>
             </div>
+            <Button variant="outline" @click="handleExport">
+                <FileDown class="mr-2 h-4 w-4" />
+                Export Excel
+            </Button>
         </div>
 
         <div class="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
@@ -361,6 +382,10 @@ const columns: ColumnDef<DngPaymentRequestRow>[] = [
                                 <span class="text-muted-foreground">Txn:</span> <span class="font-mono">{{ row.original.dng_transaction_id || '-' }}</span>
                             </div>
                         </div>
+                    </template>
+
+                    <template #cell-webhook_ref="{ row }">
+                        <span class="font-mono text-xs">{{ row.original.latest_webhook?.dng_payment_id || '-' }}</span>
                     </template>
 
                     <template #cell-bridged="{ row }">

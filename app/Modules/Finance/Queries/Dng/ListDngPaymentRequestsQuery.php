@@ -44,6 +44,7 @@ class ListDngPaymentRequestsQuery
                     ->select([
                         'id',
                         'dng_payment_request_id',
+                        'dng_payment_id',
                         'processing_status',
                         'event_type',
                         'created_at',
@@ -105,6 +106,7 @@ class ListDngPaymentRequestsQuery
                 'webhook_events_count' => $paymentRequest->webhook_events_count,
                 'latest_webhook' => $latestEvent ? [
                     'id' => $latestEvent->id,
+                    'dng_payment_id' => $latestEvent->dng_payment_id,
                     'processing_status' => $latestEvent->processing_status,
                     'event_type' => $latestEvent->event_type,
                     'is_valid_checksum' => (bool) $latestEvent->is_valid_checksum,

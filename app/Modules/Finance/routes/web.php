@@ -164,9 +164,6 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
         Route::get('/', [BillingInvoiceController::class, 'index'])
             ->middleware('can:view_finance_invoices')
             ->name('index');
-        Route::get('/export', [BillingInvoiceController::class, 'export'])
-            ->middleware('can:view_finance_export_invoices')
-            ->name('export');
         Route::get('/{invoice}', [BillingInvoiceController::class, 'show'])
             ->middleware('can:view_finance_invoices')
             ->name('show');
@@ -284,6 +281,9 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
             Route::get('/', [DngPaymentRequestController::class, 'index'])
                 ->middleware('can:view_finance_dng_payment_requests')
                 ->name('index');
+            Route::get('/export', [DngPaymentRequestController::class, 'export'])
+                ->middleware('can:view_finance_export_invoices')
+                ->name('export');
             Route::get('/{dngPaymentRequest}', [DngPaymentRequestController::class, 'show'])
                 ->middleware('can:view_finance_dng_payment_requests')
                 ->name('show');

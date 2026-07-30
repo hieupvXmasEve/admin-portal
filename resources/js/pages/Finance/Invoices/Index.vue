@@ -3,7 +3,6 @@ import DataPagination from '@/components/DataPagination.vue';
 import LookupRowActions from '@/components/finance/lookup/LookupRowActions.vue';
 import SendToBatchBar from '@/components/finance/lookup/SendToBatchBar.vue';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -18,9 +17,8 @@ import { formatCurrency } from '@/types/finance';
 import { formatDate } from '@/utils/date';
 import { financeRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
-import { ChevronsUpDown, FileDown, Search } from 'lucide-vue-next';
+import { ChevronsUpDown, Search } from 'lucide-vue-next';
 import { computed } from 'vue';
-import { route } from 'ziggy-js';
 
 interface InvoiceRow {
     id: number;
@@ -96,14 +94,6 @@ function openStudent(row: InvoiceRow): void {
     router.visit(financeRoutes.students.overview(row.student_id, `invoice:${row.id}`));
 }
 
-function handleExport(): void {
-    const params = new URLSearchParams();
-    if (filters.search) params.append('search', filters.search);
-    if (filters.status && filters.status !== 'all') params.append('status', filters.status);
-    if (filters.semester_id) params.append('semester_id', String(filters.semester_id));
-    window.location.href = `${route('finance.invoices.export')}?${params.toString()}`;
-}
-
 function getStatusBadgeVariant(status: string): 'default' | 'destructive' | 'outline' | 'secondary' {
     switch (status) {
         case 'paid':
@@ -131,10 +121,6 @@ function getStatusBadgeVariant(status: string): 'default' | 'destructive' | 'out
                 <h2 class="text-3xl font-bold tracking-tight">Invoices</h2>
                 <p class="text-muted-foreground">Tra cứu invoice — sort, filter, chọn nhiều dòng để Batch Studio.</p>
             </div>
-            <Button variant="outline" @click="handleExport">
-                <FileDown class="mr-2 h-4 w-4" />
-                Export Excel
-            </Button>
         </div>
 
         <Card>

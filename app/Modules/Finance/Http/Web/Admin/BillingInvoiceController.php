@@ -6,8 +6,6 @@ namespace App\Modules\Finance\Http\Web\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Finance\Actions\VoidFinanceChargeAction;
-use App\Modules\Finance\Http\Export\InvoiceExport;
-use App\Modules\Finance\Http\Requests\Lookup\ExportStudentInvoicesRequest;
 use App\Modules\Finance\Http\Requests\Lookup\FilterStudentInvoicesRequest;
 use App\Modules\Finance\Models\DiscountAllocation;
 use App\Modules\Finance\Models\FinanceCharge;
@@ -17,8 +15,6 @@ use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Queries\Lookup\ListStudentInvoicesQuery;
 use App\Modules\Finance\Queries\Student360\GetStudentFinancePaymentHistoryQuery;
 use App\Modules\Finance\Support\FinanceSemesterContextResolver;
-use App\Modules\Finance\Support\Reporting\CurrentSettlementPositionPresenter;
-use App\Modules\Finance\Support\Reporting\SettlementReportAsOfContext;
 use App\Modules\Finance\Support\SettlementPosition\Money;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionAmounts;
@@ -29,7 +25,6 @@ use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
-use Maatwebsite\Excel\Facades\Excel;
 
 /**
  * @phpstan-type MoneyPayload array{amount:string,currency:string,scale:int,minor_amount:int}
@@ -312,23 +307,5 @@ class BillingInvoiceController extends Controller
         $action->handle((int) $line->charge_id, $validated['void_reason'], $request->user()?->id);
 
         return back()->with('success', 'Invoice line voided successfully.');
-    }
-
-    public function export(ExportStudentInvoicesRequest $request)
-    {
-        // Re-use logic or minimal logic for export
-        // For now, simple export placeholder or real implementation if simple.
-        // We need an Export class. I will stub this out or skip if not in immediate scope of a simple file writer.
-        // The requirement says "Export to Excel". I should probably create an export class.
-
-        return Excel::download(new InvoiceExport(
-            $request->validated(),
-            $this->settlementPositionReader,
-            app(CurrentSettlementPositionPresenter::class),
-            SettlementReportAsOfContext::fromInput(
-                $request->input('as_of'),
-                $request->input('as_of_timezone'),
-            ),
-        ), 'invoices.xlsx');
     }
 }

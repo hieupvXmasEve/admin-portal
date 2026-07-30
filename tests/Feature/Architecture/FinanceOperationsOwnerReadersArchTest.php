@@ -16,7 +16,7 @@ it('keeps Finance dashboard identity and lifecycle reads on owner readers', func
         base_path('app/Modules/Finance/Queries/GetPaymentDetailsQuery.php'),
         base_path('app/Modules/Finance/Queries/Operations/ListSettlementWorklistQuery.php'),
         base_path('app/Modules/Finance/Http/Web/Admin/BillingInvoiceController.php'),
-        base_path('app/Modules/Finance/Http/Export/InvoiceExport.php'),
+        base_path('app/Modules/Finance/Http/Export/DngPaymentRequestExport.php'),
         base_path('app/Modules/Finance/Queries/ListPaymentsQuery.php'),
         base_path('app/Modules/Finance/Http/Web/Admin/FinanceAuditWorkspaceController.php'),
         base_path('app/Modules/Finance/Queries/Audit/GetFinanceAuditGraphQuery.php'),
