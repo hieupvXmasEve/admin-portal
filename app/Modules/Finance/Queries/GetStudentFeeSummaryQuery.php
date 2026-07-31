@@ -36,6 +36,7 @@ class GetStudentFeeSummaryQuery implements StudentFeeSummaryReader
         private readonly StudentReferenceReader $students,
         private readonly ProgramEnrollmentReader $programEnrollments,
         private readonly AcademicPeriodReader $academicPeriods,
+        private readonly GetActiveScholarshipAdjustmentQuery $scholarshipAdjustments,
     ) {}
 
     public function execute(int $studentId): array
@@ -215,9 +216,62 @@ class GetStudentFeeSummaryQuery implements StudentFeeSummaryReader
                     'credit' => $totals['credit'],
                     'remaining' => $remaining,
                 ],
+                // Presentational only — NEVER injected into the invoice line
+                // collection (FeeTab sums affects_payable lines and would
+                // double-count a synthetic breakdown row).
+                'scholarship_breakdown' => $this->buildScholarshipBreakdown($semesterInvoices, (int) $semester->id),
                 'invoices' => $semesterInvoices->map(fn (StudentInvoice $invoice) => $this->mapInvoiceSummary($invoice))->values(),
             ];
         })->values();
+    }
+
+    /**
+     * "GIẢM TRỪ HỌC BỔNG" breakdown for a semester carrying an active
+     * scholarship adjustment. Original terms come from the adjustment's
+     * SNAPSHOT columns (the award may have mutated since approval); the
+     * effective amount is ledger truth (active scholarship discount rows).
+     *
+     * @return array{original_amount: float, deduction_amount: float, effective_amount: float, adjustment_status: string, label: string}|null
+     */
+    private function buildScholarshipBreakdown(Collection $semesterInvoices, int $semesterId): ?array
+    {
+        $studentId = (int) ($semesterInvoices->first()?->student_id ?? 0);
+
+        if ($studentId === 0) {
+            return null;
+        }
+
+        $adjustment = $this->scholarshipAdjustments->handle($studentId, $semesterId);
+
+        if ($adjustment === null) {
+            return null;
+        }
+
+        $tuitionBase = (float) $semesterInvoices
+            ->flatMap(static fn (StudentInvoice $invoice) => $invoice->invoiceLines)
+            ->filter(fn (InvoiceLine $line): bool => $line->status === 'active'
+                && $line->charge?->charge_type === FinanceCharge::TYPE_TUITION_TERM)
+            ->sum('amount_snapshot');
+
+        $originalValue = (float) $adjustment->original_amount;
+        $originalAmount = $adjustment->original_type === 'percentage'
+            ? ($tuitionBase * $originalValue) / 100
+            : $originalValue;
+        $originalAmount = max(0.0, min($tuitionBase, $originalAmount));
+
+        $effectiveAmount = (float) $semesterInvoices
+            ->flatMap(static fn (StudentInvoice $invoice) => $invoice->discounts)
+            ->filter(static fn (InvoiceDiscount $discount): bool => $discount->discount_type === 'scholarship'
+                && ($discount->status ?? 'active') === 'active')
+            ->sum('amount');
+
+        return [
+            'original_amount' => round($originalAmount, 2),
+            'deduction_amount' => round(max(0.0, $originalAmount - $effectiveAmount), 2),
+            'effective_amount' => round($effectiveAmount, 2),
+            'adjustment_status' => (string) $adjustment->status,
+            'label' => 'GIẢM TRỪ HỌC BỔNG',
+        ];
     }
 
     private function mapInvoiceSummary(StudentInvoice $invoice): array

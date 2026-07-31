@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\ScholarshipDefinition;
 use App\Models\StudentScholarshipAward;
+use App\Modules\Finance\Models\ScholarshipSemesterAdjustment;
 use App\Modules\Finance\Support\ScholarshipFixedAmountCalculator;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
@@ -101,6 +102,24 @@ class ScholarshipService
             throw ValidationException::withMessages([
                 'amount' => ['The scholarship amount must be greater than zero.'],
             ]);
+        }
+
+        // Changing the money terms would invalidate the fingerprint that active
+        // per-semester adjustments were approved against — hard refuse.
+        $termsChanging = (isset($data['type']) && $data['type'] !== $scholarship->type)
+            || (isset($data['amount']) && (float) $data['amount'] !== (float) $scholarship->amount);
+
+        if ($termsChanging) {
+            $activeAdjustments = ScholarshipSemesterAdjustment::query()
+                ->where('scholarship_code', $scholarship->code)
+                ->whereIn('status', ScholarshipSemesterAdjustment::ACTIVE_STATUSES)
+                ->count();
+
+            if ($activeAdjustments > 0) {
+                throw ValidationException::withMessages([
+                    'amount' => ["Cannot change scholarship terms: {$activeAdjustments} active per-semester adjustment(s) reference this scholarship. Reverse them first."],
+                ]);
+            }
         }
 
         $scholarship->update($data);

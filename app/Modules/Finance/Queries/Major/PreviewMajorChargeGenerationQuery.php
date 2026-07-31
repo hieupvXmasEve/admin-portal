@@ -8,6 +8,7 @@ use App\Models\ScholarshipDefinition;
 use App\Models\StudentScholarshipAward;
 use App\Models\VoucherApplication;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Queries\GetActiveScholarshipAdjustmentQuery;
 use App\Modules\Finance\Services\DeferChargeResolver;
 use App\Modules\Finance\Support\ScholarshipDiscountResolver;
 use App\Modules\Finance\Support\StudentChargeTimingResolver;
@@ -206,7 +207,7 @@ class PreviewMajorChargeGenerationQuery
             ]);
         }
 
-        $scholarship = $this->resolveScholarship($award, (float) $amount);
+        $scholarship = $this->resolveScholarship($award, (float) $amount, $student->id, $semesterId);
         $voucher = $this->resolveVoucher($student->id, $voucherApplications, $semesterId);
 
         return array_merge($base, [
@@ -274,7 +275,7 @@ class PreviewMajorChargeGenerationQuery
     /**
      * @return array{name: string|null, type: string|null, raw_value: float|null, amount: float}
      */
-    private function resolveScholarship(?StudentScholarshipAward $award, float $baseAmount): array
+    private function resolveScholarship(?StudentScholarshipAward $award, float $baseAmount, int $studentId, int $semesterId): array
     {
         $empty = ['name' => null, 'type' => null, 'raw_value' => null, 'amount' => 0.0];
 
@@ -289,10 +290,15 @@ class PreviewMajorChargeGenerationQuery
 
         $rawValue = (float) $definition->amount;
 
-        // FIN-04/07: shared resolver owns the capped scholarship math.
-        $discount = app(ScholarshipDiscountResolver::class)->resolve($definition, $baseAmount);
+        // Preview must mirror execution: honor the per-semester adjustment.
+        $adjustment = app(GetActiveScholarshipAdjustmentQuery::class)
+            ->handle($studentId, $semesterId);
 
-        if ($discount <= 0) {
+        // FIN-04/07: shared resolver owns the capped scholarship math.
+        $discount = app(ScholarshipDiscountResolver::class)
+            ->resolveAdjusted($definition, $baseAmount, $adjustment);
+
+        if ($discount <= 0 && $adjustment === null) {
             return $empty;
         }
 

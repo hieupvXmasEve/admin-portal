@@ -8,6 +8,7 @@ use App\Models\StudentScholarshipAward;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
+use App\Modules\Finance\Queries\GetActiveScholarshipAdjustmentQuery;
 use App\Modules\Finance\Services\InvoiceGenerationService;
 use App\Modules\Finance\Support\BillingAccountProvisioner;
 use App\Modules\Finance\Support\ScholarshipDiscountResolver;
@@ -100,13 +101,26 @@ class CreateFinanceChargeAction
 
         $scholarshipDef = $award->scholarshipDefinition;
 
-        // FIN-04/07: cap the discount at the charge amount via the shared
-        // resolver so every generation path produces the same capped number and
-        // a fixed_amount/over-100% scholarship can never push balance negative.
-        $discountAmount = app(ScholarshipDiscountResolver::class)
-            ->resolve($scholarshipDef, (float) $tuitionCharge->amount);
+        // A per-semester adjustment (approved via Academic maker-checker)
+        // overrides the award for exactly this charge's semester.
+        $adjustment = app(GetActiveScholarshipAdjustmentQuery::class)
+            ->handle((int) $tuitionCharge->student_id, (int) $tuitionCharge->semester_id);
 
-        if ($discountAmount <= 0) {
+        // FIN-04/07: cap the discount via the shared resolver so every
+        // generation path produces the same capped number and a
+        // fixed_amount/over-100% scholarship can never push balance negative.
+        // Base = TOTAL active tuition on the invoice (the charge just landed
+        // on it) — the single upserted discount row must cover all of them.
+        $resolver = app(ScholarshipDiscountResolver::class);
+        $discountAmount = $resolver->resolveAdjusted(
+            $scholarshipDef,
+            $resolver->invoiceTuitionBase($invoice),
+            $adjustment,
+        );
+
+        // With an adjustment, zero is a real ledger operation (full suspension
+        // must zero any existing discount row) — only skip when unadjusted.
+        if ($discountAmount <= 0 && $adjustment === null) {
             return;
         }
 

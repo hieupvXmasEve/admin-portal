@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Phase 2: Finance Core Adjustment Model"
-status: todo
+status: done
 priority: P1
 effort: "6d"
 dependencies: [1]
@@ -134,14 +134,25 @@ public function resolveAdjusted(ScholarshipDefinition $def, float $baseAmount, ?
 
 ## Todo
 
-- [ ] Migration/model/factory
-- [ ] resolveAdjusted + tests
-- [ ] Zero-op ledger operation
-- [ ] 5 surfaces wired, parity + multi-charge + batch-refresh tests
-- [ ] Contract + action + guards + reconciliation catch
-- [ ] Import guard
-- [ ] Breakdown payload + FE
-- [ ] Reversal
+- [x] Migration/model (factory skipped — Finance models in this repo have no factories; tests use ::create)
+- [x] resolveAdjusted + tests (6)
+- [x] Zero-op ledger operation (shrink branch in SettlementService::synchronizeDiscountAllocations releases excess allocations)
+- [x] 5 surfaces wired, multi-charge + batch-refresh + suspension tests
+- [x] Contract + action + guards + reconciliation catch
+- [x] Import guard
+- [x] Breakdown payload + FE (FeeTab)
+- [x] Reversal (+ campus-permission auth + reversed_by_user_id audit)
+
+## Completion Notes (2026-08-01)
+
+- Shared base helper `ScholarshipDiscountResolver::invoiceTuitionBase()` — ALL ledger writers (CreateFinanceChargeAction, batch, apply action) compute the single upserted scholarship discount over TOTAL active tuition lines (multi-charge safety; review H3).
+- `GetActiveScholarshipAdjustmentQuery` returns only `pending_apply|applied` — `finance_review_required` rows are frozen from every auto surface (review H2; supersedes the earlier "exclude only reversed" wording in Architecture above).
+- Batch: legacy discount rows WITHOUT an adjustment are frozen (no silent rewrite on re-run — review H4); adjustment writes gated by `ScholarshipAdjustmentTimingGuard` inside the payload resolver (review H1); pending→applied transition runs POST-commit via `applyToLedger` (savepoint plan item replaced — status flips only after committed ledger; self-healing on mid-loop failure).
+- Timing guard DNG list = model-owned `HOLDING_COLLECTION_STATUSES` (made public) + `paid_uninvoiced` + `cancel_pushed_to_dng` (captured money not yet posted; review M5).
+- Definition-term edits (`ScholarshipService::updateScholarship`) and award deletion (`StudentScholarshipController::destroy`) hard-refuse while active adjustments exist (review M1/L3).
+- Apply action validates semesters (exist, source≠target), logs + genericizes persist errors, and runs guard+ledger+status in ONE transaction (TOCTOU window shrunk; review M3/M4).
+- Tests: 24 green (resolver 6, apply/reverse/import/breakdown 15, batch 3) + regression sweep clean vs known baseline.
+- **Known gaps (accepted):** no direct InstallmentReconciliationException fixture test (typed catch; throw site covered by InstallmentDiscountReconcileTest); no preview==execute automated parity test (all paths share lookup+resolver+base helper now); shrink-release allocation rows carry no source_ref audit columns (linked via discount id + entry_type=release); hub overview & StudentAcademicSummaryService still display ORIGINAL award terms (review M7 — route to Phase 3/4 display work).
 
 ## Success Criteria
 

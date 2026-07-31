@@ -2,15 +2,18 @@
 
 namespace App\Services;
 
-use App\Models\Student;
 use App\Models\ScholarshipDefinition;
+use App\Models\Student;
 use App\Models\StudentScholarshipAward;
+use App\Modules\Finance\Models\ScholarshipSemesterAdjustment;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Shared\Date;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Throwable;
 
 class StudentFinancialImportService
@@ -78,19 +81,19 @@ class StudentFinancialImportService
                     'preview_data' => $previewData,
                     'total_rows' => $analysis['total_rows'],
                     'validation_summary' => $validationSummary,
-                    'execution_time' => $executionTime . 's',
-                ]
+                    'execution_time' => $executionTime.'s',
+                ],
             ];
         } catch (Throwable $e) {
             Log::error('Student financial import preview failed', [
                 'error' => $e->getMessage(),
                 'file' => $file->getClientOriginalName(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return [
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ];
         }
     }
@@ -118,27 +121,27 @@ class StudentFinancialImportService
             $this->cleanupTemporaryFile($filePath);
 
             $executionTime = round(microtime(true) - $startTime, 2);
-            $results['execution_time'] = $executionTime . 's';
+            $results['execution_time'] = $executionTime.'s';
 
             Log::info('Student financial import completed', [
                 'results' => $results,
-                'execution_time' => $executionTime
+                'execution_time' => $executionTime,
             ]);
 
             return [
                 'success' => true,
-                'data' => $results
+                'data' => $results,
             ];
         } catch (Throwable $e) {
             Log::error('Student financial import processing failed', [
                 'error' => $e->getMessage(),
                 'file' => $file->getClientOriginalName(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return [
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ];
         }
     }
@@ -152,10 +155,10 @@ class StudentFinancialImportService
         $worksheet = $spreadsheet->getSheet(0);
 
         // Get headers
-        $headerRow = $worksheet->rangeToArray('A1:' . $worksheet->getHighestColumn() . '1')[0];
+        $headerRow = $worksheet->rangeToArray('A1:'.$worksheet->getHighestColumn().'1')[0];
         $headers = [];
         foreach ($headerRow as $index => $header) {
-            if (!empty(trim($header))) {
+            if (! empty(trim($header))) {
                 $headers[trim($header)] = $index + 1;
             }
         }
@@ -193,14 +196,16 @@ class StudentFinancialImportService
                             if (empty($rowData['student_id'])) {
                                 $results['skipped']++;
                                 $results['errors'][] = "Row {$row}: Student ID is required";
+
                                 continue;
                             }
 
                             // Find student by student_id column
                             $student = Student::where('student_id', $rowData['student_id'])->first();
-                            if (!$student) {
+                            if (! $student) {
                                 $results['failed']++;
                                 $results['errors'][] = "Row {$row}: Student ID {$rowData['student_id']} not found";
+
                                 continue;
                             }
 
@@ -210,11 +215,12 @@ class StudentFinancialImportService
                             if ($existingAward) {
                                 $results['skipped']++;
                                 $results['warnings'][] = "Row {$row}: Student {$rowData['student_id']} already has scholarship award - skipped to prevent duplicate";
+
                                 continue;
                             }
 
                             // Process scholarship assignment
-                            if (!empty($rowData['scholarship_code'])) {
+                            if (! empty($rowData['scholarship_code'])) {
                                 $scholarshipResult = $this->processScholarshipAssignment(
                                     $student,
                                     $rowData['scholarship_code'],
@@ -235,7 +241,7 @@ class StudentFinancialImportService
                             }
                         } catch (Throwable $e) {
                             // Throw exception to rollback entire batch
-                            throw new \Exception("Row {$row}: " . $e->getMessage(), 0, $e);
+                            throw new \Exception("Row {$row}: ".$e->getMessage(), 0, $e);
                         }
                     }
                 });
@@ -255,20 +261,20 @@ class StudentFinancialImportService
             } catch (Throwable $e) {
                 // Batch failed - log and stop import to prevent partial data
                 $results['failed'] += ($batchEnd - $batchStart + 1);
-                $results['errors'][] = "Batch {$results['batches_processed']} (rows {$batchStart}-{$batchEnd}): " . $e->getMessage();
+                $results['errors'][] = "Batch {$results['batches_processed']} (rows {$batchStart}-{$batchEnd}): ".$e->getMessage();
 
                 Log::error('Batch processing failed in student financial import', [
                     'batch_start' => $batchStart,
                     'batch_end' => $batchEnd,
                     'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString()
+                    'trace' => $e->getTraceAsString(),
                 ]);
 
                 // Stop processing on batch failure to maintain data consistency
                 throw new \Exception(
-                    "Import stopped at batch {$results['batches_processed']} due to errors. " .
-                    "Rows {$batchStart}-{$batchEnd} were rolled back. " .
-                    "Error: " . $e->getMessage()
+                    "Import stopped at batch {$results['batches_processed']} due to errors. ".
+                    "Rows {$batchStart}-{$batchEnd} were rolled back. ".
+                    'Error: '.$e->getMessage()
                 );
             }
         }
@@ -284,10 +290,26 @@ class StudentFinancialImportService
         try {
             // Validate scholarship code exists
             $scholarship = ScholarshipDefinition::where('code', $scholarshipCode)->first();
-            if (!$scholarship) {
+            if (! $scholarship) {
                 return [
                     'success' => false,
-                    'message' => "Row {$row}: Scholarship code '{$scholarshipCode}' not found"
+                    'message' => "Row {$row}: Scholarship code '{$scholarshipCode}' not found",
+                ];
+            }
+
+            // A student with an ACTIVE per-semester adjustment must not have the
+            // underlying award mutated — the adjustment was approved against a
+            // fingerprint of the current terms. Hard refuse; the adjustment has
+            // to be reversed/closed first.
+            $hasActiveAdjustment = ScholarshipSemesterAdjustment::query()
+                ->where('student_id', $student->id)
+                ->whereIn('status', ScholarshipSemesterAdjustment::ACTIVE_STATUSES)
+                ->exists();
+
+            if ($hasActiveAdjustment) {
+                return [
+                    'success' => false,
+                    'message' => "Row {$row}: Student has an active scholarship adjustment — reverse it before changing the scholarship",
                 ];
             }
 
@@ -303,7 +325,7 @@ class StudentFinancialImportService
 
                 return [
                     'success' => true,
-                    'message' => "Row {$row}: Updated scholarship for student {$student->id}"
+                    'message' => "Row {$row}: Updated scholarship for student {$student->id}",
                 ];
             } else {
                 // Create new scholarship assignment
@@ -315,13 +337,13 @@ class StudentFinancialImportService
 
                 return [
                     'success' => true,
-                    'message' => "Row {$row}: Assigned scholarship to student {$student->id}"
+                    'message' => "Row {$row}: Assigned scholarship to student {$student->id}",
                 ];
             }
         } catch (Throwable $e) {
             return [
                 'success' => false,
-                'message' => "Row {$row}: Failed to assign scholarship - " . $e->getMessage()
+                'message' => "Row {$row}: Failed to assign scholarship - ".$e->getMessage(),
             ];
         }
     }
@@ -337,11 +359,12 @@ class StudentFinancialImportService
             $columnIndex = $headers[$excelColumn] ?? null;
             if ($columnIndex === null) {
                 $rowData[$dbField] = null;
+
                 continue;
             }
 
             $columnLetter = $this->getColumnLetter($columnIndex);
-            $cellValue = $worksheet->getCell($columnLetter . $row)->getCalculatedValue();
+            $cellValue = $worksheet->getCell($columnLetter.$row)->getCalculatedValue();
 
             $rowData[$dbField] = $cellValue;
         }
@@ -355,14 +378,14 @@ class StudentFinancialImportService
     public function generateTemplate(): string
     {
         try {
-            $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+            $spreadsheet = new Spreadsheet;
             $sheet = $spreadsheet->getActiveSheet();
 
             // Set headers
             $headers = [
                 'Student ID',
                 'Scholarship Code',
-                'Voucher Codes'
+                'Voucher Codes',
             ];
 
             $sheet->fromArray($headers, null, 'A1');
@@ -381,28 +404,28 @@ class StudentFinancialImportService
                 $sheet->getColumnDimension($col)->setAutoSize(true);
             }
 
-            $filename = 'student_financial_template_' . date('Y-m-d') . '.xlsx';
-            $relativePath = 'temp/templates/' . $filename;
+            $filename = 'student_financial_template_'.date('Y-m-d').'.xlsx';
+            $relativePath = 'temp/templates/'.$filename;
 
             // Ensure directory exists
             Storage::makeDirectory('temp/templates');
 
-            $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+            $writer = new Xlsx($spreadsheet);
             $fullPath = Storage::path($relativePath);
             $writer->save($fullPath);
 
-            if (!file_exists($fullPath)) {
-                throw new \Exception('Template file was not created at: ' . $fullPath);
+            if (! file_exists($fullPath)) {
+                throw new \Exception('Template file was not created at: '.$fullPath);
             }
 
             return $fullPath;
         } catch (Throwable $e) {
             Log::error('Failed to generate student financial template', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
-            throw new \Exception('Failed to generate template: ' . $e->getMessage());
+            throw new \Exception('Failed to generate template: '.$e->getMessage());
         }
     }
 
@@ -414,16 +437,16 @@ class StudentFinancialImportService
         $allowedMimes = [
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'application/vnd.ms-excel',
-            'text/csv'
+            'text/csv',
         ];
         $allowedExtensions = ['xlsx', 'xls', 'csv'];
         $maxSize = 10 * 1024 * 1024; // 10MB
 
-        if (!in_array($file->getMimeType(), $allowedMimes)) {
+        if (! in_array($file->getMimeType(), $allowedMimes)) {
             throw new \InvalidArgumentException('File must be an Excel file (.xlsx, .xls) or CSV (.csv)');
         }
 
-        if (!in_array(strtolower($file->getClientOriginalExtension()), $allowedExtensions)) {
+        if (! in_array(strtolower($file->getClientOriginalExtension()), $allowedExtensions)) {
             throw new \InvalidArgumentException('File extension must be .xlsx, .xls, or .csv');
         }
 
@@ -437,8 +460,8 @@ class StudentFinancialImportService
      */
     protected function storeTemporaryFile(UploadedFile $file): string
     {
-        $filename = time() . '_' . $file->getClientOriginalName();
-        $path = 'temp/imports/' . $filename;
+        $filename = time().'_'.$file->getClientOriginalName();
+        $path = 'temp/imports/'.$filename;
 
         Storage::makeDirectory('temp/imports');
         Storage::putFileAs('temp/imports', $file, $filename);
@@ -455,9 +478,9 @@ class StudentFinancialImportService
         $worksheet = $spreadsheet->getSheet(0);
 
         $headers = [];
-        $headerRow = $worksheet->rangeToArray('A1:' . $worksheet->getHighestColumn() . '1')[0];
+        $headerRow = $worksheet->rangeToArray('A1:'.$worksheet->getHighestColumn().'1')[0];
         foreach ($headerRow as $header) {
-            if (!empty(trim($header))) {
+            if (! empty(trim($header))) {
                 $headers[] = trim($header);
             }
         }
@@ -503,10 +526,10 @@ class StudentFinancialImportService
         $spreadsheet = IOFactory::load($filePath);
         $worksheet = $spreadsheet->getSheet(0);
 
-        $headerRow = $worksheet->rangeToArray('A1:' . $worksheet->getHighestColumn() . '1')[0];
+        $headerRow = $worksheet->rangeToArray('A1:'.$worksheet->getHighestColumn().'1')[0];
         $headers = [];
         foreach ($headerRow as $index => $header) {
-            if (!empty(trim($header))) {
+            if (! empty(trim($header))) {
                 $headers[trim($header)] = $index + 1;
             }
         }
@@ -522,17 +545,18 @@ class StudentFinancialImportService
                 $columnIndex = $headers[$excelColumn] ?? null;
                 if ($columnIndex === null) {
                     $rowData[$dbField] = null;
+
                     continue;
                 }
 
                 $columnLetter = $this->getColumnLetter($columnIndex);
-                $cellValue = $worksheet->getCell($columnLetter . $row)->getCalculatedValue();
+                $cellValue = $worksheet->getCell($columnLetter.$row)->getCalculatedValue();
 
                 if ($dbField === 'payment_date' && is_numeric($cellValue)) {
                     $cellValue = Date::excelToDateTimeObject($cellValue)->format('Y-m-d');
                 }
 
-                if ($dbField === 'paid_amount' && !empty($cellValue)) {
+                if ($dbField === 'paid_amount' && ! empty($cellValue)) {
                     $cellValue = (float) $cellValue;
                 }
 
@@ -570,25 +594,25 @@ class StudentFinancialImportService
             } else {
                 // Check if student exists by student_id column
                 $student = Student::where('student_id', $row['data']['student_id'])->first();
-                if (!$student) {
+                if (! $student) {
                     $errors[] = 'Student ID not found in system';
                 } else {
-                    $rowWarnings[] = 'Student found: ' . $student->full_name;
+                    $rowWarnings[] = 'Student found: '.$student->full_name;
                 }
             }
 
             // Validate scholarship code if provided
-            if (!empty($row['data']['scholarship_code'])) {
+            if (! empty($row['data']['scholarship_code'])) {
                 $scholarship = ScholarshipDefinition::where('code', $row['data']['scholarship_code'])->first();
-                if (!$scholarship) {
+                if (! $scholarship) {
                     $errors[] = 'Scholarship code not found';
                 } else {
-                    $rowWarnings[] = 'Scholarship: ' . $scholarship->name;
+                    $rowWarnings[] = 'Scholarship: '.$scholarship->name;
                 }
             }
 
             // Validate payment amount
-            if (!empty($row['data']['paid_amount'])) {
+            if (! empty($row['data']['paid_amount'])) {
                 if ($row['data']['paid_amount'] < 0) {
                     $errors[] = 'Payment amount must be positive';
                 } else {
@@ -628,7 +652,7 @@ class StudentFinancialImportService
         } catch (Throwable $e) {
             Log::warning('Failed to cleanup temporary import file', [
                 'file_path' => $filePath,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
         }
     }
@@ -642,7 +666,7 @@ class StudentFinancialImportService
         $columnIndex--;
 
         while ($columnIndex >= 0) {
-            $columnLetter = chr(65 + ($columnIndex % 26)) . $columnLetter;
+            $columnLetter = chr(65 + ($columnIndex % 26)).$columnLetter;
             $columnIndex = intval($columnIndex / 26) - 1;
         }
 

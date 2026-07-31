@@ -70,6 +70,13 @@ interface FeeSummary {
             paid: number;
             remaining: number;
         };
+        scholarship_breakdown: {
+            original_amount: number;
+            deduction_amount: number;
+            effective_amount: number;
+            adjustment_status: string;
+            label: string;
+        } | null;
         invoices: Array<{
             id: number;
             invoice_number: string;
@@ -667,6 +674,28 @@ const summaryToneClass = computed(() => {
                                 </div>
                             </AccordionTrigger>
                             <AccordionContent class="pb-4">
+                                <!-- Scholarship adjustment breakdown — presentational only, never part of the settlement lines -->
+                                <div
+                                    v-if="semester.scholarship_breakdown"
+                                    class="mb-4 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm dark:border-amber-900 dark:bg-amber-950/30"
+                                >
+                                    <p class="mb-2 font-semibold text-amber-800 dark:text-amber-300">{{ semester.scholarship_breakdown.label }}</p>
+                                    <div class="grid grid-cols-3 gap-4">
+                                        <div>
+                                            <p class="text-muted-foreground text-[10px] uppercase">Học bổng gốc</p>
+                                            <p class="font-medium">{{ formatCurrency(semester.scholarship_breakdown.original_amount) }}</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-muted-foreground text-[10px] uppercase">Giảm trừ</p>
+                                            <p class="font-medium text-red-600">-{{ formatCurrency(semester.scholarship_breakdown.deduction_amount) }}</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-muted-foreground text-[10px] uppercase">Còn được hưởng</p>
+                                            <p class="font-medium text-green-700">{{ formatCurrency(semester.scholarship_breakdown.effective_amount) }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div v-if="semester.invoices.length === 0" class="text-muted-foreground pl-2 text-sm italic">No invoices generated in this semester.</div>
 
                                 <div v-else class="space-y-4">

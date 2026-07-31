@@ -6,16 +6,20 @@ namespace App\Modules\Finance\Actions\Operations;
 
 use App\Models\Student;
 use App\Models\StudentScholarshipAward;
+use App\Modules\Finance\Actions\ApplyScholarshipSemesterAdjustmentAction;
 use App\Modules\Finance\Actions\Egc\SubmitEgcLevelFeeDebitAction;
 use App\Modules\Finance\Actions\Major\SubmitTuitionTermDebitAction;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceDiscount;
+use App\Modules\Finance\Models\ScholarshipSemesterAdjustment;
 use App\Modules\Finance\Models\StudentInvoice;
+use App\Modules\Finance\Queries\GetActiveScholarshipAdjustmentQuery;
 use App\Modules\Finance\Services\DeferChargeResolver;
 use App\Modules\Finance\Services\InvoiceGenerationService;
 use App\Modules\Finance\Support\BillingAccountProvisioner;
 use App\Modules\Finance\Support\BillingScopeHelper;
 use App\Modules\Finance\Support\EgcLevelFeeResolver;
+use App\Modules\Finance\Support\ScholarshipAdjustmentTimingGuard;
 use App\Modules\Finance\Support\ScholarshipDiscountResolver;
 use App\Modules\Finance\Support\SettlementMutationGuard;
 use App\Modules\Finance\Support\StudentChargeTimingResolver;
@@ -388,6 +392,25 @@ class GenerateBatchChargesAction
             throw $e;
         }
 
+        // POST-commit only: transition pending_apply scholarship adjustments.
+        // Never inside the loop — the whole-loop transaction can roll back, and
+        // a status flip must be keyed on the discount actually persisted.
+        // applyToLedger re-verifies via the timing guard and refreshes the
+        // discount from the committed invoice state before marking applied.
+        $pendingAdjustments = ScholarshipSemesterAdjustment::query()
+            ->whereIn('student_id', $students->pluck('id'))
+            ->where('target_semester_id', $semesterId)
+            ->where('status', ScholarshipSemesterAdjustment::STATUS_PENDING_APPLY)
+            ->get();
+
+        foreach ($pendingAdjustments as $adjustment) {
+            try {
+                app(ApplyScholarshipSemesterAdjustmentAction::class)->applyToLedger($adjustment);
+            } catch (\Exception $e) {
+                $stats['errors'][] = "Student #{$adjustment->student_id}: adjustment transition failed - ".$e->getMessage();
+            }
+        }
+
         return $stats;
     }
 
@@ -430,26 +453,57 @@ class GenerateBatchChargesAction
             return null;
         }
 
-        $existingScholarshipDiscount = InvoiceDiscount::query()
-            ->where('invoice_id', $invoice->id)
-            ->where('discount_type', 'scholarship')
-            ->where('reference_id', $award->id)
-            ->where('discount_source', StudentScholarshipAward::class)
-            ->exists();
-
-        if ($existingScholarshipDiscount) {
-            return null;
-        }
-
         $scholarshipDef = $award->scholarshipDefinition;
         if (! $scholarshipDef) {
             return null;
         }
 
-        // FIN-04/07: cap at charge amount via the shared resolver (preview/execute parity).
-        $discount = app(ScholarshipDiscountResolver::class)->resolve($scholarshipDef, $baseAmount);
+        $adjustment = app(GetActiveScholarshipAdjustmentQuery::class)
+            ->handle((int) $invoice->student_id, (int) $invoice->semester_id);
 
-        if ($discount <= 0) {
+        $existingAmount = InvoiceDiscount::query()
+            ->where('invoice_id', $invoice->id)
+            ->where('discount_type', 'scholarship')
+            ->where('reference_id', $award->id)
+            ->where('discount_source', StudentScholarshipAward::class)
+            ->value('amount');
+
+        // No adjustment + a stored discount: FROZEN. Batch re-runs must never
+        // silently rewrite historical scholarship rows (definition edits,
+        // multi-charge drift) — only an approved adjustment moves money.
+        if ($adjustment === null && $existingAmount !== null) {
+            return null;
+        }
+
+        // An adjustment may only touch the ledger when the timing guard says
+        // the invoice is safe (unpaid, no active DNG). Otherwise leave the row
+        // alone — the post-commit transition routes it to finance review.
+        if ($adjustment !== null) {
+            $guardOutcome = app(ScholarshipAdjustmentTimingGuard::class)
+                ->evaluate((int) $invoice->student_id, (int) $invoice->semester_id)['outcome'];
+
+            if ($guardOutcome === ScholarshipAdjustmentTimingGuard::OUTCOME_REVIEW) {
+                return null;
+            }
+        }
+
+        $resolver = app(ScholarshipDiscountResolver::class);
+
+        // FIN-04/07: shared resolver + whole-invoice tuition base — the single
+        // upserted discount row covers ALL tuition charges (preview/execute
+        // parity, multi-charge safety).
+        $invoiceBase = $resolver->invoiceTuitionBase($invoice);
+        $discount = $resolver->resolveAdjusted(
+            $scholarshipDef,
+            $invoiceBase > 0 ? $invoiceBase : $baseAmount,
+            $adjustment,
+        );
+
+        if ($existingAmount !== null && abs((float) $existingAmount - $discount) < 0.01) {
+            return null;
+        }
+
+        if ($existingAmount === null && $discount <= 0) {
             return null;
         }
 

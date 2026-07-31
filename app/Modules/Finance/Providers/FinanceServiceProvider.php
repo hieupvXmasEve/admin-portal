@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Providers;
 
+use App\Modules\Finance\Actions\ApplyScholarshipSemesterAdjustmentAction;
 use App\Modules\Finance\Actions\ApplyStudentLifecycleDeferAction;
 use App\Modules\Finance\Actions\AttachStudentLifecycleFinanceEvidenceAction;
 use App\Modules\Finance\Actions\CancelFinanceObligationAction;
@@ -48,6 +49,7 @@ use App\Shared\Contracts\Finance\FinanceIntakeContract;
 use App\Shared\Contracts\Finance\FinanceObligationCancellationContract;
 use App\Shared\Contracts\Finance\HubStudentFinanceSummaryReader;
 use App\Shared\Contracts\Finance\ObligationSettlementReader;
+use App\Shared\Contracts\Finance\ScholarshipAdjustmentContract;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
 use App\Shared\Contracts\Finance\StudentFeeSummaryReader;
 use App\Shared\Contracts\Finance\StudentLifecycleFinanceCommand;
@@ -72,6 +74,7 @@ class FinanceServiceProvider extends ServiceProvider
         $this->app->bind(DngPaymentNotificationContextReader::class, EloquentDngPaymentNotificationContextReader::class);
         $this->app->bind(EgcBlockResultReconciler::class, SyncEgcBlockResultsAction::class);
         $this->app->bind(FinanceIntakeContract::class, FinanceIntakeRouter::class);
+        $this->app->bind(ScholarshipAdjustmentContract::class, ApplyScholarshipSemesterAdjustmentAction::class);
         $this->app->bind(FinanceCancellationOperationRequestContract::class, RequestFinanceCancellationOperationAction::class);
         $this->app->bind(FinanceCancellationChargeStateReader::class, ResolveFinanceCancellationChargeStateAction::class);
         $this->app->bind(FinanceObligationCancellationContract::class, CancelFinanceObligationAction::class);

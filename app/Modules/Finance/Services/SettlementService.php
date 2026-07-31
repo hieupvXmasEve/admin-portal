@@ -526,6 +526,42 @@ class SettlementService
                 ->where('invoice_discount_id', $discount->id)
                 ->sum('amount'));
 
+            // A refreshed discount can SHRINK (scholarship adjustment, full
+            // suspension to 0). The settlement position derives the discount
+            // total from allocations, so excess net allocation must be released
+            // or the ledger keeps honoring the old, larger discount.
+            $excess = $netAllocated - (float) $discount->amount;
+
+            if ($excess > 0) {
+                $netByLine = DiscountAllocation::query()
+                    ->selectRaw('invoice_line_id, SUM(amount) as net_amount')
+                    ->where('invoice_discount_id', $discount->id)
+                    ->groupBy('invoice_line_id')
+                    ->havingRaw('SUM(amount) > 0')
+                    ->orderByDesc('invoice_line_id')
+                    ->get();
+
+                foreach ($netByLine as $row) {
+                    if ($excess <= 0) {
+                        break;
+                    }
+
+                    $releaseAmount = min($excess, (float) $row->net_amount);
+
+                    DiscountAllocation::query()->create([
+                        'invoice_discount_id' => $discount->id,
+                        'invoice_line_id' => $row->invoice_line_id,
+                        'amount' => -$releaseAmount,
+                        'entry_type' => 'release',
+                        'allocation_rule' => 'current_line_chronology',
+                    ]);
+
+                    $excess -= $releaseAmount;
+                }
+
+                $netAllocated = (float) $discount->amount;
+            }
+
             $remaining = max(0, (float) $discount->amount - $netAllocated);
 
             foreach ($eligibleLines as $line) {

@@ -6,6 +6,7 @@ use App\Http\Requests\AssignScholarshipRequest;
 use App\Models\ScholarshipDefinition;
 use App\Models\Student;
 use App\Models\StudentScholarshipAward;
+use App\Modules\Finance\Models\ScholarshipSemesterAdjustment;
 use App\Services\ScholarshipService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -32,7 +33,7 @@ class StudentScholarshipController extends Controller
             ->with(['student', 'scholarshipDefinition']);
 
         // Apply search filter
-        if (!empty($validated['search'])) {
+        if (! empty($validated['search'])) {
             $query->whereHas('student', function ($q) use ($validated) {
                 $q->where('full_name', 'like', "%{$validated['search']}%")
                     ->orWhere('student_id', 'like', "%{$validated['search']}%")
@@ -41,7 +42,7 @@ class StudentScholarshipController extends Controller
         }
 
         // Apply scholarship filter
-        if (!empty($validated['scholarship_code'])) {
+        if (! empty($validated['scholarship_code'])) {
             $query->where('scholarship_code', $validated['scholarship_code']);
         }
 
@@ -108,6 +109,19 @@ class StudentScholarshipController extends Controller
     public function destroy(StudentScholarshipAward $studentScholarship)
     {
         try {
+            // FK would restrict anyway — refuse with a readable message when an
+            // active per-semester adjustment still references this award.
+            $hasActiveAdjustment = ScholarshipSemesterAdjustment::query()
+                ->where('student_scholarship_award_id', $studentScholarship->id)
+                ->whereIn('status', ScholarshipSemesterAdjustment::ACTIVE_STATUSES)
+                ->exists();
+
+            if ($hasActiveAdjustment) {
+                return back()->withErrors([
+                    'error' => 'This award has an active per-semester adjustment. Reverse the adjustment before removing the scholarship.',
+                ]);
+            }
+
             $studentScholarship->delete();
 
             return back()

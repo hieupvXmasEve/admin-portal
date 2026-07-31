@@ -42,7 +42,7 @@ class DngPaymentRequest extends Model
     public const STATUS_NEEDS_REVIEW = 'needs_review';
 
     /** @var list<string> */
-    private const HOLDING_COLLECTION_STATUSES = [
+    public const HOLDING_COLLECTION_STATUSES = [
         self::STATUS_PENDING,
         self::STATUS_PUSHED_TO_DNG,
         self::STATUS_UNKNOWN_OUTCOME,
