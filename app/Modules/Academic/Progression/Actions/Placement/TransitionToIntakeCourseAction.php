@@ -87,7 +87,7 @@ final class TransitionToIntakeCourseAction
                 $student,
                 $previousStage,
                 'intake_course',
-                $data['semester_id'],
+                (int) $data['semester_id'],
             );
 
             return $student->fresh();
