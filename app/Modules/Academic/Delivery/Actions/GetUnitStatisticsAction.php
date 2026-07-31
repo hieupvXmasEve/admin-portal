@@ -21,8 +21,8 @@ class GetUnitStatisticsAction
     public function execute(int $unitId, array $filters = []): array
     {
         $campusId = session('current_campus_id');
-        $semesterId = $filters['semester_id'] ?? null;
-        $offeringId = $filters['course_offering_id'] ?? null;
+        $semesterId = isset($filters['semester_id']) ? (int) $filters['semester_id'] : null;
+        $offeringId = isset($filters['course_offering_id']) ? (int) $filters['course_offering_id'] : null;
 
         $unitContext = $this->thresholdsQuery->handle($unitId);
         $minAttendance = $unitContext['min_attendance_threshold'];
