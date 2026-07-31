@@ -35,6 +35,8 @@ use App\Modules\Academic\FacultyWorkforce\Support\EloquentActiveLecturerReader;
 use App\Modules\Academic\FacultyWorkforce\Support\EloquentAvailableLecturerReader;
 use App\Modules\Academic\FacultyWorkforce\Support\EloquentLecturerTokenIssuer;
 use App\Modules\Academic\FacultyWorkforce\Support\EloquentTeachingEligibilityReader;
+use App\Modules\Academic\Models\ScholarshipAdjustmentDossier;
+use App\Modules\Academic\Policies\ScholarshipAdjustmentDossierPolicy;
 use App\Modules\Academic\Progression\Actions\CommitCourseResultsToTranscriptAction;
 use App\Modules\Academic\Progression\Queries\GetStudentAcademicRecordsQuery;
 use App\Modules\Academic\Progression\Queries\GetStudentGpaTrendQuery;
@@ -107,6 +109,7 @@ use App\Shared\Contracts\Finance\FinanceCancellationCompletionContract;
 use App\Shared\Contracts\Identity\ActiveLecturerReader;
 use App\Shared\Contracts\Identity\AvailableLecturerReader;
 use App\Shared\Contracts\Identity\LecturerReferenceReader;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
@@ -178,5 +181,9 @@ class AcademicServiceProvider extends ServiceProvider
             ->group(__DIR__.'/../routes/web.php');
 
         // API routes are registered in routes/api/admin.php (web middleware, campus-scoped)
+
+        // Explicit registration required: Laravel 13 auto-discovery does not
+        // resolve policies in module namespaces (App\Modules\*) automatically.
+        Gate::policy(ScholarshipAdjustmentDossier::class, ScholarshipAdjustmentDossierPolicy::class);
     }
 }

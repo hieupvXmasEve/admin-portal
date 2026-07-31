@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Phase 3: Academic Dossier Workflow"
-status: todo
+status: done
 priority: P1
 effort: "6d"
 dependencies: [2]
@@ -126,12 +126,38 @@ Guard: decision blocked until `interview_status = completed`, EXCEPT exception p
 
 ## Todo
 
-- [ ] Migration/model
-- [ ] Candidate query + command + tests (sessionless)
-- [ ] Interview lifecycle
-- [ ] Decision + contract handoff
-- [ ] Routes/policy/UI
-- [ ] Arch test + notifications
+- [x] Migration/model
+- [x] Candidate query + command + tests (sessionless) — 13 tests
+- [x] Interview lifecycle — 6 tests (incl. reopen/frozen-minutes guards added post-review)
+- [x] Decision + contract handoff — 15 tests (incl. terminal-status/defer/pending_apply-mapping guards added post-review)
+- [x] Routes/policy/UI — minimal Inertia pages (Index/Show); 3 HTTP authorization tests
+- [x] Arch test broadened (both AcademicFinanceBoundaryArchRedProofTest and the pre-existing AcademicFinanceBoundaryArchTest verified consistent)
+- [ ] Notifications — DEFERRED (see Completion Notes)
+
+## Completion Notes (2026-08-01)
+
+35 tests green. Code review (code-reviewer subagent) found 2 CRITICAL + 6 HIGH + several MEDIUM issues, all fixed except where noted:
+
+**Fixed:**
+- CRITICAL: `index()` was not campus-scoped (cross-campus dossier listing) → added `where('campus_id', $campusId)` from `app('campus')`/session, 403 on no campus.
+- CRITICAL: `campus_id` (identify) / `student_code`-derived campus (addManually) were trusted from the request without re-verifying the permission AT that specific campus → both FormRequests now call `CampusPermissionReader` at the real campus, not session campus.
+- HIGH: `decide()` had no terminal-status guard — an applied/approved/cancelled dossier could be re-decided and re-approved → added `TERMINAL_DECISION_STATUSES` guard.
+- HIGH: Interview service could reopen a decided dossier (schedule/no-show/complete had no status guard) → added `guardPreDecision()`; `editMinutes` frozen past the decision stage.
+- HIGH: Finance's `pending_apply` (no invoice yet — nothing actually applied) was mapped to dossier status `applied` → now maps to `approved` (money not yet moved); only Finance's literal `applied` status maps to `STATUS_APPLIED`.
+- HIGH: Finance rejection reason/message was discarded on handoff failure → now logged and appended to `decision_reason`.
+- MEDIUM: `approve()` had no row lock → wrapped in `DB::transaction` + `lockForUpdate()`.
+- MEDIUM: `handOffToFinance` used `firstOrFail()` after the `approved` write (could 404-strand an approved dossier) → `first()` + review-status fallback.
+- MEDIUM: `addManually` mislabeled ALL academic records (including passed ones) as "failed courses" evidence → filtered to `is_passed = false`; also `firstOrFail()` → `DomainException` for missing student/award.
+- MEDIUM: unbounded global scan of pending component appeals → scoped to the run's candidate course-offering IDs.
+- MEDIUM/LOW: duplicated is_passed-gate-fix cutoff date → `addManually` now reuses `ScholarshipAdjustmentCandidateQuery::needsDataReview()`.
+- `defer` decision type: no terminal state was defined for it → explicitly rejected at `decide()` until a future phase defines its resolution (was silently resolving to `no_adjustment`).
+- Added 6 HTTP-layer authorization tests + additional service-level guard tests to actually exercise the fixed paths (review noted zero HTTP tests existed).
+
+**Deferred (recorded, not built this phase):**
+- Notification wiring (`EnrollmentConfirmed`-pattern events for interview scheduled / minutes ready / decision approved) — plan calls for it but out of the money-adjacent critical path; add as a follow-up.
+- Sidebar menu entry for the new routes.
+- UI gaps: `Show.vue` has no `exception_override_reason` input (exception path unreachable from UI, reachable via service/API) and no `mode`/`location` fields beyond a hardcoded default; server-side errors aren't rendered in the Vue pages (flash/error prop not read). Backend enforcement is complete and tested; these are UX follow-ups.
+- No unique DB index on `(student_id, source_semester_id, target_semester_id)` — the one-dossier-per-triple invariant is service-level check-then-create, matching Phase 2's pattern for the Finance table (MySQL has no partial unique index); a race on `identify()`/`addManually()` could theoretically double-create. Accepted at pilot scale, same risk class as Phase 2's adjustment invariant.
 
 ## Success Criteria
 
