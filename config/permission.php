@@ -356,7 +356,18 @@ return [
         'fee' => [
             'view_scholarship' => 'view_scholarship',
             'assign_scholarship' => 'assign_scholarship',
+            'remove_scholarship' => 'remove_scholarship',
             'import_student_financial' => 'import_student_financial',
+        ],
+        'scholarship_adjustments' => [
+            'view_scholarship_adjustment' => 'view_scholarship_adjustment',
+            'manage_scholarship_adjustment_candidate' => 'manage_scholarship_adjustment_candidate',
+            'manage_scholarship_interview' => 'manage_scholarship_interview',
+            'decide_scholarship_adjustment' => 'decide_scholarship_adjustment',
+            'approve_scholarship_adjustment' => 'approve_scholarship_adjustment',
+            'apply_scholarship_adjustment_finance' => 'apply_scholarship_adjustment_finance',
+            'restore_scholarship' => 'restore_scholarship',
+            'confirm_scholarship_adjustment_on_behalf' => 'confirm_scholarship_adjustment_on_behalf',
         ],
         'vouchers' => [
             'view_voucher' => 'view_voucher',

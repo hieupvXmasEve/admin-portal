@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\Student;
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class AssignScholarshipRequest extends FormRequest
@@ -12,8 +13,7 @@ class AssignScholarshipRequest extends FormRequest
      */
     public function authorize(): bool
     {
-//        return $this->user()->can('scholarships.assign');
-        return true;
+        return $this->user()->can('assign_scholarship');
     }
 
     /**
@@ -41,7 +41,7 @@ class AssignScholarshipRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {

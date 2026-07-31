@@ -459,7 +459,7 @@ export const mainNavGroups: NavGroup[] = [
                 children: [
                     { title: 'Tuition Plans', href: '/tuition-plans', icon: Calculator, requiredPermissions: ['view_tuition_plan'] },
                     { title: 'Scholarships', href: '/scholarships', icon: Award, requiredPermissions: ['view_scholarship'] },
-                    { title: 'Student Scholarships', href: '/student-scholarships', icon: Users, requiredPermissions: ['assign_scholarship'] },
+                    { title: 'Student Scholarships', href: '/student-scholarships', icon: Users, requiredPermissions: ['view_scholarship'] },
                     { title: 'Vouchers', href: '/vouchers', icon: Ticket, requiredPermissions: ['view_voucher'] },
                 ],
             },

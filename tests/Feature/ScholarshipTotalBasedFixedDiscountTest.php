@@ -3,15 +3,22 @@
 declare(strict_types=1);
 
 use App\Models\Campus;
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\ScholarshipDefinition;
 use App\Models\User;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 const SCHOLARSHIP_TOTAL_TEST_CSRF = 'scholarship-total-test-csrf';
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    Cache::flush();
+
     $campus = Campus::factory()->create();
 
     session([
@@ -19,7 +26,33 @@ beforeEach(function () {
         'current_campus_id' => $campus->id,
     ]);
 
+    // Scholarship routes are permission-gated; grant the slugs this suite needs.
     $this->user = User::factory()->create();
+    $role = Role::firstOrCreate(['code' => 'scholarship_manager_test'], ['name' => 'Scholarship Manager Test']);
+
+    foreach (['view_scholarship', 'assign_scholarship'] as $code) {
+        $permission = Permission::firstOrCreate(
+            ['code' => $code],
+            ['name' => $code, 'display_name' => $code, 'module' => 'fee', 'description' => $code],
+        );
+
+        DB::table('role_permissions')->insertOrIgnore([
+            'role_id' => $role->id,
+            'permission_id' => $permission->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    DB::table('campus_user_roles')->insert([
+        'user_id' => $this->user->id,
+        'campus_id' => $campus->id,
+        'role_id' => $role->id,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    app(CampusPermissionReader::class)->forgetPermissionCodesForUserId((int) $this->user->id);
 });
 
 function scholarshipTotalBasedPayload(array $overrides = []): array

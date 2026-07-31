@@ -14,7 +14,7 @@ class ScholarshipRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return true; // Authorization handled in controller
+        return $this->user()->can('assign_scholarship');
     }
 
     /**

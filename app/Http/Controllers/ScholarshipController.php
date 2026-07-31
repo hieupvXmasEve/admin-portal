@@ -31,7 +31,7 @@ class ScholarshipController extends Controller
             ->withCount('studentScholarshipAwards as student_count');
 
         // Apply search filter
-        if (!empty($validated['search'])) {
+        if (! empty($validated['search'])) {
             $query->where(function ($q) use ($validated) {
                 $q->where('code', 'like', "%{$validated['search']}%")
                     ->orWhere('name', 'like', "%{$validated['search']}%");
@@ -39,7 +39,7 @@ class ScholarshipController extends Controller
         }
 
         // Apply status filter (ignore 'all')
-        if (!empty($validated['status']) && $validated['status'] !== 'all') {
+        if (! empty($validated['status']) && $validated['status'] !== 'all') {
             if ($validated['status'] === 'active') {
                 $query->where('is_active', true);
             } elseif ($validated['status'] === 'inactive') {
@@ -54,7 +54,7 @@ class ScholarshipController extends Controller
         }
 
         // Apply type filter (ignore 'all')
-        if (!empty($validated['type']) && $validated['type'] !== 'all') {
+        if (! empty($validated['type']) && $validated['type'] !== 'all') {
             $query->where('type', $validated['type']);
         }
 
@@ -70,9 +70,9 @@ class ScholarshipController extends Controller
                 'per_page' => $validated['per_page'] ?? 20,
             ],
             'can' => [
-                'create' => $request->user()->can('scholarships.create'),
-                'import' => $request->user()->can('scholarships.import'),
-            ]
+                'create' => $request->user()->can('assign_scholarship'),
+                'import' => $request->user()->can('import_student_financial'),
+            ],
         ]);
     }
 
@@ -120,7 +120,7 @@ class ScholarshipController extends Controller
     public function edit(ScholarshipDefinition $scholarship): Response
     {
         return Inertia::render('Scholarships/Edit', [
-            'scholarship' => $scholarship
+            'scholarship' => $scholarship,
         ]);
     }
 
