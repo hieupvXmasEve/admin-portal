@@ -557,27 +557,6 @@ class StudentService
     }
 
     /**
-     * Get student statistics
-     */
-    public function getStudentStatistics(?int $campusId = null): array
-    {
-        $query = Student::query();
-
-        if ($campusId) {
-            $query->where('campus_id', $campusId);
-        }
-
-        return [
-            'total_students' => $query->count(),
-            'active_students' => $query->whereIn('status', ['intake_course', 'intake_pre_uni_gc'])->count(),
-            'enrolled_students' => $query->whereIn('status', ['intake_course', 'intake_pre_uni_gc'])->count(), // Active students are enrolled
-            'graduated_students' => $query->where('status', 'graduated')->count(),
-            'suspended_students' => $query->where('status', 'suspended')->count(),
-            'on_leave_students' => $query->where('status', 'inactive')->count(), // Inactive can be on leave
-        ];
-    }
-
-    /**
      * Delete a student and permanently remove all related data from database
      */
     public function deleteStudent(Student $student): void

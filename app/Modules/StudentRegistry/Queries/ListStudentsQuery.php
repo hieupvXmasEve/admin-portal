@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\StudentRegistry\Queries;
 
 use App\Models\Student;
-use App\Shared\Contracts\Academic\ProgramEnrollmentStatusFilter;
+use App\Shared\Contracts\Academic\StudentLifecycleMatcher;
 use App\Shared\Contracts\StudentRegistry\StudentDirectoryReader;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Builder;
 class ListStudentsQuery implements StudentDirectoryReader
 {
     public function __construct(
-        private readonly ProgramEnrollmentStatusFilter $statusFilter,
+        private readonly StudentLifecycleMatcher $lifecycleMatcher,
     ) {}
 
     /**
@@ -84,10 +84,13 @@ class ListStudentsQuery implements StudentDirectoryReader
             $query->whereIn('specialization_id', $filters['specialization_ids']);
         }
 
-        if (! empty($filters['statuses'])) {
-            $this->statusFilter->apply($query, array_values($filters['statuses']));
-        } elseif (! empty($filters['status'])) {
-            $this->statusFilter->apply($query, [(string) $filters['status']]);
+        $statuses = ! empty($filters['statuses'])
+            ? array_values($filters['statuses'])
+            : (! empty($filters['status']) ? [(string) $filters['status']] : []);
+
+        if ($statuses !== []) {
+            $studentIds = (clone $query)->pluck('id')->all();
+            $query->whereIn('id', $this->lifecycleMatcher->matchingStudentIds($studentIds, $statuses));
         }
 
         if (! empty($filters['intake_semester_ids'])) {

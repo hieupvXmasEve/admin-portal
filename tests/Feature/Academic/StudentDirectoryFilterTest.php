@@ -9,6 +9,8 @@ use App\Models\Semester;
 use App\Models\Specialization;
 use App\Models\Student;
 use App\Models\User;
+use App\Modules\Academic\Progression\Actions\MaterializeProgramEnrollmentAction;
+use App\Modules\Academic\Progression\Models\ProgramEnrollment;
 use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -63,6 +65,37 @@ it('returns selected student codes in the Inertia filter contract', function () 
             ->where('students.data.1.student_id', 'SE500001'));
 });
 
+it('uses lifecycle enrollment for the active card and filtered directory total', function () {
+    $deferredStudent = Student::factory()->forCampus($this->campus)->forProgram($this->program)->create([
+        'status' => 'intake_pre_uni_gc',
+        'intake' => 1,
+        'intake_semester_id' => $this->semester->id,
+    ]);
+    $activeStudent = Student::factory()->forCampus($this->campus)->forProgram($this->program)->create([
+        'status' => 'intake_course',
+        'intake' => 1,
+        'intake_semester_id' => $this->semester->id,
+    ]);
+
+    MaterializeProgramEnrollmentAction::run(['student_id' => $deferredStudent->id]);
+    MaterializeProgramEnrollmentAction::run(['student_id' => $activeStudent->id]);
+    ProgramEnrollment::query()->where('student_id', $deferredStudent->id)->update([
+        'enrollment_status' => 'deferred',
+        'study_stage' => 'intake_pre_uni_gc',
+    ]);
+
+    actingAs($this->user)
+        ->withSession(['current_campus_id' => $this->campus->id])
+        ->get(route(StudentRoutes::INDEX, [
+            'statuses' => ['intake_pre_uni_gc', 'intake_course'],
+        ]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('students.total', 1)
+            ->where('statistics.active_students', 1)
+            ->where('students.data.0.id', $activeStudent->id));
+});
+
 it('rejects more than one hundred student codes', function () {
     $studentIds = collect(range(1, 101))
         ->map(fn (int $index) => sprintf('SE%06d', $index))
@@ -91,13 +124,14 @@ it('returns advanced filters and lookup options in the Inertia contract', functi
     $specialization = Specialization::factory()->forProgram($this->program)->active()->create();
     Specialization::factory()->forProgram($this->program)->inactive()->create();
 
-    Student::factory()->forCampus($this->campus)->forProgram($this->program)->create([
+    $student = Student::factory()->forCampus($this->campus)->forProgram($this->program)->create([
         'student_id' => 'SE800001',
         'specialization_id' => $specialization->id,
         'status' => 'graduated',
         'intake' => 1,
         'intake_semester_id' => $this->semester->id,
     ]);
+    MaterializeProgramEnrollmentAction::run(['student_id' => $student->id]);
 
     actingAs($this->user)
         ->withSession(['current_campus_id' => $this->campus->id])

@@ -144,3 +144,21 @@ it('backfills the same Student idempotently through the academic command', funct
         ->and(ProgramEnrollment::query()->sole()->enrollment_status)->toBe('deferred')
         ->and(ProgramEnrollment::query()->sole()->study_stage)->toBeNull();
 });
+
+it('fails the program enrollment preflight until every student has a primary enrollment', function (): void {
+    $semester = Semester::factory()->create();
+    $student = Student::factory()->create([
+        'intake' => 1,
+        'intake_semester_id' => $semester->id,
+    ]);
+
+    $this->artisan('academic:backfill-program-enrollments', ['--check' => true])
+        ->expectsOutput('Program enrollment preflight failed: 1 student(s) have no primary Program Enrollment.')
+        ->assertFailed();
+
+    MaterializeProgramEnrollmentAction::run(['student_id' => $student->id]);
+
+    $this->artisan('academic:backfill-program-enrollments', ['--check' => true])
+        ->expectsOutput('Program enrollment preflight passed: every Student has a primary Program Enrollment.')
+        ->assertSuccessful();
+});

@@ -20,6 +20,7 @@ use App\Modules\StudentRegistry\Queries\ExportStudentsQuery;
 use App\Modules\StudentRegistry\Queries\ListStudentsQuery;
 use App\Services\StudentService;
 use App\Shared\Contracts\Academic\StudentDirectoryFormOptionsReader;
+use App\Shared\Contracts\Academic\StudentDirectoryStatisticsReader;
 use App\Shared\Contracts\Identity\GuardianAccessGrantReader;
 use App\Shared\Contracts\Institution\CampusReferenceReader;
 use App\Shared\Contracts\Institution\DTO\CampusReference;
@@ -44,8 +45,11 @@ class StudentController extends Controller
         private CampusReferenceReader $campuses,
     ) {}
 
-    public function index(ListStudentsRequest $request, ListStudentsQuery $listStudentsQuery): Response|RedirectResponse
-    {
+    public function index(
+        ListStudentsRequest $request,
+        ListStudentsQuery $listStudentsQuery,
+        StudentDirectoryStatisticsReader $statistics,
+    ): Response|RedirectResponse {
         $campusId = session()->get('current_campus_id');
         Log::info('Current campus ID: '.$campusId);
         if (! $campusId) {
@@ -68,7 +72,7 @@ class StudentController extends Controller
             $this->formOptions->filterOptions();
 
         // Get statistics for current campus
-        $statistics = $this->studentService->getStudentStatistics($campusId);
+        $statistics = $statistics->forCampus((int) $campusId)->toArray();
 
         return Inertia::render('Students/Index', [
             'students' => $students,

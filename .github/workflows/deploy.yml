@@ -216,8 +216,12 @@ jobs:
             }
 
             dc build app queue scheduler
-            dc up -d --force-recreate app queue scheduler
 
             if [ "${RUN_MIGRATIONS}" = "true" ]; then
-              dc exec -T app php artisan migrate --force
+              dc run --rm app php artisan migrate --force
             fi
+
+            dc run --rm app php artisan academic:backfill-program-enrollments
+            dc run --rm app php artisan academic:backfill-program-enrollments --check
+
+            dc up -d --force-recreate app queue scheduler

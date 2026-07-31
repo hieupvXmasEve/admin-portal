@@ -122,6 +122,12 @@ else
     log "Skipping database migrations; set run_migrations=true on manual workflow dispatch to run them"
 fi
 
+log "Materializing Program Enrollments"
+"$php_bin" artisan academic:backfill-program-enrollments
+
+log "Verifying Program Enrollment coverage"
+"$php_bin" artisan academic:backfill-program-enrollments --check
+
 log "Rebuilding Laravel optimized caches"
 "$php_bin" artisan optimize
 

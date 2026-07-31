@@ -12,11 +12,17 @@ use App\Models\StudentActionLog;
 use App\Models\User;
 use App\Modules\Academic\Progression\Actions\MaterializeProgramEnrollmentAction;
 use App\Modules\Academic\Progression\Actions\RecordStudentActionAction;
+use App\Modules\Academic\Progression\Models\ProgramEnrollment;
 use App\Modules\StudentRegistry\Queries\ExportStudentsQuery;
 use App\Modules\StudentRegistry\Queries\ListStudentsQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
+
+function materializeStudentEnrollment(Student $student): void
+{
+    MaterializeProgramEnrollmentAction::run(['student_id' => $student->id]);
+}
 
 it('filters lifecycle status from Program Enrollment after the Student snapshot becomes stale', function (): void {
     $campus = Campus::factory()->create();
@@ -42,6 +48,45 @@ it('filters lifecycle status from Program Enrollment after the Student snapshot 
 
     expect(collect($students->items())->pluck('id')->all())->toBe([$student->id])
         ->and($student->fresh()->status)->toBe('intake_course');
+});
+
+it('uses Program Enrollment for matching directory and export status filters', function (): void {
+    $campus = Campus::factory()->create();
+    $program = Program::factory()->create();
+    $semester = Semester::factory()->create();
+
+    $legacyOnlyStudent = Student::factory()->forCampus($campus)->forProgram($program)->create([
+        'status' => 'intake_pre_uni_gc',
+        'intake' => 1,
+        'intake_semester_id' => $semester->id,
+    ]);
+    $activeStudent = Student::factory()->forCampus($campus)->forProgram($program)->create([
+        'status' => 'intake_course',
+        'intake' => 1,
+        'intake_semester_id' => $semester->id,
+    ]);
+
+    materializeStudentEnrollment($legacyOnlyStudent);
+    materializeStudentEnrollment($activeStudent);
+    ProgramEnrollment::query()->where('student_id', $legacyOnlyStudent->id)->update([
+        'enrollment_status' => 'deferred',
+        'study_stage' => 'intake_pre_uni_gc',
+    ]);
+
+    $students = app(ListStudentsQuery::class)->handle([
+        'statuses' => ['intake_pre_uni_gc', 'intake_course'],
+    ], $campus->id);
+    $exportedStudentIds = app(ExportStudentsQuery::class)
+        ->getBuilder($campus->id, [
+            'scope' => 'filtered',
+            'statuses' => ['intake_pre_uni_gc', 'intake_course'],
+        ])
+        ->pluck('id')
+        ->all();
+
+    expect(collect($students->items())->pluck('id')->all())->toBe([$activeStudent->id])
+        ->and($exportedStudentIds)->toBe([$activeStudent->id])
+        ->and($legacyOnlyStudent->fresh()->status)->toBe('intake_pre_uni_gc');
 });
 
 it('keeps normalized Program Enrollment lifecycle subtypes exact in staff filters', function (): void {
@@ -125,6 +170,7 @@ it('filters exact student codes within the current campus', function () {
         'intake' => 1,
         'intake_semester_id' => $semester->id,
     ]);
+
     Student::factory()->forCampus($otherCampus)->forProgram($program)->create([
         'student_id' => 'SE200001',
         'intake' => 1,
@@ -167,6 +213,10 @@ it('combines student codes with the existing search program and status filters',
         'intake_semester_id' => $semester->id,
     ]);
 
+    foreach (Student::query()->whereIn('student_id', ['SE300001', 'SE300002', 'SE300003'])->get() as $student) {
+        materializeStudentEnrollment($student);
+    }
+
     $students = app(ListStudentsQuery::class)->handle([
         'student_ids' => ['SE300001', 'SE300002', 'SE300003'],
         'search' => 'Included',
@@ -200,7 +250,7 @@ it('applies the student code filter to filtered exports', function () {
         'intake_semester_id' => $semester->id,
     ]);
 
-    $studentIds = (new ExportStudentsQuery)
+    $studentIds = app(ExportStudentsQuery::class)
         ->getBuilder($campus->id, [
             'scope' => 'filtered',
             'student_ids' => ['SE400001', 'SE400003'],
@@ -251,6 +301,10 @@ it('combines advanced multi-select filters within the current campus', function 
         'intake_semester_id' => $firstSemester->id,
     ]);
 
+    foreach (Student::query()->whereIn('student_id', ['SE600001', 'SE600002', 'SE600003', 'SE600004'])->get() as $student) {
+        materializeStudentEnrollment($student);
+    }
+
     $students = app(ListStudentsQuery::class)->handle([
         'program_ids' => [$firstProgram->id, $secondProgram->id],
         'specialization_ids' => [$firstSpecialization->id, $secondSpecialization->id],
@@ -286,7 +340,11 @@ it('applies advanced multi-select filters to filtered exports', function () {
         'intake_semester_id' => $otherSemester->id,
     ]);
 
-    $studentIds = (new ExportStudentsQuery)
+    foreach (Student::query()->whereIn('student_id', ['SE700001', 'SE700002'])->get() as $student) {
+        materializeStudentEnrollment($student);
+    }
+
+    $studentIds = app(ExportStudentsQuery::class)
         ->getBuilder($campus->id, [
             'scope' => 'filtered',
             'program_ids' => [$program->id],

@@ -216,6 +216,19 @@ Inspect migration debt before and after migration work:
 ./scripts/dev.sh artisan migration-debt:inventory --check --format=table
 ```
 
+Both supported production deploy paths materialize and verify every Student's
+primary Program Enrollment before restarting application traffic. The deploy
+fails if this preflight fails. To perform the same check during a manual
+rollout, run:
+
+```bash
+./scripts/dev.sh artisan academic:backfill-program-enrollments
+./scripts/dev.sh artisan academic:backfill-program-enrollments --check
+```
+
+The check must pass. It prevents students without a primary Program Enrollment
+from being silently omitted by lifecycle-filtered screens and exports.
+
 ## System configuration and branding cutover
 
 Global system configuration is DB-backed and branding is stored through the

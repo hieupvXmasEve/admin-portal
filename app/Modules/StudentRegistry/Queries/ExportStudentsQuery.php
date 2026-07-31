@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace App\Modules\StudentRegistry\Queries;
 
 use App\Models\Student;
+use App\Shared\Contracts\Academic\StudentLifecycleMatcher;
 use Illuminate\Database\Eloquent\Builder;
 
 class ExportStudentsQuery
 {
+    public function __construct(private readonly StudentLifecycleMatcher $lifecycleMatcher) {}
+
     public function getBuilder(int $campusId, array $filters): Builder
     {
         $query = Student::query()
@@ -35,15 +38,18 @@ class ExportStudentsQuery
                 ->when($filters['specialization_ids'] ?? [], function (Builder $query, array $specializationIds) {
                     $query->whereIn('specialization_id', $specializationIds);
                 })
-                ->when($filters['statuses'] ?? [], function (Builder $query, array $statuses) {
-                    $query->whereIn('status', $statuses);
-                })
-                ->when($filters['status'] ?? null, function (Builder $query, string $status) {
-                    $query->where('status', $status);
-                })
                 ->when($filters['intake_semester_ids'] ?? [], function (Builder $query, array $intakeSemesterIds) {
                     $query->whereIn('intake_semester_id', $intakeSemesterIds);
                 });
+
+            $statuses = ! empty($filters['statuses'])
+                ? array_values($filters['statuses'])
+                : (! empty($filters['status']) ? [(string) $filters['status']] : []);
+
+            if ($statuses !== []) {
+                $studentIds = (clone $query)->pluck('id')->all();
+                $query->whereIn('id', $this->lifecycleMatcher->matchingStudentIds($studentIds, $statuses));
+            }
         }
 
         return $query->orderBy('student_id');
