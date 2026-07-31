@@ -5,6 +5,8 @@ source:
   - resources/js/constants/menu-sidebar.ts
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 Tài liệu dành cho **cán bộ, nhân viên nhà trường** dùng hệ thống Portal trên trình duyệt. Không cần biết kỹ thuật.
 
 Sinh viên và giảng viên dùng cổng riêng, không nằm trong tài liệu này.

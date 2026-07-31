@@ -8,6 +8,8 @@ source:
   - resources/js/pages/StudentApplications/Index.vue
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item) and Students/Index.vue change (internal stat-refresh fix, no visible behavior change) -- no update needed here. -->
+
 **Student Services**는 **학생 한 명 단위**로 일하는 영역입니다. 학생 기록, 등록 상태, 입학 지원서를 다룹니다.
 
 **Reports & Audits**와 구분하십시오. 그쪽은 전교 단위 집계이고, 이곳은 개별 학생입니다.

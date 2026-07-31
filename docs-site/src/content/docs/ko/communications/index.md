@@ -14,6 +14,8 @@ source:
   - resources/js/pages/Admin/Notifications/Ops/Deliveries.vue
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 **Communications**는 메일과 알림을 외부로 보내고, 제대로 도착했는지 확인하는 도구를 제공합니다.
 
 두 그룹으로 나뉩니다. **Email**과 **Notification Management**입니다.

@@ -8,6 +8,8 @@ source:
   - resources/js/pages/StudentApplications/Index.vue
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item) and Students/Index.vue change (internal stat-refresh fix, no visible behavior change) -- no update needed here. -->
+
 **Student Services** là nơi làm việc với **từng sinh viên**: hồ sơ, tình trạng ghi danh, và hồ sơ ứng tuyển đầu vào.
 
 Phân biệt với nhóm **Reports & Audits**: bên đó là số liệu tổng hợp toàn trường, bên này là từng người cụ thể.

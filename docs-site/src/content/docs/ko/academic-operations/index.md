@@ -5,6 +5,8 @@ source:
   - resources/js/constants/menu-sidebar.ts
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 **Academic Operations**는 학사 업무를 수행하는 영역입니다. 교육과정 구성, 강좌 개설, 수강신청 관리, 출석 확인, 평점 확정, 학업 위험 학생 파악을 다룹니다.
 
 네 개 화면 그룹은 한 학기의 진행 순서를 그대로 따릅니다.

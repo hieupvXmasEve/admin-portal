@@ -5,6 +5,8 @@ source:
   - resources/js/constants/menu-sidebar.ts
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 This guide is for **university staff** who use the Portal admin application in a browser. No technical knowledge required.
 
 Students and lecturers use separate portals, which this guide does not cover.

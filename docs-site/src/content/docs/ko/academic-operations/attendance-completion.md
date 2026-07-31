@@ -8,6 +8,8 @@ source:
   - resources/js/pages/FailedStudents/Index.vue
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 **Attendance & Completion**에서는 학생의 수업 참여 상황, 강좌 이수 결과, 후속 조치가 필요한 사례를 확인합니다.
 
 ## Course Statistics — 교과목 통계

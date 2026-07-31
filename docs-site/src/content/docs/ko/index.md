@@ -5,6 +5,8 @@ source:
   - resources/js/constants/menu-sidebar.ts
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 이 안내서는 브라우저에서 Portal 관리자 시스템을 사용하는 **교직원**을 위한 것입니다. 기술 지식은 필요하지 않습니다.
 
 학생과 교원은 별도의 포털을 사용하며, 이 안내서에서는 다루지 않습니다.

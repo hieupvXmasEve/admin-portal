@@ -9,6 +9,8 @@ source:
   - resources/js/constants/menu-sidebar.ts
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 Chương này giúp bạn vào được hệ thống và hiểu bố cục màn hình. Đọc một lần là đủ dùng cho mọi chương sau.
 
 ## Đăng nhập

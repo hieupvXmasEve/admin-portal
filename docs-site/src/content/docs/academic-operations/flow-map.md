@@ -5,6 +5,8 @@ source:
   - resources/js/constants/menu-sidebar.ts
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 Trang này mô tả đường đi giữa các màn hình theo công việc thực tế. Dùng khi bạn biết mình cần làm gì nhưng chưa biết bắt đầu ở đâu.
 
 ## Luồng tổng quát

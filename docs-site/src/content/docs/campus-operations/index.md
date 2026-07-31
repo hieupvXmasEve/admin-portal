@@ -13,6 +13,8 @@ source:
   - resources/js/pages/Clubs/Index.vue
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 **Campus Operations** quản lý không gian và hoạt động ngoài giờ học: phòng ốc, sự kiện, câu lạc bộ.
 
 ## Room Management — Quản lý phòng

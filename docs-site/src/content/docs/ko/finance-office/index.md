@@ -5,6 +5,7 @@ source:
   - resources/js/constants/menu-sidebar.ts
   - resources/js/pages/Finance/Cockpit/Index.vue
   - resources/js/pages/Finance/Reporting/Index.vue
+  - resources/js/pages/Finance/Revenue/Index.vue
   - resources/js/pages/Finance/BatchStudio/Hub.vue
   - resources/js/pages/Finance/PricingOperations/Index.vue
   - resources/js/pages/Finance/Payments/Index.vue
@@ -50,6 +51,14 @@ source:
 **접근 권한.** 재무 보고 조회 권한이 있는 사용자.
 
 **절차.** **Finance Office → Finance Reporting**으로 이동해 학기나 기간을 선택하고 확인·내보내기합니다.
+
+## Doanh thu — 매출 현황
+
+**용도.** 여러 학기에 걸친 전교 매출을 캠퍼스와 항목별로 집계합니다. Collection Progress와 같은 원천 데이터로 계산하므로 두 보고서의 수치가 서로 어긋나지 않습니다.
+
+**접근 권한.** 전교 매출 보고서 조회 권한이 있는 사용자(캠퍼스 단위 Finance Reporting 권한과 별개).
+
+**절차.** **Finance Office → Doanh thu**로 이동해 학기별 표와 캠퍼스·항목별 세부 내역을 확인합니다. **미배분 금액** 행은 별도로 표시되며 합계에 포함되지 않습니다.
 
 ## Sinh phí — 부과금 생성
 
@@ -145,9 +154,13 @@ source:
 
 ### DNG Payment Requests
 
-**화면 내용.** 상태 카드: **Total**, **Pending**(대기), **Pushed to DNG**(전송됨), **Paid Uninvoiced**(납부됨, 청구서 미발행), **Paid Invoiced**(납부됨, 청구서 발행), **Failed / Bridged**(실패 또는 우회 처리).
+**화면 내용.** 상태 카드: **Total**, **Pending**(대기), **Pushed to DNG**(전송됨), **Paid Uninvoiced**(납부됨, 청구서 미발행), **Paid Invoiced**(납부됨, 청구서 발행), **Failed / Bridged**(실패 또는 우회 처리). **학기** 필터, DNG가 반환한 참조번호를 보여주는 **Ref (Webhook)** 열, 현재 필터 기준으로 내보내는 **Export Excel** 버튼이 있습니다.
 
 **유의 사항.** **Failed / Bridged**와 **DNG · Cần kiểm tra**는 매일 확인해야 합니다. 돈은 들어왔으나 제대로 기록되지 않은 건이 이곳에 있습니다.
+
+### Invoices
+
+**화면 내용.** **학기** 필터가 있습니다(기본값은 담당자가 현재 선택한 학기). Excel 내보내기는 **DNG Payment Requests** 화면으로 옮겨졌으며 여기에는 더 이상 없습니다.
 
 ## Discounts & Funding — 감면 및 지원
 

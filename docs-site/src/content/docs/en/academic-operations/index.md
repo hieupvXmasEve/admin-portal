@@ -5,6 +5,8 @@ source:
   - resources/js/constants/menu-sidebar.ts
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 **Academic Operations** is the area for running academic work: building the curriculum, opening classes, managing course registration, tracking attendance, finalising GPA, and spotting students at risk.
 
 Its four page groups follow the order of a term:

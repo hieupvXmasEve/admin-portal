@@ -8,6 +8,8 @@ source:
   - resources/js/pages/Academic/Warnings/Index.vue
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 **Grades & Performance** là giai đoạn chốt kết quả: tính GPA, tra cứu kết quả cũ, và phát hiện sinh viên có rủi ro học tập.
 
 Các báo cáo tổng hợp toàn trường — Performance Dashboard, Academic Report, Course Ranking — nằm ở nhóm menu riêng **Reports & Audits**, không ở đây.

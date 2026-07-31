@@ -12,6 +12,8 @@ source:
   - resources/js/pages/Admin/Canvas/Courses/Index.vue
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 **Course Delivery** là phần việc chính đầu mỗi kỳ: mở lớp, xếp lịch, đăng ký sinh viên, xử lý học lại và thi lại.
 
 ## Course Offering List — Danh sách lớp môn

@@ -9,6 +9,8 @@ source:
   - resources/js/pages/Forms/Queries/Inbox.vue
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 **Forms & Quality**는 학생에게서 정보를 수집합니다. 강의 평가 설문, 신청서, 문의가 이에 해당합니다.
 
 다음 세 가지를 구분하십시오.

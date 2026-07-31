@@ -14,6 +14,8 @@ source:
   - resources/js/pages/Admin/Notifications/Ops/Deliveries.vue
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 **Communications** là nơi gửi thư và thông báo ra ngoài, cùng công cụ kiểm tra thư đã tới nơi chưa.
 
 Hai nhóm: **Email** (thư điện tử) và **Notification Management** (thông báo trong hệ thống).

@@ -12,6 +12,8 @@ source:
   - resources/js/pages/Admin/Canvas/Courses/Index.vue
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 **Course Delivery** is the main work at the start of a term: opening classes, scheduling, registering students, and handling retakes and resits.
 
 ## Course Offering List

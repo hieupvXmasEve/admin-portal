@@ -5,6 +5,8 @@ source:
   - resources/js/constants/menu-sidebar.ts
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 **Academic Operations** là khu vực vận hành học vụ: dựng khung chương trình, mở lớp, quản lý đăng ký môn, theo dõi điểm danh, chốt GPA và phát hiện sinh viên có rủi ro học tập.
 
 Bốn nhóm trang xếp theo đúng trình tự một kỳ học:

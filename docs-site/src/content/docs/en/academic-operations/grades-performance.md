@@ -8,6 +8,8 @@ source:
   - resources/js/pages/Academic/Warnings/Index.vue
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 **Grades & Performance** is where results are closed out: calculating GPA, looking up past results, and spotting students at academic risk.
 
 University-wide reports — Performance Dashboard, Academic Report, Course Ranking — live in the separate **Reports & Audits** menu group, not here.

@@ -8,6 +8,8 @@ source:
   - resources/js/pages/Academic/Warnings/Index.vue
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 **Grades & Performance**는 결과를 마감하는 단계입니다. 평점을 산출하고, 과거 결과를 조회하며, 학업 위험 학생을 찾아냅니다.
 
 전교 단위 보고서인 Performance Dashboard, Academic Report, Course Ranking은 이곳이 아니라 별도 메뉴 그룹인 **Reports & Audits**에 있습니다.

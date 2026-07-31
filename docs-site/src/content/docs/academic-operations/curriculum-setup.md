@@ -11,6 +11,8 @@ source:
   - resources/js/pages/Syllabus/TemplatesIndex.vue
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 **Curriculum Setup** là nhóm trang chuẩn bị dữ liệu nền. Làm **một lần rồi dùng lại nhiều kỳ**, không phải việc hằng ngày.
 
 Nếu dữ liệu ở nhóm này sai hoặc thiếu, các bước mở lớp, đăng ký môn, tính GPA và báo cáo học vụ đều bị ảnh hưởng.

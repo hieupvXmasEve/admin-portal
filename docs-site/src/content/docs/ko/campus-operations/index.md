@@ -13,6 +13,8 @@ source:
   - resources/js/pages/Clubs/Index.vue
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 **Campus Operations**는 수업 외의 공간과 활동을 관리합니다. 강의실, 행사, 동아리가 해당합니다.
 
 ## Room Management — 강의실 관리

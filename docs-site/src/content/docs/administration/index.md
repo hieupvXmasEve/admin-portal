@@ -12,6 +12,8 @@ source:
   - resources/js/pages/Admin/EmailMonitoring/Index.vue
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 **Administration** dành cho quản trị viên. Thay đổi ở đây ảnh hưởng tới **mọi người dùng**, không riêng bạn.
 
 Nguyên tắc chung: đổi ít một, ghi lại lý do, và kiểm tra lại bằng một tài khoản thật sau khi đổi.

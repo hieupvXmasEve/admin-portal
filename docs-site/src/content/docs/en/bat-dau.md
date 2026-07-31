@@ -9,6 +9,8 @@ source:
   - resources/js/constants/menu-sidebar.ts
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 This chapter gets you into the system and explains the layout. Read it once and every later chapter will make sense.
 
 ## Signing in

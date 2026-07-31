@@ -8,6 +8,8 @@ source:
   - resources/js/pages/StudentApplications/Index.vue
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item) and Students/Index.vue change (internal stat-refresh fix, no visible behavior change) -- no update needed here. -->
+
 **Student Services** is where you work with **one student at a time**: their record, their enrolment status, and their admission application.
 
 Contrast with **Reports & Audits**: that area shows university-wide figures; this one shows individual people.

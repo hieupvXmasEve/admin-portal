@@ -9,6 +9,8 @@ source:
   - resources/js/constants/menu-sidebar.ts
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 이 장은 시스템에 접속하고 화면 구성을 이해하기 위한 것입니다. 한 번만 읽으면 이후 모든 장을 따라갈 수 있습니다.
 
 ## 로그인

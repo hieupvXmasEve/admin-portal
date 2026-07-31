@@ -12,6 +12,8 @@ source:
   - resources/js/pages/Admin/Canvas/Courses/Index.vue
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 **Course Delivery**는 학기 초 핵심 업무입니다. 강좌 개설, 시간표 편성, 수강신청, 재수강과 재시험 처리를 다룹니다.
 
 ## Course Offering List — 개설 강좌 목록

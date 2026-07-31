@@ -12,6 +12,8 @@ source:
   - resources/js/pages/Admin/EmailMonitoring/Index.vue
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 **Administration**은 관리자를 위한 영역입니다. 이곳의 변경은 본인뿐 아니라 **모든 사용자**에게 영향을 줍니다.
 
 기본 원칙은 다음과 같습니다. 한 번에 하나씩 바꾸고, 이유를 기록하고, 변경 후 실제 계정으로 확인하십시오.

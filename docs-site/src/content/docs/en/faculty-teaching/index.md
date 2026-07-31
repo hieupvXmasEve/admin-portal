@@ -8,6 +8,8 @@ source:
   - resources/js/pages/Lectures/LecturerGpa.vue
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 **Faculty & Teaching** covers the teaching staff: who teaches, how many hours, and how their classes performed.
 
 ## Lecturer List

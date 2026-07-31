@@ -8,6 +8,8 @@ source:
   - resources/js/pages/FailedStudents/Index.vue
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 **Attendance & Completion** is where you check how students are attending, how classes finished, and which cases need follow-up.
 
 ## Course Statistics

@@ -5,6 +5,7 @@ source:
   - resources/js/constants/menu-sidebar.ts
   - resources/js/pages/Finance/Cockpit/Index.vue
   - resources/js/pages/Finance/Reporting/Index.vue
+  - resources/js/pages/Finance/Revenue/Index.vue
   - resources/js/pages/Finance/BatchStudio/Hub.vue
   - resources/js/pages/Finance/PricingOperations/Index.vue
   - resources/js/pages/Finance/Payments/Index.vue
@@ -50,6 +51,14 @@ A mistake at generation propagates through every later step. This area touches r
 **Who can open it.** Anyone with permission to view finance reporting.
 
 **Steps.** Go to **Finance Office → Finance Reporting**, choose a term or date range, then read and export.
+
+## Doanh thu — Revenue
+
+**What it is for.** School-wide revenue rolled up across terms, by campus and fee type, computed from the same source data as Collection Progress so the two reports never disagree.
+
+**Who can open it.** Anyone with permission to view the school-wide revenue report (a separate permission from the per-campus Finance Reporting).
+
+**Steps.** Go to **Finance Office → Doanh thu**, read the per-term table and the campus/fee-type breakdown. The **unattributed cash** row is kept separate and never folded into the totals.
 
 ## Sinh phí — Generating charges
 
@@ -145,9 +154,13 @@ Read-only screens for finding and reconciling.
 
 ### DNG Payment Requests
 
-**On screen.** Status cards: **Total**, **Pending**, **Pushed to DNG**, **Paid Uninvoiced**, **Paid Invoiced**, **Failed / Bridged**.
+**On screen.** Status cards: **Total**, **Pending**, **Pushed to DNG**, **Paid Uninvoiced**, **Paid Invoiced**, **Failed / Bridged**. There is a filter by **term**, a **Ref (Webhook)** column showing the DNG-returned reference, and an **Export Excel** button that exports the currently filtered list.
 
 **Note.** **Failed / Bridged** and **DNG · Cần kiểm tra** deserve a daily look. That is where money has arrived but has not been recorded correctly.
+
+### Invoices
+
+**On screen.** Filter by **term** (defaults to the operator's currently selected term). Excel export has moved to the **DNG Payment Requests** screen and is no longer here.
 
 ## Discounts & Funding
 

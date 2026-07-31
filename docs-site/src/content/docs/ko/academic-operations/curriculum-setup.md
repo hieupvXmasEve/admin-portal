@@ -11,6 +11,8 @@ source:
   - resources/js/pages/Syllabus/TemplatesIndex.vue
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 **Curriculum Setup**은 바탕이 되는 자료를 준비하는 그룹입니다. **한 번 만들어 여러 학기에 재사용**하며, 매일 하는 업무가 아닙니다.
 
 이 그룹의 자료가 틀리거나 빠지면 강좌 개설, 수강신청, 평점 산출, 학사 보고가 모두 영향을 받습니다.

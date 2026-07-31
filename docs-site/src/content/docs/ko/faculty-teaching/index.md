@@ -8,6 +8,8 @@ source:
   - resources/js/pages/Lectures/LecturerGpa.vue
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 **Faculty & Teaching**은 강의 인력을 관리합니다. 누가 강의하는지, 시수는 얼마인지, 담당 강좌의 성적은 어떠한지를 다룹니다.
 
 ## Lecturer List — 교원 목록

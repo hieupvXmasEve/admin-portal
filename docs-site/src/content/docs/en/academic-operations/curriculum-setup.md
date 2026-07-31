@@ -11,6 +11,8 @@ source:
   - resources/js/pages/Syllabus/TemplatesIndex.vue
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 **Curriculum Setup** prepares the underlying data. You do it **once and reuse it across terms** — it is not daily work.
 
 If the data here is wrong or missing, opening classes, registering students, calculating GPA, and academic reporting are all affected.

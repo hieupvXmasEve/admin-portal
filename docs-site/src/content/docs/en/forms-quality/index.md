@@ -9,6 +9,8 @@ source:
   - resources/js/pages/Forms/Queries/Inbox.vue
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 **Forms & Quality** collects information from students: teaching quality surveys, registration forms, requests.
 
 Three things to keep apart:

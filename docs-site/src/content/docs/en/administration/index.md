@@ -12,6 +12,8 @@ source:
   - resources/js/pages/Admin/EmailMonitoring/Index.vue
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 **Administration** is for administrators. Changes here affect **every user**, not just you.
 
 General rule: change one thing at a time, record why, and verify with a real account afterwards.

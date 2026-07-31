@@ -5,6 +5,8 @@ source:
   - resources/js/constants/menu-sidebar.ts
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 이 문서는 담당자가 화면 사이를 이동하는 경로를 설명합니다. 할 일은 알지만 어디서 시작할지 모를 때 사용하십시오.
 
 ## 전체 흐름

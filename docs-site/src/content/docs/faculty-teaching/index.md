@@ -8,6 +8,8 @@ source:
   - resources/js/pages/Lectures/LecturerGpa.vue
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 **Faculty & Teaching** quản lý đội ngũ giảng dạy: ai đang dạy, dạy bao nhiêu giờ, lớp do họ phụ trách có kết quả thế nào.
 
 ## Lecturer List — Danh sách giảng viên

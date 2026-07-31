@@ -14,6 +14,8 @@ source:
   - resources/js/pages/Admin/Notifications/Ops/Deliveries.vue
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 **Communications** sends mail and notifications outward, and gives you the tools to check whether they arrived.
 
 Two groups: **Email** and **Notification Management**.

@@ -9,6 +9,8 @@ source:
   - resources/js/pages/Forms/Queries/Inbox.vue
 ---
 
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+
 **Forms & Quality** dùng để thu thập thông tin từ sinh viên: khảo sát chất lượng giảng dạy, phiếu đăng ký, đơn từ.
 
 Ba khái niệm cần phân biệt:

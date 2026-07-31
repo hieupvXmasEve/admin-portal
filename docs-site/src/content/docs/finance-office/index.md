@@ -5,6 +5,7 @@ source:
   - resources/js/constants/menu-sidebar.ts
   - resources/js/pages/Finance/Cockpit/Index.vue
   - resources/js/pages/Finance/Reporting/Index.vue
+  - resources/js/pages/Finance/Revenue/Index.vue
   - resources/js/pages/Finance/BatchStudio/Hub.vue
   - resources/js/pages/Finance/PricingOperations/Index.vue
   - resources/js/pages/Finance/Payments/Index.vue
@@ -50,6 +51,14 @@ Sai ở bước sinh phí thì mọi bước sau đều sai theo. Đây là khu 
 **Ai vào được.** Người có quyền xem báo cáo tài chính.
 
 **Các bước.** Vào **Finance Office → Finance Reporting**, chọn kỳ hoặc khoảng thời gian, xem và xuất báo cáo.
+
+## Doanh thu
+
+**Dùng để làm gì.** Báo cáo doanh thu toàn trường, gộp nhiều kỳ, theo cơ sở và loại phí, tính từ cùng nguồn dữ liệu với Collection Progress nên hai báo cáo không lệch số.
+
+**Ai vào được.** Người có quyền xem báo cáo doanh thu toàn trường (khác quyền xem Finance Reporting theo cơ sở).
+
+**Các bước.** Vào **Finance Office → Doanh thu**, xem bảng theo kỳ và bảng chi tiết theo cơ sở/loại phí. Dòng **tiền chưa phân bổ** tách riêng, không gộp vào tổng.
 
 ## Sinh phí
 
@@ -145,9 +154,13 @@ Nhóm chỉ đọc, dùng để tìm và đối chiếu.
 
 ### DNG Payment Requests
 
-**Nội dung màn hình.** Các thẻ trạng thái: **Total**, **Pending** (chờ), **Pushed to DNG** (đã gửi), **Paid Uninvoiced** (đã trả, chưa xuất hóa đơn), **Paid Invoiced** (đã trả, đã xuất hóa đơn), **Failed / Bridged** (lỗi hoặc phải bắc cầu).
+**Nội dung màn hình.** Các thẻ trạng thái: **Total**, **Pending** (chờ), **Pushed to DNG** (đã gửi), **Paid Uninvoiced** (đã trả, chưa xuất hóa đơn), **Paid Invoiced** (đã trả, đã xuất hóa đơn), **Failed / Bridged** (lỗi hoặc phải bắc cầu). Có bộ lọc theo **kỳ học**, cột **Ref (Webhook)** hiển thị mã DNG trả về, và nút **Export Excel** để xuất danh sách theo bộ lọc đang chọn.
 
 **Lưu ý.** **Failed / Bridged** và **DNG · Cần kiểm tra** là hai chỗ cần xem hằng ngày. Đó là nơi tiền đã vào nhưng chưa ghi nhận đúng.
+
+### Invoices
+
+**Nội dung màn hình.** Có bộ lọc theo **kỳ học** (mặc định là kỳ đang chọn của thao tác viên). Xuất Excel đã chuyển sang màn hình **DNG Payment Requests**, không còn ở đây.
 
 ## Discounts & Funding — Giảm trừ và tài trợ
 
