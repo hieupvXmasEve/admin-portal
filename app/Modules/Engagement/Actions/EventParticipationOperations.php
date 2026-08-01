@@ -211,7 +211,7 @@ final class EventParticipationOperations
 
             $event = $participant->event;
             $student = $participant->student;
-            $goldAmount = (float) $event->gold_reward_amount;
+            $goldAmount = (int) $event->gold_reward_amount;
 
             if ($goldAmount <= 0) {
                 return false;
@@ -224,7 +224,8 @@ final class EventParticipationOperations
                     $goldAmount,
                     GoldTransaction::SOURCE_EVENT,
                     $event->id,
-                    "Gold reward for attending event: {$event->title}"
+                    "Gold reward for attending event: {$event->title}",
+                    auth()->id()
                 );
 
                 // Update participant record
@@ -266,8 +267,8 @@ final class EventParticipationOperations
 
             $event = $participant->event;
             $student = $participant->student;
-            $baseGoldAmount = (float) $event->gold_reward_amount;
-            $totalGoldAmount = $baseGoldAmount + $bonusGoldAmount;
+            $baseGoldAmount = (int) $event->gold_reward_amount;
+            $totalGoldAmount = $baseGoldAmount + (int) $bonusGoldAmount;
 
             if ($totalGoldAmount <= 0) {
                 return false;
@@ -290,10 +291,11 @@ final class EventParticipationOperations
                 // Award total gold (base + bonus) through wallet service
                 $transaction = $this->GoldService->addGold(
                     $student,
-                    $totalGoldAmount,
+                    (int) $totalGoldAmount,
                     GoldTransaction::SOURCE_EVENT,
                     $event->id,
-                    $notes
+                    $notes,
+                    auth()->id()
                 );
 
                 // Update participant record
@@ -415,36 +417,36 @@ final class EventParticipationOperations
 
             $event = $participant->event;
             $student = $participant->student;
-            $goldAmount = (float) $event->gold_reward_amount;
+            $goldAmount = (int) $event->gold_reward_amount;
+            $actorId = auth()->id();
 
             // Validate reclaim eligibility
             $this->validateGoldReclaimEligibility($participant);
 
             try {
-                // Check if student has sufficient balance
-                if (! $this->GoldService->hasSufficientBalance($student, $goldAmount)) {
-                    Log::warning('Insufficient balance for gold reclaim', [
+                // Gold debt is forbidden: reclaim only what the student still
+                // holds and write off the rest (they already spent it). Done
+                // atomically under a single wallet lock.
+                $result = $this->GoldService->reclaimGold(
+                    $student,
+                    $goldAmount,
+                    GoldTransaction::SOURCE_EVENT,
+                    $event->id,
+                    "Gold reclaimed due to event participation cancellation: {$event->title}",
+                    $actorId
+                );
+
+                $entries = $result['entries'];
+                $transaction = $entries === [] ? null : end($entries);
+
+                if ($result['written_off'] > 0) {
+                    Log::warning('Partial gold reclaim; shortfall written off', [
                         'participant_id' => $participant->id,
                         'student_id' => $student->id,
                         'required_amount' => $goldAmount,
-                        'current_balance' => $this->GoldService->getBalance($student),
+                        'reclaimed' => $result['reclaimed'],
+                        'written_off' => $result['written_off'],
                     ]);
-
-                    // Create negative balance transaction with special handling
-                    $transaction = $this->GoldService->adjustBalance(
-                        $student,
-                        -$goldAmount,
-                        "Gold reclaimed due to event participation cancellation (insufficient balance): {$event->title}"
-                    );
-                } else {
-                    // Reclaim gold through wallet service
-                    $transaction = $this->GoldService->deductGold(
-                        $student,
-                        $goldAmount,
-                        GoldTransaction::SOURCE_EVENT,
-                        $event->id,
-                        "Gold reclaimed due to event participation cancellation: {$event->title}"
-                    );
                 }
 
                 // Update participant record
@@ -456,8 +458,10 @@ final class EventParticipationOperations
                 // Send reclaim notification
                 $this->notificationPublisher->sendGoldReclaimNotification((int) $student->id, $goldAmount, $event);
 
-                // Enhanced audit logging
-                $this->logGoldRewardAudit($participant, $transaction, 'reclaimed');
+                // Enhanced audit logging (a zero-reward event produces no entry)
+                if ($transaction !== null) {
+                    $this->logGoldRewardAudit($participant, $transaction, 'reclaimed');
+                }
 
                 return true;
             } catch (\Exception $e) {
@@ -1000,7 +1004,7 @@ final class EventParticipationOperations
                     }
 
                     $totalGold = $status === 'completed' && $event->gold_reward_amount > 0
-                        ? (float) $event->gold_reward_amount + ($bonusGoldAmount ?? 0)
+                        ? (int) $event->gold_reward_amount + (int) ($bonusGoldAmount ?? 0)
                         : null;
 
                     $results['added'][] = [
@@ -1382,7 +1386,7 @@ final class EventParticipationOperations
                 DB::transaction(function () use ($participant) {
                     $event = $participant->event;
                     $student = $participant->student;
-                    $goldAmount = (float) $event->gold_reward_amount;
+                    $goldAmount = (int) $event->gold_reward_amount;
 
                     // Award gold through wallet service
                     $transaction = $this->GoldService->addGold(
@@ -1390,7 +1394,8 @@ final class EventParticipationOperations
                         $goldAmount,
                         GoldTransaction::SOURCE_EVENT,
                         $event->id,
-                        "Gold reward for attending event: {$event->title}"
+                        "Gold reward for attending event: {$event->title}",
+                        auth()->id()
                     );
 
                     // Update participant record with gold amount

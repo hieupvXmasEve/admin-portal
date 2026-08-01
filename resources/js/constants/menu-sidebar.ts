@@ -599,6 +599,18 @@ export const mainNavGroups: NavGroup[] = [
                 icon: Club,
                 requiredPermissions: ['view_clubs'],
             },
+            {
+                title: 'Merchandise Store',
+                href: systemRoutes.merchandise.index(),
+                icon: Package,
+                requiredPermissions: ['view_merchandise'],
+            },
+            {
+                title: 'Merchandise Reports',
+                href: systemRoutes.merchandise.reports(),
+                icon: BarChart3,
+                requiredPermissions: ['view_merchandise_report'],
+            },
         ],
     },
     {

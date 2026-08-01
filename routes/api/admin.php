@@ -84,7 +84,9 @@ Route::middleware(['web', 'auth'])->name('api.admin.')->group(function () {
     Route::prefix('wallet')->name('wallet.')->group(function () {
         // Student-specific gold wallet operations
         Route::prefix('gold/students/{student}')->name('students.')->group(function () {
-            Route::post('/adjust', [StudentWalletController::class, 'adjustBalance'])->name('adjust');
+            Route::post('/adjust', [StudentWalletController::class, 'adjustBalance'])
+                ->middleware('can:adjust_gold_wallet')
+                ->name('adjust');
         });
         // Student cash wallet here
     });

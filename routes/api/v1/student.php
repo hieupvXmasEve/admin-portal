@@ -18,6 +18,8 @@ use App\Modules\Academic\Progression\Http\Api\Student\GpaTrendController;
 use App\Modules\Academic\Progression\Http\Api\Student\ScholarshipAdjustmentConfirmationController;
 use App\Modules\Finance\Http\Api\Student\LegacyFinanceController;
 use App\Modules\Finance\Http\Api\Student\StudentFinanceController;
+use App\Modules\Merchandise\Http\Api\Student\StudentMerchandiseController;
+use App\Modules\Merchandise\Http\Api\Student\StudentRedemptionOrderController;
 use App\Modules\Notification\Http\Api\Student\NotificationController;
 use App\Modules\Notification\Http\Api\Student\NotificationPreferenceController;
 use App\Modules\StudentRegistry\Http\Api\Student\ProfileController;
@@ -242,5 +244,25 @@ Route::middleware([
             Route::post('/{dossier}/confirmation', [ScholarshipAdjustmentConfirmationController::class, 'confirm'])
                 ->name('respond');
         });
+
+    // Merchandise Store — student ONLY, parents get 403 (D13). This
+    // deliberately does NOT use the `either:parent.student.access` group
+    // above: a parent proxy token must never reach Gold spend or a student's
+    // redemption orders.
+    Route::middleware(['student.api.auth'])->prefix('merchandise')->name('merchandise.')->group(function () {
+        Route::get('/dashboard', [StudentRedemptionOrderController::class, 'dashboard'])->name('dashboard');
+
+        Route::get('/store', [StudentMerchandiseController::class, 'index'])->name('store.index');
+        Route::get('/store/{merchandise}', [StudentMerchandiseController::class, 'show'])->name('store.show');
+
+        Route::get('/orders', [StudentRedemptionOrderController::class, 'index'])->name('orders.index');
+        Route::post('/orders', [StudentRedemptionOrderController::class, 'store'])
+            ->middleware('throttle:merchandise-checkout')
+            ->name('orders.store');
+        Route::get('/orders/{redemptionOrder}', [StudentRedemptionOrderController::class, 'show'])->name('orders.show');
+        Route::post('/orders/{redemptionOrder}/cancel', [StudentRedemptionOrderController::class, 'cancel'])
+            ->middleware('throttle:merchandise-checkout')
+            ->name('orders.cancel');
+    });
 
 }); // End auth:sanctum group

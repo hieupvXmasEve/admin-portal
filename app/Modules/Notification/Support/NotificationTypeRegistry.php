@@ -71,6 +71,64 @@ final class NotificationTypeRegistry
             'action_type' => 'finance.dng_payment_request',
             'channels' => ['email', 'realtime'],
         ],
+        // Merchandise redemption orders (Phase 3). Wired via
+        // App\Modules\Merchandise\Support\RedemptionNotificationPublisher.
+        'redemption_order_submitted' => [
+            'event_name' => 'merchandise.redemption_order_submitted',
+            'category' => 'merchandise',
+            'icon' => 'shopping-bag',
+            'action_text' => 'View Order',
+            'action_type' => 'merchandise.order',
+            'channels' => ['email', 'realtime'],
+        ],
+        'redemption_order_pending_review' => [
+            'event_name' => 'merchandise.redemption_order_pending_review',
+            'category' => 'merchandise',
+            'icon' => 'shopping-bag',
+            'action_text' => 'Review Order',
+            'action_type' => 'merchandise.order',
+            'channels' => ['email', 'realtime'],
+        ],
+        'redemption_order_approved' => [
+            'event_name' => 'merchandise.redemption_order_approved',
+            'category' => 'merchandise',
+            'icon' => 'shopping-bag',
+            'action_text' => 'View Order',
+            'action_type' => 'merchandise.order',
+            'channels' => ['email', 'realtime'],
+        ],
+        'redemption_order_rejected' => [
+            'event_name' => 'merchandise.redemption_order_rejected',
+            'category' => 'merchandise',
+            'icon' => 'shopping-bag',
+            'action_text' => 'View Order',
+            'action_type' => 'merchandise.order',
+            'channels' => ['email', 'realtime'],
+        ],
+        'redemption_order_ready_for_collection' => [
+            'event_name' => 'merchandise.redemption_order_ready_for_collection',
+            'category' => 'merchandise',
+            'icon' => 'shopping-bag',
+            'action_text' => 'View Order',
+            'action_type' => 'merchandise.order',
+            'channels' => ['email', 'realtime'],
+        ],
+        'redemption_order_shipped' => [
+            'event_name' => 'merchandise.redemption_order_shipped',
+            'category' => 'merchandise',
+            'icon' => 'shopping-bag',
+            'action_text' => 'View Order',
+            'action_type' => 'merchandise.order',
+            'channels' => ['email', 'realtime'],
+        ],
+        'redemption_order_cancelled' => [
+            'event_name' => 'merchandise.redemption_order_cancelled',
+            'category' => 'merchandise',
+            'icon' => 'shopping-bag',
+            'action_text' => 'View Order',
+            'action_type' => 'merchandise.order',
+            'channels' => ['email', 'realtime'],
+        ],
     ];
 
     /**

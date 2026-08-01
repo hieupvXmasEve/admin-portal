@@ -17,8 +17,8 @@ class StudentWalletResource extends JsonResource
         return [
             'id' => $this->id,
             'student_id' => $this->student_id,
-            'balance' => number_format($this->balance, 2),
-            'balance_raw' => $this->balance,
+            'balance' => (int) $this->balance,
+            'balance_raw' => (int) $this->balance,
             'updated_at' => $this->updated_at,
             'formatted_updated_at' => $this->updated_at?->format('M j, Y g:i A'),
 

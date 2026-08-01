@@ -2,9 +2,9 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Builder;
 
 class GoldTransaction extends Model
 {
@@ -19,9 +19,12 @@ class GoldTransaction extends Model
     protected $fillable = [
         'student_id',
         'amount',
+        'balance_before',
+        'balance_after',
         'type',
         'source_type',
         'source_id',
+        'performed_by',
         'notes',
     ];
 
@@ -29,7 +32,9 @@ class GoldTransaction extends Model
      * The attributes that should be cast.
      */
     protected $casts = [
-        'amount' => 'decimal:2',
+        'amount' => 'integer',
+        'balance_before' => 'integer',
+        'balance_after' => 'integer',
         'created_at' => 'datetime',
     ];
 
@@ -40,18 +45,64 @@ class GoldTransaction extends Model
     public $timestamps = false;
 
     /**
-     * Transaction types.
+     * Transaction types (backend allow-list — no DB enum).
      */
     public const TYPE_EARN = 'earn';
+
     public const TYPE_SPEND = 'spend';
+
     public const TYPE_ADJUST = 'adjust';
 
+    public const TYPE_REWARD = 'reward';
+
+    public const TYPE_REDEMPTION = 'redemption';
+
+    public const TYPE_REDEMPTION_REFUND = 'redemption_refund';
+
+    public const TYPE_MANUAL_ADJUSTMENT = 'manual_adjustment';
+
+    // Gold that could not be reclaimed (student had already spent it). Audit
+    // only — a write_off never moves balance, so its amount is always 0.
+    public const TYPE_WRITE_OFF = 'write_off';
+
     /**
-     * Source types.
+     * Allowed transaction types.
+     *
+     * @var list<string>
+     */
+    public const TYPES = [
+        self::TYPE_EARN,
+        self::TYPE_SPEND,
+        self::TYPE_ADJUST,
+        self::TYPE_REWARD,
+        self::TYPE_REDEMPTION,
+        self::TYPE_REDEMPTION_REFUND,
+        self::TYPE_MANUAL_ADJUSTMENT,
+        self::TYPE_WRITE_OFF,
+    ];
+
+    /**
+     * Source types (backend allow-list — no DB enum).
      */
     public const SOURCE_EVENT = 'event';
+
     public const SOURCE_REWARD = 'reward';
+
     public const SOURCE_MANUAL = 'manual';
+
+    public const SOURCE_REDEMPTION_ORDER = 'redemption_order';
+
+    /**
+     * Allowed source types.
+     *
+     * @var list<string>
+     */
+    public const SOURCE_TYPES = [
+        self::SOURCE_EVENT,
+        self::SOURCE_REWARD,
+        self::SOURCE_MANUAL,
+        self::SOURCE_REDEMPTION_ORDER,
+    ];
 
     /**
      * Get the student that owns this transaction.
@@ -126,10 +177,18 @@ class GoldTransaction extends Model
     }
 
     /**
-     * Get the absolute amount of the transaction.
+     * Get the performing staff user (null for legacy / system entries).
      */
-    public function getAbsoluteAmountAttribute(): string
+    public function performedBy(): BelongsTo
     {
-        return number_format(abs($this->amount), 2);
+        return $this->belongsTo(User::class, 'performed_by');
+    }
+
+    /**
+     * Get the absolute amount of the transaction (integer Gold).
+     */
+    public function getAbsoluteAmountAttribute(): int
+    {
+        return abs((int) $this->amount);
     }
 }

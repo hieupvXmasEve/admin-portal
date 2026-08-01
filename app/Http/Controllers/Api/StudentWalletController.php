@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AdjustWalletBalanceRequest;
-use App\Http\Resources\StudentWalletResource;
 use App\Http\Resources\GoldTransactionResource;
+use App\Http\Resources\StudentWalletResource;
 use App\Http\Responses\ApiResponse;
 use App\Models\Student;
 use App\Services\GoldService;
@@ -25,7 +25,7 @@ class StudentWalletController extends Controller
      */
     public function show(Request $request): JsonResponse
     {
-        /** @var \App\Models\Student $student */
+        /** @var Student $student */
         $student = $request->user();
         $wallet = $this->goldService->getOrCreateWallet($student);
 
@@ -40,7 +40,7 @@ class StudentWalletController extends Controller
      */
     public function summary(Request $request): JsonResponse
     {
-        /** @var \App\Models\Student $student */
+        /** @var Student $student */
         $student = $request->user();
         $summary = $this->goldService->getWalletSummary($student);
 
@@ -125,12 +125,14 @@ class StudentWalletController extends Controller
     public function checkBalance(Student $student, Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'amount' => 'required|numeric|min:0.01',
+            'amount' => 'required|integer|min:1',
         ]);
+
+        $requestedAmount = (int) $validated['amount'];
 
         $hasSufficient = $this->goldService->hasSufficientBalance(
             $student,
-            $validated['amount']
+            $requestedAmount
         );
 
         $currentBalance = $this->goldService->getBalance($student);
@@ -139,7 +141,7 @@ class StudentWalletController extends Controller
             [
                 'has_sufficient_balance' => $hasSufficient,
                 'current_balance' => $currentBalance,
-                'requested_amount' => number_format($validated['amount'], 2),
+                'requested_amount' => $requestedAmount,
             ],
             message: 'Balance check completed successfully'
         );

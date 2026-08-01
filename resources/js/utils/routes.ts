@@ -147,6 +147,13 @@ export const systemRoutes = {
         show: (id: number) => route('events.show', { event: id }),
         reports: () => route('events.reports'),
     },
+    merchandise: {
+        index: () => route('merchandise.index'),
+        create: () => route('merchandise.create'),
+        edit: (id: number) => route('merchandise.edit', { merchandise: id }),
+        show: (id: number) => route('merchandise.show', { merchandise: id }),
+        reports: () => route('merchandise.reports.index'),
+    },
     // Room Booking Routes
     roomBookings: {
         index: () => route(ROOM_BOOKING_ROUTE_NAMES.INDEX),
