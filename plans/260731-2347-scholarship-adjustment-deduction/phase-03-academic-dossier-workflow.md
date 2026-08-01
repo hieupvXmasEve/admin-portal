@@ -109,10 +109,20 @@ Guard: decision blocked until `interview_status = completed`, EXCEPT exception p
 - Create: `app/Modules/Academic/Services/ScholarshipAdjustmentCandidateService.php` (+ dedicated query object)
 - Create: `app/Modules/Academic/Services/ScholarshipAdjustmentDecisionService.php` (single status writer)
 - Create: `app/Console/Commands/IdentifyScholarshipAdjustmentCandidates.php`
-- Create: controllers + FormRequests + `routes/web/scholarship-adjustments.php` + policy
-- Create: Inertia pages `resources/js/pages/scholarship-adjustments/*`
+- Create: `app/Modules/Academic/Http/Web/ScholarshipAdjustmentDossierController.php` (Academic-owned — module HTTP, NOT global `app/Http/Controllers`)
+- Create: `app/Modules/Academic/Http/Requests/ScholarshipAdjustment/*.php` (6 FormRequests, module namespace)
+- Create: `app/Modules/Academic/Policies/ScholarshipAdjustmentDossierPolicy.php`
+- Register routes in `app/Modules/Academic/routes/web.php` (module route file — NOT a global `routes/web/*` shell)
+- Create: Inertia pages `resources/js/pages/ScholarshipAdjustments/*`
 - Modify: `tests/Feature/Architecture/AcademicFinanceBoundaryArchRedProofTest.php` — broadened regexes
+- Create: `tests/Feature/Architecture/ScholarshipAdjustmentModulePlacementArchTest.php` — HTTP + routes stay in the module (placement guard)
 - Reuse: `ScholarshipAdjustmentContract` (P2), notification event pattern
+
+> Placement note (2026-08-01): HTTP layer was initially mislanded in global
+> `app/Http/Controllers` + `app/Http/Requests` by name-matching the pre-existing
+> global `ScholarshipController`. Moved into the Academic module; a placement
+> arch test now enforces it. See `.claude/rules/development-rules.md` →
+> "File Placement & Module Ownership".
 
 ## Implementation Steps
 

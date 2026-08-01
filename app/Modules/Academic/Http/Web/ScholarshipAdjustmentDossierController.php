@@ -2,14 +2,15 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers;
+namespace App\Modules\Academic\Http\Web;
 
-use App\Http\Requests\ScholarshipAdjustment\AddScholarshipAdjustmentCandidateManuallyRequest;
-use App\Http\Requests\ScholarshipAdjustment\ApproveScholarshipAdjustmentRequest;
-use App\Http\Requests\ScholarshipAdjustment\CompleteScholarshipAdjustmentInterviewRequest;
-use App\Http\Requests\ScholarshipAdjustment\DecideScholarshipAdjustmentRequest;
-use App\Http\Requests\ScholarshipAdjustment\IdentifyScholarshipAdjustmentCandidatesRequest;
-use App\Http\Requests\ScholarshipAdjustment\ScheduleScholarshipAdjustmentInterviewRequest;
+use App\Http\Controllers\Controller;
+use App\Modules\Academic\Http\Requests\ScholarshipAdjustment\AddScholarshipAdjustmentCandidateManuallyRequest;
+use App\Modules\Academic\Http\Requests\ScholarshipAdjustment\ApproveScholarshipAdjustmentRequest;
+use App\Modules\Academic\Http\Requests\ScholarshipAdjustment\CompleteScholarshipAdjustmentInterviewRequest;
+use App\Modules\Academic\Http\Requests\ScholarshipAdjustment\DecideScholarshipAdjustmentRequest;
+use App\Modules\Academic\Http\Requests\ScholarshipAdjustment\IdentifyScholarshipAdjustmentCandidatesRequest;
+use App\Modules\Academic\Http\Requests\ScholarshipAdjustment\ScheduleScholarshipAdjustmentInterviewRequest;
 use App\Modules\Academic\Models\ScholarshipAdjustmentDossier;
 use App\Modules\Academic\Services\ScholarshipAdjustmentCandidateService;
 use App\Modules\Academic\Services\ScholarshipAdjustmentDecisionService;

@@ -40,10 +40,11 @@ use App\Modules\Academic\Delivery\Http\Web\RecordClassSessionAttendanceControlle
 use App\Modules\Academic\Delivery\Http\Web\RetakeCourseRegistrationController;
 use App\Modules\Academic\Delivery\Http\Web\UnitStatisticsController;
 use App\Modules\Academic\Http\Web\AcademicReportController;
-use App\Modules\Academic\Http\Web\StudentCompletedUnitsController;
 use App\Modules\Academic\Http\Web\CampusDetailController;
 use App\Modules\Academic\Http\Web\CourseRankingController;
 use App\Modules\Academic\Http\Web\GpaManagementController;
+use App\Modules\Academic\Http\Web\ScholarshipAdjustmentDossierController;
+use App\Modules\Academic\Http\Web\StudentCompletedUnitsController;
 use App\Modules\Academic\Progression\Http\Web\AcademicPlacementController;
 use App\Modules\Academic\Progression\Http\Web\AcademicProgressionAuditController;
 use App\Modules\Academic\Progression\Http\Web\GpaHistoryController;
@@ -797,3 +798,42 @@ Route::prefix('admin/canvas')
         Route::post('/courses/{mapping}/sync-grades', [CanvasSyllabusController::class, 'syncGrades'])
             ->name('courses.sync-grades');
     });
+
+// Scholarship adjustment dossiers (Phase 3): Academic-owned maker-checker
+// workflow. Route-level `can:` gates use the Phase 1 permission slugs;
+// record-level campus scoping is enforced in the controller/policy.
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::prefix('scholarship-adjustments')->name('scholarship-adjustments.')->group(function () {
+        Route::get('/', [ScholarshipAdjustmentDossierController::class, 'index'])
+            ->middleware('can:view_scholarship_adjustment')
+            ->name('index');
+
+        Route::get('{dossier}', [ScholarshipAdjustmentDossierController::class, 'show'])
+            ->middleware('can:view_scholarship_adjustment')
+            ->name('show');
+
+        Route::post('identify', [ScholarshipAdjustmentDossierController::class, 'identify'])
+            ->middleware('can:manage_scholarship_adjustment_candidate')
+            ->name('identify');
+
+        Route::post('add-manually', [ScholarshipAdjustmentDossierController::class, 'addManually'])
+            ->middleware('can:manage_scholarship_adjustment_candidate')
+            ->name('add-manually');
+
+        Route::post('{dossier}/interview/schedule', [ScholarshipAdjustmentDossierController::class, 'scheduleInterview'])
+            ->middleware('can:manage_scholarship_interview')
+            ->name('interview.schedule');
+
+        Route::post('{dossier}/interview/complete', [ScholarshipAdjustmentDossierController::class, 'completeInterview'])
+            ->middleware('can:manage_scholarship_interview')
+            ->name('interview.complete');
+
+        Route::post('{dossier}/decide', [ScholarshipAdjustmentDossierController::class, 'decide'])
+            ->middleware('can:decide_scholarship_adjustment')
+            ->name('decide');
+
+        Route::post('{dossier}/approve', [ScholarshipAdjustmentDossierController::class, 'approve'])
+            ->middleware('can:approve_scholarship_adjustment')
+            ->name('approve');
+    });
+});

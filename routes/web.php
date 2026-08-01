@@ -48,7 +48,6 @@ require __DIR__.'/web/email-monitoring.php';
 // Forms, surveys, and student-support routes are owned by Engagement.
 require __DIR__.'/web/scholarships.php';
 require __DIR__.'/web/student-scholarships.php';
-require __DIR__.'/web/scholarship-adjustments.php';
 require __DIR__.'/web/tuition-plans.php';
 require __DIR__.'/web/vouchers.php';
 // require __DIR__ . '/web/surveys.php';

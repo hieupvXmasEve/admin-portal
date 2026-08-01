@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Requests\ScholarshipAdjustment;
+namespace App\Modules\Academic\Http\Requests\ScholarshipAdjustment;
 
 use Illuminate\Foundation\Http\FormRequest;
 
