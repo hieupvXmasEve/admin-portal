@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Models;
+namespace App\Modules\Academic\Progression\Models;
 
 use App\Models\AuditableModel;
 use App\Models\Campus;
@@ -18,9 +18,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * discount; this model never touches money — see decision_adjusted_amount,
  * which is a proposal until the contract call returns an outcome.
  *
- * Single-writer rule: ONLY ScholarshipAdjustmentDecisionService (and the
- * companion interview/candidate services for their own sub-fields) mutate
- * `status` — no other code path writes this column.
+ * Single-writer rule: ONLY the ScholarshipAdjustment Progression actions
+ * (decision/interview/candidate actions, each for their own sub-fields)
+ * mutate `status` — no other code path writes this column.
  */
 class ScholarshipAdjustmentDossier extends AuditableModel
 {

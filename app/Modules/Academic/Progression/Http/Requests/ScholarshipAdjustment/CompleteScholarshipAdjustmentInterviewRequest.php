@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Http\Requests\ScholarshipAdjustment;
+namespace App\Modules\Academic\Progression\Http\Requests\ScholarshipAdjustment;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class ScheduleScholarshipAdjustmentInterviewRequest extends FormRequest
+class CompleteScholarshipAdjustmentInterviewRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -17,9 +17,8 @@ class ScheduleScholarshipAdjustmentInterviewRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'scheduled_at' => ['required', 'date'],
-            'mode' => ['required', 'string', 'in:in_person,online'],
-            'location' => ['nullable', 'string', 'max:255'],
+            'minutes' => ['required', 'string'],
+            'participants' => ['nullable', 'array'],
         ];
     }
 }

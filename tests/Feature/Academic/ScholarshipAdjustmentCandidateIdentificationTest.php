@@ -14,9 +14,9 @@ use App\Models\Student;
 use App\Models\StudentScholarshipAward;
 use App\Models\Unit;
 use App\Models\User;
-use App\Modules\Academic\Models\ScholarshipAdjustmentDossier;
-use App\Modules\Academic\Queries\ScholarshipAdjustmentCandidateQuery;
-use App\Modules\Academic\Services\ScholarshipAdjustmentCandidateService;
+use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\IdentifyCandidatesAction;
+use App\Modules\Academic\Progression\Models\ScholarshipAdjustmentDossier;
+use App\Modules\Academic\Progression\Queries\ScholarshipAdjustmentCandidateQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -244,10 +244,10 @@ it('flags needs_data_review for a record finalized before the is_passed gate fix
     $ctx = candidateBaseContext();
     $fixture = candidateEligibleStudent($ctx, ['grade_finalized_date' => '2026-06-01']);
 
-    $service = app(ScholarshipAdjustmentCandidateService::class);
+    $action = app(IdentifyCandidatesAction::class);
     $actor = User::factory()->create();
 
-    $service->identify($ctx['campus']->id, $ctx['source']->id, $ctx['target']->id, $actor->id);
+    $action->run($ctx['campus']->id, $ctx['source']->id, $ctx['target']->id, $actor->id);
 
     $dossier = ScholarshipAdjustmentDossier::query()->where('student_id', $fixture['student']->id)->first();
 
@@ -259,11 +259,11 @@ it('is idempotent: a second identification run does not duplicate the dossier', 
     $ctx = candidateBaseContext();
     $fixture = candidateEligibleStudent($ctx);
 
-    $service = app(ScholarshipAdjustmentCandidateService::class);
+    $action = app(IdentifyCandidatesAction::class);
     $actor = User::factory()->create();
 
-    $first = $service->identify($ctx['campus']->id, $ctx['source']->id, $ctx['target']->id, $actor->id);
-    $second = $service->identify($ctx['campus']->id, $ctx['source']->id, $ctx['target']->id, $actor->id);
+    $first = $action->run($ctx['campus']->id, $ctx['source']->id, $ctx['target']->id, $actor->id);
+    $second = $action->run($ctx['campus']->id, $ctx['source']->id, $ctx['target']->id, $actor->id);
 
     expect($first['created'])->toBe(1)
         ->and($second['created'])->toBe(0)

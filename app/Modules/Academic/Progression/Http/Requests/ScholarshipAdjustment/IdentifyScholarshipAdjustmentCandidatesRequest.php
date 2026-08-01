@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Http\Requests\ScholarshipAdjustment;
+namespace App\Modules\Academic\Progression\Http\Requests\ScholarshipAdjustment;
 
 use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Http\FormRequest;

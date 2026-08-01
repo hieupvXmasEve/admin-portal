@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\User;
-use App\Modules\Academic\Services\ScholarshipAdjustmentCandidateService;
+use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\IdentifyCandidatesAction;
 use Illuminate\Console\Command;
 
 /**
@@ -24,7 +24,7 @@ class IdentifyScholarshipAdjustmentCandidates extends Command
 
     protected $description = 'Identify scholarship adjustment candidates for a campus and semester pair';
 
-    public function handle(ScholarshipAdjustmentCandidateService $service): int
+    public function handle(IdentifyCandidatesAction $action): int
     {
         $campusId = $this->option('campus');
         $sourceSemesterId = $this->option('source-semester');
@@ -44,7 +44,7 @@ class IdentifyScholarshipAdjustmentCandidates extends Command
         }
 
         try {
-            $result = $service->identify(
+            $result = $action->run(
                 (int) $campusId,
                 (int) $sourceSemesterId,
                 (int) $targetSemesterId,

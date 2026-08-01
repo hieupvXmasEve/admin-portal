@@ -105,24 +105,33 @@ Guard: decision blocked until `interview_status = completed`, EXCEPT exception p
 ## Related Code Files
 
 - Create: migration `create_scholarship_adjustment_dossiers_table`
-- Create: `app/Modules/Academic/Models/ScholarshipAdjustmentDossier.php`
-- Create: `app/Modules/Academic/Services/ScholarshipAdjustmentCandidateService.php` (+ dedicated query object)
-- Create: `app/Modules/Academic/Services/ScholarshipAdjustmentDecisionService.php` (single status writer)
-- Create: `app/Console/Commands/IdentifyScholarshipAdjustmentCandidates.php`
-- Create: `app/Modules/Academic/Http/Web/ScholarshipAdjustmentDossierController.php` (Academic-owned — module HTTP, NOT global `app/Http/Controllers`)
-- Create: `app/Modules/Academic/Http/Requests/ScholarshipAdjustment/*.php` (6 FormRequests, module namespace)
-- Create: `app/Modules/Academic/Policies/ScholarshipAdjustmentDossierPolicy.php`
-- Register routes in `app/Modules/Academic/routes/web.php` (module route file — NOT a global `routes/web/*` shell)
+- `app/Modules/Academic/Progression/Models/ScholarshipAdjustmentDossier.php`
+- `app/Modules/Academic/Progression/Queries/ScholarshipAdjustmentCandidateQuery.php`
+- `app/Modules/Academic/Progression/Support/ScholarshipAdjustmentDossierFactory.php` (shared dossier-creation logic)
+- `app/Modules/Academic/Progression/Support/ScholarshipAdjustmentInterviewGuard.php` (shared interview-stage guards)
+- `app/Modules/Academic/Progression/Actions/ScholarshipAdjustment/{IdentifyCandidatesAction,AddCandidateManuallyAction,ScheduleInterviewAction,RecordInterviewNoShowAction,CompleteInterviewAction,EditMinutesAction,DecideAdjustmentAction,ApproveAdjustmentAction}.php` (single status writer: Decide/ApproveAdjustmentAction)
+- `app/Console/Commands/IdentifyScholarshipAdjustmentCandidates.php` (global — Academic module has no Console dir; calls `IdentifyCandidatesAction`)
+- `app/Modules/Academic/Progression/Http/Web/ScholarshipAdjustmentDossierController.php` (Academic Progression-owned — module HTTP, NOT global `app/Http/Controllers`)
+- `app/Modules/Academic/Progression/Http/Requests/ScholarshipAdjustment/*.php` (6 FormRequests, module namespace)
+- `app/Modules/Academic/Progression/Policies/ScholarshipAdjustmentDossierPolicy.php`
+- Routes registered in `app/Modules/Academic/routes/web.php` (module route file — NOT a global `routes/web/*` shell; Progression has no own route file)
 - Create: Inertia pages `resources/js/pages/ScholarshipAdjustments/*`
 - Modify: `tests/Feature/Architecture/AcademicFinanceBoundaryArchRedProofTest.php` — broadened regexes
-- Create: `tests/Feature/Architecture/ScholarshipAdjustmentModulePlacementArchTest.php` — HTTP + routes stay in the module (placement guard)
+- `tests/Feature/Architecture/ScholarshipAdjustmentModulePlacementArchTest.php` — HTTP + routes + domain layer stay inside Academic Progression (placement guard)
 - Reuse: `ScholarshipAdjustmentContract` (P2), notification event pattern
 
 > Placement note (2026-08-01): HTTP layer was initially mislanded in global
 > `app/Http/Controllers` + `app/Http/Requests` by name-matching the pre-existing
-> global `ScholarshipController`. Moved into the Academic module; a placement
-> arch test now enforces it. See `.claude/rules/development-rules.md` →
-> "File Placement & Module Ownership".
+> global `ScholarshipController`. Moved into the Academic module.
+>
+> Placement note (2026-08-01, later same day): further relocated from Academic
+> top-level into the `Progression` sub-module (sibling of StudentDecision /
+> WarningCenter) to match its convention — model/query/policy/HTTP under
+> `Progression/`, and the three former Services (`ScholarshipAdjustmentCandidate
+> Service`, `...InterviewService`, `...DecisionService`) became Progression
+> Actions (Progression has no `Services/` dir). The placement arch test now
+> enforces both the module AND sub-module boundary. See
+> `.claude/rules/development-rules.md` → "File Placement & Module Ownership".
 
 ## Implementation Steps
 

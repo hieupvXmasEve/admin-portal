@@ -10,8 +10,9 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentScholarshipAward;
 use App\Models\User;
-use App\Modules\Academic\Models\ScholarshipAdjustmentDossier;
-use App\Modules\Academic\Services\ScholarshipAdjustmentDecisionService;
+use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\ApproveAdjustmentAction;
+use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\DecideAdjustmentAction;
+use App\Modules\Academic\Progression\Models\ScholarshipAdjustmentDossier;
 use App\Modules\Finance\Actions\CreateFinanceChargeAction;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
@@ -128,8 +129,8 @@ function decisionServiceTuitionCharge(ScholarshipAdjustmentDossier $dossier, flo
 it('blocks a decision before the interview is completed without an exception reason', function () {
     $ctx = decisionServiceDossier(['interview_status' => ScholarshipAdjustmentDossier::INTERVIEW_SCHEDULED]);
 
-    expect(fn () => app(ScholarshipAdjustmentDecisionService::class)
-        ->decide($ctx['dossier'], ScholarshipAdjustmentDossier::DECISION_REDUCE, 15.0, 'Failed 2 courses', $ctx['maker']->id))
+    expect(fn () => app(DecideAdjustmentAction::class)
+        ->run($ctx['dossier'], ScholarshipAdjustmentDossier::DECISION_REDUCE, 15.0, 'Failed 2 courses', $ctx['maker']->id))
         ->toThrow(DomainException::class);
 });
 
@@ -148,7 +149,7 @@ it('allows the exception path when the maker holds approve_scholarship_adjustmen
     ]);
     app(CampusPermissionReader::class)->forgetPermissionCodesForUserId((int) $ctx['maker']->id);
 
-    $dossier = app(ScholarshipAdjustmentDecisionService::class)->decide(
+    $dossier = app(DecideAdjustmentAction::class)->run(
         $ctx['dossier'],
         ScholarshipAdjustmentDossier::DECISION_REDUCE,
         15.0,
@@ -163,48 +164,52 @@ it('allows the exception path when the maker holds approve_scholarship_adjustmen
 it('requires adjusted_amount for a reduce decision', function () {
     $ctx = decisionServiceDossier();
 
-    expect(fn () => app(ScholarshipAdjustmentDecisionService::class)
-        ->decide($ctx['dossier'], ScholarshipAdjustmentDossier::DECISION_REDUCE, null, 'reason', $ctx['maker']->id))
+    expect(fn () => app(DecideAdjustmentAction::class)
+        ->run($ctx['dossier'], ScholarshipAdjustmentDossier::DECISION_REDUCE, null, 'reason', $ctx['maker']->id))
         ->toThrow(InvalidArgumentException::class);
 });
 
 it('rejects approval by the same user who proposed the decision', function () {
     $ctx = decisionServiceDossier();
-    $service = app(ScholarshipAdjustmentDecisionService::class);
+    $decide = app(DecideAdjustmentAction::class);
+    $approve = app(ApproveAdjustmentAction::class);
 
-    $service->decide($ctx['dossier'], ScholarshipAdjustmentDossier::DECISION_KEEP, null, 'ok', $ctx['maker']->id);
+    $decide->run($ctx['dossier'], ScholarshipAdjustmentDossier::DECISION_KEEP, null, 'ok', $ctx['maker']->id);
 
-    expect(fn () => $service->approve($ctx['dossier'], $ctx['maker']->id))
+    expect(fn () => $approve->run($ctx['dossier'], $ctx['maker']->id))
         ->toThrow(DomainException::class);
 });
 
 it('rejects approval by a checker without the campus permission', function () {
     $ctx = decisionServiceDossier();
-    $service = app(ScholarshipAdjustmentDecisionService::class);
-    $service->decide($ctx['dossier'], ScholarshipAdjustmentDossier::DECISION_KEEP, null, 'ok', $ctx['maker']->id);
+    $decide = app(DecideAdjustmentAction::class);
+    $approve = app(ApproveAdjustmentAction::class);
+    $decide->run($ctx['dossier'], ScholarshipAdjustmentDossier::DECISION_KEEP, null, 'ok', $ctx['maker']->id);
 
     $stranger = User::factory()->create();
 
-    expect(fn () => $service->approve($ctx['dossier'], $stranger->id))
+    expect(fn () => $approve->run($ctx['dossier'], $stranger->id))
         ->toThrow(DomainException::class);
 });
 
 it('resolves keep to no_adjustment without calling Finance', function () {
     $ctx = decisionServiceDossier();
-    $service = app(ScholarshipAdjustmentDecisionService::class);
-    $service->decide($ctx['dossier'], ScholarshipAdjustmentDossier::DECISION_KEEP, null, 'Kept as-is', $ctx['maker']->id);
+    $decide = app(DecideAdjustmentAction::class);
+    $approve = app(ApproveAdjustmentAction::class);
+    $decide->run($ctx['dossier'], ScholarshipAdjustmentDossier::DECISION_KEEP, null, 'Kept as-is', $ctx['maker']->id);
 
-    $dossier = $service->approve($ctx['dossier'], $ctx['checker']->id);
+    $dossier = $approve->run($ctx['dossier'], $ctx['checker']->id);
 
     expect($dossier->status)->toBe(ScholarshipAdjustmentDossier::STATUS_NO_ADJUSTMENT);
 });
 
 it('resolves cancel to cancelled', function () {
     $ctx = decisionServiceDossier();
-    $service = app(ScholarshipAdjustmentDecisionService::class);
-    $service->decide($ctx['dossier'], ScholarshipAdjustmentDossier::DECISION_CANCEL, null, 'Not applicable', $ctx['maker']->id);
+    $decide = app(DecideAdjustmentAction::class);
+    $approve = app(ApproveAdjustmentAction::class);
+    $decide->run($ctx['dossier'], ScholarshipAdjustmentDossier::DECISION_CANCEL, null, 'Not applicable', $ctx['maker']->id);
 
-    $dossier = $service->approve($ctx['dossier'], $ctx['checker']->id);
+    $dossier = $approve->run($ctx['dossier'], $ctx['checker']->id);
 
     expect($dossier->status)->toBe(ScholarshipAdjustmentDossier::STATUS_CANCELLED);
 });
@@ -213,10 +218,11 @@ it('hands off a reduce decision to Finance and marks the dossier applied when an
     $ctx = decisionServiceDossier();
     decisionServiceTuitionCharge($ctx['dossier']);
 
-    $service = app(ScholarshipAdjustmentDecisionService::class);
-    $service->decide($ctx['dossier'], ScholarshipAdjustmentDossier::DECISION_REDUCE, 15.0, 'Failed 2 courses', $ctx['maker']->id);
+    $decide = app(DecideAdjustmentAction::class);
+    $approve = app(ApproveAdjustmentAction::class);
+    $decide->run($ctx['dossier'], ScholarshipAdjustmentDossier::DECISION_REDUCE, 15.0, 'Failed 2 courses', $ctx['maker']->id);
 
-    $dossier = $service->approve($ctx['dossier'], $ctx['checker']->id);
+    $dossier = $approve->run($ctx['dossier'], $ctx['checker']->id);
 
     expect($dossier->status)->toBe(ScholarshipAdjustmentDossier::STATUS_APPLIED)
         ->and(ScholarshipSemesterAdjustment::query()
@@ -229,10 +235,11 @@ it('hands off a suspend_full decision as adjusted_amount zero when an invoice al
     $ctx = decisionServiceDossier();
     decisionServiceTuitionCharge($ctx['dossier']);
 
-    $service = app(ScholarshipAdjustmentDecisionService::class);
-    $service->decide($ctx['dossier'], ScholarshipAdjustmentDossier::DECISION_SUSPEND_FULL, 0.0, 'Full suspension', $ctx['maker']->id);
+    $decide = app(DecideAdjustmentAction::class);
+    $approve = app(ApproveAdjustmentAction::class);
+    $decide->run($ctx['dossier'], ScholarshipAdjustmentDossier::DECISION_SUSPEND_FULL, 0.0, 'Full suspension', $ctx['maker']->id);
 
-    $dossier = $service->approve($ctx['dossier'], $ctx['checker']->id);
+    $dossier = $approve->run($ctx['dossier'], $ctx['checker']->id);
 
     expect($dossier->status)->toBe(ScholarshipAdjustmentDossier::STATUS_APPLIED)
         ->and(ScholarshipSemesterAdjustment::query()
@@ -245,10 +252,11 @@ it('does NOT mark the dossier applied when no invoice exists yet — status stay
     // Regression test for the pending_apply mislabel: Finance accepts and
     // stores the adjustment for later, but no money has actually moved yet.
     $ctx = decisionServiceDossier();
-    $service = app(ScholarshipAdjustmentDecisionService::class);
-    $service->decide($ctx['dossier'], ScholarshipAdjustmentDossier::DECISION_REDUCE, 15.0, 'Failed 2 courses', $ctx['maker']->id);
+    $decide = app(DecideAdjustmentAction::class);
+    $approve = app(ApproveAdjustmentAction::class);
+    $decide->run($ctx['dossier'], ScholarshipAdjustmentDossier::DECISION_REDUCE, 15.0, 'Failed 2 courses', $ctx['maker']->id);
 
-    $dossier = $service->approve($ctx['dossier'], $ctx['checker']->id);
+    $dossier = $approve->run($ctx['dossier'], $ctx['checker']->id);
 
     expect($dossier->status)->toBe(ScholarshipAdjustmentDossier::STATUS_APPROVED)
         ->and(ScholarshipSemesterAdjustment::query()
@@ -261,28 +269,30 @@ it('rejects a new decision on a dossier that is already applied', function () {
     $ctx = decisionServiceDossier();
     decisionServiceTuitionCharge($ctx['dossier']);
 
-    $service = app(ScholarshipAdjustmentDecisionService::class);
-    $service->decide($ctx['dossier'], ScholarshipAdjustmentDossier::DECISION_REDUCE, 15.0, 'first pass', $ctx['maker']->id);
-    $applied = $service->approve($ctx['dossier'], $ctx['checker']->id);
+    $decide = app(DecideAdjustmentAction::class);
+    $approve = app(ApproveAdjustmentAction::class);
+    $decide->run($ctx['dossier'], ScholarshipAdjustmentDossier::DECISION_REDUCE, 15.0, 'first pass', $ctx['maker']->id);
+    $applied = $approve->run($ctx['dossier'], $ctx['checker']->id);
 
-    expect(fn () => $service->decide($applied, ScholarshipAdjustmentDossier::DECISION_SUSPEND_FULL, 0.0, 'second pass', $ctx['maker']->id))
+    expect(fn () => $decide->run($applied, ScholarshipAdjustmentDossier::DECISION_SUSPEND_FULL, 0.0, 'second pass', $ctx['maker']->id))
         ->toThrow(DomainException::class);
 });
 
 it('rejects the defer decision type as unsupported', function () {
     $ctx = decisionServiceDossier();
 
-    expect(fn () => app(ScholarshipAdjustmentDecisionService::class)
-        ->decide($ctx['dossier'], ScholarshipAdjustmentDossier::DECISION_DEFER, null, 'reason', $ctx['maker']->id))
+    expect(fn () => app(DecideAdjustmentAction::class)
+        ->run($ctx['dossier'], ScholarshipAdjustmentDossier::DECISION_DEFER, null, 'reason', $ctx['maker']->id))
         ->toThrow(InvalidArgumentException::class);
 });
 
 it('approved decisions are immutable — a second approve call is rejected', function () {
     $ctx = decisionServiceDossier();
-    $service = app(ScholarshipAdjustmentDecisionService::class);
-    $service->decide($ctx['dossier'], ScholarshipAdjustmentDossier::DECISION_KEEP, null, 'ok', $ctx['maker']->id);
-    $service->approve($ctx['dossier'], $ctx['checker']->id);
+    $decide = app(DecideAdjustmentAction::class);
+    $approve = app(ApproveAdjustmentAction::class);
+    $decide->run($ctx['dossier'], ScholarshipAdjustmentDossier::DECISION_KEEP, null, 'ok', $ctx['maker']->id);
+    $approve->run($ctx['dossier'], $ctx['checker']->id);
 
-    expect(fn () => $service->approve($ctx['dossier']->fresh(), $ctx['checker']->id))
+    expect(fn () => $approve->run($ctx['dossier']->fresh(), $ctx['checker']->id))
         ->toThrow(DomainException::class);
 });

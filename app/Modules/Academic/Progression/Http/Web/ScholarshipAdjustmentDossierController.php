@@ -2,19 +2,22 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Http\Web;
+namespace App\Modules\Academic\Progression\Http\Web;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Academic\Http\Requests\ScholarshipAdjustment\AddScholarshipAdjustmentCandidateManuallyRequest;
-use App\Modules\Academic\Http\Requests\ScholarshipAdjustment\ApproveScholarshipAdjustmentRequest;
-use App\Modules\Academic\Http\Requests\ScholarshipAdjustment\CompleteScholarshipAdjustmentInterviewRequest;
-use App\Modules\Academic\Http\Requests\ScholarshipAdjustment\DecideScholarshipAdjustmentRequest;
-use App\Modules\Academic\Http\Requests\ScholarshipAdjustment\IdentifyScholarshipAdjustmentCandidatesRequest;
-use App\Modules\Academic\Http\Requests\ScholarshipAdjustment\ScheduleScholarshipAdjustmentInterviewRequest;
-use App\Modules\Academic\Models\ScholarshipAdjustmentDossier;
-use App\Modules\Academic\Services\ScholarshipAdjustmentCandidateService;
-use App\Modules\Academic\Services\ScholarshipAdjustmentDecisionService;
-use App\Modules\Academic\Services\ScholarshipAdjustmentInterviewService;
+use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\AddCandidateManuallyAction;
+use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\ApproveAdjustmentAction;
+use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\CompleteInterviewAction;
+use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\DecideAdjustmentAction;
+use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\IdentifyCandidatesAction;
+use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\ScheduleInterviewAction;
+use App\Modules\Academic\Progression\Http\Requests\ScholarshipAdjustment\AddScholarshipAdjustmentCandidateManuallyRequest;
+use App\Modules\Academic\Progression\Http\Requests\ScholarshipAdjustment\ApproveScholarshipAdjustmentRequest;
+use App\Modules\Academic\Progression\Http\Requests\ScholarshipAdjustment\CompleteScholarshipAdjustmentInterviewRequest;
+use App\Modules\Academic\Progression\Http\Requests\ScholarshipAdjustment\DecideScholarshipAdjustmentRequest;
+use App\Modules\Academic\Progression\Http\Requests\ScholarshipAdjustment\IdentifyScholarshipAdjustmentCandidatesRequest;
+use App\Modules\Academic\Progression\Http\Requests\ScholarshipAdjustment\ScheduleScholarshipAdjustmentInterviewRequest;
+use App\Modules\Academic\Progression\Models\ScholarshipAdjustmentDossier;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -81,12 +84,12 @@ class ScholarshipAdjustmentDossierController extends Controller
         ]);
     }
 
-    public function identify(IdentifyScholarshipAdjustmentCandidatesRequest $request, ScholarshipAdjustmentCandidateService $service)
+    public function identify(IdentifyScholarshipAdjustmentCandidatesRequest $request)
     {
         $validated = $request->validated();
 
         try {
-            $result = $service->identify(
+            $result = app(IdentifyCandidatesAction::class)->run(
                 (int) $validated['campus_id'],
                 (int) $validated['source_semester_id'],
                 (int) $validated['target_semester_id'],
@@ -99,12 +102,12 @@ class ScholarshipAdjustmentDossierController extends Controller
         return back()->with('success', "Identified {$result['created']} new candidate(s); {$result['skipped_existing']} already had a dossier.");
     }
 
-    public function addManually(AddScholarshipAdjustmentCandidateManuallyRequest $request, ScholarshipAdjustmentCandidateService $service)
+    public function addManually(AddScholarshipAdjustmentCandidateManuallyRequest $request)
     {
         $validated = $request->validated();
 
         try {
-            $service->addManually(
+            app(AddCandidateManuallyAction::class)->run(
                 $validated['student_code'],
                 (int) $validated['source_semester_id'],
                 (int) $validated['target_semester_id'],
@@ -121,11 +124,10 @@ class ScholarshipAdjustmentDossierController extends Controller
     public function scheduleInterview(
         ScheduleScholarshipAdjustmentInterviewRequest $request,
         ScholarshipAdjustmentDossier $dossier,
-        ScholarshipAdjustmentInterviewService $service,
     ) {
         $validated = $request->validated();
 
-        $service->schedule(
+        ScheduleInterviewAction::run(
             $dossier,
             new \DateTimeImmutable($validated['scheduled_at']),
             $validated['mode'],
@@ -139,11 +141,10 @@ class ScholarshipAdjustmentDossierController extends Controller
     public function completeInterview(
         CompleteScholarshipAdjustmentInterviewRequest $request,
         ScholarshipAdjustmentDossier $dossier,
-        ScholarshipAdjustmentInterviewService $service,
     ) {
         $validated = $request->validated();
 
-        $service->complete($dossier, $validated['minutes'], $validated['participants'] ?? []);
+        CompleteInterviewAction::run($dossier, $validated['minutes'], $validated['participants'] ?? []);
 
         return back()->with('success', 'Interview completed.');
     }
@@ -151,12 +152,11 @@ class ScholarshipAdjustmentDossierController extends Controller
     public function decide(
         DecideScholarshipAdjustmentRequest $request,
         ScholarshipAdjustmentDossier $dossier,
-        ScholarshipAdjustmentDecisionService $service,
     ) {
         $validated = $request->validated();
 
         try {
-            $service->decide(
+            app(DecideAdjustmentAction::class)->run(
                 $dossier,
                 $validated['decision_type'],
                 isset($validated['adjusted_amount']) ? (float) $validated['adjusted_amount'] : null,
@@ -174,10 +174,9 @@ class ScholarshipAdjustmentDossierController extends Controller
     public function approve(
         ApproveScholarshipAdjustmentRequest $request,
         ScholarshipAdjustmentDossier $dossier,
-        ScholarshipAdjustmentDecisionService $service,
     ) {
         try {
-            $updated = $service->approve($dossier, (int) $request->user()->id);
+            $updated = app(ApproveAdjustmentAction::class)->run($dossier, (int) $request->user()->id);
         } catch (\DomainException $e) {
             return back()->withErrors(['error' => $e->getMessage()]);
         }

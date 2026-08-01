@@ -10,7 +10,7 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentScholarshipAward;
 use App\Models\User;
-use App\Modules\Academic\Models\ScholarshipAdjustmentDossier;
+use App\Modules\Academic\Progression\Models\ScholarshipAdjustmentDossier;
 use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;

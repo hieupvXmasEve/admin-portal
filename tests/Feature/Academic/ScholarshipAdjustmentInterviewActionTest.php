@@ -8,8 +8,11 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentScholarshipAward;
 use App\Models\User;
-use App\Modules\Academic\Models\ScholarshipAdjustmentDossier;
-use App\Modules\Academic\Services\ScholarshipAdjustmentInterviewService;
+use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\CompleteInterviewAction;
+use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\EditMinutesAction;
+use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\RecordInterviewNoShowAction;
+use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\ScheduleInterviewAction;
+use App\Modules\Academic\Progression\Models\ScholarshipAdjustmentDossier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -56,8 +59,7 @@ it('schedules an interview and moves the dossier to interview_scheduled', functi
     $dossier = interviewServiceDossier();
     $staff = User::factory()->create();
 
-    $updated = app(ScholarshipAdjustmentInterviewService::class)
-        ->schedule($dossier, now()->addDays(3), 'online', null, $staff->id);
+    $updated = ScheduleInterviewAction::run($dossier, now()->addDays(3), 'online', null, $staff->id);
 
     expect($updated->status)->toBe(ScholarshipAdjustmentDossier::STATUS_INTERVIEW_SCHEDULED)
         ->and($updated->interview_status)->toBe(ScholarshipAdjustmentDossier::INTERVIEW_SCHEDULED)
@@ -67,7 +69,7 @@ it('schedules an interview and moves the dossier to interview_scheduled', functi
 it('records a student no-show', function () {
     $dossier = interviewServiceDossier();
 
-    $updated = app(ScholarshipAdjustmentInterviewService::class)->recordNoShow($dossier);
+    $updated = RecordInterviewNoShowAction::run($dossier);
 
     expect($updated->status)->toBe(ScholarshipAdjustmentDossier::STATUS_STUDENT_NO_SHOW)
         ->and($updated->interview_status)->toBe(ScholarshipAdjustmentDossier::INTERVIEW_STUDENT_NO_SHOW);
@@ -76,8 +78,7 @@ it('records a student no-show', function () {
 it('completes an interview, sets minutes, and makes the dossier decidable', function () {
     $dossier = interviewServiceDossier();
 
-    $updated = app(ScholarshipAdjustmentInterviewService::class)
-        ->complete($dossier, 'Discussed 2 failed courses.', ['staff', 'student']);
+    $updated = CompleteInterviewAction::run($dossier, 'Discussed 2 failed courses.', ['staff', 'student']);
 
     expect($updated->status)->toBe(ScholarshipAdjustmentDossier::STATUS_INTERVIEWED)
         ->and($updated->interview_status)->toBe(ScholarshipAdjustmentDossier::INTERVIEW_COMPLETED)
@@ -87,38 +88,35 @@ it('completes an interview, sets minutes, and makes the dossier decidable', func
 
 it('refuses to reopen a dossier that already has an approved decision', function () {
     $dossier = interviewServiceDossier();
-    $service = app(ScholarshipAdjustmentInterviewService::class);
-    $service->complete($dossier, 'Initial minutes', []);
+    CompleteInterviewAction::run($dossier, 'Initial minutes', []);
     $dossier->update(['status' => ScholarshipAdjustmentDossier::STATUS_APPLIED]);
 
-    expect(fn () => $service->complete($dossier->fresh(), 'Attempted reopen', []))
+    expect(fn () => CompleteInterviewAction::run($dossier->fresh(), 'Attempted reopen', []))
         ->toThrow(DomainException::class);
 
-    expect(fn () => $service->recordNoShow($dossier->fresh()))
+    expect(fn () => RecordInterviewNoShowAction::run($dossier->fresh()))
         ->toThrow(DomainException::class);
 
-    expect(fn () => $service->schedule($dossier->fresh(), now()->addDay(), 'online', null, User::factory()->create()->id))
+    expect(fn () => ScheduleInterviewAction::run($dossier->fresh(), now()->addDay(), 'online', null, User::factory()->create()->id))
         ->toThrow(DomainException::class);
 });
 
 it('refuses to edit minutes once the dossier is applied — evidence is frozen', function () {
     $dossier = interviewServiceDossier();
-    $service = app(ScholarshipAdjustmentInterviewService::class);
-    $completed = $service->complete($dossier, 'Initial minutes', []);
+    $completed = CompleteInterviewAction::run($dossier, 'Initial minutes', []);
     $completed->update(['status' => ScholarshipAdjustmentDossier::STATUS_APPLIED]);
 
-    expect(fn () => $service->editMinutes($completed->fresh(), 'Late edit'))
+    expect(fn () => EditMinutesAction::run($completed->fresh(), 'Late edit'))
         ->toThrow(DomainException::class);
 });
 
 it('bumps minutes_version on every edit, invalidating a prior student confirmation', function () {
     $dossier = interviewServiceDossier();
-    $service = app(ScholarshipAdjustmentInterviewService::class);
 
-    $completed = $service->complete($dossier, 'Draft minutes', []);
+    $completed = CompleteInterviewAction::run($dossier, 'Draft minutes', []);
     expect($completed->minutes_version)->toBe(1);
 
-    $edited = $service->editMinutes($completed, 'Corrected minutes');
+    $edited = EditMinutesAction::run($completed, 'Corrected minutes');
     expect($edited->minutes_version)->toBe(2)
         ->and($edited->minutes)->toBe('Corrected minutes');
 });

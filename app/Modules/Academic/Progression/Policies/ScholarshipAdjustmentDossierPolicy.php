@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Policies;
+namespace App\Modules\Academic\Progression\Policies;
 
 use App\Models\User;
-use App\Modules\Academic\Models\ScholarshipAdjustmentDossier;
+use App\Modules\Academic\Progression\Models\ScholarshipAdjustmentDossier;
 use App\Shared\Contracts\Identity\CampusPermissionReader;
 
 /**
