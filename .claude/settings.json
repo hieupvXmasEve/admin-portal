@@ -7,6 +7,10 @@
           {
             "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/plan-format-kanban.cjs\"",
             "type": "command"
+          },
+          {
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/vue-inertia-feedback.cjs\"",
+            "type": "command"
           }
         ],
         "matcher": "Edit|Write"
@@ -35,6 +39,10 @@
         "hooks": [
           {
             "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/descriptive-name.cjs\"",
+            "type": "command"
+          },
+          {
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/module-placement-guard.cjs\"",
             "type": "command"
           }
         ],
