@@ -80,7 +80,10 @@ return [
 
     'locale' => env('APP_LOCALE', 'vn'),
 
-    'fallback_locale' => env('APP_FALLBACK_LOCALE', 'vn'),
+    // Falls back to English rather than to itself: a key missing from lang/vn
+    // (e.g. one a package adds later) then renders an English sentence instead
+    // of leaking the raw key like "validation.required" into the UI.
+    'fallback_locale' => env('APP_FALLBACK_LOCALE', 'en'),
 
     'faker_locale' => env('APP_FAKER_LOCALE', 'vi_VN'),
 
