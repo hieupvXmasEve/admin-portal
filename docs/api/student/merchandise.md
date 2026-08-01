@@ -46,6 +46,43 @@ item hidden or archived returns `404` from `show`.
 `show` variants are filtered to `campus_id = <student's campus>` and
 `is_active = true`. A variant that exists at another campus is not returned.
 
+`GET /store` list item (inside the paginated `data[]`):
+
+```json
+{
+  "id": 12,
+  "name": "Campus Hoodie",
+  "gold_price": 250,
+  "availability": "available",
+  "image": "merchandise/abc.jpg"
+}
+```
+
+- `image` is the primary image path (string) or `null`. It is a storage path,
+  not a fully-qualified URL — resolve against the image base URL client-side.
+- The list does NOT include `description` or `variants`; fetch `show` for those.
+
+`GET /store/{merchandise}` detail:
+
+```json
+{
+  "id": 12,
+  "name": "Campus Hoodie",
+  "description": "Soft fleece hoodie",
+  "gold_price": 250,
+  "availability": "available",
+  "images": [{ "path": "merchandise/abc.jpg", "is_primary": true }],
+  "variants": [
+    { "id": 34, "color": "Black", "size": "L", "stock_quantity": 8 }
+  ]
+}
+```
+
+- `description`, `color`, `size` may be `null`. There is NO `variant.label`
+  field — build a display label client-side from `color` / `size`.
+- `images[].path` is a storage path (same resolution as list `image`).
+- `variants[].stock_quantity` is the live per-campus stock (integer).
+
 ## Dashboard
 
 `GET /dashboard` returns:
