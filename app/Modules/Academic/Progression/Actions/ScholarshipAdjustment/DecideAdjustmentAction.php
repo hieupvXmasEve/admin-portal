@@ -72,13 +72,27 @@ class DecideAdjustmentAction
             throw new \InvalidArgumentException('adjusted_amount is required for reduce/suspend_full decisions.');
         }
 
+        // An adjustment only ever reduces. A value above the awarded amount is
+        // silently clamped by the discount resolver, so without this guard the
+        // dossier records a decision that changes no money at all. Compared
+        // against the dossier's own snapshot, not the live definition, which
+        // may have been edited since the dossier was raised.
+        if ($adjustedAmount !== null
+            && $dossier->original_amount !== null
+            && $adjustedAmount > (float) $dossier->original_amount) {
+            throw new \InvalidArgumentException(
+                "adjusted_amount ({$adjustedAmount}) cannot exceed the awarded amount ({$dossier->original_amount}).",
+            );
+        }
+
         // P4 confirmation gate: a fee-increasing (money) decision requires the
-        // student to have acknowledged the interview minutes. Overdue is
-        // overridable by an approver (same permission as the interview-override
-        // exception path); disputed/pending/declined/absent are hard blocks —
-        // never bind a fee increase over an unaddressed dispute.
+        // student to have acknowledged the interview minutes, or an approver to
+        // have overruled their dispute on the record (OverruleDisputeAction).
+        // Overdue is overridable inline by an approver; pending/declined and an
+        // UNADDRESSED dispute are hard blocks — a fee increase is never bound
+        // over an objection nobody has reviewed.
         if (in_array($decisionType, ScholarshipAdjustmentDossier::MONEY_DECISION_TYPES, true)
-            && ! $dossier->isStudentConfirmed()) {
+            && ! $dossier->canProceedToMoneyDecision()) {
             $isOverrideableOverdue = $dossier->confirmation_status === ScholarshipAdjustmentDossier::CONFIRMATION_OVERDUE
                 && $exceptionOverrideReason !== null;
 
@@ -95,10 +109,19 @@ class DecideAdjustmentAction
             }
         }
 
+        // Only a money decision carries an amount. keep/cancel never reach
+        // Finance (see ApproveAdjustmentAction), so a value left in the form
+        // would be stored as a scholarship change that never happens — and
+        // every surface reading decision_adjusted_amount (the fee-impact
+        // preview above all) would show a fee movement that is not real.
+        $storedAmount = in_array($decisionType, ScholarshipAdjustmentDossier::MONEY_DECISION_TYPES, true)
+            ? $adjustedAmount
+            : null;
+
         $dossier->update([
             'status' => ScholarshipAdjustmentDossier::STATUS_READY_FOR_DECISION,
             'decision_type' => $decisionType,
-            'decision_adjusted_amount' => $adjustedAmount,
+            'decision_adjusted_amount' => $storedAmount,
             'decision_reason' => $reason.($exceptionOverrideReason !== null ? " [Exception: {$exceptionOverrideReason}]" : ''),
             'proposed_by_user_id' => $makerUserId,
             'decided_at' => now(),
