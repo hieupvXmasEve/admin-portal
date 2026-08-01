@@ -9,6 +9,7 @@ use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Queries\GetActiveScholarshipAdjustmentQuery;
+use App\Modules\Finance\Queries\GetUnresolvedPriorAdjustmentQuery;
 use App\Modules\Finance\Services\InvoiceGenerationService;
 use App\Modules\Finance\Support\BillingAccountProvisioner;
 use App\Modules\Finance\Support\ScholarshipDiscountResolver;
@@ -106,6 +107,17 @@ class CreateFinanceChargeAction
         $adjustment = app(GetActiveScholarshipAdjustmentQuery::class)
             ->handle((int) $tuitionCharge->student_id, (int) $tuitionCharge->semester_id);
 
+        // Restoration gate (Phase 5): no adjustment for THIS semester, but an
+        // earlier `applied` adjustment carries forward unresolved (no
+        // approved restoration) — carry its reduced rate forward rather than
+        // silently restoring the full award.
+        $isCarryForward = false;
+        if ($adjustment === null) {
+            $adjustment = app(GetUnresolvedPriorAdjustmentQuery::class)
+                ->handle((int) $tuitionCharge->student_id, (int) $tuitionCharge->semester_id);
+            $isCarryForward = $adjustment !== null;
+        }
+
         // FIN-04/07: cap the discount via the shared resolver so every
         // generation path produces the same capped number and a
         // fixed_amount/over-100% scholarship can never push balance negative.
@@ -124,12 +136,16 @@ class CreateFinanceChargeAction
             return;
         }
 
+        $description = $isCarryForward
+            ? "Scholarship carry-forward (adj #{$adjustment->id}): {$scholarshipDef->name}"
+            : "Scholarship: {$scholarshipDef->name}";
+
         $this->invoiceService->applyInvoiceDiscount(
             $invoice,
             'scholarship',
             $discountAmount,
             StudentScholarshipAward::class,
-            "Scholarship: {$scholarshipDef->name}",
+            $description,
             (int) $award->id,
             $tuitionCharge->created_by_user_id,
         );

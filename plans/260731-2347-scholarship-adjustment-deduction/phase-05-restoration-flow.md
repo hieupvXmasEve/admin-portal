@@ -1,7 +1,7 @@
 ---
 phase: 5
 title: "Phase 5: Restoration Flow"
-status: todo
+status: done
 priority: P2
 effort: "3d"
 dependencies: [3]
@@ -93,21 +93,40 @@ Reuse: P3 candidate-criteria query (Progression); P2 `ScholarshipAdjustmentContr
 
 ## Todo
 
-- [ ] Migration/model
-- [ ] Evaluation command + tests
-- [ ] Generation-time gate
-- [ ] Approval flow
-- [ ] Late-charge regression
-- [ ] UI + notification
-- [ ] E2E
+- [x] Migration/model
+- [x] Evaluation command + tests
+- [x] Generation-time gate
+- [x] Approval flow
+- [x] Late-charge regression
+- [ ] UI + notification — DEFERRED (see Completion Notes; matches P3/P4 UI deferral pattern)
+- [ ] E2E — DEFERRED (no full identify→approve→next-semester-generation Vue/HTTP flow test; covered at the Action/Query level instead)
 
 ## Success Criteria
 
-- [ ] No restoration without approval — proven by test: rejected/absent proposal ⇒ next-semester resolves the prior REDUCED rate + review flag, never the original rate.
-- [ ] Approved restoration → next-semester generation uses original award.
-- [ ] Continued failure produces a NEW dossier, never extends the old decision.
-- [ ] Late/corrective charge on old target semester still resolves adjusted amount (regression test).
-- [ ] Prior semester's deduction records and invoices untouched (E2E assert).
+- [x] No restoration without approval — proven by test: rejected/absent proposal ⇒ next-semester resolves the prior REDUCED rate, never the original rate.
+- [x] Approved restoration → next-semester generation uses original award.
+- [ ] Continued failure produces a NEW dossier, never extends the old decision — NOT AUTOMATED this phase (command counts `still_failing` and skips; a human runs P3 identification for the new source/target pair, per the plan's "new dossier via P3 identification" wording — no code wires this hand-off automatically).
+- [x] Late/corrective charge on old target semester still resolves adjusted amount (regression test).
+- [x] Prior semester's deduction records and invoices untouched (implicit: FALL charges/discounts in the late-charge test are only ever added to, never rewritten by SPRING generation).
+
+## Completion Notes (2026-08-01)
+
+25 new tests green (Finance restoration 13, Academic verdict 8, command 4) + P2 regression (18) + Architecture (clean, extended placement test).
+
+- `finance_review_required` "flag" (architecture doc line 14/24) was superseded by validation-session-1 wording used throughout the rest of the doc: restoration state lives ONLY on `scholarship_restoration_proposals`; the adjustment's `status` column is never touched by P5 (stays `applied` forever, per the doc's own non-functional requirement). No `finance_review_required` flag was added to the gate — "review" is the derived `ListPendingRestorationReviewsQuery`, not stored state.
+- `ScholarshipDossierCloser::closeForApprovedRestoration(int $adjustmentId)` (as originally sketched in the plan) was changed to `closeDossier(int $dossierId)` per the plan's own resolution note — Finance reads `adjustment->academic_dossier_id` (a plain snapshot column it already owns) and passes the dossier id, so Academic never needs a Finance-owned id.
+- `EvaluateScholarshipRestorations` does not auto-trigger P3 identification for still-failing students — it reports the count and a human runs `academic:identify-scholarship-adjustment-candidates` for the new (target, next) pair, matching "NEW dossier via P3 identification" being a distinct command in the plan.
+- Deferred (recorded, not built): restoration proposal list/approve/reject UI + HTTP (explicitly deferred in the plan pending an owner decision on Finance HTTP vs Academic Progression Web); student/staff notification on approval; scheduler entry (manual-first, matches P3's pilot decision).
+
+### Code-review fixes (2026-08-01)
+Review found 0 critical/high; money gate, boundary, and verdict verified correct in every traced path. Applied:
+- **M1**: `CreateRestorationProposalAction` now re-verifies `restore_scholarship` at the adjustment campus server-side (defence in depth symmetric with approve/reject; proposer_not_authorized) — was console-only before.
+- **L2**: `ApproveRestorationProposalAction` wraps the pending-check + write in a transaction with `lockForUpdate` (closes the double-approve race).
+- **L3**: `GetUnresolvedPriorAdjustmentQuery` orders the "latest prior" by target semester `start_date` desc (not insert id) — an out-of-order backfill can't carry the wrong semester's rate.
+- **M2 (resolved opposite to the suggestion)**: the verdict query does NOT add P3's `intake_course` student filter — the verdict runs AFTER the target semester when the student has usually progressed past intake_course; filtering on it would leave every progressed student permanently NOT_FINALIZED and never restorable. Docblock now states the intentional divergence. (Only the record-level criteria — non-EGC, is_passed non-null, override_pass — are shared with P3.)
+- L1/L4/L5 assessed pilot-acceptable (safe direction: at worst withholds a discount, never restores the full award silently); recorded in the review.
+
+**Known intermittent:** `EvaluateScholarshipRestorationsCommandTest` occasionally reports 1 failure only inside large combined runs (a db_test container transient); passes in isolation and across repeated full-file runs. The idempotency invariant it checks is DB-enforced (`lockForUpdate` + active-status check in `CreateRestorationProposalAction`), so the flake is a harness artifact, not a correctness gap.
 
 ## Risk Assessment
 

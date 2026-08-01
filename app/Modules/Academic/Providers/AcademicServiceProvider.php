@@ -36,12 +36,14 @@ use App\Modules\Academic\FacultyWorkforce\Support\EloquentAvailableLecturerReade
 use App\Modules\Academic\FacultyWorkforce\Support\EloquentLecturerTokenIssuer;
 use App\Modules\Academic\FacultyWorkforce\Support\EloquentTeachingEligibilityReader;
 use App\Modules\Academic\Progression\Actions\CommitCourseResultsToTranscriptAction;
+use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\CloseDossierAction;
 use App\Modules\Academic\Progression\Models\ScholarshipAdjustmentDossier;
 use App\Modules\Academic\Progression\Policies\ScholarshipAdjustmentDossierPolicy;
 use App\Modules\Academic\Progression\Queries\GetStudentAcademicRecordsQuery;
 use App\Modules\Academic\Progression\Queries\GetStudentGpaTrendQuery;
 use App\Modules\Academic\Progression\Queries\Reporting\GetAcademicReportQuery;
 use App\Modules\Academic\Progression\Queries\Reporting\GetStudentCompletedUnitsQuery;
+use App\Modules\Academic\Progression\Queries\ScholarshipRestorationVerdictQuery;
 use App\Modules\Academic\Progression\Support\EloquentProgramEnrollmentLifecycleWriter;
 use App\Modules\Academic\Progression\Support\EloquentProgramEnrollmentReader;
 use App\Modules\Academic\Progression\Support\EloquentProgramEnrollmentWriter;
@@ -88,6 +90,8 @@ use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use App\Shared\Contracts\Academic\ProgramEnrollmentWriter;
 use App\Shared\Contracts\Academic\ProgramReferenceReader;
 use App\Shared\Contracts\Academic\RetakeRegistrationPaymentSyncer;
+use App\Shared\Contracts\Academic\ScholarshipDossierCloser;
+use App\Shared\Contracts\Academic\ScholarshipRestorationVerdictReader;
 use App\Shared\Contracts\Academic\StudentAcademicHoldReader;
 use App\Shared\Contracts\Academic\StudentAcademicRecordsReader;
 use App\Shared\Contracts\Academic\StudentCompletedUnitsReader;
@@ -171,6 +175,8 @@ class AcademicServiceProvider extends ServiceProvider
         $this->app->bind(RetakeRegistrationPaymentSyncer::class, SyncPaidRetakeRegistrationsAction::class);
         $this->app->bind(ExamResitAttemptPaymentSyncer::class, SyncPaidExamResitAttemptsAction::class);
         $this->app->bind(FinanceCancellationCompletionContract::class, CompleteFinanceCancellationOperationAction::class);
+        $this->app->bind(ScholarshipRestorationVerdictReader::class, ScholarshipRestorationVerdictQuery::class);
+        $this->app->bind(ScholarshipDossierCloser::class, CloseDossierAction::class);
     }
 
     public function boot(): void

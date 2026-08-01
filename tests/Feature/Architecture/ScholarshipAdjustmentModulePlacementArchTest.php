@@ -109,3 +109,39 @@ it('keeps the P4 confirmation HTTP + actions inside Academic Progression', funct
 
     expect($strayGlobal)->toBeEmpty('ScholarshipAdjustment student API is Academic-owned — place it under Academic/Progression/Http/Api/Student, not the global Api/V1/Student surface.');
 });
+
+/**
+ * Phase 5: the restoration proposal table is Finance-owned money; the
+ * verdict query and dossier-close action are Academic-owned and live in
+ * Progression alongside the rest of the dossier domain layer.
+ */
+it('keeps the P5 restoration proposal in Finance and the verdict/dossier-close in Academic Progression', function (): void {
+    $workspace = dirname(__DIR__, 3);
+
+    expect(file_exists($workspace.'/app/Modules/Finance/Models/ScholarshipRestorationProposal.php'))->toBeTrue()
+        ->and(file_exists($workspace.'/app/Modules/Academic/Progression/Queries/ScholarshipRestorationVerdictQuery.php'))->toBeTrue()
+        ->and(file_exists($workspace.'/app/Modules/Academic/Progression/Actions/ScholarshipAdjustment/CloseDossierAction.php'))->toBeTrue();
+
+    $strayModels = glob($workspace.'/app/Modules/Academic/Models/ScholarshipRestoration*.php') ?: [];
+    $strayQueries = glob($workspace.'/app/Modules/Finance/Queries/ScholarshipRestorationVerdict*.php') ?: [];
+
+    expect($strayModels)->toBeEmpty('ScholarshipRestorationProposal must live under Finance/Models, not Academic.')
+        ->and($strayQueries)->toBeEmpty('The restoration verdict query is Academic-owned, not Finance.');
+
+    // Finance's new restoration code must depend on the Shared contract
+    // only — never a concrete Academic module class or AcademicRecord model.
+    $financeRestorationFiles = array_merge(
+        glob($workspace.'/app/Modules/Finance/Actions/*RestorationProposal*.php') ?: [],
+        glob($workspace.'/app/Modules/Finance/Queries/*UnresolvedPriorAdjustment*.php') ?: [],
+        glob($workspace.'/app/Console/Commands/EvaluateScholarshipRestorations.php') ?: [],
+    );
+
+    expect($financeRestorationFiles)->not->toBeEmpty();
+
+    foreach ($financeRestorationFiles as $file) {
+        $contents = file_get_contents($file) ?: '';
+        expect($contents)
+            ->not->toContain('App\\Modules\\Academic\\')
+            ->not->toContain('App\\Models\\AcademicRecord');
+    }
+});

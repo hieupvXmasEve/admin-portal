@@ -9,6 +9,7 @@ use App\Models\StudentScholarshipAward;
 use App\Models\VoucherApplication;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Queries\GetActiveScholarshipAdjustmentQuery;
+use App\Modules\Finance\Queries\GetUnresolvedPriorAdjustmentQuery;
 use App\Modules\Finance\Services\DeferChargeResolver;
 use App\Modules\Finance\Support\ScholarshipDiscountResolver;
 use App\Modules\Finance\Support\StudentChargeTimingResolver;
@@ -293,6 +294,13 @@ class PreviewMajorChargeGenerationQuery
         // Preview must mirror execution: honor the per-semester adjustment.
         $adjustment = app(GetActiveScholarshipAdjustmentQuery::class)
             ->handle($studentId, $semesterId);
+
+        // Restoration gate (Phase 5) parity: no adjustment for THIS semester,
+        // but an earlier `applied` adjustment carries forward unresolved.
+        if ($adjustment === null) {
+            $adjustment = app(GetUnresolvedPriorAdjustmentQuery::class)
+                ->handle($studentId, $semesterId);
+        }
 
         // FIN-04/07: shared resolver owns the capped scholarship math.
         $discount = app(ScholarshipDiscountResolver::class)

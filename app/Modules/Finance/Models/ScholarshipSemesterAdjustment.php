@@ -11,6 +11,7 @@ use App\Models\StudentScholarshipAward;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * Per-semester scholarship adjustment approved by the Academic maker-checker
@@ -112,5 +113,11 @@ class ScholarshipSemesterAdjustment extends Model
     public function approvedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by_user_id');
+    }
+
+    /** Restoration proposals evaluated against this adjustment (Phase 5). */
+    public function restorationProposals(): HasMany
+    {
+        return $this->hasMany(ScholarshipRestorationProposal::class, 'scholarship_semester_adjustment_id');
     }
 }

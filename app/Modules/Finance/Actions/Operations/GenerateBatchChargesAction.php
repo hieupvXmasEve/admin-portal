@@ -14,6 +14,7 @@ use App\Modules\Finance\Models\InvoiceDiscount;
 use App\Modules\Finance\Models\ScholarshipSemesterAdjustment;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Queries\GetActiveScholarshipAdjustmentQuery;
+use App\Modules\Finance\Queries\GetUnresolvedPriorAdjustmentQuery;
 use App\Modules\Finance\Services\DeferChargeResolver;
 use App\Modules\Finance\Services\InvoiceGenerationService;
 use App\Modules\Finance\Support\BillingAccountProvisioner;
@@ -461,6 +462,16 @@ class GenerateBatchChargesAction
         $adjustment = app(GetActiveScholarshipAdjustmentQuery::class)
             ->handle((int) $invoice->student_id, (int) $invoice->semester_id);
 
+        // Restoration gate (Phase 5): no adjustment for THIS semester, but an
+        // earlier `applied` adjustment carries forward unresolved (no
+        // approved restoration) — carry its reduced rate forward.
+        $isCarryForward = false;
+        if ($adjustment === null) {
+            $adjustment = app(GetUnresolvedPriorAdjustmentQuery::class)
+                ->handle((int) $invoice->student_id, (int) $invoice->semester_id);
+            $isCarryForward = $adjustment !== null;
+        }
+
         $existingAmount = InvoiceDiscount::query()
             ->where('invoice_id', $invoice->id)
             ->where('discount_type', 'scholarship')
@@ -507,11 +518,15 @@ class GenerateBatchChargesAction
             return null;
         }
 
+        $description = $isCarryForward
+            ? "Scholarship carry-forward (adj #{$adjustment->id}): {$scholarshipDef->name}"
+            : 'Scholarship: '.$scholarshipDef->name;
+
         return [
             'discount_type' => 'scholarship',
             'amount' => $discount,
             'discount_source' => StudentScholarshipAward::class,
-            'description' => 'Scholarship: '.$scholarshipDef->name,
+            'description' => $description,
             'reference_id' => (int) $award->id,
         ];
     }
