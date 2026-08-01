@@ -38,8 +38,14 @@ class GoldService
      * Re-fetch the wallet under a row lock. Must be called inside a
      * transaction; every write path goes through here so balance mutations
      * cannot interleave.
+     *
+     * Public so callers that combine a wallet mutation with locks on other
+     * resources in the same transaction (e.g. Merchandise redemption
+     * checkout/refund) can acquire the wallet lock FIRST and honor the
+     * system-wide lock order: Gold wallet, then merchandise variants
+     * ascending by id (see App\Modules\Merchandise\Support\StockService).
      */
-    private function lockWalletForUpdate(Student $student): StudentWallet
+    public function lockWalletForUpdate(Student $student): StudentWallet
     {
         $this->getOrCreateWallet($student);
 

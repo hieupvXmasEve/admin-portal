@@ -78,19 +78,24 @@ class GoldTransactionController extends Controller
     }
 
     /**
-     * Get a specific transaction.
+     * Get a specific transaction. Student-owned only: the actor resolved by
+     * the request (which is already the target Student even for a parent
+     * proxy token, via ParentStudentAccess's user resolver override) must
+     * own this transaction. `Auth::guard('student')->user()` is deliberately
+     * NOT used here — it only resolves for a token authenticated directly on
+     * the `student` guard, so a parent-proxy or any other non-student actor
+     * made it null and skipped the ownership check entirely, letting anyone
+     * read an arbitrary transaction by id. There is no staff/admin route to
+     * this action (see routes/api/v1/student.php), so denying every
+     * non-owning actor is correct, not just a stopgap.
      */
-    public function show(GoldTransaction $transaction): JsonResponse
+    public function show(Request $request, GoldTransaction $transaction): JsonResponse
     {
-        $user = Auth::user();
-        $student = Auth::guard('student')->user();
+        $actor = $request->user();
 
-        // Students can only view their own transactions
-        if ($student && $transaction->student_id !== $student->id) {
+        if (! $actor instanceof Student || (int) $transaction->student_id !== (int) $actor->id) {
             return ApiResponse::authorizationError('Unauthorized to view this transaction');
         }
-
-        // Staff can view any transaction (handled by policy)
 
         return ApiResponse::success(
             new GoldTransactionResource($transaction->load('student')),

@@ -1,5 +1,7 @@
 # Phase 3 — Redemption
 
+> **3a DONE (2026-08-01).** Backend + contract shipped, 56 test. RedemptionService (createOrder atomic, symmetric refund, 11 transitions), migrations (redemption_orders/items, stock_movements FK, gold_transactions partial-unique dedup key), student API (student.api.auth only — parent 403), staff API + RedemptionOrderPolicy, notification via Shared Contract, docs/api/student/merchandise.md, GoldTransactionController IDOR fix. Report: [cook-260801-1602-merchandise-store-phase-3a-redemption](../reports/cook-260801-1602-merchandise-store-phase-3a-redemption.md). **3b portal pending — FE/student-nuxt not checked out.** Deferred: staff cancellation-request notification (PII scoping = Notification-owner call).
+
 Phụ thuộc Phase 1 (ledger) + Phase 2 (catalog/inventory).
 
 **Tách 3a (backend) và 3b (portal Nuxt) — RT-6.** Student portal KHÔNG phải Vue page trong repo này. Là repo Nuxt riêng `FE/student-nuxt` (git-ignored, history riêng), theo `docs/portal-repos.md`: contract ở `docs/api/student/`, chạy `./scripts/portal-status.sh`, lint/typecheck/build riêng. `Portal impact: student`.

@@ -28,7 +28,7 @@ Nguồn: FR Notion + review [review-260801-0147-merchandise-store-fr.md](../repo
 |---|---|---|
 | ✅ [1 — Gold ledger foundation](phase-1-gold-ledger-foundation.md) | **DONE 2026-08-01** — integer ledger + row-lock + audit + reclaim redesign + mint gate. 12/12 test. Report: [phase-1](../reports/cook-260801-1302-merchandise-store-phase-1.md). D11 = invocation fix (`-e DB_CONNECTION=testing`), không đổi code | — |
 | ✅ [2 — Catalog + Inventory](phase-2-catalog-inventory.md) | **DONE 2026-08-01** — module + 4 tables + StockService(lock+conditional+audit) + CRUD API + perms + campus policy + Upload via Shared Contract + admin Inertia/Vue UI (Index/Form/Show + menu). 34 test pass (1 Inertia-render env-limited in dev docker, passes CI). Report: [phase-2-backend](../reports/cook-260801-1433-merchandise-store-phase-2-backend.md). Manual UI smoke pending. | 1 |
-| [3 — Redemption](phase-3-redemption.md) | 3a: backend orders + state machine + concurrency + staff API + contract; 3b: portal Nuxt store UI (repo FE/student-nuxt) | 1, 2 |
+| 🟡 [3 — Redemption](phase-3-redemption.md) | **3a DONE 2026-08-01** — orders + items + state machine + atomic checkout/refund (wallet→variants asc lock, partial-unique double-refund guard, idempotency) + student API (parent 403) + staff API + notification seam + contract docs/api/student/merchandise.md. 56 test. Report: [phase-3a](../reports/cook-260801-1602-merchandise-store-phase-3a-redemption.md). **3b portal (FE/student-nuxt) pending — repo not present.** | 1, 2 |
 | [4 — Reports](phase-4-reports.md) | Báo cáo §19 + export | 2, 3 + stakeholder chốt |
 
 Gold Transfer: **ngoài scope** (D10) — sau khi xong Phase 4 hỏi lại user trước khi cân nhắc.

@@ -354,8 +354,7 @@ return [
             'view_any_gold_transaction' => 'view_any_gold_transaction',
             'adjust_gold_wallet' => 'adjust_gold_wallet',
         ],
-        // Merchandise store — catalog + inventory (Phase 2). Redemption order
-        // permissions land in Phase 3 once redemption_orders exists.
+        // Merchandise store — catalog + inventory (Phase 2).
         'merchandise' => [
             'view_merchandise' => 'view_merchandise',
             'create_merchandise' => 'create_merchandise',
@@ -367,6 +366,16 @@ return [
             'view_merchandise_report' => 'view_merchandise_report',
             'export_merchandise_report' => 'export_merchandise_report',
             'view_merchandise_audit' => 'view_merchandise_audit',
+        ],
+        // Merchandise redemption orders (Phase 3) — campus-scoped via
+        // RedemptionOrderPolicy, resolved from the order's snapshot campus_id.
+        'redemption' => [
+            'view_redemption_order' => 'view_redemption_order',
+            'approve_redemption_order' => 'approve_redemption_order',
+            'reject_redemption_order' => 'reject_redemption_order',
+            'cancel_redemption_order' => 'cancel_redemption_order',
+            'confirm_redemption_collection' => 'confirm_redemption_collection',
+            'mark_redemption_shipped' => 'mark_redemption_shipped',
         ],
         'fee' => [
             'view_scholarship' => 'view_scholarship',

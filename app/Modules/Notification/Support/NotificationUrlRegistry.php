@@ -31,6 +31,12 @@ final class NotificationUrlRegistry
             'web' => '/academic/enrollments/{id}',
             'mobile' => '/enrollments/{id}',
         ],
+        // Deep-links into the student portal (FE/student-nuxt) redemption
+        // order detail — see docs/api/student/merchandise.md.
+        'merchandise.order' => [
+            'web' => '/merchandise/orders/{id}',
+            'mobile' => '/merchandise/orders/{id}',
+        ],
     ];
 
     public function resolve(string $actionType, array $params, string $platform = 'web'): ?string
@@ -81,7 +87,7 @@ final class NotificationUrlRegistry
     {
         $result = $pattern;
         foreach ($params as $key => $value) {
-            $result = str_replace('{' . $key . '}', (string) $value, $result);
+            $result = str_replace('{'.$key.'}', (string) $value, $result);
         }
 
         return $result;

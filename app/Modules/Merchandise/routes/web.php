@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Modules\Merchandise\Http\Api\MerchandiseController;
 use App\Modules\Merchandise\Http\Api\MerchandiseImageController;
 use App\Modules\Merchandise\Http\Api\MerchandiseVariantController;
+use App\Modules\Merchandise\Http\Api\RedemptionOrderController;
 use App\Modules\Merchandise\Http\Web\MerchandiseWebController;
 use Illuminate\Support\Facades\Route;
 
@@ -76,4 +77,56 @@ Route::middleware(['web', 'auth'])->prefix('merchandise')->name('merchandise.')-
     Route::get('/variants/{variant}/stock-movements', [MerchandiseVariantController::class, 'stockMovements'])
         ->middleware('can:view_merchandise_audit')
         ->name('variants.stock-movements');
+});
+
+/**
+ * Staff redemption order queue + transitions. `can:` here is the coarse
+ * session-campus gate (same pattern as the merchandise routes above); the
+ * fine campus-scoped check against the ORDER's snapshot campus_id happens in
+ * RedemptionOrderController via RedemptionOrderPolicy (RT-13).
+ */
+Route::middleware(['web', 'auth'])->prefix('redemption-orders')->name('redemption-orders.')->group(function () {
+    Route::get('/', [RedemptionOrderController::class, 'index'])
+        ->middleware('can:view_redemption_order')
+        ->name('index');
+
+    Route::get('/{redemptionOrder}', [RedemptionOrderController::class, 'show'])
+        ->middleware('can:view_redemption_order')
+        ->name('show');
+
+    Route::post('/{redemptionOrder}/approve', [RedemptionOrderController::class, 'approve'])
+        ->middleware('can:approve_redemption_order')
+        ->name('approve');
+
+    Route::post('/{redemptionOrder}/reject', [RedemptionOrderController::class, 'reject'])
+        ->middleware('can:reject_redemption_order')
+        ->name('reject');
+
+    Route::post('/{redemptionOrder}/ready-for-collection', [RedemptionOrderController::class, 'setReadyForCollection'])
+        ->middleware('can:approve_redemption_order')
+        ->name('ready-for-collection');
+
+    Route::post('/{redemptionOrder}/extend-deadline', [RedemptionOrderController::class, 'extendDeadline'])
+        ->middleware('can:approve_redemption_order')
+        ->name('extend-deadline');
+
+    Route::post('/{redemptionOrder}/confirm-collected', [RedemptionOrderController::class, 'confirmCollected'])
+        ->middleware('can:confirm_redemption_collection')
+        ->name('confirm-collected');
+
+    Route::post('/{redemptionOrder}/mark-shipped', [RedemptionOrderController::class, 'markShipped'])
+        ->middleware('can:mark_redemption_shipped')
+        ->name('mark-shipped');
+
+    Route::post('/{redemptionOrder}/mark-overdue', [RedemptionOrderController::class, 'markOverdue'])
+        ->middleware('can:confirm_redemption_collection')
+        ->name('mark-overdue');
+
+    Route::post('/{redemptionOrder}/cancel-overdue', [RedemptionOrderController::class, 'cancelOverdue'])
+        ->middleware('can:cancel_redemption_order')
+        ->name('cancel-overdue');
+
+    Route::post('/{redemptionOrder}/handle-cancellation', [RedemptionOrderController::class, 'handleCancellation'])
+        ->middleware('can:cancel_redemption_order')
+        ->name('handle-cancellation');
 });
