@@ -6,6 +6,7 @@ use App\Modules\Merchandise\Http\Api\MerchandiseController;
 use App\Modules\Merchandise\Http\Api\MerchandiseImageController;
 use App\Modules\Merchandise\Http\Api\MerchandiseVariantController;
 use App\Modules\Merchandise\Http\Api\RedemptionOrderController;
+use App\Modules\Merchandise\Http\Web\MerchandiseReportController;
 use App\Modules\Merchandise\Http\Web\MerchandiseWebController;
 use Illuminate\Support\Facades\Route;
 
@@ -20,11 +21,22 @@ Route::middleware(['web', 'auth'])->prefix('merchandise')->name('merchandise.')-
         ->middleware('can:view_merchandise')
         ->name('index');
 
-    // Static segment before the {merchandise} wildcard so it isn't captured
-    // as a route-model-bound id.
+    // Static segments before the {merchandise} wildcard so they aren't
+    // captured as a route-model-bound id.
     Route::get('/create', [MerchandiseWebController::class, 'create'])
         ->middleware('can:create_merchandise')
         ->name('create');
+
+    // Read-only admin reports (Phase 4). Coarse session-campus gate here;
+    // the real campus scope is the caller's GRANTED campuses, resolved
+    // inside MerchandiseReportController (RT-13).
+    Route::get('/reports', [MerchandiseReportController::class, 'index'])
+        ->middleware('can:view_merchandise_report')
+        ->name('reports.index');
+
+    Route::get('/reports/data', [MerchandiseReportController::class, 'data'])
+        ->middleware('can:view_merchandise_report')
+        ->name('reports.data');
 
     Route::get('/{merchandise}/edit', [MerchandiseWebController::class, 'edit'])
         ->middleware('can:edit_merchandise')

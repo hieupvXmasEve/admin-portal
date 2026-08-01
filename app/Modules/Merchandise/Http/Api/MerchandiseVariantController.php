@@ -19,6 +19,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 class MerchandiseVariantController extends Controller
 {
@@ -37,7 +38,13 @@ class MerchandiseVariantController extends Controller
         // so the check resolves from the requested campus_id.
         $campusId = (int) $validated['campus_id'];
         $granted = $this->permissionReader->permissionCodesForUserId((int) Auth::id(), $campusId);
-        abort_unless(in_array('manage_merchandise_variant', $granted, true), Response::HTTP_FORBIDDEN);
+
+        // AccessDeniedHttpException (not abort(403)) so ApiExceptionHandler maps
+        // it to a 403 envelope on JSON requests — abort()'s generic HttpException
+        // falls through to 500 for expectsJson clients (e.g. the axios admin UI).
+        if (! in_array('manage_merchandise_variant', $granted, true)) {
+            throw new AccessDeniedHttpException('Not granted manage_merchandise_variant at the requested campus.');
+        }
 
         $variant = CreateMerchandiseVariantAction::run($merchandise, $validated);
 

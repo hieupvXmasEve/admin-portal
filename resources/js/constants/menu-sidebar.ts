@@ -604,6 +604,12 @@ export const mainNavGroups: NavGroup[] = [
                 icon: Package,
                 requiredPermissions: ['view_merchandise'],
             },
+            {
+                title: 'Merchandise Reports',
+                href: systemRoutes.merchandise.reports(),
+                icon: BarChart3,
+                requiredPermissions: ['view_merchandise_report'],
+            },
         ],
     },
     {

@@ -1,5 +1,7 @@
 # Phase 4 — Reports (Student Services)
 
+> **DONE (2026-08-02).** Read-only report queries (Merchandise/Queries/Reports: orders-by-status+queues, gold used/refunded reconciled to ledger, most-redeemed from order_items, stock-by-campus+movements) + MerchandiseReportController (Inertia + JSON data endpoint) + admin UI resources/js/pages/Merchandise/Reports + menu, campus-scoped via granted campuses. 66 test. **Excel export DEFERRED** (stakeholder-gated per §20 default; export_merchandise_report perm + maatwebsite/excel ready for later). Also fixed a Phase-2 latent bug: abort_unless(403)→500 on JSON, now throws AccessDeniedHttpException. Report: [cook-260802-0057-merchandise-store-phase-4-reports](../reports/cook-260802-0057-merchandise-store-phase-4-reports.md).
+
 Phụ thuộc Phase 2–3. Gated: chờ stakeholder chốt scope export (§20 Q10) trước khi làm.
 
 ## Nội dung (§19)
