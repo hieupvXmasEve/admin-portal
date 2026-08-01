@@ -53,7 +53,7 @@ Idempotency: one row with status IN (pending_approval, approved) per adjustment_
 - Completeness precondition per student: ALL enrolled units of the target semester have `grade_finalized_date` set; else skip this run.
 - Command: `finance:evaluate-scholarship-restorations --campus= --semester=` (required, validated) + staff UI trigger. Manual-first for pilot (validation session 1) — no scheduler entry; add scheduling later if operationally needed.
 
-**Approval:** `restore_scholarship` (propose) + `approve_scholarship_adjustment` (approve, different user, campus-verified server-side). On approval: notification to student; open dossier (if any) → `closed` via P3 decision service. Rejected → adjustment stays `applied`, generation gate stays closed; re-proposal allowed with new reason.
+**Approval:** `restore_scholarship` (propose) + `approve_scholarship_adjustment` (approve, different user, campus-verified server-side). On approval: notification to student; open dossier (if any) → `closed` via a P3 **Progression Action** (the dossier-status single-writer; add a `CloseDossierAction` under `Academic/Progression/Actions/ScholarshipAdjustment/` rather than writing status directly). Rejected → adjustment stays `applied`, generation gate stays closed; re-proposal allowed with new reason.
 
 **P2 apply-path hook (small modification, listed here, implemented against P2 code):** the scholarship apply path consults, besides the target-semester adjustment lookup, a "prior unresolved adjustment" check: latest `applied` adjustment for the student with `target_semester_id.start_date < current semester.start_date` and no `approved` restoration proposal → resolve provisionally with that adjustment's `adjusted_amount` (carry-forward) + flag review. One query object (`GetUnresolvedPriorAdjustmentQuery`), covered by the generation parity tests.
 
@@ -63,12 +63,23 @@ Idempotency: one row with status IN (pending_approval, approved) per adjustment_
 
 ## Related Code Files
 
-- Create: migration `create_scholarship_restoration_proposals_table`
+Paths pinned per `.claude/rules/development-rules.md` → "File Placement & Module Ownership". Two owners: **Finance** (restoration proposal table + apply-path hook — the money side) and **Academic Progression** (the academic verdict + dossier close — read by Finance through a Shared contract, never a cross-module import).
+
+Finance (owns the proposal + all money):
+- Create: migration `create_scholarship_restoration_proposals_table` (global `database/migrations/`)
 - Create: `app/Modules/Finance/Models/ScholarshipRestorationProposal.php`
-- Create: evaluation service split (Academic verdict query via shared contract + Finance proposal writer) + `app/Console/Commands/EvaluateScholarshipRestorations.php` (manual trigger, no scheduler in pilot)
-- Create: `GetUnresolvedPriorAdjustmentQuery` (Finance) + wiring into the P2 apply path + batch path
-- Create: controller + routes + UI list/approve
-- Reuse: P3 candidate criteria query object; P2 contract/authorization helpers
+- Create: Finance proposal writer + approve/reject as Finance Actions (`app/Modules/Finance/Actions/`), not a top-level Service
+- Create: `app/Modules/Finance/Queries/GetUnresolvedPriorAdjustmentQuery.php` + wiring into the P2 apply path + batch path
+- Create: `app/Console/Commands/EvaluateScholarshipRestorations.php` (global; manual trigger, no scheduler in pilot) — calls the Finance proposal writer
+
+Academic Progression (the verdict + dossier close, exposed to Finance via a Shared contract):
+- Create: academic-verdict query in `app/Modules/Academic/Progression/Queries/` (reuses the P3 candidate-criteria query object), surfaced to Finance through a `App\Shared\Contracts\Academic\*` reader (NEVER import Academic from Finance)
+- Create: `app/Modules/Academic/Progression/Actions/ScholarshipAdjustment/CloseDossierAction.php` (dossier-close single-writer)
+
+Restoration proposal UI/HTTP (co-located with the P3 dossier UI):
+- Decision to pin at P5 time: the proposal table is Finance-owned but the plan co-locates its list/approve UI with the Academic dossier detail. Resolve the controller owner FIRST (Finance module HTTP vs Academic Progression Web calling a Shared contract) before creating it — do NOT default to a global `app/Http/Controllers`. FormRequests + routes follow the chosen owner module.
+
+Reuse: P3 candidate-criteria query (Progression); P2 `ScholarshipAdjustmentContract` + campus-authorization helpers.
 
 ## Implementation Steps
 

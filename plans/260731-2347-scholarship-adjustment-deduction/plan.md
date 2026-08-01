@@ -16,6 +16,8 @@ blocks: []
 
 Implement "điều chỉnh học bổng theo học kỳ" per PRD [docs/features/academic/scholarship-adjustment-deduction.md](../../docs/features/academic/scholarship-adjustment-deduction.md). Original `StudentScholarshipAward` is never edited; a semester-scoped adjustment record changes the effective discount for one target semester only. Academic owns the dossier/decision; Finance owns the applied discount. Boundary via `App\Shared\Contracts\Finance\ScholarshipAdjustmentContract` + DTO (mirrors `FinanceIntakeContract` pattern), no cross-module model or action imports.
 
+**Module structure (as built, 2026-08-01):** the Academic side lives in the **Progression** sub-module (`app/Modules/Academic/Progression/{Models,Queries,Policies,Actions/ScholarshipAdjustment,Http/Web,Http/Requests,Support}`) — sibling of StudentDecision/WarningCenter (decisions on a student's academic standing). Behavior is expressed as Progression **Actions** (`run()`), not Services (Progression has no Services dir). The Finance side stays in `app/Modules/Finance/`. The student-portal API (P4) is its own global bounded surface (`app/Http/Controllers/Api/V1/Student/*`). A placement arch test (`tests/Feature/Architecture/ScholarshipAdjustmentModulePlacementArchTest.php`) enforces this. P4/P5 phase docs pin exact paths accordingly.
+
 **Settled decisions (brainstorm 2026-07-31, refined by red-team 2026-08-01):**
 1. `GIẢM TRỪ HỌC BỔNG` breakdown is **presentational only** — ledger keeps ONE adjusted `InvoiceDiscount` line; breakdown exposed as a separate `scholarship_breakdown` payload key (never injected into the settlement line collection — FeeTab sums those).
 2. Confirmation deadline = **1 calendar day** (Asia/Saigon) → `confirmation_overdue`.

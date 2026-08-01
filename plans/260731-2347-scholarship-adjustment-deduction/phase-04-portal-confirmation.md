@@ -14,6 +14,15 @@ dependencies: [3]
 Student confirms (or disputes) the interview minutes on the Student Portal, tied to an exact minutes version. Staff can confirm on behalf with a dedicated permission. 1-calendar-day deadline → `confirmation_overdue`.
 
 <!-- red-team 2026-08-01: student.api.auth alone (no either/parent); hold-exempt route; single status owner via decision service -->
+<!-- module-fix 2026-08-01: P3 was relocated to the Academic **Progression**
+     sub-module and Services were converted to Actions. P4 follows the same
+     convention: confirmation "decision service methods" are Progression
+     Actions under `app/Modules/Academic/Progression/Actions/ScholarshipAdjustment/`;
+     the model lives in `Academic/Progression/Models`. The STUDENT-PORTAL API,
+     however, is its own global bounded surface (`app/Http/Controllers/Api/V1/Student/*`,
+     requests in `app/Http/Requests/Api/V1/*`) — the student confirmation
+     controller belongs THERE, not in the Academic module; it stays a thin
+     transport that calls the Progression Actions. -->
 
 ## Requirements
 
@@ -42,15 +51,17 @@ confirmed_on_behalf      boolean default false
 on_behalf_note           text nullable
 ```
 
-**Single-owner rule:** `confirmation_status` and dossier `status` are both mutated ONLY through `ScholarshipAdjustmentDecisionService` methods (`requestConfirmation`, `recordStudentResponse`, `recordOnBehalfConfirmation`, `markOverdue`). The overdue command and controllers call these methods. `markOverdue` REJECTS when `confirmed_at IS NOT NULL` (race: student confirms seconds before the nightly run) — guards the confirmed+overdue inconsistency.
+**Single-owner rule:** `confirmation_status` and dossier `status` are both mutated ONLY through the confirmation **Progression Actions** (mirrors P3's split of the former decision service into Actions): `RequestConfirmationAction`, `RecordStudentResponseAction`, `RecordOnBehalfConfirmationAction`, `MarkOverdueAction` — all under `app/Modules/Academic/Progression/Actions/ScholarshipAdjustment/`. The overdue command, the student API controller, and the staff web controller call these Actions; none writes the columns directly. `MarkOverdueAction` REJECTS when `confirmed_at IS NOT NULL` (race: student confirms seconds before the nightly run) — guards the confirmed+overdue inconsistency. Any status-write guard rules (e.g. terminal-status) belong in these Actions, matching `DecideAdjustmentAction`/`ApproveAdjustmentAction`.
+
+**Confirmation gate (SETTLED 2026-08-01):** `confirmation_status` is a SEPARATE axis from the P3 main `status` (matches the separate-column schema). The P3 main flow is UNCHANGED (`interviewed → ready_for_decision → approved`). The gate is enforced INSIDE `DecideAdjustmentAction`: the maker decision is BLOCKED unless `confirmation_status === confirmed`, OR (`confirmation_status === overdue` AND a `confirmation_override_reason` is supplied by a holder of `approve_scholarship_adjustment` at the dossier campus — reuse the existing exception-path pattern already in `DecideAdjustmentAction`). `disputed`/`pending`/`declined` → decide refused. This keeps a single clean gate (no P3 state-machine rework) while making the student acknowledgement a hard precondition for a fee-increasing decision. The P3 status token `awaiting_student_confirmation` = "interview complete, `confirmation_status = pending`".
 
 **Flow:**
 
-- P3 `awaiting_student_confirmation` → sets `confirmation_requested_at`, notification → portal pending item.
-- Student POST confirm: validate `minutes_version === dossier.minutes_version` (stale ⇒ 409, client refetches); → `ready_for_decision` or `student_disputed`.
-- Minutes edited later → decision service resets confirmation to pending, clears confirmed fields, re-notifies.
-- Overdue: daily command `academic:mark-scholarship-confirmations-overdue` → pending + requested_at older than 1 calendar day (Asia/Saigon) → overdue (via decision service). Proceeding from overdue = P3 approver gate.
-- Staff on-behalf: staff web endpoint, permission + mandatory note; `confirmed_on_behalf = true`.
+- Interview completed → `RequestConfirmationAction`: sets `confirmation_status = pending` + `confirmation_requested_at`, notification → portal pending item. (Main `status` stays `interviewed`.)
+- Student POST confirm/dispute (`RecordStudentResponseAction`): validate `minutes_version === dossier.minutes_version` (stale ⇒ 409, client refetches); agree → `confirmation_status = confirmed` + `confirmed_at`/`confirmed_minutes_version`; dispute → `confirmation_status = disputed` + comment. Main `status` untouched here — the gate lives in `DecideAdjustmentAction`.
+- Minutes edited later → `EditMinutesAction` (P3) resets `confirmation_status` to pending, clears confirmed fields, re-notifies (extend the existing Action, not a new writer).
+- Overdue: daily command `academic:mark-scholarship-confirmations-overdue` → `confirmation_status = pending` + requested_at older than 1 calendar day (Asia/Saigon) → `overdue` (via `MarkOverdueAction`). Proceeding from overdue = the approver-gated decide branch above.
+- Staff on-behalf (`RecordOnBehalfConfirmationAction`): staff web endpoint, permission + mandatory note; `confirmed_on_behalf = true`, `confirmation_status = confirmed`.
 
 **Endpoints:**
 
@@ -63,13 +74,32 @@ on_behalf_note           text nullable
 
 ## Related Code Files
 
-- Create: migration adding confirmation columns
-- Create: student API controller + FormRequest + dedicated route group (`student.api.auth` alone)
-- Modify: `app/Http/Middleware/StudentApiAuthorization.php` — confirmation route-name exemption in `holdBlocksRoute()`
-- Create: `app/Console/Commands/MarkScholarshipConfirmationsOverdue.php` + scheduler registration
-- Modify: `ScholarshipAdjustmentDecisionService` — the four confirmation methods incl. overdue race guard
-- Create: student-nuxt page + composable
-- Modify: staff dossier detail UI — confirmation panel + on-behalf action
+Paths pinned per `.claude/rules/development-rules.md` → "File Placement & Module Ownership". Two owners here: the **student-portal API** (global bounded surface) and the **Academic Progression** domain.
+
+Domain layer (Academic Progression — owns the dossier + confirmation rules):
+- Create: `app/Modules/Academic/Progression/Actions/ScholarshipAdjustment/RequestConfirmationAction.php`
+- Create: `.../Actions/ScholarshipAdjustment/RecordStudentResponseAction.php` (version-match confirm/dispute; stale ⇒ 409)
+- Create: `.../Actions/ScholarshipAdjustment/RecordOnBehalfConfirmationAction.php`
+- Create: `.../Actions/ScholarshipAdjustment/MarkOverdueAction.php` (overdue race guard: no-op when `confirmed_at` set)
+- Modify: `.../Actions/ScholarshipAdjustment/EditMinutesAction.php` — reset confirmation to pending on minutes edit
+- Migration adding the confirmation columns (global `database/migrations/`)
+
+Student-portal API (global surface — matches `Api/V1/Student/DashboardController` convention; NOT the Academic module):
+- Create: `app/Http/Controllers/Api/V1/Student/ScholarshipAdjustmentConfirmationController.php` (thin transport → Progression Actions)
+- Create: FormRequest under `app/Http/Requests/Api/V1/` (student-portal request convention)
+- Register routes in `routes/api/v1/student.php` — a NEW sub-group under `student.api.auth` ALONE (no `either`, no `parent.student.access`); route names added to the hold-exemption allow-list
+- Modify: `app/Http/Middleware/StudentApiAuthorization.php` — confirmation route-name exemption in `holdBlocksRoute()` (allow-list beside `profile`)
+
+Staff web (Academic Progression — the existing dossier controller):
+- Modify: `app/Modules/Academic/Progression/Http/Web/ScholarshipAdjustmentDossierController.php` — add `confirmOnBehalf` action; route in `app/Modules/Academic/routes/web.php` (module route file); FormRequest under `app/Modules/Academic/Progression/Http/Requests/ScholarshipAdjustment/`
+
+Cross-cutting / infra (global — Academic module has no Console dir, consistent with `IdentifyScholarshipAdjustmentCandidates`):
+- Create: `app/Console/Commands/MarkScholarshipConfirmationsOverdue.php` + scheduler registration (calls `MarkOverdueAction`)
+- Placement arch test: extend `tests/Feature/Architecture/ScholarshipAdjustmentModulePlacementArchTest.php` — confirmation Actions live in Progression; staff on-behalf stays on the Progression Web controller. (The student-portal controller is intentionally global — assert it is NOT forced into the module.)
+
+Frontend (FE/student-nuxt — separate surface):
+- Create: student-nuxt page + composable (notification deep-link → minutes view + confirm/dispute)
+- Modify: staff dossier detail UI (`resources/js/pages/ScholarshipAdjustments/Show.vue`) — confirmation panel + on-behalf action
 
 ## Implementation Steps
 
@@ -96,7 +126,7 @@ on_behalf_note           text nullable
 - [ ] Overdue at +1 calendar day; confirmed-then-overdue race impossible (guard test).
 - [ ] Parent/guardian token cannot confirm (negative test); held student can confirm (exemption test).
 - [ ] On-behalf flagged with note + permission; student only sees own dossier.
-- [ ] `confirmation_status`/dossier status mutated only via decision service.
+- [ ] `confirmation_status`/dossier status mutated only via the confirmation Progression Actions (single-writer) — asserted by the placement arch test.
 
 ## Risk Assessment
 

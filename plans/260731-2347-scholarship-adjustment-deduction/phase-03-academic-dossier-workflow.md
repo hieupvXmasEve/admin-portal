@@ -27,7 +27,7 @@ Academic-owned dossier lifecycle: identify candidates from failed courses of an 
 
 ## Architecture
 
-**Table `scholarship_adjustment_dossiers`** (Academic module):
+**Table `scholarship_adjustment_dossiers`** (Academic **Progression** sub-module — model at `app/Modules/Academic/Progression/Models/ScholarshipAdjustmentDossier.php`):
 
 ```
 id
@@ -65,7 +65,7 @@ timestamps
 Index (student_id, source_semester_id, target_semester_id) + service invariant: one non-cancelled dossier per triple.
 ```
 
-**Status machine** (single writer rule: ONLY `ScholarshipAdjustmentDecisionService` mutates `status`; other services — confirmation handler, overdue command — call into it, never write the column):
+**Status machine** (single-writer rule: dossier `status` is mutated ONLY by the scholarship-adjustment **Progression Actions** — `DecideAdjustmentAction`, `ApproveAdjustmentAction`, and the interview actions via `Support/ScholarshipAdjustmentInterviewGuard`; P4/P5 confirmation/close actions likewise. No other code writes the column. — as built the former `ScholarshipAdjustmentDecisionService` was split into these Actions under `app/Modules/Academic/Progression/Actions/ScholarshipAdjustment/`):
 
 ```
 identified → interview_scheduled → interviewed → awaiting_student_confirmation
@@ -76,7 +76,7 @@ branches: student_disputed, student_no_show, confirmation_overdue,
 
 Guard: decision blocked until `interview_status = completed`, EXCEPT exception path requiring reason + `approve_scholarship_adjustment` holder.
 
-**Identification service** `ScholarshipAdjustmentCandidateService` — DEDICATED query object, NOT a reuse of `FailedStudentsService` (that service reads `session('current_campus_id')` at :19 and hard-filters on it at :38 — under artisan the session is null and `campus_id = NULL` matches zero rows; it also lacks unit-type, finalization, and override predicates):
+**Identification** — `Progression/Queries/ScholarshipAdjustmentCandidateQuery` (dossier creation via `Actions/ScholarshipAdjustment/IdentifyCandidatesAction` + `AddCandidateManuallyAction`, sharing `Support/ScholarshipAdjustmentDossierFactory`). DEDICATED query object, NOT a reuse of `FailedStudentsService` (that service reads `session('current_campus_id')` at :19 and hard-filters on it at :38 — under artisan the session is null and `campus_id = NULL` matches zero rows; it also lacks unit-type, finalization, and override predicates):
 
 - Signature: `identify(int $campusId, int $sourceSemesterId, int $targetSemesterId): CandidateResult` — campus explicit, semesters explicit.
 - Semester inputs validated: both exist, non-archived, `start_date IS NOT NULL`, source.start_date < target.start_date. NO auto-derivation of "previous semester" (`semesters.start_date` is nullable, no campus column, `is_active` non-unique — migration `2025_05_27_101351`:19-23).
