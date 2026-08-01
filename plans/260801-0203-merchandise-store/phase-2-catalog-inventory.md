@@ -1,5 +1,7 @@
 # Phase 2 — Catalog + Inventory
 
+> **Status: BACKEND DONE (2026-08-01).** Module + 4 migrations + StockService + CRUD API + permissions + `MerchandiseVariantPolicy` (campus-from-record) + Upload via Shared Contract `FileUploadGateway`. 33/33 test (incl. DomainBoundary + Gold regression). Report: [cook-260801-1433-merchandise-store-phase-2-backend](../reports/cook-260801-1433-merchandise-store-phase-2-backend.md). Deltas from draft: image upload goes through the **Shared Contract** (not Upload module concretes — DomainBoundaryArchitectureTest forbids cross-module concrete imports); variant CREATE campus-scoped to target campus_id; campus_id immutable on update. **Admin Vue/Inertia UI still pending (separate slice).**
+
 Module mới `app/Modules/Merchandise/` theo skeleton module hiện hành (Actions, Models, Http/Api, Queries, routes).
 
 **RT-4: đăng ký `MerchandiseServiceProvider` ở `bootstrap/providers.php`** — không thì routes/bindings của module không load. Nêu rõ như một bước.

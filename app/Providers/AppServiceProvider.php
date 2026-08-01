@@ -11,6 +11,7 @@ use App\Mcp\Support\PermissionMcpCampusResolver;
 use App\Models\CourseOffering;
 use App\Models\Department;
 use App\Models\Lecture;
+use App\Models\MerchandiseVariant;
 use App\Models\Program;
 use App\Models\RoomBooking;
 use App\Models\Semester;
@@ -22,6 +23,7 @@ use App\Modules\Academic\Catalog\Policies\ProgramPolicy;
 use App\Modules\Academic\FacultyWorkforce\Observers\SyncLecturerAccessEligibility;
 use App\Modules\Academic\FacultyWorkforce\Support\EloquentLecturerTokenIssuer;
 use App\Modules\Admissions\Policies\StudentApplicationPolicy;
+use App\Modules\Merchandise\Policies\MerchandiseVariantPolicy;
 use App\Policies\ApiActorPolicy;
 use App\Policies\CourseOfferingPolicy;
 use App\Shared\Contracts\Identity\LecturerTokenIssuer;
@@ -159,6 +161,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(CourseOffering::class, CourseOfferingPolicy::class);
         Gate::policy(Semester::class, AcademicPeriodPolicy::class);
         Gate::policy(Program::class, ProgramPolicy::class);
+        Gate::policy(MerchandiseVariant::class, MerchandiseVariantPolicy::class);
     }
 
     /**

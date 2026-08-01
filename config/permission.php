@@ -354,6 +354,20 @@ return [
             'view_any_gold_transaction' => 'view_any_gold_transaction',
             'adjust_gold_wallet' => 'adjust_gold_wallet',
         ],
+        // Merchandise store — catalog + inventory (Phase 2). Redemption order
+        // permissions land in Phase 3 once redemption_orders exists.
+        'merchandise' => [
+            'view_merchandise' => 'view_merchandise',
+            'create_merchandise' => 'create_merchandise',
+            'edit_merchandise' => 'edit_merchandise',
+            'archive_merchandise' => 'archive_merchandise',
+            'manage_merchandise_image' => 'manage_merchandise_image',
+            'manage_merchandise_variant' => 'manage_merchandise_variant',
+            'adjust_merchandise_stock' => 'adjust_merchandise_stock',
+            'view_merchandise_report' => 'view_merchandise_report',
+            'export_merchandise_report' => 'export_merchandise_report',
+            'view_merchandise_audit' => 'view_merchandise_audit',
+        ],
         'fee' => [
             'view_scholarship' => 'view_scholarship',
             'assign_scholarship' => 'assign_scholarship',

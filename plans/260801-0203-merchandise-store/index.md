@@ -27,7 +27,7 @@ Nguồn: FR Notion + review [review-260801-0147-merchandise-store-fr.md](../repo
 | Phase | Nội dung | Phụ thuộc |
 |---|---|---|
 | ✅ [1 — Gold ledger foundation](phase-1-gold-ledger-foundation.md) | **DONE 2026-08-01** — integer ledger + row-lock + audit + reclaim redesign + mint gate. 12/12 test. Report: [phase-1](../reports/cook-260801-1302-merchandise-store-phase-1.md). D11 = invocation fix (`-e DB_CONNECTION=testing`), không đổi code | — |
-| [2 — Catalog + Inventory](phase-2-catalog-inventory.md) | merchandise / images / variants / stock_movements, admin CRUD, permissions, audit | 1 |
+| 🟡 [2 — Catalog + Inventory](phase-2-catalog-inventory.md) | **Backend DONE 2026-08-01** — module + 4 tables + StockService(lock+conditional+audit) + CRUD API + perms + campus policy + Upload via Shared Contract; 33/33 test. Report: [phase-2-backend](../reports/cook-260801-1433-merchandise-store-phase-2-backend.md). **Admin Vue UI = pending slice.** | 1 |
 | [3 — Redemption](phase-3-redemption.md) | 3a: backend orders + state machine + concurrency + staff API + contract; 3b: portal Nuxt store UI (repo FE/student-nuxt) | 1, 2 |
 | [4 — Reports](phase-4-reports.md) | Báo cáo §19 + export | 2, 3 + stakeholder chốt |
 

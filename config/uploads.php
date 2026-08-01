@@ -158,6 +158,21 @@ return [
             'max_pixels' => 16000000,
             'canonical_extension' => true,
         ],
+        'merchandise_image' => [
+            'max_size' => env('MERCHANDISE_IMAGE_MAX_SIZE', 5120), // KB
+            'allowed_types' => ['image/jpeg', 'image/png', 'image/webp'],
+            'allowed_extensions' => ['jpg', 'jpeg', 'png', 'webp'],
+            'directory' => 'merchandise',
+            'generate_thumbnails' => false,
+            'public' => true,
+            // Named 'images' disk (env-switchable local/S3) — never hardcode
+            // Storage::disk('public').
+            'disk' => 'images',
+            'max_width' => 4096,
+            'max_height' => 4096,
+            'max_pixels' => 16000000,
+            'canonical_extension' => true,
+        ],
     ],
 
     /*

@@ -10,6 +10,7 @@ use App\Modules\Facilities\Providers\FacilitiesServiceProvider;
 use App\Modules\Finance\Providers\FinanceServiceProvider;
 use App\Modules\Identity\Providers\IdentityServiceProvider;
 use App\Modules\Institution\Providers\InstitutionServiceProvider;
+use App\Modules\Merchandise\Providers\MerchandiseServiceProvider;
 use App\Modules\Notification\Providers\NotificationServiceProvider;
 use App\Modules\Platform\Providers\PlatformServiceProvider;
 use App\Modules\StudentRegistry\Providers\StudentRegistryServiceProvider;
@@ -30,6 +31,7 @@ return [
     AcademicServiceProvider::class,
     FacilitiesServiceProvider::class,
     FinanceServiceProvider::class,
+    MerchandiseServiceProvider::class,
     NotificationServiceProvider::class,
     UploadServiceProvider::class,
     // App\Providers\TelescopeServiceProvider::class,
