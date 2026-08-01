@@ -71,9 +71,10 @@ class ApplyScholarshipSemesterAdjustmentAction implements ScholarshipAdjustmentC
             return ScholarshipAdjustmentResult::rejected('checker_inactive', 'Checker user missing or inactive.');
         }
 
-        if ($maker->id === $checker->id) {
-            return ScholarshipAdjustmentResult::rejected('maker_is_checker', 'Maker and checker must differ.');
-        }
+        // No maker != checker rule: Academic allows a proposer to approve their
+        // own decision, and re-imposing it here would only push a legitimate
+        // approval into finance_review_required. Both user ids are still
+        // persisted on the adjustment for audit.
 
         // Campus MUST be non-null here: a null campus returns the all-campus
         // union and would accept a checker with the permission anywhere.

@@ -31,9 +31,12 @@ class ApproveAdjustmentAction
     ) {}
 
     /**
-     * Checker approves. Maker != checker is enforced HERE (action-level),
-     * not merely UI-level. Approved decisions are immutable afterward —
-     * corrections are reversal decisions (Phase 5 reads this dossier back).
+     * Checker approves. Approval is gated on the approve permission at the
+     * dossier's campus only — the proposer may approve their own decision, by
+     * product decision: proposed_by_user_id and approved_by_user_id record who
+     * did what, and that audit trail is accepted as sufficient here.
+     * Approved decisions are immutable afterward — corrections are reversal
+     * decisions (Phase 5 reads this dossier back).
      */
     public function run(ScholarshipAdjustmentDossier $dossier, int $checkerUserId): ScholarshipAdjustmentDossier
     {
@@ -47,10 +50,6 @@ class ApproveAdjustmentAction
 
             if ($locked->status !== ScholarshipAdjustmentDossier::STATUS_READY_FOR_DECISION) {
                 throw new \DomainException('Dossier is not awaiting approval.');
-            }
-
-            if ($locked->proposed_by_user_id === $checkerUserId) {
-                throw new \DomainException('Maker and checker must differ.');
             }
 
             $checkerCodes = $this->permissions->permissionCodesForUserId($checkerUserId, (int) $locked->campus_id);

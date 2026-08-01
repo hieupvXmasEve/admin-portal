@@ -173,15 +173,32 @@ it('requires adjusted_amount for a reduce decision', function () {
         ->toThrow(InvalidArgumentException::class);
 });
 
-it('rejects approval by the same user who proposed the decision', function () {
+it('lets the proposer approve their own decision when they hold the permission', function () {
+    // Product decision: separation of maker and checker is not enforced. What
+    // gates approval is the approve permission at the dossier campus; who
+    // proposed and who approved both stay on the record.
     $ctx = decisionServiceDossier();
     $decide = app(DecideAdjustmentAction::class);
     $approve = app(ApproveAdjustmentAction::class);
 
+    $role = Role::firstOrCreate(['code' => 'self_approve_test'], ['name' => 'Self Approve Test']);
+    $permission = Permission::where('code', 'approve_scholarship_adjustment')->first();
+    DB::table('role_permissions')->insertOrIgnore([
+        'role_id' => $role->id, 'permission_id' => $permission->id, 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    DB::table('campus_user_roles')->insert([
+        'user_id' => $ctx['maker']->id, 'campus_id' => $ctx['campus']->id, 'role_id' => $role->id,
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    app(CampusPermissionReader::class)->forgetPermissionCodesForUserId((int) $ctx['maker']->id);
+
     $decide->run($ctx['dossier'], ScholarshipAdjustmentDossier::DECISION_KEEP, null, 'ok', $ctx['maker']->id);
 
-    expect(fn () => $approve->run($ctx['dossier'], $ctx['maker']->id))
-        ->toThrow(DomainException::class);
+    $updated = $approve->run($ctx['dossier'], $ctx['maker']->id);
+
+    expect($updated->approved_by_user_id)->toBe($ctx['maker']->id)
+        ->and($updated->proposed_by_user_id)->toBe($ctx['maker']->id)
+        ->and($updated->approved_at)->not->toBeNull();
 });
 
 it('rejects approval by a checker without the campus permission', function () {

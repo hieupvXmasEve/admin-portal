@@ -155,13 +155,16 @@ function adjustmentScholarshipDiscount(array $ctx): ?InvoiceDiscount
         ->first();
 }
 
-it('rejects when maker and checker are the same user', function () {
+it('accepts an adjustment whose maker and checker are the same user', function () {
+    // Product decision: holding the approve permission is enough, and both user
+    // ids stay on the record. Finance must not re-impose a separation rule that
+    // Academic does not apply, or a legitimate approval lands in review.
     $ctx = adjustmentApplyContext();
     $result = app(ScholarshipAdjustmentContract::class)
         ->apply(adjustmentApplyData($ctx, ['maker_user_id' => $ctx['checker']->id]));
 
-    expect($result->accepted)->toBeFalse()
-        ->and($result->status)->toBe('maker_is_checker');
+    expect($result->accepted)->toBeTrue()
+        ->and($result->status)->not->toBe('maker_is_checker');
 });
 
 it('rejects a checker without the permission at the student campus', function () {

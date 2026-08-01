@@ -378,16 +378,30 @@ it('refuses a proposal from a user without restore_scholarship at the campus', f
         ->toThrow(DomainException::class, 'proposer_not_authorized');
 });
 
-it('rejects approval when maker and checker are the same user', function () {
+it('lets the proposer approve their own restoration when they hold the approve permission', function () {
+    // Product decision: separation of proposer and approver is not enforced —
+    // the approve permission at the campus is the gate, and both user ids stay
+    // on the proposal for audit.
     $ctx = restorationContext();
     $adjustment = restorationApplyFallAdjustment($ctx);
 
     $proposal = app(CreateRestorationProposalAction::class)
         ->run($adjustment->id, 'Clean result', $ctx['maker']->id);
 
-    expect(fn () => app(ApproveRestorationProposalAction::class)
-        ->run($proposal->id, $ctx['maker']->id))
-        ->toThrow(DomainException::class, 'maker_is_checker');
+    // The maker only holds restore_scholarship by default; add the approve
+    // permission so this asserts self-approval, not a permission failure.
+    $role = Role::firstOrCreate(['code' => 'restoration_checker_test'], ['name' => 'Restoration Checker Test']);
+    DB::table('campus_user_roles')->insert([
+        'user_id' => $ctx['maker']->id, 'campus_id' => $ctx['campus']->id, 'role_id' => $role->id,
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    app(CampusPermissionReader::class)->forgetPermissionCodesForUserId((int) $ctx['maker']->id);
+
+    $approved = app(ApproveRestorationProposalAction::class)->run($proposal->id, $ctx['maker']->id);
+
+    expect($approved->status)->toBe(ScholarshipRestorationProposal::STATUS_APPROVED)
+        ->and((int) $approved->approved_by_user_id)->toBe($ctx['maker']->id)
+        ->and((int) $approved->proposed_by_user_id)->toBe($ctx['maker']->id);
 });
 
 it('rejects approval by a checker without the campus permission', function () {

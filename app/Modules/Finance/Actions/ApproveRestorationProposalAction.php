@@ -41,9 +41,9 @@ class ApproveRestorationProposalAction
                 throw new \DomainException('proposal_not_pending');
             }
 
-            if ((int) $proposal->proposed_by_user_id === $approverUserId) {
-                throw new \DomainException('maker_is_checker');
-            }
+            // No maker != checker rule, matching the adjustment approval path:
+            // holding the approve permission at the campus is the gate, and
+            // proposed_by_user_id / approved_by_user_id keep the audit trail.
 
             // Campus MUST be non-null — a null campus returns the all-campus
             // union and would accept an approver with the permission anywhere.
