@@ -101,17 +101,42 @@ class StudentApiAuthorization
         // Financial holds block most services
         if (
             $hold->hold_type === 'financial' &&
-            ! str_contains($routeName, 'profile')
+            ! $this->isHoldExemptRoute($routeName)
         ) {
             return true;
         }
 
-        // All category holds block everything except profile
+        // All category holds block everything except the exempt allow-list
         if (
             $hold->hold_category === 'all' &&
-            ! str_contains($routeName, 'profile')
+            ! $this->isHoldExemptRoute($routeName)
         ) {
             return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Route-name allow-list exempt from financial/all holds. `profile` is the
+     * long-standing exemption; scholarship-adjustment confirmation is added so
+     * the fee-increase cohort (who by definition carry financial exposure) can
+     * still acknowledge the interview minutes instead of being locked out and
+     * then counted as non-responsive. Match is a `str_contains` on the route
+     * NAME by a distinctive token — a new route must not reuse these tokens in
+     * its name unless it should also be hold-exempt.
+     */
+    private function isHoldExemptRoute(string $routeName): bool
+    {
+        $exemptTokens = [
+            'profile',
+            'scholarship-adjustment-confirmation',
+        ];
+
+        foreach ($exemptTokens as $token) {
+            if (str_contains($routeName, $token)) {
+                return true;
+            }
         }
 
         return false;

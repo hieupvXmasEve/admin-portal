@@ -90,3 +90,9 @@ Schedule::job(new ReconcileDngPaymentsJob)
     ->everyFifteenMinutes()
     ->withoutOverlapping(10)
     ->onOneServer();
+
+// Mark scholarship-adjustment confirmations overdue after 1 calendar day.
+Schedule::command('academic:mark-scholarship-confirmations-overdue')
+    ->dailyAt('00:15')
+    ->withoutOverlapping()
+    ->onOneServer();

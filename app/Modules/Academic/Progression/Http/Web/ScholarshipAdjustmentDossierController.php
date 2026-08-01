@@ -10,10 +10,13 @@ use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\ApproveAdjust
 use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\CompleteInterviewAction;
 use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\DecideAdjustmentAction;
 use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\IdentifyCandidatesAction;
+use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\RecordOnBehalfConfirmationAction;
+use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\RequestConfirmationAction;
 use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\ScheduleInterviewAction;
 use App\Modules\Academic\Progression\Http\Requests\ScholarshipAdjustment\AddScholarshipAdjustmentCandidateManuallyRequest;
 use App\Modules\Academic\Progression\Http\Requests\ScholarshipAdjustment\ApproveScholarshipAdjustmentRequest;
 use App\Modules\Academic\Progression\Http\Requests\ScholarshipAdjustment\CompleteScholarshipAdjustmentInterviewRequest;
+use App\Modules\Academic\Progression\Http\Requests\ScholarshipAdjustment\ConfirmScholarshipAdjustmentOnBehalfRequest;
 use App\Modules\Academic\Progression\Http\Requests\ScholarshipAdjustment\DecideScholarshipAdjustmentRequest;
 use App\Modules\Academic\Progression\Http\Requests\ScholarshipAdjustment\IdentifyScholarshipAdjustmentCandidatesRequest;
 use App\Modules\Academic\Progression\Http\Requests\ScholarshipAdjustment\ScheduleScholarshipAdjustmentInterviewRequest;
@@ -144,9 +147,31 @@ class ScholarshipAdjustmentDossierController extends Controller
     ) {
         $validated = $request->validated();
 
-        CompleteInterviewAction::run($dossier, $validated['minutes'], $validated['participants'] ?? []);
+        $dossier = CompleteInterviewAction::run($dossier, $validated['minutes'], $validated['participants'] ?? []);
 
-        return back()->with('success', 'Interview completed.');
+        // Completing the interview immediately opens the student-confirmation
+        // window (P4) — the student must acknowledge the minutes before a
+        // fee-increasing decision.
+        RequestConfirmationAction::run($dossier);
+
+        return back()->with('success', 'Interview completed — student confirmation requested.');
+    }
+
+    public function confirmOnBehalf(
+        ConfirmScholarshipAdjustmentOnBehalfRequest $request,
+        ScholarshipAdjustmentDossier $dossier,
+    ) {
+        try {
+            RecordOnBehalfConfirmationAction::run(
+                $dossier,
+                (int) $request->user()->id,
+                $request->validated()['on_behalf_note'],
+            );
+        } catch (\DomainException $e) {
+            return back()->withErrors(['error' => $e->getMessage()]);
+        }
+
+        return back()->with('success', 'Confirmation recorded on behalf of the student.');
     }
 
     public function decide(

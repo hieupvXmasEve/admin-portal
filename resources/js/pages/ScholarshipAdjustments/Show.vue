@@ -25,6 +25,9 @@ interface Dossier {
     interview_mode: string | null;
     minutes: string | null;
     minutes_version: number;
+    confirmation_status: string | null;
+    confirmed_on_behalf: boolean;
+    student_comment: string | null;
     decision_type: string | null;
     decision_adjusted_amount: string | null;
     decision_reason: string | null;
@@ -38,6 +41,11 @@ const props = defineProps<{ dossier: Dossier }>();
 const scheduleForm = useForm({ scheduled_at: '', mode: 'in_person', location: '' });
 const completeForm = useForm({ minutes: '', participants: [] as string[] });
 const decideForm = useForm({ decision_type: 'keep', adjusted_amount: null as number | null, reason: '', exception_override_reason: '' });
+const onBehalfForm = useForm({ on_behalf_note: '' });
+
+function submitOnBehalf() {
+    onBehalfForm.post(route('scholarship-adjustments.confirm-on-behalf', props.dossier.id), { preserveScroll: true });
+}
 
 function submitSchedule() {
     scheduleForm.post(route('scholarship-adjustments.interview.schedule', props.dossier.id), { preserveScroll: true });
@@ -115,6 +123,33 @@ function submitApprove() {
                     <p class="text-muted-foreground">Minutes (v{{ dossier.minutes_version }}):</p>
                     <p class="whitespace-pre-wrap">{{ dossier.minutes }}</p>
                 </div>
+            </CardContent>
+        </Card>
+
+        <Card class="lg:col-span-2">
+            <CardHeader>
+                <CardTitle>Student confirmation</CardTitle>
+            </CardHeader>
+            <CardContent class="space-y-3">
+                <p class="text-sm">
+                    <span class="text-muted-foreground">Status:</span>
+                    <Badge class="ml-1">{{ dossier.confirmation_status ?? 'not requested' }}</Badge>
+                    <Badge v-if="dossier.confirmed_on_behalf" variant="secondary" class="ml-1">on behalf</Badge>
+                </p>
+                <p v-if="dossier.student_comment" class="text-sm">
+                    <span class="text-muted-foreground">Student comment:</span> {{ dossier.student_comment }}
+                </p>
+
+                <!-- Staff confirm-on-behalf: only while a response is still outstanding. -->
+                <form
+                    v-if="['pending', 'overdue', 'disputed'].includes(dossier.confirmation_status ?? '')"
+                    class="space-y-2"
+                    @submit.prevent="submitOnBehalf"
+                >
+                    <Label for="on_behalf_note">Confirm on behalf — contact evidence note</Label>
+                    <Textarea id="on_behalf_note" v-model="onBehalfForm.on_behalf_note" rows="2" />
+                    <Button type="submit" variant="secondary" :disabled="onBehalfForm.processing">Confirm on behalf of student</Button>
+                </form>
             </CardContent>
         </Card>
 

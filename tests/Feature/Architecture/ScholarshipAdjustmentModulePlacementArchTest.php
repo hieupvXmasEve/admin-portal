@@ -85,3 +85,27 @@ it('keeps the scholarship adjustment domain layer inside Academic Progression', 
         ->and($strayPolicies)->toBeEmpty('ScholarshipAdjustment policy must live under Academic/Progression/Policies, not Academic top-level.')
         ->and($strayHttp)->toBeEmpty('ScholarshipAdjustment HTTP classes must live under Academic/Progression/Http, not Academic top-level.');
 });
+
+/**
+ * P4: the student-portal confirmation controller is a domain-owned student API
+ * — it belongs in the Progression module's Http/Api/Student (sibling of
+ * AcademicRecordController), NOT the global app/Http/Controllers/Api tree.
+ * The confirmation Actions live with the rest of the domain in Progression.
+ */
+it('keeps the P4 confirmation HTTP + actions inside Academic Progression', function (): void {
+    $workspace = dirname(__DIR__, 3);
+
+    expect(file_exists($workspace.'/app/Modules/Academic/Progression/Http/Api/Student/ScholarshipAdjustmentConfirmationController.php'))->toBeTrue()
+        ->and(file_exists($workspace.'/app/Modules/Academic/Progression/Actions/ScholarshipAdjustment/RequestConfirmationAction.php'))->toBeTrue()
+        ->and(file_exists($workspace.'/app/Modules/Academic/Progression/Actions/ScholarshipAdjustment/RecordStudentResponseAction.php'))->toBeTrue()
+        ->and(file_exists($workspace.'/app/Modules/Academic/Progression/Actions/ScholarshipAdjustment/MarkOverdueAction.php'))->toBeTrue();
+
+    // No scholarship-adjustment student controller/request leaked into the
+    // global student-portal surface.
+    $strayGlobal = array_merge(
+        glob($workspace.'/app/Http/Controllers/Api/V1/Student/ScholarshipAdjustment*.php') ?: [],
+        glob($workspace.'/app/Http/Requests/Api/V1/Student/*ScholarshipAdjustment*.php') ?: [],
+    );
+
+    expect($strayGlobal)->toBeEmpty('ScholarshipAdjustment student API is Academic-owned — place it under Academic/Progression/Http/Api/Student, not the global Api/V1/Student surface.');
+});

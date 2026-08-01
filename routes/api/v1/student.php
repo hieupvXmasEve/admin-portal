@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\V1\Student\TimetableController;
 use App\Modules\Academic\Delivery\Http\Api\Student\AttendanceController;
 use App\Modules\Academic\Progression\Http\Api\Student\AcademicRecordController;
 use App\Modules\Academic\Progression\Http\Api\Student\GpaTrendController;
+use App\Modules\Academic\Progression\Http\Api\Student\ScholarshipAdjustmentConfirmationController;
 use App\Modules\Finance\Http\Api\Student\LegacyFinanceController;
 use App\Modules\Finance\Http\Api\Student\StudentFinanceController;
 use App\Modules\Notification\Http\Api\Student\NotificationController;
@@ -223,5 +224,21 @@ Route::middleware([
         });
 
     }); // End either middleware group
+
+    // Scholarship adjustment confirmation — student.api.auth ALONE (NO either /
+    // parent.student.access): a legally-relevant acknowledgement must be bound
+    // by the Student actor only, never a guardian token. Route names carry the
+    // `scholarship-adjustment-confirmation` token so StudentApiAuthorization
+    // exempts them from financial/all holds (this fee-increase cohort would
+    // otherwise be locked out then counted "quá hạn không phản hồi").
+    Route::middleware(['student.api.auth'])
+        ->prefix('scholarship-adjustments')
+        ->name('scholarship-adjustment-confirmation.')
+        ->group(function () {
+            Route::get('/{dossier}/minutes', [ScholarshipAdjustmentConfirmationController::class, 'minutes'])
+                ->name('minutes');
+            Route::post('/{dossier}/confirmation', [ScholarshipAdjustmentConfirmationController::class, 'confirm'])
+                ->name('respond');
+        });
 
 }); // End auth:sanctum group

@@ -45,7 +45,7 @@ Implement "điều chỉnh học bổng theo học kỳ" per PRD [docs/features/
 | 1 | [Phase 1: Authorization Hardening](./phase-01-start.md) | Done (2026-08-01) |
 | 2 | [Phase 2: Finance Core Adjustment Model](./phase-02-finance-core-adjustment-model.md) | Done (2026-08-01) |
 | 3 | [Phase 3: Academic Dossier Workflow](./phase-03-academic-dossier-workflow.md) | Done (2026-08-01) |
-| 4 | [Phase 4: Portal Confirmation](./phase-04-portal-confirmation.md) | Pending |
+| 4 | [Phase 4: Portal Confirmation](./phase-04-portal-confirmation.md) | Done (2026-08-01) |
 | 5 | [Phase 5: Restoration Flow](./phase-05-restoration-flow.md) | Pending |
 
 Dependencies: P2 ← P1; P3 ← P2; P4 ← P3; P5 ← P3 (P5 also modifies the P2 apply path via the generation-time gate). P1 shippable alone.

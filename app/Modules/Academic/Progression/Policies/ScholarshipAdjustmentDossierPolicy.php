@@ -38,6 +38,11 @@ class ScholarshipAdjustmentDossierPolicy
         return $this->hasPermissionAtDossierCampus($user, $dossier, 'approve_scholarship_adjustment');
     }
 
+    public function confirmOnBehalf(User $user, ScholarshipAdjustmentDossier $dossier): bool
+    {
+        return $this->hasPermissionAtDossierCampus($user, $dossier, 'confirm_scholarship_adjustment_on_behalf');
+    }
+
     private function hasPermissionAtDossierCampus(User $user, ScholarshipAdjustmentDossier $dossier, string $permission): bool
     {
         $campusId = $dossier->campus_id;

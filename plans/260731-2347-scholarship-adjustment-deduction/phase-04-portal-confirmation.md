@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Phase 4: Portal Confirmation"
-status: todo
+status: done
 priority: P2
 effort: "3d"
 dependencies: [3]
@@ -112,12 +112,27 @@ Frontend (FE/student-nuxt — separate surface):
 
 ## Todo
 
-- [ ] Migration
-- [ ] Student endpoints (student.api.auth only) + ownership/parent/hold tests
-- [ ] Version confirm/invalidate
-- [ ] Overdue command + race guard
-- [ ] On-behalf flow
-- [ ] Portal UI
+- [x] Migration (confirmation columns + index)
+- [x] Student endpoints (student.api.auth only) + ownership/parent/hold tests
+- [x] Version confirm/invalidate
+- [x] Overdue command + race guard (atomic conditional update)
+- [x] On-behalf flow
+- [x] Staff confirmation panel in Show.vue
+- [ ] Portal UI (FE/student-nuxt) — DEFERRED (see notes)
+
+## Completion Notes (2026-08-01)
+
+25 P4 tests green (17 flow + 8 API); P3 + Architecture regressions green; pint + eslint clean.
+
+- Gate implemented in `DecideAdjustmentAction` on the separate `confirmation_status` axis (settled): money decisions blocked unless confirmed, or overdue + approver override. P3 main status machine untouched. P3 decision fixture defaults `confirmation_status=confirmed` so money tests exercise the post-confirmation path; dedicated gate tests cover pending/disputed/overdue.
+- Confirmation logic = Progression Actions (`RequestConfirmationAction`, `RecordStudentResponseAction`, `RecordOnBehalfConfirmationAction`, `MarkOverdueAction`) + `EditMinutesAction` reset; single-writer preserved. `StaleMinutesVersionException` → 409.
+- **Placement correction (vs plan draft):** the student controller went to `Academic/Progression/Http/Api/Student/` (module, sibling of `AcademicRecordController`), NOT global `app/Http/Controllers/Api/V1/Student/` — the plan draft was stale; the module is the real convention. FormRequest in `Progression/Http/Requests/ScholarshipAdjustment/`. Arch test extended to enforce this.
+- Security verified by review: parent/guardian cannot confirm (route uses `student.api.auth` alone, no `parent.student.access`; test sends `X-Student-ID` and still 403s); ownership from auth only, cross-student → 404; hold-exemption is a route-name token allow-list (`profile`, `scholarship-adjustment-confirmation`), proven not-too-broad by a reflection test.
+- Overdue: daily command + scheduler (00:15). Race closed with an **atomic conditional update** (`where pending, whereNull confirmed_at`) — a confirm landing after the command loads the row no-ops instead of clobbering (regression test added). "1 calendar day" implemented as rolling 24h (app tz Asia/Saigon) — acceptable for pilot; not a midnight-boundary calendar day.
+
+**Deferred (recorded):**
+- FE/student-nuxt student portal page + composable + notification deep-link — separate frontend surface, out of this backend slice (staff-side Show.vue confirmation panel + on-behalf IS done).
+- Notification wiring (`NotificationMessage` on request/invalidation/overdue) — same deferral as P3 notifications; hook points exist (RequestConfirmationAction, EditMinutesAction reset, MarkOverdueAction).
 
 ## Success Criteria
 

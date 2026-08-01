@@ -72,6 +72,29 @@ class DecideAdjustmentAction
             throw new \InvalidArgumentException('adjusted_amount is required for reduce/suspend_full decisions.');
         }
 
+        // P4 confirmation gate: a fee-increasing (money) decision requires the
+        // student to have acknowledged the interview minutes. Overdue is
+        // overridable by an approver (same permission as the interview-override
+        // exception path); disputed/pending/declined/absent are hard blocks —
+        // never bind a fee increase over an unaddressed dispute.
+        if (in_array($decisionType, ScholarshipAdjustmentDossier::MONEY_DECISION_TYPES, true)
+            && ! $dossier->isStudentConfirmed()) {
+            $isOverrideableOverdue = $dossier->confirmation_status === ScholarshipAdjustmentDossier::CONFIRMATION_OVERDUE
+                && $exceptionOverrideReason !== null;
+
+            if (! $isOverrideableOverdue) {
+                throw new \DomainException(
+                    "Student confirmation required before a fee-increasing decision (confirmation_status: {$dossier->confirmation_status}).",
+                );
+            }
+
+            $overrideCodes = $this->permissions->permissionCodesForUserId($makerUserId, (int) $dossier->campus_id);
+
+            if (! in_array('approve_scholarship_adjustment', $overrideCodes, true)) {
+                throw new \DomainException('Overriding an overdue confirmation requires approve_scholarship_adjustment at the dossier campus.');
+            }
+        }
+
         $dossier->update([
             'status' => ScholarshipAdjustmentDossier::STATUS_READY_FOR_DECISION,
             'decision_type' => $decisionType,

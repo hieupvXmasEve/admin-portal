@@ -835,5 +835,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('{dossier}/approve', [ScholarshipAdjustmentDossierController::class, 'approve'])
             ->middleware('can:approve_scholarship_adjustment')
             ->name('approve');
+
+        Route::post('{dossier}/confirm-on-behalf', [ScholarshipAdjustmentDossierController::class, 'confirmOnBehalf'])
+            ->middleware('can:confirm_scholarship_adjustment_on_behalf')
+            ->name('confirm-on-behalf');
     });
 });

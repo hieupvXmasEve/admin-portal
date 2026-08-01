@@ -93,6 +93,10 @@ function decisionServiceDossier(array $overrides = []): array
         'original_type' => $definition->type,
         'original_amount' => $definition->amount,
         'interview_status' => ScholarshipAdjustmentDossier::INTERVIEW_COMPLETED,
+        // Default to an already-confirmed dossier so money-decision tests pass
+        // the P4 gate; gate-specific tests override confirmation_status.
+        'confirmation_status' => ScholarshipAdjustmentDossier::CONFIRMATION_CONFIRMED,
+        'confirmed_at' => now(),
         'created_by_user_id' => $maker->id,
     ], $overrides));
 

@@ -119,6 +119,27 @@ class ScholarshipAdjustmentDossier extends AuditableModel
         self::DECISION_SUSPEND_FULL,
     ];
 
+    // Confirmation is a SEPARATE axis from `status` (P4): the student
+    // acknowledges the interview minutes before a fee-increasing decision.
+    public const CONFIRMATION_PENDING = 'pending';
+
+    public const CONFIRMATION_CONFIRMED = 'confirmed';
+
+    public const CONFIRMATION_DISPUTED = 'disputed';
+
+    public const CONFIRMATION_DECLINED = 'declined';
+
+    public const CONFIRMATION_OVERDUE = 'overdue';
+
+    /** Backend allow-list — varchar column, not a DB enum. null = not yet requested. */
+    public const CONFIRMATION_STATUSES = [
+        self::CONFIRMATION_PENDING,
+        self::CONFIRMATION_CONFIRMED,
+        self::CONFIRMATION_DISPUTED,
+        self::CONFIRMATION_DECLINED,
+        self::CONFIRMATION_OVERDUE,
+    ];
+
     protected $fillable = [
         'student_id',
         'campus_id',
@@ -150,6 +171,14 @@ class ScholarshipAdjustmentDossier extends AuditableModel
         'decided_at',
         'approved_at',
         'created_by_user_id',
+        'confirmation_status',
+        'confirmation_requested_at',
+        'confirmed_minutes_version',
+        'student_comment',
+        'confirmed_at',
+        'confirmed_by_user_id',
+        'confirmed_on_behalf',
+        'on_behalf_note',
     ];
 
     protected $casts = [
@@ -163,11 +192,21 @@ class ScholarshipAdjustmentDossier extends AuditableModel
         'interview_scheduled_at' => 'datetime',
         'decided_at' => 'datetime',
         'approved_at' => 'datetime',
+        'confirmation_requested_at' => 'datetime',
+        'confirmed_minutes_version' => 'integer',
+        'confirmed_at' => 'datetime',
+        'confirmed_on_behalf' => 'boolean',
     ];
 
     public function isDecidable(): bool
     {
         return $this->interview_status === self::INTERVIEW_COMPLETED;
+    }
+
+    /** A fee-increasing (money) decision may proceed only when the student has confirmed. */
+    public function isStudentConfirmed(): bool
+    {
+        return $this->confirmation_status === self::CONFIRMATION_CONFIRMED;
     }
 
     public function student(): BelongsTo
