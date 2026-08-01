@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\DecideAdjustmentAction;
 use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\EditMinutesAction;
 use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\MarkOverdueAction;
+use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\OverruleDisputeAction;
 use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\RecordOnBehalfConfirmationAction;
 use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\RecordStudentResponseAction;
 use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\RequestConfirmationAction;
@@ -273,4 +274,91 @@ it('refuses an overdue override without the approver permission', function () {
     expect(fn () => app(DecideAdjustmentAction::class)
         ->run($dossier, ScholarshipAdjustmentDossier::DECISION_REDUCE, 15.0, 'reason', $maker->id, 'trying to override'))
         ->toThrow(DomainException::class);
+});
+
+// --- Dispute resolution (a student who disagreed is never "confirmed" for) ---
+
+it('refuses to confirm on behalf of a student who disputed', function () {
+    $dossier = confirmationDossier([
+        'confirmation_status' => ScholarshipAdjustmentDossier::CONFIRMATION_DISPUTED,
+        'student_comment' => 'The notes are wrong about my resit.',
+    ]);
+
+    expect(fn () => RecordOnBehalfConfirmationAction::run($dossier, User::factory()->create()->id, 'Called the student'))
+        ->toThrow(DomainException::class);
+
+    expect($dossier->fresh()->confirmation_status)
+        ->toBe(ScholarshipAdjustmentDossier::CONFIRMATION_DISPUTED);
+});
+
+it('lets an approver overrule a dispute without recording a confirmation', function () {
+    $dossier = confirmationDossier([
+        'confirmation_status' => ScholarshipAdjustmentDossier::CONFIRMATION_DISPUTED,
+        'student_comment' => 'I disagree.',
+    ]);
+    $approver = User::factory()->create();
+    grantApprover($approver->id, (int) $dossier->campus_id);
+
+    $updated = app(OverruleDisputeAction::class)->run($dossier, $approver->id, 'Resit record checked; the notes are accurate.');
+
+    expect($updated->confirmation_status)->toBe(ScholarshipAdjustmentDossier::CONFIRMATION_DISPUTE_OVERRULED)
+        ->and($updated->dispute_overrule_reason)->toBe('Resit record checked; the notes are accurate.')
+        ->and($updated->dispute_overruled_by_user_id)->toBe($approver->id)
+        // The student's own words and the absence of a confirmation both stand.
+        ->and($updated->student_comment)->toBe('I disagree.')
+        ->and($updated->isStudentConfirmed())->toBeFalse()
+        ->and($updated->confirmed_at)->toBeNull();
+});
+
+it('refuses to overrule a dispute without the approver permission', function () {
+    $dossier = confirmationDossier(['confirmation_status' => ScholarshipAdjustmentDossier::CONFIRMATION_DISPUTED]);
+
+    expect(fn () => app(OverruleDisputeAction::class)->run($dossier, User::factory()->create()->id, 'Because I say so.'))
+        ->toThrow(DomainException::class);
+
+    expect($dossier->fresh()->confirmation_status)
+        ->toBe(ScholarshipAdjustmentDossier::CONFIRMATION_DISPUTED);
+});
+
+it('refuses to overrule anything that is not a dispute', function () {
+    $dossier = confirmationDossier(['confirmation_status' => ScholarshipAdjustmentDossier::CONFIRMATION_PENDING]);
+    $approver = User::factory()->create();
+    grantApprover($approver->id, (int) $dossier->campus_id);
+
+    expect(fn () => app(OverruleDisputeAction::class)->run($dossier, $approver->id, 'Nothing to overrule here.'))
+        ->toThrow(DomainException::class);
+});
+
+it('blocks a money decision while a dispute is unaddressed', function () {
+    $dossier = confirmationDossier(['confirmation_status' => ScholarshipAdjustmentDossier::CONFIRMATION_DISPUTED]);
+
+    expect(fn () => app(DecideAdjustmentAction::class)
+        ->run($dossier, ScholarshipAdjustmentDossier::DECISION_REDUCE, 15.0, 'reason', User::factory()->create()->id))
+        ->toThrow(DomainException::class);
+});
+
+it('allows a money decision once the dispute has been overruled', function () {
+    $dossier = confirmationDossier(['confirmation_status' => ScholarshipAdjustmentDossier::CONFIRMATION_DISPUTED]);
+    $approver = User::factory()->create();
+    grantApprover($approver->id, (int) $dossier->campus_id);
+
+    $dossier = app(OverruleDisputeAction::class)->run($dossier, $approver->id, 'Reviewed with the department head.');
+
+    $updated = app(DecideAdjustmentAction::class)
+        ->run($dossier, ScholarshipAdjustmentDossier::DECISION_REDUCE, 15.0, 'reason', User::factory()->create()->id);
+
+    expect($updated->status)->toBe(ScholarshipAdjustmentDossier::STATUS_READY_FOR_DECISION);
+});
+
+it('resets a disputed dossier to pending when the minutes are corrected', function () {
+    $dossier = confirmationDossier([
+        'confirmation_status' => ScholarshipAdjustmentDossier::CONFIRMATION_DISPUTED,
+        'student_comment' => 'Wrong course listed.',
+    ]);
+
+    $updated = EditMinutesAction::run($dossier, 'Corrected: the resit for COS10001 was counted.');
+
+    expect($updated->confirmation_status)->toBe(ScholarshipAdjustmentDossier::CONFIRMATION_PENDING)
+        ->and($updated->minutes_version)->toBe(2)
+        ->and($updated->student_comment)->toBeNull();
 });

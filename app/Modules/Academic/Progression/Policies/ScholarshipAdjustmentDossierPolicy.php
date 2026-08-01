@@ -43,6 +43,15 @@ class ScholarshipAdjustmentDossierPolicy
         return $this->hasPermissionAtDossierCampus($user, $dossier, 'confirm_scholarship_adjustment_on_behalf');
     }
 
+    /**
+     * Overruling a student's dispute is an approver act, not an interview or
+     * on-behalf act — it unblocks a fee increase over a stated objection.
+     */
+    public function overruleDispute(User $user, ScholarshipAdjustmentDossier $dossier): bool
+    {
+        return $this->hasPermissionAtDossierCampus($user, $dossier, 'approve_scholarship_adjustment');
+    }
+
     private function hasPermissionAtDossierCampus(User $user, ScholarshipAdjustmentDossier $dossier, string $permission): bool
     {
         $campusId = $dossier->campus_id;

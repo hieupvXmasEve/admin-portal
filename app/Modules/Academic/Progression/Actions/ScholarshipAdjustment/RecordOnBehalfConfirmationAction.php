@@ -21,15 +21,23 @@ final class RecordOnBehalfConfirmationAction
         int $staffUserId,
         string $onBehalfNote,
     ): ScholarshipAdjustmentDossier {
+        // Only a student who has NOT responded may be confirmed on their
+        // behalf. A student who answered in disagreement must never be
+        // recorded as having agreed — that dispute is resolved by correcting
+        // the minutes, or by an approver overruling it on the record
+        // (OverruleDisputeAction).
         $confirmable = [
             ScholarshipAdjustmentDossier::CONFIRMATION_PENDING,
             ScholarshipAdjustmentDossier::CONFIRMATION_OVERDUE,
-            ScholarshipAdjustmentDossier::CONFIRMATION_DISPUTED,
         ];
 
         if (! in_array($dossier->confirmation_status, $confirmable, true)) {
+            $hint = $dossier->confirmation_status === ScholarshipAdjustmentDossier::CONFIRMATION_DISPUTED
+                ? ' The student disputed the minutes — correct the minutes and ask again, or have an approver overrule the dispute.'
+                : '';
+
             throw new \DomainException(
-                "Cannot confirm on behalf (confirmation_status: {$dossier->confirmation_status}).",
+                "Cannot confirm on behalf (confirmation_status: {$dossier->confirmation_status}).".$hint,
             );
         }
 

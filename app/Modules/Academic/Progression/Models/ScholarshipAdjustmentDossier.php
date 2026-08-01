@@ -131,6 +131,14 @@ class ScholarshipAdjustmentDossier extends AuditableModel
 
     public const CONFIRMATION_OVERDUE = 'overdue';
 
+    /**
+     * The student disputed and an approver overruled that dispute after review.
+     * Deliberately NOT 'confirmed': the student never agreed, and the record
+     * must keep saying so. Unblocks a money decision the same way a
+     * confirmation does — see canProceedToMoneyDecision().
+     */
+    public const CONFIRMATION_DISPUTE_OVERRULED = 'dispute_overruled';
+
     /** Backend allow-list — varchar column, not a DB enum. null = not yet requested. */
     public const CONFIRMATION_STATUSES = [
         self::CONFIRMATION_PENDING,
@@ -138,6 +146,7 @@ class ScholarshipAdjustmentDossier extends AuditableModel
         self::CONFIRMATION_DISPUTED,
         self::CONFIRMATION_DECLINED,
         self::CONFIRMATION_OVERDUE,
+        self::CONFIRMATION_DISPUTE_OVERRULED,
     ];
 
     protected $fillable = [
@@ -179,6 +188,9 @@ class ScholarshipAdjustmentDossier extends AuditableModel
         'confirmed_by_user_id',
         'confirmed_on_behalf',
         'on_behalf_note',
+        'dispute_overruled_at',
+        'dispute_overruled_by_user_id',
+        'dispute_overrule_reason',
     ];
 
     protected $casts = [
@@ -196,6 +208,7 @@ class ScholarshipAdjustmentDossier extends AuditableModel
         'confirmed_minutes_version' => 'integer',
         'confirmed_at' => 'datetime',
         'confirmed_on_behalf' => 'boolean',
+        'dispute_overruled_at' => 'datetime',
     ];
 
     public function isDecidable(): bool
@@ -207,6 +220,17 @@ class ScholarshipAdjustmentDossier extends AuditableModel
     public function isStudentConfirmed(): bool
     {
         return $this->confirmation_status === self::CONFIRMATION_CONFIRMED;
+    }
+
+    /**
+     * Whether the confirmation gate is satisfied for a fee-increasing decision.
+     * True for a real confirmation, and for a reviewed-and-overruled dispute —
+     * which is an approver's accountable decision, not the student's assent.
+     */
+    public function canProceedToMoneyDecision(): bool
+    {
+        return $this->isStudentConfirmed()
+            || $this->confirmation_status === self::CONFIRMATION_DISPUTE_OVERRULED;
     }
 
     public function student(): BelongsTo
