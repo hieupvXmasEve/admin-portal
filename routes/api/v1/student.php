@@ -235,6 +235,8 @@ Route::middleware([
         ->prefix('scholarship-adjustments')
         ->name('scholarship-adjustment-confirmation.')
         ->group(function () {
+            Route::get('/', [ScholarshipAdjustmentConfirmationController::class, 'index'])
+                ->name('index');
             Route::get('/{dossier}/minutes', [ScholarshipAdjustmentConfirmationController::class, 'minutes'])
                 ->name('minutes');
             Route::post('/{dossier}/confirmation', [ScholarshipAdjustmentConfirmationController::class, 'confirm'])

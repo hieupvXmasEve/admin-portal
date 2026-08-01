@@ -65,6 +65,7 @@ class EventIntentMapper
             'academic.egc_course_completed' => 'egc_course_completed',
             'academic.egc_program_completed' => 'egc_program_completed',
             'academic.course_stage_changed' => 'course_stage_changed',
+            'academic.scholarship_adjustment_confirmation_requested' => 'scholarship_adjustment_confirmation_requested',
             'manual.notification_sent' => 'manual_notification',
             'query.ticket_submitted' => 'query_submitted',
             'query.reply_created' => 'query_reply_created',

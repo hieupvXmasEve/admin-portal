@@ -180,3 +180,72 @@ it('rejects a guardian/parent actor even when supplying the student binding inpu
 
     expect($dossier->fresh()->confirmation_status)->toBe(ScholarshipAdjustmentDossier::CONFIRMATION_PENDING);
 });
+
+it('lists only the authenticated student own reviews', function () {
+    $student = apiStudent();
+    $other = apiStudent();
+    $mine = apiDossierFor($student);
+    $theirs = apiDossierFor($other);
+    Sanctum::actingAs($student);
+
+    $response = $this->getJson(route('v1.student.scholarship-adjustment-confirmation.index'))
+        ->assertOk();
+
+    $ids = collect($response->json('data'))->pluck('id')->all();
+
+    expect($ids)->toContain($mine->id)
+        ->and($ids)->not->toContain($theirs->id);
+});
+
+it('omits dossiers whose confirmation window was never opened', function () {
+    // A dossier still in interview has nothing for the student to act on and
+    // must not surface in their portal list.
+    $student = apiStudent();
+    $visible = apiDossierFor($student);
+    $hidden = apiDossierFor($student, [
+        'confirmation_status' => null,
+        'confirmation_requested_at' => null,
+    ]);
+    Sanctum::actingAs($student);
+
+    $ids = collect(
+        $this->getJson(route('v1.student.scholarship-adjustment-confirmation.index'))->assertOk()->json('data')
+    )->pluck('id')->all();
+
+    expect($ids)->toContain($visible->id)
+        ->and($ids)->not->toContain($hidden->id);
+});
+
+it('flags a pending review as awaiting the student response', function () {
+    $student = apiStudent();
+    apiDossierFor($student);
+    Sanctum::actingAs($student);
+
+    $this->getJson(route('v1.student.scholarship-adjustment-confirmation.index'))
+        ->assertOk()
+        ->assertJsonPath('data.0.awaiting_response', true);
+});
+
+it('does not flag an already-confirmed review as awaiting a response', function () {
+    $student = apiStudent();
+    apiDossierFor($student, [
+        'confirmation_status' => ScholarshipAdjustmentDossier::CONFIRMATION_CONFIRMED,
+        'confirmed_at' => now(),
+    ]);
+    Sanctum::actingAs($student);
+
+    $this->getJson(route('v1.student.scholarship-adjustment-confirmation.index'))
+        ->assertOk()
+        ->assertJsonPath('data.0.awaiting_response', false);
+});
+
+it('refuses to list reviews for a guardian actor', function () {
+    $student = apiStudent();
+    apiDossierFor($student);
+    Sanctum::actingAs(User::factory()->create());
+
+    $this->getJson(
+        route('v1.student.scholarship-adjustment-confirmation.index'),
+        ['X-Student-ID' => (string) $student->id],
+    )->assertForbidden();
+});

@@ -169,6 +169,45 @@ final class AcademicLifecycleEventFactory
     }
 
     /**
+     * Student must acknowledge the interview minutes before a money decision
+     * can be made, so the deduplication key includes the minutes version — a
+     * re-issued request after edited minutes is a genuinely new notification.
+     */
+    public static function scholarshipAdjustmentConfirmationRequested(
+        Student $student,
+        int $dossierId,
+        int $minutesVersion,
+        ?string $targetSemesterName,
+    ): DomainEvent {
+        $semester = $targetSemesterName !== null && $targetSemesterName !== ''
+            ? " for {$targetSemesterName}"
+            : '';
+
+        return self::event(
+            name: 'academic.scholarship_adjustment_confirmation_requested',
+            deduplicationKey: implode(':', [
+                'academic.scholarship_adjustment_confirmation_requested',
+                'dossier', $dossierId,
+                'student', $student->id,
+                'minutes_version', $minutesVersion,
+            ]),
+            student: $student,
+            aggregateType: 'scholarship_adjustment_dossier',
+            aggregateId: (string) $dossierId,
+            data: [
+                'title' => 'Confirm your scholarship review',
+                'body' => "Please read the interview notes and confirm whether you agree. Your scholarship{$semester} cannot be decided until you respond.",
+                'category' => 'academic',
+                'is_important' => true,
+                'action_url' => "/scholarship-review/{$dossierId}",
+                'action_text' => 'Review and confirm',
+                'dossier_id' => $dossierId,
+                'minutes_version' => $minutesVersion,
+            ],
+        );
+    }
+
+    /**
      * @param  array<int, string>  $requestedChannels
      * @param  array<string, mixed>  $data
      */
