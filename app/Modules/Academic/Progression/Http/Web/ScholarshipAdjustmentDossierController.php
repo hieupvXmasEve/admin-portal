@@ -5,11 +5,16 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Progression\Http\Web;
 
 use App\Http\Controllers\Controller;
+use App\Models\Semester;
+use App\Models\Student;
 use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\AddCandidateManuallyAction;
 use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\ApproveAdjustmentAction;
 use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\CompleteInterviewAction;
 use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\DecideAdjustmentAction;
+use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\EditMinutesAction;
 use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\IdentifyCandidatesAction;
+use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\OverruleDisputeAction;
+use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\PublishConfirmationRequestNotificationAction;
 use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\RecordOnBehalfConfirmationAction;
 use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\RequestConfirmationAction;
 use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\ScheduleInterviewAction;
@@ -18,9 +23,16 @@ use App\Modules\Academic\Progression\Http\Requests\ScholarshipAdjustment\Approve
 use App\Modules\Academic\Progression\Http\Requests\ScholarshipAdjustment\CompleteScholarshipAdjustmentInterviewRequest;
 use App\Modules\Academic\Progression\Http\Requests\ScholarshipAdjustment\ConfirmScholarshipAdjustmentOnBehalfRequest;
 use App\Modules\Academic\Progression\Http\Requests\ScholarshipAdjustment\DecideScholarshipAdjustmentRequest;
+use App\Modules\Academic\Progression\Http\Requests\ScholarshipAdjustment\EditScholarshipAdjustmentMinutesRequest;
 use App\Modules\Academic\Progression\Http\Requests\ScholarshipAdjustment\IdentifyScholarshipAdjustmentCandidatesRequest;
+use App\Modules\Academic\Progression\Http\Requests\ScholarshipAdjustment\OverruleScholarshipAdjustmentDisputeRequest;
+use App\Modules\Academic\Progression\Http\Requests\ScholarshipAdjustment\PreviewScholarshipAdjustmentCandidatesRequest;
+use App\Modules\Academic\Progression\Http\Requests\ScholarshipAdjustment\PreviewScholarshipAdjustmentImpactRequest;
 use App\Modules\Academic\Progression\Http\Requests\ScholarshipAdjustment\ScheduleScholarshipAdjustmentInterviewRequest;
 use App\Modules\Academic\Progression\Models\ScholarshipAdjustmentDossier;
+use App\Modules\Academic\Progression\Queries\ScholarshipAdjustmentCandidateQuery;
+use App\Shared\Contracts\Finance\ScholarshipAdjustmentPreviewReader;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -69,6 +81,7 @@ class ScholarshipAdjustmentDossierController extends Controller
         return Inertia::render('ScholarshipAdjustments/Index', [
             'dossiers' => $dossiers,
             'filters' => $validated,
+            'campusId' => $campusId,
         ]);
     }
 
@@ -82,9 +95,38 @@ class ScholarshipAdjustmentDossierController extends Controller
 
         $dossier->load(['student', 'sourceSemester', 'targetSemester', 'campus', 'interviewStaff', 'proposedBy', 'approvedBy']);
 
+        // Money impact of the decision, resolved by Finance so the figures on
+        // screen are the ones the ledger would write. A decided dossier previews
+        // its own proposed value; an undecided one previews the current position.
+        $preview = app(ScholarshipAdjustmentPreviewReader::class)->preview(
+            (int) $dossier->student_id,
+            (int) $dossier->target_semester_id,
+            $dossier->decision_adjusted_amount !== null ? (float) $dossier->decision_adjusted_amount : null,
+        );
+
         return Inertia::render('ScholarshipAdjustments/Show', [
             'dossier' => $dossier,
+            'preview' => [...(array) $preview, 'delta' => $preview->delta()],
         ]);
+    }
+
+    /**
+     * Live money preview while the maker types a value — same reader as show(),
+     * so the number they watch is the number that will be charged.
+     */
+    public function decisionPreview(PreviewScholarshipAdjustmentImpactRequest $request, ScholarshipAdjustmentDossier $dossier): JsonResponse
+    {
+        $this->authorize('view', $dossier);
+
+        $proposed = $request->validated()['adjusted_amount'] ?? null;
+
+        $preview = app(ScholarshipAdjustmentPreviewReader::class)->preview(
+            (int) $dossier->student_id,
+            (int) $dossier->target_semester_id,
+            $proposed !== null ? (float) $proposed : null,
+        );
+
+        return response()->json([...(array) $preview, 'delta' => $preview->delta()]);
     }
 
     public function identify(IdentifyScholarshipAdjustmentCandidatesRequest $request)
@@ -97,12 +139,79 @@ class ScholarshipAdjustmentDossierController extends Controller
                 (int) $validated['source_semester_id'],
                 (int) $validated['target_semester_id'],
                 (int) $request->user()->id,
+                isset($validated['student_ids']) ? array_map('intval', $validated['student_ids']) : null,
             );
         } catch (\InvalidArgumentException $e) {
             return back()->withErrors(['error' => $e->getMessage()]);
         }
 
         return back()->with('success', "Identified {$result['created']} new candidate(s); {$result['skipped_existing']} already had a dossier.");
+    }
+
+    /**
+     * Read-only preview of scan candidates — shows who WOULD get a dossier
+     * without writing anything, so staff can pick a subset before creating.
+     */
+    public function candidatesPreview(PreviewScholarshipAdjustmentCandidatesRequest $request): Response
+    {
+        $validated = $request->validated();
+        $campusId = (int) $validated['campus_id'];
+
+        $preview = null;
+        $error = null;
+
+        if (isset($validated['source_semester_id'], $validated['target_semester_id'])) {
+            try {
+                $result = app(ScholarshipAdjustmentCandidateQuery::class)->handle(
+                    $campusId,
+                    (int) $validated['source_semester_id'],
+                    (int) $validated['target_semester_id'],
+                );
+
+                $studentIds = $result['candidates']->pluck('student_id');
+                $students = Student::query()->whereIn('id', $studentIds)->get(['id', 'student_id', 'full_name'])->keyBy('id');
+
+                // A candidate who already has a non-cancelled dossier for this
+                // exact (student, source, target) pair would just be skipped by
+                // IdentifyCandidatesAction — don't show them as pickable here.
+                $studentIdsWithDossier = ScholarshipAdjustmentDossier::query()
+                    ->whereIn('student_id', $studentIds)
+                    ->where('source_semester_id', (int) $validated['source_semester_id'])
+                    ->where('target_semester_id', (int) $validated['target_semester_id'])
+                    ->where('status', '!=', ScholarshipAdjustmentDossier::STATUS_CANCELLED)
+                    ->pluck('student_id');
+
+                $candidatesWithoutDossier = $result['candidates']->reject(
+                    fn (array $candidate) => $studentIdsWithDossier->contains($candidate['student_id']),
+                );
+
+                $preview = [
+                    'excluded_null_is_passed' => $result['excluded_null_is_passed'],
+                    'already_has_dossier' => $studentIdsWithDossier->count(),
+                    'candidates' => $candidatesWithoutDossier->map(fn (array $candidate) => [
+                        'student_id' => $candidate['student_id'],
+                        'student' => $students->get($candidate['student_id']),
+                        'failed_courses' => $candidate['failed_records']->map(fn ($record) => [
+                            'unit_code' => $record->unit?->code,
+                            'unit_name' => $record->unit?->name,
+                            'grade_finalized_date' => $record->grade_finalized_date,
+                        ])->values(),
+                        'needs_data_review' => app(ScholarshipAdjustmentCandidateQuery::class)->needsDataReview($candidate['failed_records']),
+                    ])->values(),
+                ];
+            } catch (\InvalidArgumentException $e) {
+                $error = $e->getMessage();
+            }
+        }
+
+        return Inertia::render('ScholarshipAdjustments/CandidatesPreview', [
+            'campusId' => $campusId,
+            'sourceSemesterId' => isset($validated['source_semester_id']) ? (int) $validated['source_semester_id'] : null,
+            'targetSemesterId' => isset($validated['target_semester_id']) ? (int) $validated['target_semester_id'] : null,
+            'semesters' => Semester::query()->where('is_archived', false)->orderByDesc('start_date')->get(['id', 'code', 'name', 'start_date']),
+            'preview' => $preview,
+            'error' => $error,
+        ]);
     }
 
     public function addManually(AddScholarshipAdjustmentCandidateManuallyRequest $request)
@@ -152,9 +261,54 @@ class ScholarshipAdjustmentDossierController extends Controller
         // Completing the interview immediately opens the student-confirmation
         // window (P4) — the student must acknowledge the minutes before a
         // fee-increasing decision.
-        RequestConfirmationAction::run($dossier);
+        $dossier = RequestConfirmationAction::run($dossier);
+
+        app(PublishConfirmationRequestNotificationAction::class)->run($dossier);
 
         return back()->with('success', 'Interview completed — student confirmation requested.');
+    }
+
+    /**
+     * Correct the minutes after the interview — the primary way to resolve a
+     * student's dispute. Bumps the version, which resets the confirmation to
+     * pending so the student answers on the corrected text, and re-notifies.
+     */
+    public function editMinutes(
+        EditScholarshipAdjustmentMinutesRequest $request,
+        ScholarshipAdjustmentDossier $dossier,
+    ) {
+        try {
+            $dossier = EditMinutesAction::run($dossier, $request->validated()['minutes']);
+        } catch (\DomainException $e) {
+            return back()->withErrors(['error' => $e->getMessage()]);
+        }
+
+        if ($dossier->confirmation_status === ScholarshipAdjustmentDossier::CONFIRMATION_PENDING) {
+            app(PublishConfirmationRequestNotificationAction::class)->run($dossier);
+        }
+
+        return back()->with('success', 'Minutes updated — the student has been asked to confirm the corrected notes.');
+    }
+
+    /**
+     * Approver overrules a dispute that survived correction, so a fee decision
+     * is not blocked forever. Never recorded as a student confirmation.
+     */
+    public function overruleDispute(
+        OverruleScholarshipAdjustmentDisputeRequest $request,
+        ScholarshipAdjustmentDossier $dossier,
+    ) {
+        try {
+            app(OverruleDisputeAction::class)->run(
+                $dossier,
+                (int) $request->user()->id,
+                $request->validated()['overrule_reason'],
+            );
+        } catch (\DomainException $e) {
+            return back()->withErrors(['error' => $e->getMessage()]);
+        }
+
+        return back()->with('success', 'Dispute overruled — the reason is recorded and a decision can now be proposed.');
     }
 
     public function confirmOnBehalf(

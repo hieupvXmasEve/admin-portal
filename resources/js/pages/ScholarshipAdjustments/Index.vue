@@ -2,9 +2,14 @@
 import { Head, Link, router } from '@inertiajs/vue3';
 import { route } from 'ziggy-js';
 
+import DataPagination from '@/components/DataPagination.vue';
+import Heading from '@/components/Heading.vue';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { PaginatedResponse } from '@/types';
+import { DOSSIER_SOURCE_LABELS, DOSSIER_STATUS_LABELS, labelFor } from './dossier-labels';
 
 interface DossierRow {
     id: number;
@@ -18,14 +23,12 @@ interface DossierRow {
 }
 
 interface Props {
-    dossiers: {
-        data: DossierRow[];
-        links: Array<{ url: string | null; label: string; active: boolean }>;
-    };
+    dossiers: PaginatedResponse<DossierRow>;
     filters: Record<string, string | number | null>;
+    campusId: number;
 }
 
-defineProps<Props>();
+const props = defineProps<Props>();
 
 function statusVariant(status: string) {
     if (['applied', 'no_adjustment'].includes(status)) return 'default';
@@ -33,40 +36,49 @@ function statusVariant(status: string) {
     return 'secondary';
 }
 
-function goTo(url: string | null) {
-    if (url) router.visit(url, { preserveScroll: true });
+function handlePaginationNavigate(url: string) {
+    router.visit(url, { preserveState: true, preserveScroll: true, only: ['dossiers'] });
+}
+
+function handlePageSizeChange(pageSize: number) {
+    router.visit(route('scholarship-adjustments.index'), {
+        data: { ...props.filters, per_page: pageSize },
+        preserveState: true,
+        preserveScroll: true,
+    });
 }
 </script>
 
 <template>
-    <Head title="Scholarship Adjustments" />
+    <Head title="Scholarship adjustments" />
 
     <div class="flex items-center justify-between">
-        <div>
-            <h2 class="text-foreground text-xl leading-tight font-semibold">Scholarship Adjustments</h2>
-            <p class="text-muted-foreground mt-1 text-sm">Per-semester scholarship adjustment dossiers — identification, interview, and maker-checker decision.</p>
-        </div>
+        <Heading title="Scholarship adjustments" description="Review students who failed a course, record the interview, and decide whether their scholarship changes next semester." />
+        <Link :href="route('scholarship-adjustments.candidates.preview', { campus_id: props.campusId })">
+            <Button>Find students to review</Button>
+        </Link>
     </div>
 
     <Card class="mt-6">
         <CardHeader>
-            <CardTitle>Dossiers</CardTitle>
+            <CardTitle>Students under review</CardTitle>
+            <CardDescription>{{ dossiers.total }} student(s) at this campus.</CardDescription>
         </CardHeader>
         <CardContent>
             <Table>
                 <TableHeader>
                     <TableRow>
                         <TableHead>Student</TableHead>
-                        <TableHead>Source → Target</TableHead>
+                        <TableHead>Failed in → Applies to</TableHead>
                         <TableHead>Campus</TableHead>
-                        <TableHead>Source</TableHead>
-                        <TableHead>Status</TableHead>
+                        <TableHead>Added by</TableHead>
+                        <TableHead>Stage</TableHead>
                         <TableHead />
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                     <TableRow v-if="dossiers.data.length === 0">
-                        <TableCell colspan="6" class="text-muted-foreground text-center">No dossiers found.</TableCell>
+                        <TableCell colspan="6" class="text-muted-foreground text-center"> No students under review yet. Use “Find students to review” to scan a semester. </TableCell>
                     </TableRow>
                     <TableRow v-for="row in dossiers.data" :key="row.id">
                         <TableCell>
@@ -75,29 +87,19 @@ function goTo(url: string | null) {
                         </TableCell>
                         <TableCell>{{ row.source_semester?.name }} → {{ row.target_semester?.name }}</TableCell>
                         <TableCell>{{ row.campus?.name }}</TableCell>
-                        <TableCell class="capitalize">{{ row.source }}</TableCell>
+                        <TableCell>{{ labelFor(DOSSIER_SOURCE_LABELS, row.source) }}</TableCell>
                         <TableCell>
-                            <Badge :variant="statusVariant(row.status)">{{ row.status }}</Badge>
-                            <Badge v-if="row.needs_data_review" variant="destructive" class="ml-1">needs review</Badge>
+                            <Badge :variant="statusVariant(row.status)">{{ labelFor(DOSSIER_STATUS_LABELS, row.status) }}</Badge>
+                            <Badge v-if="row.needs_data_review" variant="destructive" class="ml-1">Check grades manually</Badge>
                         </TableCell>
                         <TableCell>
-                            <Link :href="route('scholarship-adjustments.show', row.id)" class="text-primary text-sm underline">View</Link>
+                            <Link :href="route('scholarship-adjustments.show', row.id)" class="text-primary text-sm underline">Open</Link>
                         </TableCell>
                     </TableRow>
                 </TableBody>
             </Table>
 
-            <div class="mt-4 flex justify-center gap-2">
-                <button
-                    v-for="link in dossiers.links"
-                    :key="link.label"
-                    class="rounded px-3 py-1 text-sm"
-                    :class="link.active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'"
-                    :disabled="!link.url"
-                    v-html="link.label"
-                    @click="goTo(link.url)"
-                />
-            </div>
+            <DataPagination class="mt-4" :pagination-data="dossiers" item-name="students" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
         </CardContent>
     </Card>
 </template>
