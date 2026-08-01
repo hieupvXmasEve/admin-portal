@@ -75,19 +75,15 @@ class ScholarshipAdjustmentCandidateQuery
                 ->has($record->student_id.':'.$record->course_offering_id)
         );
 
-        // Active scholarship award covering the target semester's start date.
+        // Active scholarship award — no valid_from/valid_until window check:
+        // a scholarship award runs for the whole program, not a single
+        // semester, so the target semester's start date is not a validity
+        // boundary.
         $studentIdsWithFailure = $failedRecords->pluck('student_id')->unique()->values();
 
         $activeAwardStudentIds = StudentScholarshipAward::query()
             ->whereIn('student_id', $studentIdsWithFailure)
-            ->whereHas('scholarshipDefinition', function ($query) use ($targetSemesterId): void {
-                $targetStart = Semester::query()->find($targetSemesterId)?->start_date;
-                $query->where('is_active', true);
-                if ($targetStart !== null) {
-                    $query->where('valid_from', '<=', $targetStart)
-                        ->where('valid_until', '>=', $targetStart);
-                }
-            })
+            ->whereHas('scholarshipDefinition', fn ($query) => $query->where('is_active', true))
             ->pluck('student_id')
             ->unique();
 

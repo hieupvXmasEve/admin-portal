@@ -7,13 +7,13 @@ namespace App\Modules\Academic\Progression\Http\Requests\ScholarshipAdjustment;
 use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Http\FormRequest;
 
-class IdentifyScholarshipAdjustmentCandidatesRequest extends FormRequest
+class PreviewScholarshipAdjustmentCandidatesRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // `can:` middleware on the route only proves the permission "somewhere"
-        // (session campus). campus_id is a request field the operator picks —
-        // re-verify the permission AT that specific campus, not the session's.
+        // Read-only, but exposes per-student failed-course data — gate on the
+        // same permission as actually creating candidates, and re-verify AT
+        // the campus_id the operator picked, not the session campus.
         $campusId = $this->integer('campus_id');
 
         if ($campusId <= 0) {
@@ -29,10 +29,8 @@ class IdentifyScholarshipAdjustmentCandidatesRequest extends FormRequest
     {
         return [
             'campus_id' => ['required', 'integer', 'exists:campuses,id'],
-            'source_semester_id' => ['required', 'integer', 'exists:semesters,id'],
-            'target_semester_id' => ['required', 'integer', 'exists:semesters,id'],
-            'student_ids' => ['nullable', 'array'],
-            'student_ids.*' => ['integer'],
+            'source_semester_id' => ['nullable', 'integer', 'exists:semesters,id'],
+            'target_semester_id' => ['nullable', 'integer', 'exists:semesters,id'],
         ];
     }
 }

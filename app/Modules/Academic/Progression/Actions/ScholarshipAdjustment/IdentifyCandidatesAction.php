@@ -18,16 +18,24 @@ class IdentifyCandidatesAction
     public function __construct(private readonly ScholarshipAdjustmentCandidateQuery $query) {}
 
     /**
+     * @param  array<int, int>|null  $selectedStudentIds  When given, only these student IDs are turned into
+     *                                                    dossiers (staff-picked subset from the preview screen).
+     *                                                    Null keeps the original "create every candidate" behavior
+     *                                                    (CLI / scheduler use).
      * @return array{created: int, skipped_existing: int, excluded_null_is_passed: int}
      */
-    public function run(int $campusId, int $sourceSemesterId, int $targetSemesterId, int $actorUserId): array
+    public function run(int $campusId, int $sourceSemesterId, int $targetSemesterId, int $actorUserId, ?array $selectedStudentIds = null): array
     {
         $result = $this->query->handle($campusId, $sourceSemesterId, $targetSemesterId);
+
+        $candidates = $selectedStudentIds === null
+            ? $result['candidates']
+            : $result['candidates']->whereIn('student_id', $selectedStudentIds);
 
         $created = 0;
         $skipped = 0;
 
-        foreach ($result['candidates'] as $candidate) {
+        foreach ($candidates as $candidate) {
             $studentId = $candidate['student_id'];
 
             $exists = ScholarshipAdjustmentDossier::query()
