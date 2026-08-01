@@ -13,34 +13,14 @@ use App\Modules\Merchandise\Actions\UpdateMerchandiseAction;
 use App\Modules\Merchandise\Http\Requests\StoreMerchandiseRequest;
 use App\Modules\Merchandise\Http\Requests\UpdateMerchandiseRequest;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
+/**
+ * Write-only JSON API (create/update/archive). Reads are server-rendered via
+ * Inertia — see Http/Web/MerchandiseWebController for index/show/create/edit.
+ */
 class MerchandiseController extends Controller
 {
-    public function index(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'status' => ['nullable', 'string', 'in:'.implode(',', Merchandise::STATUSES)],
-            'per_page' => ['nullable', 'integer', 'min:5', 'max:100'],
-        ]);
-
-        $merchandise = Merchandise::query()
-            ->with(['images', 'variants'])
-            ->when($validated['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
-            ->orderBy('created_at', 'desc')
-            ->paginate($validated['per_page'] ?? 15);
-
-        return ApiResponse::paginated($merchandise);
-    }
-
-    public function show(Merchandise $merchandise): JsonResponse
-    {
-        $merchandise->load(['images', 'variants.campus']);
-
-        return ApiResponse::success($merchandise);
-    }
-
     public function store(StoreMerchandiseRequest $request): JsonResponse
     {
         $merchandise = CreateMerchandiseAction::run($request->validated());

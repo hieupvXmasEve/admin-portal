@@ -5,19 +5,31 @@ declare(strict_types=1);
 use App\Modules\Merchandise\Http\Api\MerchandiseController;
 use App\Modules\Merchandise\Http\Api\MerchandiseImageController;
 use App\Modules\Merchandise\Http\Api\MerchandiseVariantController;
+use App\Modules\Merchandise\Http\Web\MerchandiseWebController;
 use Illuminate\Support\Facades\Route;
 
 /**
- * JSON API only — no Inertia UI in this module yet. Uses the 'web' + 'auth'
- * middleware group (session guard + CSRF), same shape as routes/api/admin.php,
- * so responses stay ApiResponse envelopes gated by session-based can: checks.
+ * GET page routes render Inertia (Http/Web) — the admin list/create/edit/show
+ * screens. Write routes stay JSON API (Http/Api, ApiResponse envelope); Vue
+ * pages call them via fetch() + router.reload(). All under 'web' + 'auth'
+ * (session guard + CSRF), same shape as routes/api/admin.php.
  */
 Route::middleware(['web', 'auth'])->prefix('merchandise')->name('merchandise.')->group(function () {
-    Route::get('/', [MerchandiseController::class, 'index'])
+    Route::get('/', [MerchandiseWebController::class, 'index'])
         ->middleware('can:view_merchandise')
         ->name('index');
 
-    Route::get('/{merchandise}', [MerchandiseController::class, 'show'])
+    // Static segment before the {merchandise} wildcard so it isn't captured
+    // as a route-model-bound id.
+    Route::get('/create', [MerchandiseWebController::class, 'create'])
+        ->middleware('can:create_merchandise')
+        ->name('create');
+
+    Route::get('/{merchandise}/edit', [MerchandiseWebController::class, 'edit'])
+        ->middleware('can:edit_merchandise')
+        ->name('edit');
+
+    Route::get('/{merchandise}', [MerchandiseWebController::class, 'show'])
         ->middleware('can:view_merchandise')
         ->name('show');
 

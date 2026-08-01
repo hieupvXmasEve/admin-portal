@@ -44,8 +44,18 @@ Run: `docker run --rm -v <repo>:/app -v swinx-dev_composer_vendor:/app/vendor --
 - Merchandise entity itself has no campus policy (no campus_id; only variants carry campus).
 - image `path` stores the gateway-resolved public URL; keeping an upload_id for delete/replace-by-id lifecycle deferred (YAGNI until Phase 2 UI/edit needs it).
 
-## NOT done in this slice
-- **Admin Vue/Inertia UI** (`resources/js/pages/Merchandise/`: list+filter, form with images + variant matrix, stock-adjust + movement history). Reference: `resources/js/pages/Finance/Operations/`. Plan marks it "smoke by hand". This is a separate frontend slice.
+## Admin UI slice — DONE (2026-08-01)
+Inertia v3 + Vue 3 + shadcn-vue, reads via Inertia props, writes via the existing tested JSON API (axios + `router.reload`).
+- `app/Modules/Merchandise/Http/Web/MerchandiseWebController.php` — index (paginated, DataPagination shape) / create / edit / show (images, variants+campus, per-campus availability, per-variant recent movements). GET page routes added; JSON `index`/`show` (unused by tests) removed to avoid route collision.
+- `resources/js/pages/Merchandise/Index.vue` (list+search+status filter+archive), `Form.vue` (fields + image upload/reorder/primary + variant matrix), `Show.vue` (detail + availability + stock-adjust dialog + movement history).
+- Menu entry "Merchandise Store" (gated `view_merchandise`) in `resources/js/constants/menu-sidebar.ts` + `resources/js/utils/routes.ts`.
+- ESLint clean on all new .vue/.ts; pint clean; route:list shows 16 clean merchandise routes, no collision.
+
+### Env-limited test (not a defect)
+`MerchandiseAdminPageTest`: the 403-gate case passes; the full-render assertion fails **only in the dev docker recipe** (500) because `SystemConfigurationStore` rejects the `array` cache and there is no Vite build in the container. Proven pre-existing: the untouched `tests/Feature/Attendance/StandaloneAttendancePagesTest` fails identically (same "requires a shared cache store" error) via the same recipe. Passes in CI (APP_ENV=testing + built assets). Net local tally: **34 passed, 1 env-limited** across Merchandise + Gold + DomainBoundary.
+
+### Still pending
+- Manual UI smoke in a real dev env (Vite build + browser) — could not run headless here.
 
 ## Pre-existing failures (unchanged, NOT from this work)
 - `MigrationDebtInventoryTest` — already red on branch (baseline drift). Phase 2 adds legitimate `app/Modules` → `app/Models` imports which the `shared_model_imports` baseline counts; bumping that baseline in `config/migration_debt.php` is a governance decision, not done here.
