@@ -9,6 +9,10 @@ dependencies: [3]
 
 # Phase 5: Restoration Flow
 
+> **Partly superseded (2026-08-02).** The maker != checker rule on restoration
+> approval is no longer enforced; approval is gated on the campus permission
+> alone. See "Post-plan changes" in [the plan](./plan.md).
+
 ## Overview
 
 After the adjusted (target) semester's results are finalized, evaluate each applied adjustment: clean result → restoration **proposal awaiting approval**; still failing → new dossier via Phase 3; incomplete/appealing → wait. To make "chờ duyệt" actually enforceable, fee generation for the NEXT semester is gated: no approved restoration and no new adjustment ⇒ the ORIGINAL rate is not silently restored — the prior REDUCED rate carries forward provisionally + review flag.

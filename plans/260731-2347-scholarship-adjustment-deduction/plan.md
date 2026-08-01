@@ -1,7 +1,7 @@
 ---
 title: "Scholarship Adjustment Deduction"
-description: "Per-semester scholarship reduction workflow: Academic dossier (failed courses → interview → maker-checker decision) → Finance applies adjusted discount → portal confirmation → restoration next semester. PRD: docs/features/academic/scholarship-adjustment-deduction.md"
-status: in-progress
+description: "Per-semester scholarship reduction workflow: Academic dossier (failed courses → interview → decision) → Finance applies adjusted discount → portal confirmation → restoration next semester. PRD: docs/features/academic/scholarship-adjustment-deduction.md"
+status: done
 priority: P1
 effort: "3-4w"
 tags: [academic, finance, scholarship]
@@ -16,7 +16,7 @@ blocks: []
 
 Implement "điều chỉnh học bổng theo học kỳ" per PRD [docs/features/academic/scholarship-adjustment-deduction.md](../../docs/features/academic/scholarship-adjustment-deduction.md). Original `StudentScholarshipAward` is never edited; a semester-scoped adjustment record changes the effective discount for one target semester only. Academic owns the dossier/decision; Finance owns the applied discount. Boundary via `App\Shared\Contracts\Finance\ScholarshipAdjustmentContract` + DTO (mirrors `FinanceIntakeContract` pattern), no cross-module model or action imports.
 
-**Module structure (as built, 2026-08-01):** the Academic side lives in the **Progression** sub-module (`app/Modules/Academic/Progression/{Models,Queries,Policies,Actions/ScholarshipAdjustment,Http/Web,Http/Requests,Support}`) — sibling of StudentDecision/WarningCenter (decisions on a student's academic standing). Behavior is expressed as Progression **Actions** (`run()`), not Services (Progression has no Services dir). The Finance side stays in `app/Modules/Finance/`. The student-portal API (P4) is its own global bounded surface (`app/Http/Controllers/Api/V1/Student/*`). A placement arch test (`tests/Feature/Architecture/ScholarshipAdjustmentModulePlacementArchTest.php`) enforces this. P4/P5 phase docs pin exact paths accordingly.
+**Module structure (as built, 2026-08-01):** the Academic side lives in the **Progression** sub-module (`app/Modules/Academic/Progression/{Models,Queries,Policies,Actions/ScholarshipAdjustment,Http/Web,Http/Requests,Support}`) — sibling of StudentDecision/WarningCenter (decisions on a student's academic standing). Behavior is expressed as Progression **Actions** (`run()`), not Services (Progression has no Services dir). The Finance side stays in `app/Modules/Finance/`. The student-portal API (P4) also lives in Progression (`app/Modules/Academic/Progression/Http/Api/Student/`), alongside the existing `AcademicRecordController` — not in the global `app/Http/Controllers/Api/V1/Student/*` tree. A placement arch test (`tests/Feature/Architecture/ScholarshipAdjustmentModulePlacementArchTest.php`) enforces this. P4/P5 phase docs pin exact paths accordingly.
 
 **Settled decisions (brainstorm 2026-07-31, refined by red-team 2026-08-01):**
 1. `GIẢM TRỪ HỌC BỔNG` breakdown is **presentational only** — ledger keeps ONE adjusted `InvoiceDiscount` line; breakdown exposed as a separate `scholarship_breakdown` payload key (never injected into the settlement line collection — FeeTab sums those).
@@ -162,6 +162,57 @@ User decisions preserved: "no recalc is_passed" (guarded via `grade_finalized_da
 - Decision deltas checked: 4
 - Reconciled stale references: suppress-scholarship gate wording (plan settled decision 4, success criteria, phase-05 overview/requirements/steps/criteria); mirror-role grant step (phase-01); refuse-or-flag import (phase-02); P5 scheduler (phase-05)
 - Unresolved contradictions: 0
+
+## Post-plan changes (2026-08-02)
+
+Shipped after all five phases closed, from review of the working screens. Each
+contradicts something written above, so read these as the current behaviour.
+
+1. **maker != checker removed** (supersedes settled decision on the decision
+   step and the PRD recommendation). Approval is gated on
+   `approve_scholarship_adjustment` at the record's campus alone; the proposer
+   may approve their own decision. Removed from all three enforcing sites —
+   Academic approve, Finance apply, restoration approve — since leaving one
+   behind pushes a legitimate approval into `finance_review_required` with no
+   visible reason.
+
+2. **Dispute resolution** (supersedes P4's on-behalf scope). Confirming on
+   behalf no longer accepts a disputed dossier: it covers only a student who did
+   not answer. A dispute is resolved by correcting the minutes, or by an
+   approver overruling it with a written reason — a new `dispute_overruled`
+   confirmation status that unblocks the money gate without fabricating a
+   confirmation. `student_comment`, `confirmed_at` and `confirmed_by_user_id`
+   stay untouched. Columns: `dispute_overruled_at`,
+   `dispute_overruled_by_user_id`, `dispute_overrule_reason`.
+
+3. **Fee impact preview.** New Shared contract
+   `ScholarshipAdjustmentPreviewReader` (implemented by Finance's
+   `PreviewScholarshipAdjustmentQuery`) projects tuition base, discount before
+   and after, and payable before and after. Every figure runs through
+   `ScholarshipDiscountResolver`, so the number staff approve is the number
+   charged, including its clamp. Consumed by the staff decision panel live and
+   by the student page once the decision is settled.
+
+4. **Award validity window dropped** from candidate identification: only
+   `is_active` is checked. A scholarship runs for the whole programme, so
+   `valid_until` was excluding students whose award had merely passed that date.
+
+5. **Candidate scan UI.** Dossiers no longer require the artisan command:
+   staff pick the semester pair, review who would be raised, and tick a subset.
+   `IdentifyCandidatesAction` takes an optional student id list; the command
+   still passes none and keeps creating all.
+
+6. **Amount hardening.** `adjusted_amount` is capped at the dossier's own
+   snapshot of the award (request and action), and is stored only for a money
+   decision — `keep`/`cancel` never reach Finance, so a value left in the form
+   was recording a change that never happened and driving a false preview.
+
+Also shipped alongside: `lang/` published with a Vietnamese set (the app had
+none while `APP_LOCALE=vn`, so every unmapped rule rendered its raw key), and
+two repo hooks guarding module placement and Inertia feedback.
+
+Not done: email template for the confirmation notification (realtime only), and
+no UI walkthrough of the above on a browser yet.
 
 ## Open Questions
 

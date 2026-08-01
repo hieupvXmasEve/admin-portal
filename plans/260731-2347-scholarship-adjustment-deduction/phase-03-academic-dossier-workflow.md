@@ -9,6 +9,12 @@ dependencies: [2]
 
 # Phase 3: Academic Dossier Workflow
 
+> **Partly superseded (2026-08-02).** The maker != checker rule described below
+> is no longer enforced anywhere, and candidate identification no longer checks
+> the award's `valid_from`/`valid_until` window. Dossiers are now raised from a
+> scan-and-pick screen rather than only the artisan command. See "Post-plan
+> changes" in [the plan](./plan.md) for what replaced them.
+
 ## Overview
 
 Academic-owned dossier lifecycle: identify candidates from failed courses of an explicitly specified source semester, schedule/record interview, maker-checker decision, then hand approved reductions to Finance via the Shared contract. Staff UI included.

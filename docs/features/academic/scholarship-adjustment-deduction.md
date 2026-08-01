@@ -51,7 +51,7 @@ Một sinh viên được đưa vào danh sách xem xét khi:
 - Có ít nhất một kết quả môn chính thức là trượt trong học kỳ nguồn.
 - Kết quả đã được chốt, không còn ở trạng thái dự thảo.
 - Không có override pass hoặc khiếu nại điểm đang xử lý.
-- Có học bổng đang hiệu lực.
+- Có học bổng đang bật (`is_active`). Không xét cửa sổ `valid_from`/`valid_until`: học bổng cấp cho toàn bộ chương trình học, nên ngày bắt đầu học kỳ đích không phải mốc quyết định còn hay hết quyền lợi.
 - Dự kiến tiếp tục học trong học kỳ áp dụng.
 
 Nên tổng hợp theo sinh viên, không tạo một hồ sơ cho từng môn trượt. Hồ sơ vẫn lưu danh sách các môn làm căn cứ.
@@ -105,6 +105,12 @@ Trường hợp sinh viên không phản hồi hoặc từ chối xác nhận kh
 
 Sau thời hạn do nhà trường quy định, Đào tạo có thể xử lý tiếp nhưng phải ghi nhận căn cứ liên hệ và cần bước phê duyệt bổ sung.
 
+Cần phân biệt rõ **không phản hồi** với **phản đối**:
+
+- Xác nhận thay sinh viên chỉ áp dụng cho người **chưa trả lời** (`Chờ xác nhận`, `Quá hạn`). Sinh viên đã trả lời là không đồng ý thì không được ghi nhận thành đã đồng ý — làm vậy là ghi sai sự thật vào hồ sơ và mở cổng tăng học phí trên một sự đồng thuận không tồn tại.
+- Hướng xử lý chính khi có phản đối: sửa biên bản. Việc sửa tự tăng phiên bản, đưa xác nhận về trạng thái chờ và yêu cầu sinh viên trả lời lại trên bản đã sửa.
+- Nếu phản đối vẫn còn sau khi đã sửa: người có quyền phê duyệt **bác bỏ phản đối**, bắt buộc nhập lý do. Hồ sơ chuyển sang trạng thái riêng, **không** phải "đã xác nhận": ý kiến của sinh viên và việc họ không đồng ý vẫn nằm nguyên trên hồ sơ, kèm tên người quyết định. Không có bước này thì hồ sơ bị treo vĩnh viễn, vì cổng tiền chặn cứng trạng thái phản đối.
+
 Portal impact: **student**.
 
 ### 4. Quyết định cuối cùng
@@ -128,7 +134,14 @@ Thông tin bắt buộc:
 - Ngày quyết định.
 - Học kỳ hiệu lực.
 
-Nên áp dụng maker–checker: người lập hồ sơ không đồng thời là người duyệt quyết định làm tăng học phí, ít nhất đối với trường hợp giảm một phần hoặc toàn bộ.
+**Không áp dụng maker–checker** (quyết định sản phẩm 2026-08-02). Điều kiện để phê duyệt là quyền `approve_scholarship_adjustment` tại campus của hồ sơ; người đề xuất được phép tự duyệt. Căn cứ: hồ sơ đã lưu đủ người đề xuất, người duyệt và thời điểm, và audit đó được chấp nhận là đủ. Đánh đổi đã biết: đây là kiểm soát **phát hiện**, không phải kiểm soát **ngăn chặn** — một người vẫn có thể tự mình làm tăng học phí của sinh viên mà không ai xem lại trước.
+
+Màn hình quyết định phải cho thấy hệ quả tiền **ngay khi nhập**, không để người duyệt ký vào một con số trần:
+
+- Học phí học kỳ đích, mức học bổng trước và sau, số tiền sinh viên phải đóng trước và sau.
+- Đơn vị của ô nhập theo loại học bổng gốc (phần trăm hay số tiền), và giá trị nhập là **phần còn lại** sau khi giảm, không phải phần bị trừ.
+- Cảnh báo khi chênh lệch bằng 0: học bổng đã bị chặn trần ở mức học phí nên quyết định không làm thay đổi số tiền nào.
+- Số hiển thị phải do Finance tính, không tính lại ở tầng giao diện, để con số duyệt trùng con số thu.
 
 ### 5. Áp dụng vào học phí
 
@@ -176,6 +189,7 @@ Khôi phục phải:
 Các nhánh bổ sung:
 
 - `student_disputed`
+- `dispute_overruled` (phản đối đã được xem xét và bác bỏ — không đồng nghĩa "đã xác nhận")
 - `student_no_show`
 - `confirmation_overdue`
 - `no_adjustment`
@@ -229,6 +243,20 @@ Chưa nên hấp thụ:
 - Mọi thao tác được kiểm tra quyền và campus scope.
 - “Trượt môn” loại trừ EGC, chỉ dành cho student intake_course
 - Mức giảm do Đào tạo nhập tự do nhưng không được lớn hơn học bổng được nhận, nếu không có học bổng thì không cần giảm
-- Sinh viên phải tự xác nhận trên portal, hoặc staff được phép xác nhận thay
+- Sinh viên phải tự xác nhận trên portal, hoặc staff được phép xác nhận thay **khi sinh viên chưa trả lời**
 - Thời hạn phản hồi trước khi chuyển sang `quá hạn không phản hồi` là 1 ngày
+
+## Sai khác so với đề xuất (as-built, 2026-08-02)
+
+Tài liệu trên là đề xuất nghiệp vụ. Những điểm dưới đây hệ thống làm **khác** với đề xuất ban đầu, ghi lại để người đọc sau không hiểu nhầm tài liệu là mô tả hiện trạng.
+
+| Đề xuất ban đầu | Hệ thống thật | Vì sao |
+|---|---|---|
+| Áp dụng maker–checker | Không áp dụng; chỉ cần quyền duyệt tại campus | Quyết định sản phẩm: audit ghi đủ người thực hiện |
+| Ứng viên phải có học bổng "đang hiệu lực" | Chỉ cần học bổng đang bật | Học bổng cấp cho toàn chương trình, không theo cửa sổ ngày |
+| Staff xác nhận thay khi sinh viên "từ chối xác nhận" | Chỉ thay khi **chưa trả lời**; đã phản đối thì sửa biên bản hoặc bác bỏ có lý do | Không ghi nhận đồng thuận không có thật |
+| — | Màn hình quyết định hiện tác động tiền theo thời gian thực | Người duyệt cần thấy hệ quả trước khi ký |
+| Sinh hồ sơ ứng viên bằng lệnh artisan | Có màn hình quét, chọn từng sinh viên rồi mới tạo | Staff nghiệp vụ không chạy được lệnh CLI |
+
+Chưa làm: mẫu email cho thông báo xác nhận (hiện chỉ bắn realtime trong app).
 - Bắt buộc hai người lập–duyệt cho mọi quyết định (người có quyền)

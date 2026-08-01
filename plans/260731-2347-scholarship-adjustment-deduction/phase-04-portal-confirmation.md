@@ -9,6 +9,14 @@ dependencies: [3]
 
 # Phase 4: Portal Confirmation
 
+> **Partly superseded (2026-08-02).** Confirming on behalf no longer accepts a
+> disputed dossier — it covers only a student who has not answered. A dispute is
+> resolved by correcting the minutes or by an approver overruling it, which adds
+> a `dispute_overruled` confirmation status that the money gate accepts. The
+> portal pages, the notification and the student-facing fee figures were also
+> built after this phase closed. See "Post-plan changes" in
+> [the plan](./plan.md).
+
 ## Overview
 
 Student confirms (or disputes) the interview minutes on the Student Portal, tied to an exact minutes version. Staff can confirm on behalf with a dedicated permission. 1-calendar-day deadline → `confirmation_overdue`.
