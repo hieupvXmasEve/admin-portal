@@ -352,6 +352,7 @@ return [
         'gold_transactions' => [
             'view_gold_transaction' => 'view_gold_transaction',
             'view_any_gold_transaction' => 'view_any_gold_transaction',
+            'adjust_gold_wallet' => 'adjust_gold_wallet',
         ],
         'fee' => [
             'view_scholarship' => 'view_scholarship',

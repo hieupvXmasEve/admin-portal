@@ -38,7 +38,7 @@ class Event extends Model
         'published_at' => 'datetime',
         'cancelled_at' => 'datetime',
         'completed_at' => 'datetime',
-        'gold_reward_amount' => 'decimal:0',
+        'gold_reward_amount' => 'integer',
         'is_manual' => 'boolean',
         'is_historical' => 'boolean',
         'requires_registration' => 'boolean'

@@ -5,12 +5,13 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\GoldTransactionResource;
 use App\Http\Responses\ApiResponse;
-use App\Models\Student;
 use App\Models\GoldTransaction;
+use App\Models\Student;
 use App\Services\GoldService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class GoldTransactionController extends Controller
 {
@@ -27,7 +28,7 @@ class GoldTransactionController extends Controller
         $student = Auth::guard('student')->user();
 
         $validated = $request->validate([
-            'type' => 'nullable|in:earn,spend,adjust',
+            'type' => ['nullable', Rule::in(GoldTransaction::TYPES)],
             'per_page' => 'nullable|integer|min:1|max:100',
         ]);
 
@@ -55,7 +56,7 @@ class GoldTransactionController extends Controller
     {
 
         $validated = $request->validate([
-            'type' => 'nullable|in:earn,spend,adjust',
+            'type' => ['nullable', Rule::in(GoldTransaction::TYPES)],
             'per_page' => 'nullable|integer|min:1|max:100',
         ]);
 

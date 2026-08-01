@@ -17,11 +17,11 @@ class GoldTransactionResource extends JsonResource
         return [
             'id' => $this->id,
             'student_id' => $this->student_id,
-            'amount' => number_format($this->amount, 2),
-            'amount_raw' => $this->amount,
+            'amount' => (int) $this->amount,
+            'amount_raw' => (int) $this->amount,
             'absolute_amount' => $this->absolute_amount,
             'type' => $this->type,
-            'type_label' => ucfirst($this->type),
+            'type_label' => ucfirst(str_replace('_', ' ', $this->type)),
             'source_type' => $this->source_type,
             'source_type_label' => ucfirst(str_replace('_', ' ', $this->source_type)),
             'source_id' => $this->source_id,
@@ -44,8 +44,8 @@ class GoldTransactionResource extends JsonResource
 
             // Transaction display helpers
             'display_amount' => $this->isPositive() ?
-                '+' . number_format($this->amount, 2) :
-                number_format($this->amount, 2),
+                '+'.(int) $this->amount :
+                (string) (int) $this->amount,
             'amount_class' => $this->isPositive() ? 'text-green-600' : 'text-red-600',
             'type_color' => match ($this->type) {
                 'earn' => 'green',
