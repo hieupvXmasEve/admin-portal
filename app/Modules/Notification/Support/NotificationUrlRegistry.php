@@ -42,6 +42,11 @@ final class NotificationUrlRegistry
         'merchandise.redemption_order_review' => [
             'web' => '/redemption-orders/{id}',
         ],
+        // Staff-facing: the admin app's scholarship adjustment dossier
+        // (app/Modules/Academic/routes/web.php scholarship-adjustments.show).
+        'academic.scholarship_adjustment' => [
+            'web' => '/scholarship-adjustments/{id}',
+        ],
         // Deep-links into the student portal (FE/student-nuxt) store product
         // detail page.
         'merchandise.catalog_item' => [

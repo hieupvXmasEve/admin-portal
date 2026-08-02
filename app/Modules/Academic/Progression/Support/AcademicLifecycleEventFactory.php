@@ -204,6 +204,10 @@ final class AcademicLifecycleEventFactory
                 'body' => "Please read the interview notes and confirm whether you agree. Your scholarship{$semester} cannot be decided until you respond.",
                 'category' => 'academic',
                 'is_important' => true,
+                // Literal, not an action_type: this event reaches the student
+                // through EventIntentMapper, which passes `data` straight
+                // through and never runs NotificationPayloadBuilder — so a
+                // NotificationUrlRegistry entry would resolve for nobody.
                 'action_url' => "/scholarship-review/{$dossierId}",
                 'action_text' => 'Review and confirm',
                 'dossier_id' => $dossierId,

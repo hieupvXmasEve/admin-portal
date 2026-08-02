@@ -203,3 +203,20 @@ it('reaches whoever holds the permission, whatever their role is', function () {
 
     expect($ids)->toContain($officer->id);
 });
+
+it('gives every staff notification a clickable link to the dossier', function () {
+    // NotificationPayloadBuilder OVERWRITES action_url with whatever
+    // NotificationUrlRegistry resolves from action_type — passing a literal url
+    // in the data array does not survive. An unregistered action_type therefore
+    // yields a notification nobody can click, silently.
+    $campus = Campus::factory()->create();
+    staffNotifyUser($campus, 'decide_scholarship_adjustment');
+    $dossier = staffNotifyDossier($campus);
+
+    app(ScholarshipStaffNotificationPublisher::class)->disputed($dossier, null);
+
+    $data = soleOutboxPayload()['data'];
+
+    expect($data['action_url'])->toBe("/scholarship-adjustments/{$dossier->id}")
+        ->and($data['action_type'])->toBe('academic.scholarship_adjustment');
+});
