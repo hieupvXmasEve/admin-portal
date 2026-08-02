@@ -220,3 +220,22 @@ it('gives every staff notification a clickable link to the dossier', function ()
     expect($data['action_url'])->toBe("/scholarship-adjustments/{$dossier->id}")
         ->and($data['action_type'])->toBe('academic.scholarship_adjustment');
 });
+
+it('tells the deciders that a student accepted the minutes', function () {
+    // Acceptance is what unblocks a fee-increasing decision, so it is as much a
+    // work signal as a rejection — a confirmed dossier must not sit waiting on
+    // staff who still think the student has not answered.
+    $campus = Campus::factory()->create();
+    $decider = staffNotifyUser($campus, 'decide_scholarship_adjustment');
+    $dossier = staffNotifyDossier($campus);
+
+    app(ScholarshipStaffNotificationPublisher::class)->confirmed($dossier, 'Tôi đồng ý');
+
+    $payload = soleOutboxPayload();
+
+    expect($payload['type_key'])->toBe('scholarship_adjustment_confirmed')
+        ->and($payload['recipient_targets'])->toBe([['type' => 'user', 'id' => $decider->id]])
+        ->and($payload['data']['body'])->toContain('Tôi đồng ý')
+        ->and($payload['data']['action_url'])->toBe("/scholarship-adjustments/{$dossier->id}")
+        ->and($payload['channels'])->toBe(['realtime']);
+});

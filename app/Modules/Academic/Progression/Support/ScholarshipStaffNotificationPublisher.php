@@ -59,6 +59,30 @@ class ScholarshipStaffNotificationPublisher
     }
 
     /**
+     * The student accepted the minutes. That is what unblocks a fee-increasing
+     * decision, so the people who can now act have to know it arrived —
+     * otherwise a confirmed dossier sits waiting on staff who are still
+     * expecting an answer.
+     */
+    public function confirmed(ScholarshipAdjustmentDossier $dossier, ?string $studentComment): void
+    {
+        $name = $this->studentLabel($dossier);
+        $comment = $studentComment !== null && $studentComment !== ''
+            ? " Ý kiến: \"{$studentComment}\""
+            : '';
+
+        $this->publish(
+            'scholarship_adjustment_confirmed',
+            $dossier,
+            'decide_scholarship_adjustment',
+            [
+                'title' => 'Sinh viên đã xác nhận biên bản',
+                'body' => "{$name} đồng ý với biên bản xét học bổng. Hồ sơ có thể ra quyết định.{$comment}",
+            ],
+        );
+    }
+
+    /**
      * The confirmation window closed with no answer. The overdue state is what
      * lets an approver override the gate, so it must not change silently.
      */

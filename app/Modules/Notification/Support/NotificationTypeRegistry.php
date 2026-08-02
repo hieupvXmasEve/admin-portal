@@ -93,6 +93,14 @@ final class NotificationTypeRegistry
             'action_type' => 'academic.scholarship_adjustment',
             'channels' => ['realtime'],
         ],
+        'scholarship_adjustment_confirmed' => [
+            'event_name' => 'academic.scholarship_adjustment_confirmed',
+            'category' => 'academic',
+            'icon' => 'check-circle',
+            'action_text' => 'Xem hồ sơ',
+            'action_type' => 'academic.scholarship_adjustment',
+            'channels' => ['realtime'],
+        ],
         'scholarship_adjustment_confirmation_overdue' => [
             'event_name' => 'academic.scholarship_adjustment_confirmation_overdue',
             'category' => 'academic',

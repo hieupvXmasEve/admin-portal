@@ -105,11 +105,16 @@ class ScholarshipAdjustmentConfirmationController extends Controller
             return ApiResponse::businessLogicError($e->getMessage());
         }
 
-        // A rejection blocks the money decision, so the staff driving the
-        // dossier have to hear about it — nothing else surfaces it.
-        if ($updated->confirmation_status === ScholarshipAdjustmentDossier::CONFIRMATION_DISPUTED) {
-            app(ScholarshipStaffNotificationPublisher::class)->disputed($updated, $updated->student_comment);
-        }
+        // Either answer changes what staff can do next and neither surfaces
+        // anywhere else: a rejection blocks the money decision, an acceptance
+        // unblocks it.
+        $publisher = app(ScholarshipStaffNotificationPublisher::class);
+
+        match ($updated->confirmation_status) {
+            ScholarshipAdjustmentDossier::CONFIRMATION_DISPUTED => $publisher->disputed($updated, $updated->student_comment),
+            ScholarshipAdjustmentDossier::CONFIRMATION_CONFIRMED => $publisher->confirmed($updated, $updated->student_comment),
+            default => null,
+        };
 
         return ApiResponse::success([
             'id' => $updated->id,

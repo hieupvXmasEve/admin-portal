@@ -5,13 +5,18 @@ declare(strict_types=1);
 use App\Http\Middleware\StudentApiAuthorization;
 use App\Models\AcademicHold;
 use App\Models\Campus;
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\ScholarshipDefinition;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentScholarshipAward;
 use App\Models\User;
 use App\Modules\Academic\Progression\Models\ScholarshipAdjustmentDossier;
+use App\Modules\Notification\Models\NotificationEventOutbox;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
@@ -248,4 +253,56 @@ it('refuses to list reviews for a guardian actor', function () {
         route('v1.student.scholarship-adjustment-confirmation.index'),
         ['X-Student-ID' => (string) $student->id],
     )->assertForbidden();
+});
+
+it('notifies staff over HTTP for both an acceptance and a rejection', function () {
+    // The publisher is unit-tested separately; this proves the endpoint
+    // actually reaches it, for BOTH answers — the acceptance path was missing
+    // and nothing failed, because a silent notification looks like a working
+    // request.
+    config([
+        'notification.outbox.push_enabled' => false,
+        'notification.v2_enabled' => true,
+        'notification.write_mode' => 'v2',
+    ]);
+
+    $decider = User::factory()->create();
+    $role = Role::firstOrCreate(['code' => 'api_notify_decider'], ['name' => 'Api notify decider']);
+    $permission = Permission::firstOrCreate(
+        ['code' => 'decide_scholarship_adjustment'],
+        ['name' => 'decide_scholarship_adjustment', 'display_name' => 'Decide', 'module' => 'scholarship_adjustments', 'description' => 'test'],
+    );
+    DB::table('role_permissions')->insertOrIgnore([
+        'role_id' => $role->id, 'permission_id' => $permission->id, 'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    $answer = function (bool $agree, ?string $comment) use ($decider, $role): string {
+        NotificationEventOutbox::query()->delete();
+
+        $student = apiStudent();
+        $dossier = apiDossierFor($student);
+
+        DB::table('campus_user_roles')->insertOrIgnore([
+            'user_id' => $decider->id, 'campus_id' => $dossier->campus_id, 'role_id' => $role->id,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        app(CampusPermissionReader::class)->forgetPermissionCodesForUserId((int) $decider->id);
+
+        Sanctum::actingAs($student);
+        test()->postJson(
+            route('v1.student.scholarship-adjustment-confirmation.respond', ['dossier' => $dossier->id]),
+            // Built explicitly: array_filter() would drop agree=false.
+            $comment === null
+                ? ['minutes_version' => 1, 'agree' => $agree]
+                : ['minutes_version' => 1, 'agree' => $agree, 'comment' => $comment],
+        )->assertOk();
+
+        $payload = NotificationEventOutbox::query()->sole()->payload;
+        $payload = is_array($payload) ? $payload : json_decode((string) $payload, true);
+
+        return $payload['type_key'];
+    };
+
+    expect($answer(true, null))->toBe('scholarship_adjustment_confirmed')
+        ->and($answer(false, 'Ghi sai môn'))->toBe('scholarship_adjustment_disputed');
 });
