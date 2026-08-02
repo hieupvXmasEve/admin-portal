@@ -7,10 +7,10 @@ namespace App\Modules\Merchandise\Support;
 use App\Models\RedemptionOrder;
 use App\Shared\Contracts\DomainEvents\DomainEvent;
 use App\Shared\Contracts\DomainEvents\DomainEventPublisher;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use App\Shared\Contracts\Notification\NotificationPayloadFactory;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Fires redemption order lifecycle notifications through the Shared Contract
@@ -25,8 +25,10 @@ use Illuminate\Support\Facades\DB;
  * Covers every redemption order lifecycle transition, in-app only
  * (`channels: ['realtime']` — no email, per product decision). Staff-facing
  * types (`pendingStaffReview`, `cancellationRequested`) target everyone with
- * the matching permission at the order's own campus_id (RT-13,
- * RedemptionOrderPolicy's own campus+permission model) — their notification
+ * the matching permission at the order's own campus_id, resolved through
+ * CampusPermissionReader rather than a local query, so Identity stays the only
+ * owner of campus_user_roles (RT-13, RedemptionOrderPolicy's own
+ * campus+permission model) — their notification
  * body deliberately omits `shipping_address` (PII), staff see it on the
  * order detail page itself once they open it.
  */
@@ -35,6 +37,7 @@ class RedemptionNotificationPublisher
     public function __construct(
         private readonly DomainEventPublisher $domainEventPublisher,
         private readonly NotificationPayloadFactory $payloadFactory,
+        private readonly CampusPermissionReader $permissions,
     ) {}
 
     public function orderSubmitted(RedemptionOrder $order): void
@@ -144,7 +147,7 @@ class RedemptionNotificationPublisher
 
     private function toStaff(RedemptionOrder $order, string $permission, string $typeKey, array $data): void
     {
-        $userIds = $this->staffWithPermissionAtCampus((int) $order->campus_id, $permission);
+        $userIds = $this->permissions->userIdsWithPermissionAtCampus($permission, (int) $order->campus_id);
 
         if ($userIds === []) {
             return;
@@ -193,19 +196,5 @@ class RedemptionNotificationPublisher
         );
 
         $this->domainEventPublisher->publishAfterCommit($event);
-    }
-
-    /** @return list<int> */
-    private function staffWithPermissionAtCampus(int $campusId, string $permission): array
-    {
-        return DB::table('campus_user_roles')
-            ->join('role_permissions', 'role_permissions.role_id', '=', 'campus_user_roles.role_id')
-            ->join('permissions', 'permissions.id', '=', 'role_permissions.permission_id')
-            ->where('campus_user_roles.campus_id', $campusId)
-            ->where('permissions.code', $permission)
-            ->distinct()
-            ->pluck('campus_user_roles.user_id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
     }
 }
