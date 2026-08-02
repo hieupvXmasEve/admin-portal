@@ -9,7 +9,6 @@ use App\Http\Responses\ApiResponse;
 use App\Models\RedemptionOrder;
 use App\Modules\Merchandise\Exceptions\RedemptionStateConflictException;
 use App\Modules\Merchandise\Support\RedemptionService;
-use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -17,44 +16,17 @@ use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException;
 
 /**
- * Staff redemption order queue + transitions. Every mutating action
- * authorizes via RedemptionOrderPolicy, which resolves the campus from the
- * order's snapshot campus_id (RT-13) — a staff member only acts on orders at
- * a campus they hold the matching permission at.
+ * Staff redemption order state transitions. Every action authorizes via
+ * RedemptionOrderPolicy, which resolves the campus from the order's snapshot
+ * campus_id (RT-13) — a staff member only acts on orders at a campus they hold
+ * the matching permission at.
+ *
+ * Reading is not here: the queue and the detail page are served by
+ * RedemptionOrderWebController (Inertia). This class only mutates.
  */
 class RedemptionOrderController extends Controller
 {
-    public function __construct(
-        private readonly RedemptionService $redemptionService,
-        private readonly CampusPermissionReader $permissions,
-    ) {}
-
-    /** Campus-scoped queue: only orders at campuses the caller holds view_redemption_order at. */
-    public function index(Request $request): JsonResponse
-    {
-        $campusIds = $this->grantedCampusIds((int) Auth::id(), 'view_redemption_order');
-
-        if ($campusIds === []) {
-            return ApiResponse::paginated(RedemptionOrder::whereRaw('1 = 0')->paginate(15));
-        }
-
-        $query = RedemptionOrder::whereIn('campus_id', $campusIds)
-            ->with('items')
-            ->orderByDesc('created_at');
-
-        if ($status = $request->input('status')) {
-            $query->where('status', $status);
-        }
-
-        return ApiResponse::paginated($query->paginate(min((int) $request->input('per_page', 15), 100)));
-    }
-
-    public function show(RedemptionOrder $redemptionOrder): JsonResponse
-    {
-        $this->authorize('view', $redemptionOrder);
-
-        return ApiResponse::success($redemptionOrder->load('items', 'student'));
-    }
+    public function __construct(private readonly RedemptionService $redemptionService) {}
 
     public function approve(RedemptionOrder $redemptionOrder): JsonResponse
     {
@@ -154,11 +126,5 @@ class RedemptionOrderController extends Controller
         }
 
         return ApiResponse::success($order->load('items'));
-    }
-
-    /** @return list<int> */
-    private function grantedCampusIds(int $userId, string $permission): array
-    {
-        return $this->permissions->campusIdsWithPermissionForUser($userId, $permission);
     }
 }
