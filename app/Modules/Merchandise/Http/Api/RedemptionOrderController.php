@@ -9,11 +9,11 @@ use App\Http\Responses\ApiResponse;
 use App\Models\RedemptionOrder;
 use App\Modules\Merchandise\Exceptions\RedemptionStateConflictException;
 use App\Modules\Merchandise\Support\RedemptionService;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 /**
@@ -24,7 +24,10 @@ use InvalidArgumentException;
  */
 class RedemptionOrderController extends Controller
 {
-    public function __construct(private readonly RedemptionService $redemptionService) {}
+    public function __construct(
+        private readonly RedemptionService $redemptionService,
+        private readonly CampusPermissionReader $permissions,
+    ) {}
 
     /** Campus-scoped queue: only orders at campuses the caller holds view_redemption_order at. */
     public function index(Request $request): JsonResponse
@@ -156,14 +159,6 @@ class RedemptionOrderController extends Controller
     /** @return list<int> */
     private function grantedCampusIds(int $userId, string $permission): array
     {
-        return DB::table('campus_user_roles')
-            ->join('role_permissions', 'role_permissions.role_id', '=', 'campus_user_roles.role_id')
-            ->join('permissions', 'permissions.id', '=', 'role_permissions.permission_id')
-            ->where('campus_user_roles.user_id', $userId)
-            ->where('permissions.code', $permission)
-            ->distinct()
-            ->pluck('campus_user_roles.campus_id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
+        return $this->permissions->campusIdsWithPermissionForUser($userId, $permission);
     }
 }

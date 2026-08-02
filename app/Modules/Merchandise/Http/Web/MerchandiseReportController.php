@@ -13,9 +13,9 @@ use App\Modules\Merchandise\Queries\Reports\GoldUsedAndRefundedReportQuery;
 use App\Modules\Merchandise\Queries\Reports\MostRedeemedMerchandiseReportQuery;
 use App\Modules\Merchandise\Queries\Reports\OrdersByStatusReportQuery;
 use App\Modules\Merchandise\Queries\Reports\StockByCampusReportQuery;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
@@ -37,6 +37,7 @@ class MerchandiseReportController extends Controller
         private readonly GoldUsedAndRefundedReportQuery $goldSummaryQuery,
         private readonly MostRedeemedMerchandiseReportQuery $mostRedeemedQuery,
         private readonly StockByCampusReportQuery $stockQuery,
+        private readonly CampusPermissionReader $permissions,
     ) {}
 
     public function index(ListMerchandiseReportRequest $request): Response
@@ -95,14 +96,6 @@ class MerchandiseReportController extends Controller
      */
     private function grantedCampusIds(int $userId): array
     {
-        return DB::table('campus_user_roles')
-            ->join('role_permissions', 'role_permissions.role_id', '=', 'campus_user_roles.role_id')
-            ->join('permissions', 'permissions.id', '=', 'role_permissions.permission_id')
-            ->where('campus_user_roles.user_id', $userId)
-            ->where('permissions.code', self::REPORT_PERMISSION)
-            ->distinct()
-            ->pluck('campus_user_roles.campus_id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
+        return $this->permissions->campusIdsWithPermissionForUser($userId, self::REPORT_PERMISSION);
     }
 }

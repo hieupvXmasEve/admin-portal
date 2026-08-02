@@ -6,9 +6,9 @@ namespace App\Modules\Merchandise\Http\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\RedemptionOrder;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -21,6 +21,8 @@ use Inertia\Response;
  */
 class RedemptionOrderWebController extends Controller
 {
+    public function __construct(private readonly CampusPermissionReader $permissions) {}
+
     public function index(Request $request): Response
     {
         $campusIds = $this->grantedCampusIds((int) Auth::id(), 'view_redemption_order');
@@ -90,14 +92,6 @@ class RedemptionOrderWebController extends Controller
     /** @return list<int> */
     private function grantedCampusIds(int $userId, string $permission): array
     {
-        return DB::table('campus_user_roles')
-            ->join('role_permissions', 'role_permissions.role_id', '=', 'campus_user_roles.role_id')
-            ->join('permissions', 'permissions.id', '=', 'role_permissions.permission_id')
-            ->where('campus_user_roles.user_id', $userId)
-            ->where('permissions.code', $permission)
-            ->distinct()
-            ->pluck('campus_user_roles.campus_id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
+        return $this->permissions->campusIdsWithPermissionForUser($userId, $permission);
     }
 }

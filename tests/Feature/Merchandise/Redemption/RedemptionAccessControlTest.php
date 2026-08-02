@@ -167,3 +167,56 @@ it('returns 403 for a parent proxy token on every merchandise student endpoint',
     test()->getJson(route('v1.student.merchandise.orders.show', $order))->assertForbidden();
     test()->postJson(route('v1.student.merchandise.orders.cancel', $order))->assertForbidden();
 });
+
+it('lists only orders from campuses where the staff member holds the permission', function () {
+    // Guards the campus scoping that grantedCampusIds() performs: the route
+    // `can:` gate resolves against the session campus alone, so if this filter
+    // ever widened, a staff member would silently see another campus's orders.
+    Cache::flush();
+    test()->seed(RoleAndPermissionSeeder::class);
+
+    $campusA = Campus::factory()->create();
+    $campusB = Campus::factory()->create();
+    $semester = Semester::factory()->create();
+    $merchandise = Merchandise::factory()->create(['gold_price' => 20]);
+
+    $orderAt = function (Campus $campus) use ($semester, $merchandise): RedemptionOrder {
+        $student = Student::factory()->create([
+            'campus_id' => $campus->id,
+            'intake' => $semester->id,
+            'intake_semester_id' => $semester->id,
+        ]);
+        $variant = MerchandiseVariant::factory()->create([
+            'merchandise_id' => $merchandise->id,
+            'campus_id' => $campus->id,
+            'stock_quantity' => 10,
+        ]);
+        app(GoldService::class)->addGold($student, 100, GoldTransaction::SOURCE_EVENT, 1, 'funding');
+
+        return app(RedemptionService::class)->createOrder(
+            $student,
+            [['variant_id' => $variant->id, 'quantity' => 1]],
+            RedemptionOrder::METHOD_PICKUP,
+            null,
+            null,
+            null,
+        );
+    };
+
+    $orderA = $orderAt($campusA);
+    $orderB = $orderAt($campusB);
+
+    $staff = User::factory()->create();
+    grantRedemptionRoleAtCampus($staff, $campusA, 'super_admin');
+
+    session(['current_campus_id' => $campusA->id]);
+
+    $response = test()->actingAs($staff)
+        ->get(route('redemption-orders.index'))
+        ->assertOk();
+
+    $ids = collect($response->viewData('page')['props']['orders']['data'])->pluck('id')->all();
+
+    expect($ids)->toContain($orderA->id)
+        ->and($ids)->not->toContain($orderB->id);
+});
