@@ -31,6 +31,7 @@ use App\Modules\Academic\Progression\Http\Requests\ScholarshipAdjustment\Preview
 use App\Modules\Academic\Progression\Http\Requests\ScholarshipAdjustment\ScheduleScholarshipAdjustmentInterviewRequest;
 use App\Modules\Academic\Progression\Models\ScholarshipAdjustmentDossier;
 use App\Modules\Academic\Progression\Queries\ScholarshipAdjustmentCandidateQuery;
+use App\Modules\Academic\Progression\Support\ScholarshipStaffNotificationPublisher;
 use App\Shared\Contracts\Finance\ScholarshipAdjustmentPreviewReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -346,6 +347,8 @@ class ScholarshipAdjustmentDossierController extends Controller
         } catch (\DomainException|\InvalidArgumentException $e) {
             return back()->withErrors(['error' => $e->getMessage()]);
         }
+
+        app(ScholarshipStaffNotificationPublisher::class)->readyForDecision($dossier->refresh());
 
         return back()->with('success', 'Decision recorded — awaiting checker approval.');
     }

@@ -35,6 +35,19 @@ final class EloquentCampusPermissionReader implements CampusPermissionReader
         return $permissions;
     }
 
+    public function userIdsWithPermissionAtCampus(string $permissionCode, int $campusId): array
+    {
+        return DB::table('campus_user_roles')
+            ->join('role_permissions', 'role_permissions.role_id', '=', 'campus_user_roles.role_id')
+            ->join('permissions', 'permissions.id', '=', 'role_permissions.permission_id')
+            ->where('campus_user_roles.campus_id', $campusId)
+            ->where('permissions.code', $permissionCode)
+            ->distinct()
+            ->pluck('campus_user_roles.user_id')
+            ->map(static fn (int|string $userId): int => (int) $userId)
+            ->all();
+    }
+
     public function forgetPermissionCodesForUserId(int $userId, array $knownCampusIds = []): void
     {
         Cache::forget($this->cacheKey($userId, null));

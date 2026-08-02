@@ -11,6 +11,7 @@ use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\RecordStudent
 use App\Modules\Academic\Progression\Exceptions\StaleMinutesVersionException;
 use App\Modules\Academic\Progression\Http\Requests\ScholarshipAdjustment\ConfirmScholarshipAdjustmentRequest;
 use App\Modules\Academic\Progression\Models\ScholarshipAdjustmentDossier;
+use App\Modules\Academic\Progression\Support\ScholarshipStaffNotificationPublisher;
 use App\Shared\Contracts\Finance\ScholarshipAdjustmentPreviewReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -102,6 +103,12 @@ class ScholarshipAdjustmentConfirmationController extends Controller
             return ApiResponse::conflict($e->getMessage());
         } catch (\DomainException $e) {
             return ApiResponse::businessLogicError($e->getMessage());
+        }
+
+        // A rejection blocks the money decision, so the staff driving the
+        // dossier have to hear about it — nothing else surfaces it.
+        if ($updated->confirmation_status === ScholarshipAdjustmentDossier::CONFIRMATION_DISPUTED) {
+            app(ScholarshipStaffNotificationPublisher::class)->disputed($updated, $updated->student_comment);
         }
 
         return ApiResponse::success([

@@ -82,6 +82,33 @@ final class NotificationTypeRegistry
             'action_type' => 'merchandise.order',
             'channels' => ['realtime'],
         ],
+        // Scholarship adjustment — staff work queues. In-app only: these chase
+        // staff who are already in the system, unlike the student-facing
+        // confirmation request which has to reach someone outside it.
+        'scholarship_adjustment_disputed' => [
+            'event_name' => 'academic.scholarship_adjustment_disputed',
+            'category' => 'academic',
+            'icon' => 'alert-triangle',
+            'action_text' => 'Xem hồ sơ',
+            'action_type' => 'academic.scholarship_adjustment',
+            'channels' => ['realtime'],
+        ],
+        'scholarship_adjustment_confirmation_overdue' => [
+            'event_name' => 'academic.scholarship_adjustment_confirmation_overdue',
+            'category' => 'academic',
+            'icon' => 'clock',
+            'action_text' => 'Xem hồ sơ',
+            'action_type' => 'academic.scholarship_adjustment',
+            'channels' => ['realtime'],
+        ],
+        'scholarship_adjustment_ready_for_decision' => [
+            'event_name' => 'academic.scholarship_adjustment_ready_for_decision',
+            'category' => 'academic',
+            'icon' => 'check-circle',
+            'action_text' => 'Duyệt quyết định',
+            'action_type' => 'academic.scholarship_adjustment',
+            'channels' => ['realtime'],
+        ],
         'redemption_order_pending_review' => [
             'event_name' => 'merchandise.redemption_order_pending_review',
             'category' => 'merchandise',

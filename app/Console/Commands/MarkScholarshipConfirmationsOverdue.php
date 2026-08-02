@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\MarkOverdueAction;
 use App\Modules\Academic\Progression\Models\ScholarshipAdjustmentDossier;
+use App\Modules\Academic\Progression\Support\ScholarshipStaffNotificationPublisher;
 use Illuminate\Console\Command;
 
 /**
@@ -43,6 +44,10 @@ class MarkScholarshipConfirmationsOverdue extends Command
 
             if ($updated->confirmation_status === ScholarshipAdjustmentDossier::CONFIRMATION_OVERDUE) {
                 $marked++;
+
+                // Overdue is what lets an approver override the confirmation
+                // gate, so this transition must never happen silently.
+                app(ScholarshipStaffNotificationPublisher::class)->confirmationOverdue($updated);
             }
         }
 
