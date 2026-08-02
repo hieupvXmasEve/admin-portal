@@ -9,6 +9,7 @@ use App\Models\EmailLog;
 use App\Modules\Notification\Mail\RenderedNotificationEmail;
 use App\Modules\Notification\Models\NotificationDelivery;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use RuntimeException;
 
@@ -33,6 +34,20 @@ class SmtpEmailTransport
         $message = $delivery->message()->firstOrFail();
         $emailLog = $this->resolveEmailLog($delivery, $recipient, $subject, $message->campus_id);
         $emailLog->markAsSending();
+
+        if (! Config::get('mail.allow_outbound')) {
+            Log::warning('Outbound email blocked: MAIL_ALLOW_OUTBOUND is disabled', [
+                'email_log_id' => $emailLog->id,
+                'recipient' => $recipient,
+                'subject' => $subject,
+            ]);
+            $emailLog->markAsRejected('Outbound email blocked: MAIL_ALLOW_OUTBOUND is disabled');
+
+            return [
+                'provider_message_id' => null,
+                'email_log_id' => (int) $emailLog->id,
+            ];
+        }
 
         try {
             $this->configureMailer($this->resolveConfiguration($message->campus_id));

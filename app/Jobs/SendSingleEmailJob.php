@@ -84,6 +84,17 @@ class SendSingleEmailJob implements ShouldQueue
                 );
             }
 
+            if (! Config::get('mail.allow_outbound')) {
+                Log::warning('Outbound email blocked: MAIL_ALLOW_OUTBOUND is disabled', [
+                    'email_log_id' => $this->emailLog->id,
+                    'recipient' => $this->emailLog->recipient,
+                    'subject' => $this->emailLog->subject,
+                ]);
+                $this->emailLog->markAsRejected('Outbound email blocked: MAIL_ALLOW_OUTBOUND is disabled');
+
+                return;
+            }
+
             $this->configureMailer($config);
 
             // Create and send the email

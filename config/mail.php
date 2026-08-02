@@ -113,4 +113,19 @@ return [
         'name' => env('MAIL_FROM_NAME', 'Example'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Allow Real Outbound Delivery
+    |--------------------------------------------------------------------------
+    |
+    | Guards the two code paths that force a real SMTP send using per-campus
+    | EmailConfiguration credentials (SendSingleEmailJob, SmtpEmailTransport),
+    | bypassing the MAIL_MAILER driver above. Defaults to production only so
+    | non-prod environments (dev-x, local) never deliver real email even if
+    | someone flips MAIL_MAILER.
+    |
+    */
+
+    'allow_outbound' => env('MAIL_ALLOW_OUTBOUND', env('APP_ENV') === 'production'),
+
 ];
