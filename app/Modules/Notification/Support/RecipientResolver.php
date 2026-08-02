@@ -14,7 +14,7 @@ class RecipientResolver
 {
     /**
      * @param  array<int, array{type:string,id?:int,email?:string}>  $targets
-     * @return array{resolved_recipients:array<int, array{key:string,user_id:int|null,email:string|null}>, unresolved:array<int, array{type:string,id:int,reason:string}>}
+     * @return array{resolved_recipients:array<int, array{key:string,user_id:int|null,email:string|null,campus_id:int|null}>, unresolved:array<int, array{type:string,id:int,reason:string}>}
      */
     public function resolve(array $targets, ?int $campusId): array
     {
@@ -77,7 +77,7 @@ class RecipientResolver
                     continue;
                 }
 
-                $resolvedRecipients[] = $this->userRecipient((int) $student->user_id);
+                $resolvedRecipients[] = $this->userRecipient((int) $student->user_id, $student->campus_id !== null ? (int) $student->campus_id : null);
 
                 continue;
             }
@@ -96,7 +96,7 @@ class RecipientResolver
                     continue;
                 }
 
-                $resolvedRecipients[] = $this->userRecipient((int) $lecture->user_id);
+                $resolvedRecipients[] = $this->userRecipient((int) $lecture->user_id, $lecture->campus_id !== null ? (int) $lecture->campus_id : null);
 
                 continue;
             }
@@ -134,23 +134,25 @@ class RecipientResolver
         ];
     }
 
-    /** @return array{key:string,user_id:int,email:null} */
-    private function userRecipient(int $userId): array
+    /** @return array{key:string,user_id:int,email:null,campus_id:int|null} */
+    private function userRecipient(int $userId, ?int $campusId = null): array
     {
         return [
             'key' => 'user:'.$userId,
             'user_id' => $userId,
             'email' => null,
+            'campus_id' => $campusId,
         ];
     }
 
-    /** @return array{key:string,user_id:null,email:string} */
+    /** @return array{key:string,user_id:null,email:string,campus_id:null} */
     private function externalEmailRecipient(string $email): array
     {
         return [
             'key' => 'email:'.$email,
             'user_id' => null,
             'email' => $email,
+            'campus_id' => null,
         ];
     }
 }

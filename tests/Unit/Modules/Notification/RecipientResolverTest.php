@@ -33,8 +33,8 @@ describe('department target type', function () {
         ], null);
 
         expect($result['resolved_recipients'])->toContain(
-            ['key' => 'user:'.$user1->id, 'user_id' => $user1->id, 'email' => null],
-            ['key' => 'user:'.$user2->id, 'user_id' => $user2->id, 'email' => null],
+            ['key' => 'user:'.$user1->id, 'user_id' => $user1->id, 'email' => null, 'campus_id' => null],
+            ['key' => 'user:'.$user2->id, 'user_id' => $user2->id, 'email' => null, 'campus_id' => null],
         )
             ->and($result['unresolved'])->toBeEmpty();
     });
@@ -93,7 +93,7 @@ describe('external email target type', function () {
         ], 123);
 
         expect($result['resolved_recipients'])->toBe([
-            ['key' => 'email:external@example.test', 'user_id' => null, 'email' => 'external@example.test'],
+            ['key' => 'email:external@example.test', 'user_id' => null, 'email' => 'external@example.test', 'campus_id' => null],
         ])->and($result['unresolved'])->toBeEmpty();
     });
 

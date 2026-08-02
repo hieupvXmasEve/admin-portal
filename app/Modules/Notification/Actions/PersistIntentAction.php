@@ -19,7 +19,7 @@ class PersistIntentAction
     ) {}
 
     /**
-     * @param  array<int, array{key:string,user_id:int|null,email:string|null}>  $recipients
+     * @param  array<int, array{key:string,user_id:int|null,email:string|null,campus_id?:int|null}>  $recipients
      * @param  array<int, string>  $allowChannels
      * @param  array{rendered_subject?: string, rendered_html?: string, rendered_text?: string|null}  $renderedEmail
      * @return array<int, NotificationDelivery>
@@ -31,6 +31,11 @@ class PersistIntentAction
         foreach ($recipients as $recipient) {
             $recipientUserId = $recipient['user_id'];
             $recipientEmail = $recipient['email'];
+            // Broadcast events carry no campus_id (event->campusId is null); tag
+            // each message with the recipient's own real campus so per-campus
+            // admin filtering (ListMessagesQuery) still finds it. Scoped events
+            // fall through to the event's campus_id as before.
+            $messageCampusId = $recipient['campus_id'] ?? $event->campusId;
             $message = NotificationMessage::query()->updateOrCreate(
                 [
                     'event_id' => $event->eventId,
@@ -39,7 +44,7 @@ class PersistIntentAction
                 ],
                 [
                     'event_name' => $event->eventName,
-                    'campus_id' => $event->campusId,
+                    'campus_id' => $messageCampusId,
                     'actor_user_id' => $event->actorUserId,
                     'recipient_user_id' => $recipientUserId,
                     'recipient_email' => $recipientEmail,
