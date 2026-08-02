@@ -221,6 +221,8 @@ jobs:
               dc run --rm app php artisan migrate --force
             fi
 
+            dc run --rm app php artisan db:seed --class=UpdatePermissionsSeeder --force
+
             dc run --rm app php artisan academic:backfill-program-enrollments
             dc run --rm app php artisan academic:backfill-program-enrollments --check
 

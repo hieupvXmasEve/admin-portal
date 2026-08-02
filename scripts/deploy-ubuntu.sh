@@ -122,6 +122,9 @@ else
     log "Skipping database migrations; set run_migrations=true on manual workflow dispatch to run them"
 fi
 
+log "Syncing permissions and super_admin grants"
+"$php_bin" artisan db:seed --class=UpdatePermissionsSeeder --force
+
 log "Materializing Program Enrollments"
 "$php_bin" artisan academic:backfill-program-enrollments
 
