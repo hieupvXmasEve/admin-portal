@@ -73,21 +73,22 @@ final class NotificationTypeRegistry
         ],
         // Merchandise redemption orders (Phase 3). Wired via
         // App\Modules\Merchandise\Support\RedemptionNotificationPublisher.
+        // In-app only (realtime) — no email channel for this category.
         'redemption_order_submitted' => [
             'event_name' => 'merchandise.redemption_order_submitted',
             'category' => 'merchandise',
             'icon' => 'shopping-bag',
             'action_text' => 'View Order',
             'action_type' => 'merchandise.order',
-            'channels' => ['email', 'realtime'],
+            'channels' => ['realtime'],
         ],
         'redemption_order_pending_review' => [
             'event_name' => 'merchandise.redemption_order_pending_review',
             'category' => 'merchandise',
             'icon' => 'shopping-bag',
             'action_text' => 'Review Order',
-            'action_type' => 'merchandise.order',
-            'channels' => ['email', 'realtime'],
+            'action_type' => 'merchandise.redemption_order_review',
+            'channels' => ['realtime'],
         ],
         'redemption_order_approved' => [
             'event_name' => 'merchandise.redemption_order_approved',
@@ -95,7 +96,7 @@ final class NotificationTypeRegistry
             'icon' => 'shopping-bag',
             'action_text' => 'View Order',
             'action_type' => 'merchandise.order',
-            'channels' => ['email', 'realtime'],
+            'channels' => ['realtime'],
         ],
         'redemption_order_rejected' => [
             'event_name' => 'merchandise.redemption_order_rejected',
@@ -103,7 +104,7 @@ final class NotificationTypeRegistry
             'icon' => 'shopping-bag',
             'action_text' => 'View Order',
             'action_type' => 'merchandise.order',
-            'channels' => ['email', 'realtime'],
+            'channels' => ['realtime'],
         ],
         'redemption_order_ready_for_collection' => [
             'event_name' => 'merchandise.redemption_order_ready_for_collection',
@@ -111,7 +112,7 @@ final class NotificationTypeRegistry
             'icon' => 'shopping-bag',
             'action_text' => 'View Order',
             'action_type' => 'merchandise.order',
-            'channels' => ['email', 'realtime'],
+            'channels' => ['realtime'],
         ],
         'redemption_order_shipped' => [
             'event_name' => 'merchandise.redemption_order_shipped',
@@ -119,7 +120,7 @@ final class NotificationTypeRegistry
             'icon' => 'shopping-bag',
             'action_text' => 'View Order',
             'action_type' => 'merchandise.order',
-            'channels' => ['email', 'realtime'],
+            'channels' => ['realtime'],
         ],
         'redemption_order_cancelled' => [
             'event_name' => 'merchandise.redemption_order_cancelled',
@@ -127,7 +128,57 @@ final class NotificationTypeRegistry
             'icon' => 'shopping-bag',
             'action_text' => 'View Order',
             'action_type' => 'merchandise.order',
-            'channels' => ['email', 'realtime'],
+            'channels' => ['realtime'],
+        ],
+        'redemption_order_collected' => [
+            'event_name' => 'merchandise.redemption_order_collected',
+            'category' => 'merchandise',
+            'icon' => 'shopping-bag',
+            'action_text' => 'View Order',
+            'action_type' => 'merchandise.order',
+            'channels' => ['realtime'],
+        ],
+        'redemption_order_overdue' => [
+            'event_name' => 'merchandise.redemption_order_overdue',
+            'category' => 'merchandise',
+            'icon' => 'shopping-bag',
+            'action_text' => 'View Order',
+            'action_type' => 'merchandise.order',
+            'channels' => ['realtime'],
+        ],
+        'redemption_order_cancellation_requested' => [
+            'event_name' => 'merchandise.redemption_order_cancellation_requested',
+            'category' => 'merchandise',
+            'icon' => 'shopping-bag',
+            'action_text' => 'Review Request',
+            'action_type' => 'merchandise.redemption_order_review',
+            'channels' => ['realtime'],
+        ],
+        'redemption_order_cancellation_rejected' => [
+            'event_name' => 'merchandise.redemption_order_cancellation_rejected',
+            'category' => 'merchandise',
+            'icon' => 'shopping-bag',
+            'action_text' => 'View Order',
+            'action_type' => 'merchandise.order',
+            'channels' => ['realtime'],
+        ],
+        'redemption_order_deadline_extended' => [
+            'event_name' => 'merchandise.redemption_order_deadline_extended',
+            'category' => 'merchandise',
+            'icon' => 'shopping-bag',
+            'action_text' => 'View Order',
+            'action_type' => 'merchandise.order',
+            'channels' => ['realtime'],
+        ],
+        // New catalog item published (Merchandise::store, status=active only).
+        // Broadcast to every active student — see MerchandiseCatalogNotificationPublisher.
+        'merchandise_catalog_item_published' => [
+            'event_name' => 'merchandise.catalog_item_published',
+            'category' => 'merchandise',
+            'icon' => 'shopping-bag',
+            'action_text' => 'View Item',
+            'action_type' => 'merchandise.catalog_item',
+            'channels' => ['realtime'],
         ],
     ];
 

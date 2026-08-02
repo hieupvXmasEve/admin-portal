@@ -24,6 +24,10 @@ return [
             'system.security',
             'system.announcement.global',
             'finance.dng_payment_allocated',
+            // Merchandise catalog items carry no campus_id (only their
+            // variants do) — a new active item is a legitimate cross-campus
+            // broadcast to every student, not a campus-isolation leak.
+            'merchandise.catalog_item_published',
         ],
     ],
 

@@ -22,14 +22,13 @@ use Illuminate\Support\Facades\DB;
  * OUTERMOST transaction commits — safe to call from inside
  * RedemptionService's locked transitions.
  *
- * Covers 6 of the 7 planned notification types. The 7th — notifying staff
- * that a STUDENT requested a cancellation — is intentionally NOT wired here:
- * the order detail carries `shipping_address` (PII), and who should receive
- * that (which permission, campus-scoped how) is a product decision for a
- * Notification-module owner, not something to guess at. `pendingStaffReview`
- * below is the one staff-facing type that IS wired, since "who approves
- * orders at this campus" is unambiguous from RedemptionOrderPolicy's own
- * campus+permission model.
+ * Covers every redemption order lifecycle transition, in-app only
+ * (`channels: ['realtime']` — no email, per product decision). Staff-facing
+ * types (`pendingStaffReview`, `cancellationRequested`) target everyone with
+ * the matching permission at the order's own campus_id (RT-13,
+ * RedemptionOrderPolicy's own campus+permission model) — their notification
+ * body deliberately omits `shipping_address` (PII), staff see it on the
+ * order detail page itself once they open it.
  */
 class RedemptionNotificationPublisher
 {
@@ -88,10 +87,64 @@ class RedemptionNotificationPublisher
         ]);
     }
 
+    public function orderCollected(RedemptionOrder $order): void
+    {
+        $this->toStudent('redemption_order_collected', $order, [
+            'title' => 'Order collected',
+            'body' => "Your order {$order->code} has been marked as collected. Enjoy!",
+        ]);
+    }
+
+    public function orderOverdue(RedemptionOrder $order): void
+    {
+        $this->toStudent('redemption_order_overdue', $order, [
+            'title' => 'Pickup overdue',
+            'body' => "Your order {$order->code} is now overdue for collection — please pick it up soon or it may be cancelled.",
+        ]);
+    }
+
+    public function deadlineExtended(RedemptionOrder $order): void
+    {
+        $this->toStudent('redemption_order_deadline_extended', $order, [
+            'title' => 'Pickup deadline extended',
+            'body' => "The collection deadline for your order {$order->code} has been extended.",
+        ]);
+    }
+
+    public function cancellationRejected(RedemptionOrder $order): void
+    {
+        $this->toStudent('redemption_order_cancellation_rejected', $order, [
+            'title' => 'Cancellation request rejected',
+            'body' => "Your cancellation request for order {$order->code} was rejected — the order remains active.",
+        ]);
+    }
+
+    /** Staff-facing: everyone with cancel_redemption_order at the order's own campus. */
+    public function cancellationRequested(RedemptionOrder $order): void
+    {
+        $this->toStaff($order, 'cancel_redemption_order', 'redemption_order_cancellation_requested', [
+            'title' => 'Cancellation requested',
+            'body' => "Student requested cancellation of order {$order->code}.",
+            'action_type' => 'merchandise.redemption_order_review',
+        ]);
+    }
+
     /** Staff-facing: everyone with approve_redemption_order at the order's own campus. */
     private function pendingStaffReview(RedemptionOrder $order): void
     {
-        $userIds = $this->staffWithPermissionAtCampus((int) $order->campus_id, 'approve_redemption_order');
+        $this->toStaff($order, 'approve_redemption_order', 'redemption_order_pending_review', [
+            'title' => 'New redemption order to review',
+            'body' => "Order {$order->code} is awaiting review.",
+            // Staff review this in the admin app (routes/web.php
+            // redemption-orders.show), NOT the student portal deep-link
+            // ('merchandise.order' below resolves into FE/student-nuxt).
+            'action_type' => 'merchandise.redemption_order_review',
+        ]);
+    }
+
+    private function toStaff(RedemptionOrder $order, string $permission, string $typeKey, array $data): void
+    {
+        $userIds = $this->staffWithPermissionAtCampus((int) $order->campus_id, $permission);
 
         if ($userIds === []) {
             return;
@@ -99,10 +152,7 @@ class RedemptionNotificationPublisher
 
         $targets = array_map(fn (int $id) => ['type' => 'user', 'id' => $id], $userIds);
 
-        $this->publish('redemption_order_pending_review', $order, $targets, [
-            'title' => 'New redemption order to review',
-            'body' => "Order {$order->code} is awaiting review.",
-        ]);
+        $this->publish($typeKey, $order, $targets, $data);
     }
 
     private function toStudent(string $typeKey, RedemptionOrder $order, array $data): void
@@ -113,8 +163,9 @@ class RedemptionNotificationPublisher
     /** @param  list<array{type:string,id:int}>  $targets */
     private function publish(string $typeKey, RedemptionOrder $order, array $targets, array $data): void
     {
-        $payload = $this->payloadFactory->build($typeKey, array_merge($data, [
+        $payload = $this->payloadFactory->build($typeKey, array_merge([
             'action_type' => 'merchandise.order',
+        ], $data, [
             'action_params' => ['id' => $order->id],
         ]));
 
@@ -132,7 +183,11 @@ class RedemptionNotificationPublisher
             payload: [
                 'type_key' => $typeKey,
                 'recipient_targets' => $targets,
-                'channels' => ['email', 'realtime'],
+                // In-app only — no email channel for this category (product
+                // decision). NotificationTypeRegistry's per-type `channels`
+                // key is NOT read by this pipeline; EventIntentMapper reads
+                // this DomainEvent payload field directly.
+                'channels' => ['realtime'],
                 'data' => $payload,
             ],
         );

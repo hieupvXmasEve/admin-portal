@@ -63,7 +63,7 @@ class StudentRedemptionOrderController extends Controller
         $student = $request->user();
 
         $query = RedemptionOrder::where('student_id', $student->id)
-            ->with('items')
+            ->with($this->itemImageEagerLoad())
             ->orderByDesc('created_at');
 
         $status = $request->input('status');
@@ -90,7 +90,7 @@ class StudentRedemptionOrderController extends Controller
             return ApiResponse::notFound('Redemption order not found');
         }
 
-        $redemptionOrder->load('items');
+        $redemptionOrder->load($this->itemImageEagerLoad());
 
         return ApiResponse::success($this->present($redemptionOrder, includeTimeline: true));
     }
@@ -147,6 +147,12 @@ class StudentRedemptionOrderController extends Controller
         ]);
     }
 
+    /** @return array<int, string> */
+    private function itemImageEagerLoad(): array
+    {
+        return ['items.variant.merchandise.images'];
+    }
+
     /** @return array<string, mixed> */
     private function present(RedemptionOrder $order, bool $includeTimeline = false): array
     {
@@ -163,6 +169,11 @@ class StudentRedemptionOrderController extends Controller
                 'gold_price_each' => (int) $item->gold_price_each,
                 'line_total' => (int) $item->line_total,
                 'quantity' => (int) $item->quantity,
+                // Snapshot fields never store an image — resolve today's
+                // primary image via the (possibly since-archived) variant's
+                // merchandise. Null once the variant/merchandise is gone.
+                'image' => $item->variant?->merchandise?->images->firstWhere('is_primary', true)?->path
+                    ?? $item->variant?->merchandise?->images->first()?->path,
             ])->values(),
             'collection' => $order->method === RedemptionOrder::METHOD_PICKUP ? [
                 'location' => $order->collection_location,
@@ -176,13 +187,26 @@ class StudentRedemptionOrderController extends Controller
                 'note' => $order->shipping_note,
             ] : null,
             'reject_reason' => $order->reject_reason,
-            'cancellation' => $order->cancellation_requested_at !== null ? [
+            // Gate on status/cancelled_at too, not just cancellation_requested_at:
+            // the student "cancel while still pending_review" path
+            // (RedemptionService::cancelPendingReview) cancels immediately —
+            // it sets cancellation_reason + cancelled_at but never "requests"
+            // one, so requested_at alone would drop the reason from this API.
+            'cancellation' => ($order->status === RedemptionOrder::STATUS_CANCELLED || $order->cancellation_requested_at !== null) ? [
                 'requested_at' => $order->cancellation_requested_at?->toIso8601String(),
                 'reason' => $order->cancellation_reason,
                 'result' => $order->cancellation_result,
                 'handled_at' => $order->cancellation_handled_at?->toIso8601String(),
                 'note' => $order->cancellation_note,
+                'cancelled_at' => $order->cancelled_at?->toIso8601String(),
             ] : null,
+            // Whenever the order ends in 'rejected' or 'cancelled', the full
+            // order total was refunded (RedemptionService::refund is called
+            // on every path into either status) — surface it explicitly so
+            // the student isn't left guessing whether their Gold came back.
+            'refunded_gold' => in_array($order->status, [RedemptionOrder::STATUS_REJECTED, RedemptionOrder::STATUS_CANCELLED], true)
+                ? (int) $order->total_gold
+                : null,
             'created_at' => $order->created_at?->toIso8601String(),
         ];
 

@@ -293,6 +293,7 @@ class RedemptionService
             [RedemptionOrder::STATUS_READY_FOR_COLLECTION],
             function (RedemptionOrder $order) use ($newDeadline) {
                 $order->collection_deadline = $newDeadline;
+                $this->notifications->deadlineExtended($order);
             }
         );
     }
@@ -307,6 +308,7 @@ class RedemptionService
                 $order->status = RedemptionOrder::STATUS_COLLECTED;
                 $order->collected_at = now();
                 $order->collected_confirmed_by = $performedBy;
+                $this->notifications->orderCollected($order);
             }
         );
     }
@@ -336,6 +338,7 @@ class RedemptionService
             function (RedemptionOrder $order) {
                 $order->previous_status = $order->status;
                 $order->status = RedemptionOrder::STATUS_PICKUP_OVERDUE;
+                $this->notifications->orderOverdue($order);
             }
         );
     }
@@ -382,6 +385,7 @@ class RedemptionService
                 $order->cancellation_reason = $reason;
                 $order->cancellation_requested_by = $requestedByStudentId;
                 $order->cancellation_requested_at = now();
+                $this->notifications->cancellationRequested($order);
             }
         );
     }
@@ -414,6 +418,7 @@ class RedemptionService
                     $order->cancellation_result = RedemptionOrder::CANCELLATION_RESULT_REJECTED;
                     $order->previous_status = $order->status;
                     $order->status = $priorStatus ?? RedemptionOrder::STATUS_APPROVED;
+                    $this->notifications->cancellationRejected($order);
                 }
             }
         );

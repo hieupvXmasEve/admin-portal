@@ -12,6 +12,7 @@ use App\Modules\Merchandise\Actions\CreateMerchandiseAction;
 use App\Modules\Merchandise\Actions\UpdateMerchandiseAction;
 use App\Modules\Merchandise\Http\Requests\StoreMerchandiseRequest;
 use App\Modules\Merchandise\Http\Requests\UpdateMerchandiseRequest;
+use App\Modules\Merchandise\Support\MerchandiseCatalogNotificationPublisher;
 use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -21,16 +22,31 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class MerchandiseController extends Controller
 {
+    public function __construct(private readonly MerchandiseCatalogNotificationPublisher $notifications) {}
+
     public function store(StoreMerchandiseRequest $request): JsonResponse
     {
         $merchandise = CreateMerchandiseAction::run($request->validated());
+
+        if ($merchandise->status === Merchandise::STATUS_ACTIVE) {
+            $this->notifications->catalogItemPublished($merchandise);
+        }
 
         return ApiResponse::success($merchandise, message: 'Merchandise created successfully', status: Response::HTTP_CREATED);
     }
 
     public function update(UpdateMerchandiseRequest $request, Merchandise $merchandise): JsonResponse
     {
+        $wasActive = $merchandise->status === Merchandise::STATUS_ACTIVE;
+
         $merchandise = UpdateMerchandiseAction::run($merchandise, $request->validated());
+
+        // Notify on the coming_soon/hidden -> active TRANSITION only — not
+        // on every subsequent edit while it's already active (that would
+        // re-broadcast to every student on a price typo fix).
+        if (! $wasActive && $merchandise->status === Merchandise::STATUS_ACTIVE) {
+            $this->notifications->catalogItemPublished($merchandise);
+        }
 
         return ApiResponse::success($merchandise, message: 'Merchandise updated successfully');
     }

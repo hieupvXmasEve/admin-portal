@@ -37,6 +37,17 @@ final class NotificationUrlRegistry
             'web' => '/merchandise/orders/{id}',
             'mobile' => '/merchandise/orders/{id}',
         ],
+        // Staff-facing: the admin app's own redemption order review screen
+        // (routes/web.php redemption-orders.show), NOT the student portal.
+        'merchandise.redemption_order_review' => [
+            'web' => '/redemption-orders/{id}',
+        ],
+        // Deep-links into the student portal (FE/student-nuxt) store product
+        // detail page.
+        'merchandise.catalog_item' => [
+            'web' => '/merchandise/{id}',
+            'mobile' => '/merchandise/{id}',
+        ],
     ];
 
     public function resolve(string $actionType, array $params, string $platform = 'web'): ?string

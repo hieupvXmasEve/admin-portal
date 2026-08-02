@@ -136,7 +136,7 @@ const handleImageSelected = async (event: Event) => {
     try {
         const formData = new FormData();
         formData.append('image', file);
-        formData.append('is_primary', String(merchandise.images.length === 0));
+        formData.append('is_primary', merchandise.images.length === 0 ? '1' : '0');
 
         const response = await api.post(route('merchandise.images.store', merchandise.id), formData);
         const body = response.data.value as ApiResponse | null;

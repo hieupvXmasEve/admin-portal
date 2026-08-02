@@ -600,16 +600,29 @@ export const mainNavGroups: NavGroup[] = [
                 requiredPermissions: ['view_clubs'],
             },
             {
-                title: 'Merchandise Store',
-                href: systemRoutes.merchandise.index(),
+                title: 'Merchandise',
+                href: '#',
                 icon: Package,
-                requiredPermissions: ['view_merchandise'],
-            },
-            {
-                title: 'Merchandise Reports',
-                href: systemRoutes.merchandise.reports(),
-                icon: BarChart3,
-                requiredPermissions: ['view_merchandise_report'],
+                children: [
+                    {
+                        title: 'Store',
+                        href: systemRoutes.merchandise.index(),
+                        icon: Package,
+                        requiredPermissions: ['view_merchandise'],
+                    },
+                    {
+                        title: 'Redemption Orders',
+                        href: systemRoutes.redemptionOrders.index(),
+                        icon: ClipboardList,
+                        requiredPermissions: ['view_redemption_order'],
+                    },
+                    {
+                        title: 'Reports',
+                        href: systemRoutes.merchandise.reports(),
+                        icon: BarChart3,
+                        requiredPermissions: ['view_merchandise_report'],
+                    },
+                ],
             },
         ],
     },

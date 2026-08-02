@@ -8,6 +8,7 @@ use App\Modules\Merchandise\Http\Api\MerchandiseVariantController;
 use App\Modules\Merchandise\Http\Api\RedemptionOrderController;
 use App\Modules\Merchandise\Http\Web\MerchandiseReportController;
 use App\Modules\Merchandise\Http\Web\MerchandiseWebController;
+use App\Modules\Merchandise\Http\Web\RedemptionOrderWebController;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -98,11 +99,11 @@ Route::middleware(['web', 'auth'])->prefix('merchandise')->name('merchandise.')-
  * RedemptionOrderController via RedemptionOrderPolicy (RT-13).
  */
 Route::middleware(['web', 'auth'])->prefix('redemption-orders')->name('redemption-orders.')->group(function () {
-    Route::get('/', [RedemptionOrderController::class, 'index'])
+    Route::get('/', [RedemptionOrderWebController::class, 'index'])
         ->middleware('can:view_redemption_order')
         ->name('index');
 
-    Route::get('/{redemptionOrder}', [RedemptionOrderController::class, 'show'])
+    Route::get('/{redemptionOrder}', [RedemptionOrderWebController::class, 'show'])
         ->middleware('can:view_redemption_order')
         ->name('show');
 

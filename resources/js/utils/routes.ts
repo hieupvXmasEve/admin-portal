@@ -154,6 +154,10 @@ export const systemRoutes = {
         show: (id: number) => route('merchandise.show', { merchandise: id }),
         reports: () => route('merchandise.reports.index'),
     },
+    redemptionOrders: {
+        index: () => route('redemption-orders.index'),
+        show: (id: number) => route('redemption-orders.show', { redemptionOrder: id }),
+    },
     // Room Booking Routes
     roomBookings: {
         index: () => route(ROOM_BOOKING_ROUTE_NAMES.INDEX),
