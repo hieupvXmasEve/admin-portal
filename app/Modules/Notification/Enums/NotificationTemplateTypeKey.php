@@ -29,6 +29,8 @@ enum NotificationTemplateTypeKey: string
 
     case DngPaymentReceived = 'dng_payment_received';
 
+    case ScholarshipAdjustmentConfirmationRequested = 'scholarship_adjustment_confirmation_requested';
+
     /**
      * Per-case variable allow-list consumed by the FormRequest validator,
      * the admin editor's variable picker, and the preview pane sample render.
@@ -96,6 +98,17 @@ enum NotificationTemplateTypeKey: string
                 'semester_code' => ['label' => 'Semester code', 'sample' => 'SP2026'],
                 'amount_formatted' => ['label' => 'Amount paid (formatted)', 'sample' => '12.500.000 VNĐ'],
                 'paid_at' => ['label' => 'Paid at', 'sample' => '15/06/2026 14:30'],
+            ],
+            // Variables mirror the payload built by
+            // AcademicLifecycleEventFactory::scholarshipAdjustmentConfirmationRequested().
+            // No money figures here on purpose: the decision does not exist yet
+            // when this is sent, so any amount would be a guess.
+            self::ScholarshipAdjustmentConfirmationRequested => [
+                'student_name' => ['label' => 'Student name', 'sample' => 'Nguyễn Văn A'],
+                'student_code' => ['label' => 'Student code', 'sample' => 'SE12345'],
+                'semester_code' => ['label' => 'Semester the adjustment would apply to', 'sample' => 'SUMMER2026'],
+                'deadline' => ['label' => 'Response deadline', 'sample' => '16/06/2026 09:00'],
+                'action_url' => ['label' => 'Portal link to the review', 'sample' => '/scholarship-review/12'],
             ],
         };
     }

@@ -178,10 +178,15 @@ final class AcademicLifecycleEventFactory
         int $dossierId,
         int $minutesVersion,
         ?string $targetSemesterName,
+        ?CarbonImmutable $requestedAt = null,
     ): DomainEvent {
         $semester = $targetSemesterName !== null && $targetSemesterName !== ''
             ? " for {$targetSemesterName}"
             : '';
+
+        // Mirrors MarkScholarshipConfirmationsOverdue: a pending confirmation
+        // goes overdue one calendar day after it was requested.
+        $deadline = ($requestedAt ?? CarbonImmutable::now())->addDay();
 
         return self::event(
             name: 'academic.scholarship_adjustment_confirmation_requested',
@@ -203,7 +208,16 @@ final class AcademicLifecycleEventFactory
                 'action_text' => 'Review and confirm',
                 'dossier_id' => $dossierId,
                 'minutes_version' => $minutesVersion,
+                // Consumed by the admin-editable email template
+                // (NotificationTemplateTypeKey::ScholarshipAdjustmentConfirmationRequested).
+                'student_name' => (string) $student->full_name,
+                'student_code' => (string) $student->student_id,
+                'semester_code' => $targetSemesterName ?? '',
+                'deadline' => $deadline->format('d/m/Y H:i'),
             ],
+            // Unlike other academic events this one asks the student to act
+            // within a day, so it must leave the app as well as sit in the bell.
+            channels: ['email', 'realtime'],
         );
     }
 
@@ -241,6 +255,11 @@ final class AcademicLifecycleEventFactory
     /**
      * @param  array<string, mixed>  $data
      */
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  array<int, string>|null  $channels  Overrides EventIntentMapper's
+     *                                             academic default of realtime-only.
+     */
     private static function event(
         string $name,
         string $deduplicationKey,
@@ -248,6 +267,7 @@ final class AcademicLifecycleEventFactory
         string $aggregateType,
         string $aggregateId,
         array $data,
+        ?array $channels = null,
     ): DomainEvent {
         return new DomainEvent(
             name: $name,
@@ -257,10 +277,11 @@ final class AcademicLifecycleEventFactory
             aggregateId: $aggregateId,
             campusId: (int) $student->campus_id,
             actorUserId: null,
-            payload: [
+            payload: array_filter([
                 'student_id' => (int) $student->id,
                 'data' => $data,
-            ],
+                'channels' => $channels,
+            ], fn ($value) => $value !== null),
         );
     }
 

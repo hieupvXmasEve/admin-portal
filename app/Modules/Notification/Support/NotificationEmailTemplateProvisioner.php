@@ -371,6 +371,63 @@ class NotificationEmailTemplateProvisioner
                 </html>
                 HTML,
             ],
+            NotificationTemplateTypeKey::ScholarshipAdjustmentConfirmationRequested->value => [
+                'subject' => '[Asia Việt Nam] Cần xác nhận biên bản xét học bổng - Học kỳ {{semester_code}}',
+                'body_html' => <<<'HTML'
+                <!DOCTYPE html>
+                <html lang="vi">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                </head>
+                <body style="font-family: Arial, sans-serif; color: #222; font-size: 14px; line-height: 1.6; max-width: 680px; margin: 0 auto; padding: 24px;">
+
+                    <p>Thân gửi <strong>{{student_name}} {{student_code}}</strong>,</p>
+
+                    <p>Nhà trường đã hoàn tất buổi trao đổi về kết quả học tập của bạn và lập biên bản để xét lại mức học bổng cho học kỳ <strong>{{semester_code}}</strong>.</p>
+
+                    <p>Bạn vui lòng đăng nhập Student Portal, đọc biên bản và cho biết bạn <strong>đồng ý</strong> hay <strong>không đồng ý</strong> với nội dung đó. Nếu có điểm nào chưa đúng, hãy ghi rõ ý kiến khi phản hồi.</p>
+
+                    <table style="border-collapse: collapse; width: 100%; margin-bottom: 16px;">
+                        <tbody>
+                            <tr><td style="border: 1px solid #d1d5db; padding: 8px 16px;"><strong>Học kỳ áp dụng:</strong></td><td style="border: 1px solid #d1d5db; padding: 8px 16px;"><strong>{{semester_code}}</strong></td></tr>
+                            <tr><td style="border: 1px solid #d1d5db; padding: 8px 16px;"><strong>Hạn phản hồi:</strong></td><td style="border: 1px solid #d1d5db; padding: 8px 16px;"><strong>{{deadline}}</strong></td></tr>
+                        </tbody>
+                    </table>
+
+                    <p><strong>Chưa có quyết định nào được đưa ra</strong> và mức học bổng của bạn chưa thay đổi. Nhà trường chỉ ra quyết định sau khi nhận được phản hồi của bạn.</p>
+
+                    <p>Nếu quá hạn trên mà không có phản hồi, nhà trường sẽ liên hệ trực tiếp và có thể tiếp tục xử lý hồ sơ.</p>
+
+                    <p>Nếu bạn có bất kỳ thắc mắc nào, vui lòng phản hồi email này hoặc gửi yêu cầu qua hệ thống queries.</p>
+                    <p>Trân trọng.</p>
+
+                    <hr style="border: none; border-top: 1px solid #ccc; margin: 24px 0;">
+
+                    <p>Dear <strong>{{student_name}} {{student_code}}</strong>,</p>
+
+                    <p>We have completed the interview about your academic results and recorded minutes for the review of your scholarship in <strong>{{semester_code}}</strong>.</p>
+
+                    <p>Please sign in to the Student Portal, read the minutes, and tell us whether you <strong>agree</strong> or <strong>disagree</strong>. If anything is wrong, say what it is when you reply.</p>
+
+                    <table style="border-collapse: collapse; width: 100%; margin-bottom: 16px;">
+                        <tbody>
+                            <tr><td style="border: 1px solid #d1d5db; padding: 8px 16px;">Semester concerned:</td><td style="border: 1px solid #d1d5db; padding: 8px 16px;"><strong>{{semester_code}}</strong></td></tr>
+                            <tr><td style="border: 1px solid #d1d5db; padding: 8px 16px;">Reply by:</td><td style="border: 1px solid #d1d5db; padding: 8px 16px;"><strong>{{deadline}}</strong></td></tr>
+                        </tbody>
+                    </table>
+
+                    <p><strong>No decision has been made yet</strong> and your scholarship is unchanged. A decision follows only after we hear from you.</p>
+
+                    <p>If we do not hear from you by then, we will contact you directly and the review may continue.</p>
+
+                    <p>If you have any questions, please reply to this email or submit a query via the system.</p>
+                    <p><em>Regards.</em></p>
+
+                </body>
+                </html>
+                HTML,
+            ],
         ];
     }
 }

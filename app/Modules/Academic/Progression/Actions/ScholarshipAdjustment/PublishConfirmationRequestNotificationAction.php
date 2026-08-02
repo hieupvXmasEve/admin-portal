@@ -34,6 +34,7 @@ class PublishConfirmationRequestNotificationAction
             (int) $dossier->id,
             (int) $dossier->minutes_version,
             $dossier->targetSemester?->name,
+            $dossier->confirmation_requested_at?->toImmutable(),
         );
 
         $this->domainEventPublisher->publishAfterCommit($event);
