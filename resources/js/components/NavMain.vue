@@ -3,7 +3,7 @@ import NavMenuItem from '@/components/NavMenuItem.vue';
 import { SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu } from '@/components/ui/sidebar';
 import type { NavGroup, NavItem } from '@/types';
 import { usePage } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
 
 const props = defineProps<{
     groups: NavGroup[];
@@ -59,6 +59,26 @@ const activeHref = computed(() => {
 
     return bestMatch;
 });
+
+// Scroll the active menu item into view on load and on every SPA navigation.
+// flush: 'post' waits for the collapsible group to finish opening; the double
+// rAF waits one more frame for the browser to finish layout/paint (needed on
+// hard reload, where flush:'post' alone fires before the sidebar has a size).
+watch(
+    activeHref,
+    (href) => {
+        if (!href) return;
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                const el = document.querySelector<HTMLElement>(
+                    '[data-slot="sidebar-menu-button"][data-active="true"], [data-slot="sidebar-menu-sub-button"][data-active="true"]',
+                );
+                el?.scrollIntoView({ block: 'center' });
+            });
+        });
+    },
+    { immediate: true, flush: 'post' },
+);
 </script>
 
 <template>

@@ -82,7 +82,7 @@ watch(() => [page.url, props.activeHref], () => {
         </Link>
       </SidebarMenuButton>
     </SidebarMenuItem>
-    
+
     <SidebarMenuSubItem v-else>
       <SidebarMenuSubButton as-child :is-active="isActive">
         <Link :href="item.href">
