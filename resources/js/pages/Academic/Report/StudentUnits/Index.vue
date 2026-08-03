@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useDataTable } from '@/composables/useDataTable';
 import type { PaginatedResponse } from '@/types';
+import { getStudentStatusBadgeClass, getStudentStatusLabel } from '@/types/student';
 import { Head } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { FileSpreadsheet, Search, X } from 'lucide-vue-next';
@@ -23,6 +24,7 @@ interface StudentCompletedUnitsRow {
     student_id: string;
     full_name: string;
     program: string | null;
+    status: string | null;
     gc: CompletedUnit[];
     major: CompletedUnit[];
     units_count: number;
@@ -35,6 +37,7 @@ const props = defineProps<{
     filters: {
         active: {
             program_id: number | null;
+            semester_id: number | null;
             keyword: string | null;
             sort: string;
             direction: 'asc' | 'desc';
@@ -42,12 +45,14 @@ const props = defineProps<{
         };
         options: {
             programs: { id: number; name: string }[];
+            semesters: { id: number; name: string; code: string }[];
         };
     };
 }>();
 
 interface StudentCompletedUnitsFilters {
     program_id: string;
+    semester_id: string;
     keyword: string;
     sort: string | null;
     direction: 'asc' | 'desc' | null;
@@ -59,15 +64,16 @@ const { filters, setFilter, clearAllFilters, handleSearch, handleSortChange, han
         baseUrl: route('academic.reports.student-units.index'),
         initialFilters: {
             program_id: props.filters.active.program_id ? String(props.filters.active.program_id) : '',
+            semester_id: props.filters.active.semester_id ? String(props.filters.active.semester_id) : '',
             keyword: props.filters.active.keyword ?? '',
             sort: props.filters.active.sort,
             direction: props.filters.active.direction,
             per_page: props.filters.active.per_page,
         },
-        defaultValues: { program_id: '', keyword: '', sort: 'student_id', direction: 'asc', per_page: 25 },
+        defaultValues: { program_id: '', semester_id: '', keyword: '', sort: 'student_id', direction: 'asc', per_page: 25 },
         only: ['report', 'filters'],
         fieldDebounce: { keyword: 400 },
-        immediateFields: ['program_id'],
+        immediateFields: ['program_id', 'semester_id'],
     });
 
 const data = computed(() => props.report.data);
@@ -75,6 +81,12 @@ const data = computed(() => props.report.data);
 const displayProgramId = computed(() => filters.program_id || 'all');
 
 const updateProgramFilter = (value: unknown) => setFilter('program_id', value === 'all' ? '' : String(value ?? ''));
+
+const displaySemesterId = computed(() => filters.semester_id || 'all');
+
+const updateSemesterFilter = (value: unknown) => setFilter('semester_id', value === 'all' ? '' : String(value ?? ''));
+
+const selectedSemesterName = computed(() => props.filters.options.semesters.find((semester) => String(semester.id) === filters.semester_id)?.name ?? null);
 
 const chipCell = (units: CompletedUnit[]) =>
     units.length === 0
@@ -93,6 +105,15 @@ const columns: ColumnDef<StudentCompletedUnitsRow>[] = [
         accessorKey: 'program',
         enableSorting: false,
         cell: ({ row }) => row.original.program ?? h('span', { class: 'text-slate-300' }, '—'),
+    },
+    {
+        header: 'Status',
+        accessorKey: 'status',
+        enableSorting: false,
+        cell: ({ row }) =>
+            row.original.status
+                ? h(Badge, { variant: 'outline', class: getStudentStatusBadgeClass(row.original.status) }, () => getStudentStatusLabel(row.original.status as string))
+                : h('span', { class: 'text-slate-300' }, '—'),
     },
     {
         header: 'GC Units',
@@ -122,12 +143,14 @@ const exportUrl = computed(() => {
 </script>
 
 <template>
-    <Head title="Student Completed Units" />
+    <Head title="Student Registered Units" />
 
     <div class="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
-            <h1 class="text-3xl font-bold tracking-tight text-slate-900">Student Completed Units</h1>
-            <p class="mt-1 text-slate-500">All students with passed units, split by GC / Major.</p>
+            <h1 class="text-3xl font-bold tracking-tight text-slate-900">Student Registered Units</h1>
+            <p class="mt-1 text-slate-500">
+                {{ selectedSemesterName ? `Units registered in ${selectedSemesterName}, split by GC / Major.` : 'All units students have registered so far, split by GC / Major.' }}
+            </p>
         </div>
         <Button as="a" :href="exportUrl" class="bg-indigo-600 text-white shadow-md transition-all hover:bg-indigo-700">
             <FileSpreadsheet class="mr-2 h-4 w-4" />
@@ -141,6 +164,18 @@ const exportUrl = computed(() => {
                 <Search class="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
                 <DebouncedInput v-model="filters.keyword" @debounced="handleSearch" placeholder="Student ID / Name..." class="pl-9" :debounce="400" />
             </div>
+        </div>
+
+        <div class="min-w-[180px]">
+            <Select :model-value="displaySemesterId" @update:model-value="updateSemesterFilter">
+                <SelectTrigger>
+                    <SelectValue placeholder="All semesters" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All semesters</SelectItem>
+                    <SelectItem v-for="semester in props.filters.options.semesters" :key="semester.id" :value="String(semester.id)">{{ semester.name }}</SelectItem>
+                </SelectContent>
+            </Select>
         </div>
 
         <div class="min-w-[180px]">

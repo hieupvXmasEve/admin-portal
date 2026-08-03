@@ -10,6 +10,7 @@ use App\Models\CurriculumVersion;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
+use App\Modules\Academic\Progression\Models\ProgramEnrollment;
 use App\Modules\Academic\Progression\Queries\Reporting\GetStudentCompletedUnitsQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -23,7 +24,7 @@ function makeCampusStudent(array $studentAttrs = []): Student
     return Student::factory()->create(array_merge(['campus_id' => $campus->id, 'intake' => 1, 'intake_semester_id' => Semester::factory()], $studentAttrs));
 }
 
-it('excludes is_passed = 0 from gc, major, count and credits', function () {
+it('lists a failed registration but earns no credits for it', function () {
     $student = makeCampusStudent();
     $unit = Unit::factory()->create(['unit_type' => 'egc']);
     AcademicRecord::factory()->create([
@@ -37,12 +38,12 @@ it('excludes is_passed = 0 from gc, major, count and credits', function () {
     $result = app(GetStudentCompletedUnitsQuery::class)->handle(['campus_id' => $student->campus_id]);
     $row = collect($result['data'])->firstWhere('id', $student->id);
 
-    expect($row['gc'])->toBeEmpty()
-        ->and($row['units_count'])->toBe(0)
+    expect($row['gc'])->toHaveCount(1)
+        ->and($row['units_count'])->toBe(1)
         ->and((float) $row['credits_earned'])->toBe(0.0);
 });
 
-it('excludes is_passed IS NULL from gc, major, count and credits', function () {
+it('lists an in-progress registration but earns no credits for it', function () {
     $student = makeCampusStudent();
     $unit = Unit::factory()->create(['unit_type' => 'egc']);
     AcademicRecord::factory()->create([
@@ -56,10 +57,12 @@ it('excludes is_passed IS NULL from gc, major, count and credits', function () {
     $result = app(GetStudentCompletedUnitsQuery::class)->handle(['campus_id' => $student->campus_id]);
     $row = collect($result['data'])->firstWhere('id', $student->id);
 
-    expect($row['gc'])->toBeEmpty()->and($row['units_count'])->toBe(0);
+    expect($row['gc'])->toHaveCount(1)
+        ->and($row['units_count'])->toBe(1)
+        ->and((float) $row['credits_earned'])->toBe(0.0);
 });
 
-it('dedupes two passed records for the same unit into one chip, credits counted once', function () {
+it('collapses two registrations for the same unit into one chip, credits counted once', function () {
     $student = makeCampusStudent();
     $unit = Unit::factory()->create(['unit_type' => 'general', 'code' => 'SE001']);
     AcademicRecord::factory()->create([
@@ -101,7 +104,165 @@ it('splits units into gc and major by unit_type', function () {
         ->and($row['major'])->toHaveCount(1)->and($row['major'][0]['code'])->toBe('SE001');
 });
 
-it('shows a row with empty arrays and zero counts for a student with no passed unit', function () {
+it('scopes every unit column and count to the selected semester', function () {
+    $student = makeCampusStudent();
+    $first = Semester::factory()->create(['start_date' => '2025-01-01']);
+    $second = Semester::factory()->create(['start_date' => '2025-06-01']);
+
+    $firstUnit = Unit::factory()->create(['unit_type' => 'general', 'code' => 'SE001']);
+    $secondUnit = Unit::factory()->create(['unit_type' => 'general', 'code' => 'SE002']);
+    AcademicRecord::factory()->create(['course_offering_id' => CourseOffering::factory(), 'student_id' => $student->id, 'unit_id' => $firstUnit->id, 'semester_id' => $first->id, 'is_passed' => true, 'credit_points_earned' => 6]);
+    AcademicRecord::factory()->create(['course_offering_id' => CourseOffering::factory(), 'student_id' => $student->id, 'unit_id' => $secondUnit->id, 'semester_id' => $second->id, 'is_passed' => true, 'credit_points_earned' => 8]);
+
+    $result = app(GetStudentCompletedUnitsQuery::class)->handle(['campus_id' => $student->campus_id, 'semester_id' => $second->id]);
+    $row = collect($result['data'])->firstWhere('id', $student->id);
+
+    expect($row['major'])->toHaveCount(1)
+        ->and($row['major'][0]['code'])->toBe('SE002')
+        ->and($row['units_count'])->toBe(1)
+        ->and((float) $row['credits_earned'])->toBe(8.0);
+});
+
+it('leaves the unit columns empty for a student with no registration in the selected semester', function () {
+    $student = makeCampusStudent();
+    $enrolled = Semester::factory()->create(['start_date' => '2025-01-01']);
+    $laterSemester = Semester::factory()->create(['start_date' => '2025-06-01']);
+
+    $unit = Unit::factory()->create(['unit_type' => 'general']);
+    AcademicRecord::factory()->create(['course_offering_id' => CourseOffering::factory(), 'student_id' => $student->id, 'unit_id' => $unit->id, 'semester_id' => $enrolled->id, 'is_passed' => true, 'credit_points_earned' => 6]);
+
+    $result = app(GetStudentCompletedUnitsQuery::class)->handle(['campus_id' => $student->campus_id, 'semester_id' => $laterSemester->id]);
+    $row = collect($result['data'])->firstWhere('id', $student->id);
+
+    expect($row['gc'])->toBeEmpty()
+        ->and($row['major'])->toBeEmpty()
+        ->and($row['units_count'])->toBe(0)
+        ->and((float) $row['credits_earned'])->toBe(0.0);
+});
+
+it('lists a retake under every semester it was registered in, while the chip list stays unique', function () {
+    $student = makeCampusStudent();
+    $first = Semester::factory()->create(['start_date' => '2025-01-01']);
+    $second = Semester::factory()->create(['start_date' => '2025-06-01']);
+    $unit = Unit::factory()->create(['unit_type' => 'general', 'code' => 'SE001']);
+
+    AcademicRecord::factory()->create(['course_offering_id' => CourseOffering::factory(), 'student_id' => $student->id, 'unit_id' => $unit->id, 'semester_id' => $first->id, 'attempt_number' => 1, 'is_passed' => false, 'credit_points_earned' => 0]);
+    AcademicRecord::factory()->create(['course_offering_id' => CourseOffering::factory(), 'student_id' => $student->id, 'unit_id' => $unit->id, 'semester_id' => $second->id, 'attempt_number' => 2, 'is_passed' => true, 'credit_points_earned' => 6]);
+
+    $row = app(GetStudentCompletedUnitsQuery::class)
+        ->handleExport(['campus_id' => $student->campus_id])
+        ->firstWhere('id', $student->id);
+
+    expect($row['major'])->toHaveCount(1)
+        ->and($row['units_count'])->toBe(1)
+        ->and((float) $row['credits_earned'])->toBe(6.0)
+        ->and($row['units_by_semester'])->toHaveKeys([$first->id, $second->id])
+        ->and($row['units_by_semester'][$first->id]['units'][0]['code'])->toBe('SE001')
+        ->and($row['units_by_semester'][$second->id]['units'][0]['code'])->toBe('SE001');
+});
+
+it('reports the lifecycle status from the primary program enrolment', function () {
+    $student = makeCampusStudent();
+    ProgramEnrollment::create([
+        'student_id' => $student->id,
+        'program_id' => $student->program_id,
+        'curriculum_version_id' => $student->curriculum_version_id ?? CurriculumVersion::factory()->create()->id,
+        'intake_semester_id' => $student->intake_semester_id,
+        'is_primary' => true,
+        'enrollment_status' => 'active',
+        'study_stage' => 'intake_course',
+        'source_type' => 'test_program_enrollment',
+        'source_id' => $student->id,
+        'source_snapshot' => [],
+        'materialized_at' => now(),
+    ]);
+
+    $result = app(GetStudentCompletedUnitsQuery::class)->handle(['campus_id' => $student->campus_id]);
+    $row = collect($result['data'])->firstWhere('id', $student->id);
+
+    expect($row['status'])->toBe('intake_course');
+});
+
+it('sorts by units_count within the selected semester only', function () {
+    $campus = Campus::factory()->create();
+    $target = Semester::factory()->create(['start_date' => '2025-06-01']);
+    $other = Semester::factory()->create(['start_date' => '2025-01-01']);
+
+    $manyInTarget = Student::factory()->create(['campus_id' => $campus->id, 'intake' => 1, 'intake_semester_id' => Semester::factory()]);
+    $manyElsewhere = Student::factory()->create(['campus_id' => $campus->id, 'intake' => 1, 'intake_semester_id' => Semester::factory()]);
+
+    foreach (range(1, 2) as $ignored) {
+        AcademicRecord::factory()->create(['course_offering_id' => CourseOffering::factory(), 'student_id' => $manyInTarget->id, 'unit_id' => Unit::factory(), 'semester_id' => $target->id, 'is_passed' => true]);
+    }
+    foreach (range(1, 5) as $ignored) {
+        AcademicRecord::factory()->create(['course_offering_id' => CourseOffering::factory(), 'student_id' => $manyElsewhere->id, 'unit_id' => Unit::factory(), 'semester_id' => $other->id, 'is_passed' => true]);
+    }
+
+    $result = app(GetStudentCompletedUnitsQuery::class)->handle([
+        'campus_id' => $campus->id,
+        'semester_id' => $target->id,
+        'sort' => 'units_count',
+        'direction' => 'desc',
+    ]);
+
+    $ids = collect($result['data'])->pluck('id')->values();
+    expect($ids->search($manyInTarget->id))->toBeLessThan($ids->search($manyElsewhere->id));
+});
+
+it('sorts by credits_earned within the selected semester only', function () {
+    $campus = Campus::factory()->create();
+    $target = Semester::factory()->create(['start_date' => '2025-06-01']);
+    $other = Semester::factory()->create(['start_date' => '2025-01-01']);
+
+    $richInTarget = Student::factory()->create(['campus_id' => $campus->id, 'intake' => 1, 'intake_semester_id' => Semester::factory()]);
+    $richElsewhere = Student::factory()->create(['campus_id' => $campus->id, 'intake' => 1, 'intake_semester_id' => Semester::factory()]);
+
+    AcademicRecord::factory()->create(['course_offering_id' => CourseOffering::factory(), 'student_id' => $richInTarget->id, 'unit_id' => Unit::factory(), 'semester_id' => $target->id, 'is_passed' => true, 'credit_points_earned' => 6]);
+    AcademicRecord::factory()->create(['course_offering_id' => CourseOffering::factory(), 'student_id' => $richElsewhere->id, 'unit_id' => Unit::factory(), 'semester_id' => $other->id, 'is_passed' => true, 'credit_points_earned' => 30]);
+
+    $result = app(GetStudentCompletedUnitsQuery::class)->handle([
+        'campus_id' => $campus->id,
+        'semester_id' => $target->id,
+        'sort' => 'credits_earned',
+        'direction' => 'desc',
+    ]);
+
+    $ids = collect($result['data'])->pluck('id')->values();
+    $targetRow = collect($result['data'])->firstWhere('id', $richInTarget->id);
+
+    expect((float) $targetRow['credits_earned'])->toBe(6.0)
+        ->and($ids->search($richInTarget->id))->toBeLessThan($ids->search($richElsewhere->id));
+});
+
+it('ignores soft-deleted records in the derived sort, matching the displayed row', function () {
+    $campus = Campus::factory()->create();
+    $live = Student::factory()->create(['campus_id' => $campus->id, 'intake' => 1, 'intake_semester_id' => Semester::factory()]);
+    $mostlyTrashed = Student::factory()->create(['campus_id' => $campus->id, 'intake' => 1, 'intake_semester_id' => Semester::factory()]);
+
+    AcademicRecord::factory()->create(['course_offering_id' => CourseOffering::factory(), 'student_id' => $live->id, 'unit_id' => Unit::factory(), 'is_passed' => true, 'credit_points_earned' => 6]);
+    AcademicRecord::factory()->create(['course_offering_id' => CourseOffering::factory(), 'student_id' => $mostlyTrashed->id, 'unit_id' => Unit::factory(), 'is_passed' => true, 'credit_points_earned' => 1]);
+    // Raw SQL doesn't get the SoftDeletes scope for free — without an explicit
+    // `deleted_at is null` this row would sort $mostlyTrashed to the top while
+    // its rendered credits stayed at 1.
+    AcademicRecord::factory()
+        ->create(['course_offering_id' => CourseOffering::factory(), 'student_id' => $mostlyTrashed->id, 'unit_id' => Unit::factory(), 'is_passed' => true, 'credit_points_earned' => 99])
+        ->delete();
+
+    $result = app(GetStudentCompletedUnitsQuery::class)->handle([
+        'campus_id' => $campus->id,
+        'sort' => 'credits_earned',
+        'direction' => 'desc',
+    ]);
+
+    $ids = collect($result['data'])->pluck('id')->values();
+    $trashedRow = collect($result['data'])->firstWhere('id', $mostlyTrashed->id);
+
+    expect((float) $trashedRow['credits_earned'])->toBe(1.0)
+        ->and($trashedRow['units_count'])->toBe(1)
+        ->and($ids->search($live->id))->toBeLessThan($ids->search($mostlyTrashed->id));
+});
+
+it('shows a row with empty arrays and zero counts for a student with no registration', function () {
     $student = makeCampusStudent();
 
     $result = app(GetStudentCompletedUnitsQuery::class)->handle(['campus_id' => $student->campus_id]);
@@ -224,8 +385,9 @@ it('runs a bounded number of queries across multiple students (no N+1)', functio
 
     app(GetStudentCompletedUnitsQuery::class)->handle(['campus_id' => $campus->id]);
 
-    // count + students select + program eager load + passed records + required-credits batch.
-    expect($queryCount)->toBeLessThanOrEqual(5);
+    // count + students select + program eager load + registered records
+    // + lifecycle statuses (enrolments, plus a fallback lookup) + required-credits batch.
+    expect($queryCount)->toBeLessThanOrEqual(7);
 });
 
 it('reports total required curriculum credits, batched once per curriculum version', function () {

@@ -74,7 +74,32 @@ it('renders the page with report data and filter options', function (): void {
         ->assertInertia(fn ($page) => $page
             ->component('Academic/Report/StudentUnits/Index')
             ->has('report.data')
-            ->has('filters.options.programs'));
+            ->has('filters.options.programs')
+            ->has('filters.options.semesters')
+            ->has('report.data.0.status')
+            // The per-semester breakdown is export-only; shipping it here would
+            // bloat every page load with data the table never renders.
+            ->missing('report.data.0.units_by_semester'));
+});
+
+it('rejects a semester_id that is archived and therefore absent from the dropdown', function (): void {
+    $user = User::factory()->create();
+    actingAs($user);
+    grantStudentCompletedUnitsPermission($user, $this->campus, 'view_academic_report');
+
+    $archived = Semester::factory()->create(['is_archived' => true]);
+
+    get(route('academic.reports.student-units.index', ['semester_id' => $archived->id]))
+        ->assertSessionHasErrors('semester_id');
+});
+
+it('rejects an unknown semester_id', function (): void {
+    $user = User::factory()->create();
+    actingAs($user);
+    grantStudentCompletedUnitsPermission($user, $this->campus, 'view_academic_report');
+
+    get(route('academic.reports.student-units.index', ['semester_id' => 999999]))
+        ->assertSessionHasErrors('semester_id');
 });
 
 it('ignores a client-supplied campus_id and stays scoped to the session campus', function (): void {

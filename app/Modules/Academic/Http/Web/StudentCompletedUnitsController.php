@@ -8,6 +8,8 @@ use App\Exports\StudentCompletedUnitsExport;
 use App\Http\Controllers\Controller;
 use App\Models\Campus;
 use App\Models\Program;
+use App\Models\Semester;
+use App\Modules\Academic\Catalog\Queries\GetSemesterFilterOptionsQuery;
 use App\Modules\Academic\Http\Requests\ListStudentCompletedUnitsRequest;
 use App\Services\ExcelExportService;
 use App\Shared\Contracts\Academic\ProgramReferenceReader;
@@ -22,6 +24,7 @@ class StudentCompletedUnitsController extends Controller
         ListStudentCompletedUnitsRequest $request,
         StudentCompletedUnitsReader $reader,
         ProgramReferenceReader $programs,
+        GetSemesterFilterOptionsQuery $semesterOptions,
     ): Response {
         $filters = $this->resolveFilters($request);
 
@@ -30,6 +33,7 @@ class StudentCompletedUnitsController extends Controller
             'filters' => [
                 'active' => [
                     'program_id' => $filters['program_id'] ?? null,
+                    'semester_id' => $filters['semester_id'] ?? null,
                     'keyword' => $filters['keyword'] ?? null,
                     'sort' => $filters['sort'],
                     'direction' => $filters['direction'],
@@ -38,6 +42,14 @@ class StudentCompletedUnitsController extends Controller
                 'options' => [
                     'programs' => collect($programs->all())
                         ->map(static fn (array $program): array => ['id' => $program['id'], 'name' => $program['name']])
+                        ->values()
+                        ->all(),
+                    'semesters' => $semesterOptions->semesters()
+                        ->map(static fn (Semester $semester): array => [
+                            'id' => $semester->id,
+                            'name' => $semester->name,
+                            'code' => $semester->code,
+                        ])
                         ->values()
                         ->all(),
                 ],
@@ -57,11 +69,15 @@ class StudentCompletedUnitsController extends Controller
             'campus_name' => Campus::find($filters['campus_id'])?->name,
             'keyword' => $filters['keyword'] ?? null,
             'program_name' => ! empty($filters['program_id']) ? Program::find($filters['program_id'])?->name : null,
+            'semester_name' => ! empty($filters['semester_id']) ? Semester::find($filters['semester_id'])?->name : null,
         ]);
 
-        $filename = 'student-completed-units-'.now()->format('Y-m-d-His');
+        $filename = 'student-registered-units-'.now()->format('Y-m-d-His');
 
-        return $excel->download(new StudentCompletedUnitsExport($rows, $exportFilters), $filename);
+        return $excel->download(
+            new StudentCompletedUnitsExport($rows, $exportFilters, splitBySemester: empty($filters['semester_id'])),
+            $filename,
+        );
     }
 
     /**
