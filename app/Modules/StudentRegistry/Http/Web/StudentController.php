@@ -19,6 +19,7 @@ use App\Modules\StudentRegistry\Http\Requests\Student\SearchStudentsRequest;
 use App\Modules\StudentRegistry\Queries\ExportStudentsQuery;
 use App\Modules\StudentRegistry\Queries\ListStudentsQuery;
 use App\Services\StudentService;
+use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use App\Shared\Contracts\Academic\StudentDirectoryFormOptionsReader;
 use App\Shared\Contracts\Academic\StudentDirectoryStatisticsReader;
 use App\Shared\Contracts\Identity\GuardianAccessGrantReader;
@@ -43,6 +44,7 @@ class StudentController extends Controller
         private GuardianAccessGrantReader $guardianAccessGrantReader,
         private StudentDirectoryFormOptionsReader $formOptions,
         private CampusReferenceReader $campuses,
+        private ProgramEnrollmentReader $enrollmentReader,
     ) {}
 
     public function index(
@@ -221,18 +223,22 @@ class StudentController extends Controller
             ->limit($limit)
             ->get();
 
+        $enrollmentSummaries = $this->enrollmentReader->forStudentIds(
+            $students->pluck('id')->map(static fn (int|string $id): int => (int) $id)->all(),
+        );
+
         return ApiResponse::compatible([
             'success' => true,
             'message' => 'Students retrieved successfully',
             'data' => [
-                'items' => $students->map(function ($student) {
+                'items' => $students->map(function ($student) use ($enrollmentSummaries) {
                     return [
                         'id' => $student->id,
                         'student_id' => $student->student_id,
                         'full_name' => $student->full_name,
                         'email' => $student->email,
                         'avatar_url' => $student->avatar_url,
-                        'status' => $student->status,
+                        'status' => $enrollmentSummaries[$student->id]?->legacyCompatibleStatus() ?? $student->status,
                         'program' => $student->program ? [
                             'id' => $student->program->id,
                             'name' => $student->program->name,
@@ -269,7 +275,7 @@ class StudentController extends Controller
                 'student_id' => $student->student_id,
                 'full_name' => $student->full_name,
                 'email' => $student->email,
-                'status' => $student->status,
+                'status' => $this->enrollmentReader->forStudentId((int) $student->id)->legacyCompatibleStatus(),
                 'program' => $student->program ? [
                     'id' => $student->program->id,
                     'name' => $student->program->name,
@@ -303,11 +309,17 @@ class StudentController extends Controller
             ->whereIn('student_id', $validated['student_ids'])
             ->get();
 
+        $enrollmentSummaries = $this->enrollmentReader->forStudentIds(
+            $students->pluck('id')->map(static fn (int|string $id): int => (int) $id)->all(),
+        );
+
         return ApiResponse::compatible([
             'success' => true,
             'message' => 'Students retrieved successfully',
             'data' => [
-                'students' => $students->map(function ($student) {
+                'students' => $students->map(function ($student) use ($enrollmentSummaries) {
+                    $status = $enrollmentSummaries[$student->id]?->legacyCompatibleStatus() ?? $student->status;
+
                     return [
                         'id' => $student->id,
                         'student_id' => $student->student_id,
@@ -318,7 +330,7 @@ class StudentController extends Controller
                         'program_name' => $student->program?->name ?? null,
                         'campus_name' => $student->campus?->name ?? null,
                         'specialization_name' => $student->specialization?->name ?? null,
-                        'status' => $student->status,
+                        'status' => $status,
                         // Additional fields that can be used as template variables in the future
                         'template_variables' => [
                             'name' => $student->full_name,
@@ -328,7 +340,7 @@ class StudentController extends Controller
                             'campus' => $student->campus?->name ?? '',
                             'specialization' => $student->specialization?->name ?? '',
                             'curriculum_version' => $student->curriculumVersion?->version_code ?? '',
-                            'status' => $student->status,
+                            'status' => $status,
                         ],
                     ];
                 }),

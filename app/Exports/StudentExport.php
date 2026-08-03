@@ -2,6 +2,8 @@
 
 namespace App\Exports;
 
+use App\Shared\Contracts\Academic\DTO\ProgramEnrollmentSummary;
+use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
@@ -18,14 +20,23 @@ class StudentExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMapp
 
     protected array $filters;
 
-    public function __construct(Builder $query, array $filters = [])
+    protected ProgramEnrollmentReader $enrollmentReader;
+
+    /** @var array<int, ProgramEnrollmentSummary> */
+    protected array $enrollmentSummaries = [];
+
+    public function __construct(Builder $query, array $filters = [], ?ProgramEnrollmentReader $enrollmentReader = null)
     {
         $this->query = $query;
         $this->filters = $filters;
+        $this->enrollmentReader = $enrollmentReader ?? app(ProgramEnrollmentReader::class);
     }
 
     public function query()
     {
+        $studentIds = (clone $this->query)->pluck('id')->map(static fn (int|string $id): int => (int) $id)->all();
+        $this->enrollmentSummaries = $this->enrollmentReader->forStudentIds($studentIds);
+
         return $this->query->with([
             'campus:id,name,code',
             'program:id,name',
@@ -162,7 +173,7 @@ class StudentExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMapp
             // $student->high_school_name ?? '',
             // $student->high_school_graduation_year ?? '',
             // $student->entrance_exam_score ?? '',
-            ucfirst($student->status ?? ''),
+            ucfirst($this->enrollmentSummaries[$student->id]?->legacyCompatibleStatus() ?? $student->status ?? ''),
             ucfirst($student->academic_status ?? ''),
             // $student->status_change_date ? $student->status_change_date->format('Y-m-d') : '',
             // $student->status_reason ?? '',

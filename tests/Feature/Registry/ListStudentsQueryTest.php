@@ -50,6 +50,26 @@ it('filters lifecycle status from Program Enrollment after the Student snapshot 
         ->and($student->fresh()->status)->toBe('intake_course');
 });
 
+it('reflects the live study_stage in the returned rows, not the stale students.status column', function (): void {
+    $campus = Campus::factory()->create();
+    $program = Program::factory()->create();
+    $semester = Semester::factory()->create();
+    $student = Student::factory()->forCampus($campus)->forProgram($program)->create([
+        'status' => 'intake_pre_uni_gc',
+        'intake' => 1,
+        'intake_semester_id' => $semester->id,
+    ]);
+    materializeStudentEnrollment($student);
+    ProgramEnrollment::query()->where('student_id', $student->id)->update([
+        'study_stage' => 'intake_course',
+    ]);
+
+    $students = app(ListStudentsQuery::class)->handle([], $campus->id);
+
+    expect(collect($students->items())->firstWhere('id', $student->id)->status)->toBe('intake_course')
+        ->and($student->fresh()->status)->toBe('intake_pre_uni_gc');
+});
+
 it('uses Program Enrollment for matching directory and export status filters', function (): void {
     $campus = Campus::factory()->create();
     $program = Program::factory()->create();

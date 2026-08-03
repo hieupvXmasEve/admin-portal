@@ -10,6 +10,8 @@ use App\Models\Semester;
 use App\Models\Specialization;
 use App\Models\Student;
 use App\Models\User;
+use App\Modules\Academic\Progression\Actions\MaterializeProgramEnrollmentAction;
+use App\Modules\Academic\Progression\Models\ProgramEnrollment;
 use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Auth\Middleware\Authorize;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
@@ -146,6 +148,19 @@ describe('api search', function (): void {
             ->assertJsonPath('success', false)
             ->assertJsonPath('errors.0.field', 'status');
     });
+
+    it('reflects the live study_stage, not the stale students.status column', function (): void {
+        $student = directoryStudent($this->campus, $this->program, $this->semester, [
+            'student_id' => 'SE600010',
+            'status' => 'intake_pre_uni_gc',
+        ]);
+        MaterializeProgramEnrollmentAction::run(['student_id' => $student->id]);
+        ProgramEnrollment::query()->where('student_id', $student->id)->update(['study_stage' => 'intake_course']);
+
+        get(route('api.admin.students.apiSearch', ['query' => 'SE600010']))
+            ->assertOk()
+            ->assertJsonPath('data.items.0.status', 'intake_course');
+    });
 });
 
 describe('api show', function (): void {
@@ -160,6 +175,19 @@ describe('api show', function (): void {
             ->assertJsonPath('message', 'Student retrieved successfully')
             ->assertJsonPath('data.student_id', 'SE600003')
             ->assertJsonPath('data.program.id', $this->program->id);
+    });
+
+    it('reflects the live study_stage, not the stale students.status column', function (): void {
+        $student = directoryStudent($this->campus, $this->program, $this->semester, [
+            'student_id' => 'SE600011',
+            'status' => 'intake_pre_uni_gc',
+        ]);
+        MaterializeProgramEnrollmentAction::run(['student_id' => $student->id]);
+        ProgramEnrollment::query()->where('student_id', $student->id)->update(['study_stage' => 'intake_course']);
+
+        get(route('api.admin.students.apiShow', ['student' => $student->id]))
+            ->assertOk()
+            ->assertJsonPath('data.status', 'intake_course');
     });
 });
 
@@ -176,6 +204,20 @@ describe('api lookup by student codes', function (): void {
             ->assertJsonPath('data.students.0.student_id', 'SE600004')
             ->assertJsonPath('data.students.0.fullname', 'DO THI F')
             ->assertJsonPath('data.students.0.template_variables.program', 'Software Engineering');
+    });
+
+    it('reflects the live study_stage, not the stale students.status column', function (): void {
+        $student = directoryStudent($this->campus, $this->program, $this->semester, [
+            'student_id' => 'SE600012',
+            'status' => 'intake_pre_uni_gc',
+        ]);
+        MaterializeProgramEnrollmentAction::run(['student_id' => $student->id]);
+        ProgramEnrollment::query()->where('student_id', $student->id)->update(['study_stage' => 'intake_course']);
+
+        post(route('api.admin.students.getByStudentIds'), ['student_ids' => ['SE600012']])
+            ->assertOk()
+            ->assertJsonPath('data.students.0.status', 'intake_course')
+            ->assertJsonPath('data.students.0.template_variables.status', 'intake_course');
     });
 
     it('never reaches the lookup when no campus is selected', function (): void {

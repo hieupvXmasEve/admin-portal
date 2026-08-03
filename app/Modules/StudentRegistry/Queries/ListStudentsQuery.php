@@ -5,15 +5,18 @@ declare(strict_types=1);
 namespace App\Modules\StudentRegistry\Queries;
 
 use App\Models\Student;
+use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use App\Shared\Contracts\Academic\StudentLifecycleMatcher;
 use App\Shared\Contracts\StudentRegistry\StudentDirectoryReader;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 
 class ListStudentsQuery implements StudentDirectoryReader
 {
     public function __construct(
         private readonly StudentLifecycleMatcher $lifecycleMatcher,
+        private readonly ProgramEnrollmentReader $enrollmentReader,
     ) {}
 
     /**
@@ -30,12 +33,40 @@ class ListStudentsQuery implements StudentDirectoryReader
         $this->applyAdvancedFilters($query, $filters);
         $this->applySorting($query, $filters);
 
-        return $query
+        $paginator = $query
             ->paginate(
                 perPage: (int) ($filters['per_page'] ?? 10),
                 page: (int) ($filters['page'] ?? 1),
             )
             ->withQueryString();
+
+        $this->overrideStatusWithProgramEnrollmentTruth($paginator->getCollection());
+
+        return $paginator;
+    }
+
+    /**
+     * `students.status` is a legacy column that program-enrollment transitions
+     * (e.g. intake_pre_uni_gc -> intake_course) don't write back to. Override
+     * it with the live program_enrollments projection so the directory list
+     * matches the academic-summary page instead of the stale column.
+     *
+     * @param  Collection<int, Student>  $students
+     */
+    private function overrideStatusWithProgramEnrollmentTruth(Collection $students): void
+    {
+        $studentIds = $students->pluck('id')->map(static fn (int|string $id): int => (int) $id)->all();
+        if ($studentIds === []) {
+            return;
+        }
+
+        $summaries = $this->enrollmentReader->forStudentIds($studentIds);
+
+        $students->each(function (Student $student) use ($summaries): void {
+            if (isset($summaries[$student->id])) {
+                $student->status = $summaries[$student->id]->legacyCompatibleStatus();
+            }
+        });
     }
 
     /**
