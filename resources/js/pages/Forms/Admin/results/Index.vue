@@ -72,7 +72,7 @@ const { filters, hasActiveFilters, clearAllFilters, handleSearch, setFilter, han
 
 // Build the ?return= param to preserve filter state when navigating to Aggregate
 const buildReturnParam = () => {
-    const url = buildUrl(filters);
+    const url = buildUrl();
     const qs = url.includes('?') ? url.split('?')[1] : '';
     return qs ? encodeURIComponent(qs) : '';
 };

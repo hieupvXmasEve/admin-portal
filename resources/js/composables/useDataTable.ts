@@ -250,6 +250,7 @@ export function useDataTable<T extends Record<string, any> = Record<string, Filt
         setPerPage,
         apply,
         refresh,
+        buildUrl,
 
         // Convenience handlers (DataTable, DataPagination, DebouncedInput)
         handleSearch,

@@ -60,7 +60,7 @@ final class GetSurveyRunAggregateQuery
                 'responses_percent' => (int) $responsePercent,
             ],
             'overall' => [
-                'average' => (float) round($overallAvg, 1),
+                'average' => $overallAvg !== null ? (float) round($overallAvg, 1) : 0.0,
                 'positive_percent' => $overallTotal > 0 ? (int) round(($overallPositive / $overallTotal) * 100) : 0,
                 'neutral_percent' => $overallTotal > 0 ? (int) round(($overallNeutral / $overallTotal) * 100) : 0,
                 'negative_percent' => $overallTotal > 0 ? (int) round(($overallNegative / $overallTotal) * 100) : 0,
@@ -249,7 +249,7 @@ final class GetSurveyRunAggregateQuery
                 'responses_percent' => (int) $responsePercent,
             ],
             'overall' => [
-                'average' => (float) round($overallAvg, 1),
+                'average' => $overallAvg !== null ? (float) round($overallAvg, 1) : 0.0,
                 'positive_percent' => $overallTotal > 0 ? (int) round(($overallPositive / $overallTotal) * 100) : 0,
                 'neutral_percent' => $overallTotal > 0 ? (int) round(($overallNeutral / $overallTotal) * 100) : 0,
                 'negative_percent' => $overallTotal > 0 ? (int) round(($overallNegative / $overallTotal) * 100) : 0,
