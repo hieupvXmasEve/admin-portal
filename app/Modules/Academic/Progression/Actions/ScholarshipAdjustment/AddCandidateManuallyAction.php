@@ -28,7 +28,7 @@ class AddCandidateManuallyAction
         $student = Student::query()->where('student_id', $studentCode)->first();
 
         if ($student === null) {
-            throw new \DomainException("Student {$studentCode} does not exist.");
+            throw new \DomainException("Không tìm thấy sinh viên có mã {$studentCode}.");
         }
 
         $exists = ScholarshipAdjustmentDossier::query()
@@ -39,7 +39,7 @@ class AddCandidateManuallyAction
             ->exists();
 
         if ($exists) {
-            throw new \DomainException('An active dossier already exists for this student and semester pair.');
+            throw new \DomainException('Sinh viên này đã được xét cho cặp học kỳ này rồi.');
         }
 
         // Manual add bypasses the AUTO CRITERIA (EGC/override/appeal/award

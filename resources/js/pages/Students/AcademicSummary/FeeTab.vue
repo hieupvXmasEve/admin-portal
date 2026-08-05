@@ -139,6 +139,7 @@ interface FeeSummary {
             term_number: number;
             semester_id: number | null;
             semester_name: string | null;
+            is_projected_semester?: boolean;
             required_amount: number;
             discount_amount: number;
             is_estimated_discount?: boolean;
@@ -896,7 +897,8 @@ const summaryToneClass = computed(() => {
                                     <div>
                                         <div class="text-sm font-semibold">Term {{ term.term_number ?? '—' }}</div>
                                         <div class="text-muted-foreground">
-                                            {{ term.semester_name ?? 'Dự kiến' }}
+                                            {{ term.semester_name ?? 'Chưa xác định học kỳ' }}
+                                            <span v-if="term.is_projected_semester" class="text-muted-foreground/70">(dự kiến)</span>
                                         </div>
                                     </div>
                                     <div class="text-right">

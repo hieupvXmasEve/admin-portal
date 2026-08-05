@@ -38,7 +38,7 @@ class ScholarshipAdjustmentDossierFactory
             ->first();
 
         if ($award === null || $award->scholarshipDefinition === null) {
-            throw new \DomainException('Student has no active scholarship award — no dossier can be created.');
+            throw new \DomainException('Sinh viên này không có học bổng nên không có gì để xét.');
         }
 
         $definition = $award->scholarshipDefinition;

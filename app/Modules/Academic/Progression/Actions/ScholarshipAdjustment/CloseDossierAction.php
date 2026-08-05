@@ -21,6 +21,7 @@ class CloseDossierAction implements ScholarshipDossierCloser
         ScholarshipAdjustmentDossier::STATUS_CLOSED,
         ScholarshipAdjustmentDossier::STATUS_CANCELLED,
         ScholarshipAdjustmentDossier::STATUS_NO_ADJUSTMENT,
+        ScholarshipAdjustmentDossier::STATUS_NOT_APPLICABLE,
     ];
 
     public function closeDossier(int $dossierId): void

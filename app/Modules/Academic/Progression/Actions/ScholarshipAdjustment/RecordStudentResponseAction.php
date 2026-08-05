@@ -32,7 +32,7 @@ final class RecordStudentResponseAction
 
         if (! in_array($dossier->confirmation_status, $respondable, true)) {
             throw new \DomainException(
-                "No open confirmation to respond to (confirmation_status: {$dossier->confirmation_status}).",
+                'There is no open confirmation request to answer.',
             );
         }
 

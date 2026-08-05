@@ -17,7 +17,7 @@ final class RequestConfirmationAction
     public static function run(ScholarshipAdjustmentDossier $dossier): ScholarshipAdjustmentDossier
     {
         if ($dossier->interview_status !== ScholarshipAdjustmentDossier::INTERVIEW_COMPLETED) {
-            throw new \DomainException('Interview must be completed before requesting student confirmation.');
+            throw new \DomainException('Phải ghi nhận xong buổi phỏng vấn trước khi gửi sinh viên xác nhận.');
         }
 
         $dossier->update([

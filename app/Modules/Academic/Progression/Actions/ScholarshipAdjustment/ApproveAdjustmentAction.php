@@ -49,13 +49,13 @@ class ApproveAdjustmentAction
                 ->firstOrFail();
 
             if ($locked->status !== ScholarshipAdjustmentDossier::STATUS_READY_FOR_DECISION) {
-                throw new \DomainException('Dossier is not awaiting approval.');
+                throw new \DomainException('Hồ sơ này không có quyết định nào đang chờ duyệt.');
             }
 
             $checkerCodes = $this->permissions->permissionCodesForUserId($checkerUserId, (int) $locked->campus_id);
 
             if (! in_array('approve_scholarship_adjustment', $checkerCodes, true)) {
-                throw new \DomainException("Checker lacks approve_scholarship_adjustment at campus {$locked->campus_id}.");
+                throw new \DomainException('Bạn không có quyền duyệt quyết định học bổng tại cơ sở của sinh viên này.');
             }
 
             $locked->update([
@@ -95,7 +95,10 @@ class ApproveAdjustmentAction
         if ($award === null || $award->scholarshipDefinition === null) {
             // Approved but Finance has nothing to apply against — route to
             // review rather than 404ing on an already-committed approval.
-            $dossier->update(['status' => ScholarshipAdjustmentDossier::STATUS_FINANCE_REVIEW_REQUIRED]);
+            $dossier->update([
+                'status' => ScholarshipAdjustmentDossier::STATUS_FINANCE_REVIEW_REQUIRED,
+                'finance_review_note' => 'Không tìm thấy học bổng đang hiệu lực của sinh viên để áp dụng điều chỉnh. Phòng tài chính cần kiểm tra lại hồ sơ học bổng của sinh viên.',
+            ]);
             Log::warning('Scholarship adjustment approved with no resolvable award', ['dossier_id' => $dossier->id]);
 
             return $dossier->refresh();
@@ -130,9 +133,9 @@ class ApproveAdjustmentAction
             // Finance rejected the request outright (e.g. duplicate, bounds,
             // fingerprint mismatch) — the dossier stays approved but unresolved;
             // it never reverts to a pre-approval status, so the maker/checker
-            // decision is preserved for audit and manual follow-up. The reason
-            // is logged and appended to decision_reason so an operator sees
-            // WHY, not just that review is required.
+            // decision is preserved for audit and manual follow-up. Finance's
+            // explanation is kept in its own column: decision_reason belongs to
+            // the maker and must stay exactly what they wrote.
             Log::warning('Scholarship adjustment rejected by Finance', [
                 'dossier_id' => $dossier->id,
                 'reason_code' => $result->status,
@@ -141,7 +144,7 @@ class ApproveAdjustmentAction
 
             $dossier->update([
                 'status' => ScholarshipAdjustmentDossier::STATUS_FINANCE_REVIEW_REQUIRED,
-                'decision_reason' => $dossier->decision_reason." [Finance: {$result->status} — {$result->message}]",
+                'finance_review_note' => $result->message,
             ]);
 
             return $dossier->refresh();
@@ -154,10 +157,24 @@ class ApproveAdjustmentAction
         $mappedStatus = match ($result->status) {
             'applied' => ScholarshipAdjustmentDossier::STATUS_APPLIED,
             ScholarshipAdjustmentDossier::STATUS_FINANCE_REVIEW_REQUIRED => ScholarshipAdjustmentDossier::STATUS_FINANCE_REVIEW_REQUIRED,
+            ScholarshipAdjustmentDossier::STATUS_NOT_APPLICABLE => ScholarshipAdjustmentDossier::STATUS_NOT_APPLICABLE,
             default => ScholarshipAdjustmentDossier::STATUS_APPROVED,
         };
 
-        $dossier->update(['status' => $mappedStatus]);
+        // Accepted-but-blocked and accepted-but-moot both carry an explanation.
+        // Dropping it here is what left the dossier saying "needs finance
+        // review" — or "waiting for the invoice" — with no reason.
+        $explainedStatuses = [
+            ScholarshipAdjustmentDossier::STATUS_FINANCE_REVIEW_REQUIRED,
+            ScholarshipAdjustmentDossier::STATUS_NOT_APPLICABLE,
+        ];
+
+        $dossier->update([
+            'status' => $mappedStatus,
+            'finance_review_note' => in_array($mappedStatus, $explainedStatuses, true)
+                ? $result->message
+                : null,
+        ]);
 
         return $dossier->refresh();
     }

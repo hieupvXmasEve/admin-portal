@@ -57,6 +57,24 @@ class SemesterAcademicPeriodReader implements AcademicPeriodReader
             ->count();
     }
 
+    public function nthStartingFrom(CarbonImmutable $start, int $nth): ?AcademicPeriodReference
+    {
+        if ($nth < 1) {
+            return null;
+        }
+
+        // Same set and ordering as countStartingBetween (archived periods
+        // included) — the two must agree or a term number maps to the wrong
+        // semester.
+        return $this->mapPeriod(
+            Semester::query()
+                ->where('start_date', '>=', $start)
+                ->orderBy('start_date')
+                ->skip($nth - 1)
+                ->first()
+        );
+    }
+
     /**
      * @return list<AcademicPeriodReference>
      */

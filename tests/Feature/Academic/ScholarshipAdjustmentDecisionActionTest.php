@@ -17,6 +17,9 @@ use App\Modules\Finance\Actions\CreateFinanceChargeAction;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\ScholarshipSemesterAdjustment;
+use App\Shared\Contracts\Finance\DTO\ScholarshipAdjustmentData;
+use App\Shared\Contracts\Finance\DTO\ScholarshipAdjustmentResult;
+use App\Shared\Contracts\Finance\ScholarshipAdjustmentContract;
 use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -316,4 +319,41 @@ it('approved decisions are immutable — a second approve call is rejected', fun
 
     expect(fn () => $approve->run($ctx['dossier']->fresh(), $ctx['checker']->id))
         ->toThrow(DomainException::class);
+});
+
+it('keeps the reason Finance gave when an approved adjustment cannot reach the ledger', function () {
+    // Accepted-but-blocked (the common case: the invoice was already paid).
+    // Finance explains why; the dossier must keep that sentence, and it must
+    // NOT land in decision_reason, which belongs to the maker.
+    $ctx = decisionServiceDossier();
+    $note = 'Sinh viên đã thanh toán học phí của học kỳ này nên hệ thống không tự điều chỉnh học bổng trên hoá đơn đã thu tiền.';
+
+    app()->bind(ScholarshipAdjustmentContract::class, fn () => new class($note) implements ScholarshipAdjustmentContract
+    {
+        public function __construct(private readonly string $note) {}
+
+        public function apply(ScholarshipAdjustmentData $data): ScholarshipAdjustmentResult
+        {
+            return new ScholarshipAdjustmentResult(
+                true,
+                ScholarshipAdjustmentDossier::STATUS_FINANCE_REVIEW_REQUIRED,
+                1,
+                $this->note,
+            );
+        }
+    });
+
+    app(DecideAdjustmentAction::class)->run(
+        $ctx['dossier'],
+        ScholarshipAdjustmentDossier::DECISION_REDUCE,
+        15.0,
+        'Trượt hai môn',
+        $ctx['maker']->id,
+    );
+
+    $approved = app(ApproveAdjustmentAction::class)->run($ctx['dossier']->refresh(), $ctx['checker']->id);
+
+    expect($approved->status)->toBe(ScholarshipAdjustmentDossier::STATUS_FINANCE_REVIEW_REQUIRED)
+        ->and($approved->finance_review_note)->toBe($note)
+        ->and($approved->decision_reason)->toBe('Trượt hai môn');
 });

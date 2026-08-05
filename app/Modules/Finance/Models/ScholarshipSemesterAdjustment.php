@@ -31,6 +31,15 @@ class ScholarshipSemesterAdjustment extends Model
 
     public const STATUS_FINANCE_REVIEW_REQUIRED = 'finance_review_required';
 
+    /**
+     * The target semester charges no tuition at all (a 0đ term in the tuition
+     * plan), so there is nothing for the adjustment to reduce — ever. Terminal
+     * on purpose: leaving such a row `pending_apply` kept it in the set that
+     * drives money, ready to fire months later if a tuition charge for that
+     * semester ever appeared by another route.
+     */
+    public const STATUS_NOT_APPLICABLE = 'not_applicable';
+
     public const STATUS_REVERSED = 'reversed';
 
     /** Backend allow-list — status column is varchar by design, not a DB enum. */
@@ -65,6 +74,7 @@ class ScholarshipSemesterAdjustment extends Model
         'adjusted_amount',
         'status',
         'reason',
+        'review_note',
         'academic_dossier_id',
         'created_by_user_id',
         'approved_by_user_id',

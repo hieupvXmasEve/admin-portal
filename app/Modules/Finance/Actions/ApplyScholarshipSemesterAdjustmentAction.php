@@ -14,6 +14,7 @@ use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\InvoiceGenerationService;
 use App\Modules\Finance\Support\ScholarshipAdjustmentTimingGuard;
 use App\Modules\Finance\Support\ScholarshipDiscountResolver;
+use App\Modules\Finance\Support\StudentChargeTimingResolver;
 use App\Shared\Contracts\Finance\DTO\ScholarshipAdjustmentData;
 use App\Shared\Contracts\Finance\DTO\ScholarshipAdjustmentResult;
 use App\Shared\Contracts\Finance\ScholarshipAdjustmentContract;
@@ -36,6 +37,7 @@ class ApplyScholarshipSemesterAdjustmentAction implements ScholarshipAdjustmentC
         private readonly ScholarshipDiscountResolver $resolver,
         private readonly ScholarshipAdjustmentTimingGuard $timingGuard,
         private readonly InvoiceGenerationService $invoiceService,
+        private readonly StudentChargeTimingResolver $termResolver,
     ) {}
 
     public function apply(ScholarshipAdjustmentData $data): ScholarshipAdjustmentResult
@@ -184,8 +186,11 @@ class ApplyScholarshipSemesterAdjustmentAction implements ScholarshipAdjustmentC
         try {
             // Guard read + ledger write + status flip share one transaction so
             // a payment landing between the read and the write cannot slip in.
-            $outcome = DB::transaction(function () use ($adjustment): string {
+            $guardReason = null;
+
+            $outcome = DB::transaction(function () use ($adjustment, &$guardReason): string {
                 $guard = $this->timingGuard->evaluate((int) $adjustment->student_id, (int) $adjustment->target_semester_id);
+                $guardReason = $guard['reason'] ?? null;
 
                 if ($guard['outcome'] === ScholarshipAdjustmentTimingGuard::OUTCOME_NO_INVOICE) {
                     // Nothing to touch yet — generation paths resolve through
@@ -211,32 +216,99 @@ class ApplyScholarshipSemesterAdjustmentAction implements ScholarshipAdjustmentC
         } catch (InstallmentReconciliationException $e) {
             // Ledger refusal — approval stays, routed to review in its own
             // committed write.
-            $adjustment->update(['status' => ScholarshipSemesterAdjustment::STATUS_FINANCE_REVIEW_REQUIRED]);
+            $note = 'Không tách lại được các đợt thu học phí nên hệ thống chưa áp dụng điều chỉnh: '.$e->getMessage();
+
+            $adjustment->update([
+                'status' => ScholarshipSemesterAdjustment::STATUS_FINANCE_REVIEW_REQUIRED,
+                'review_note' => $note,
+            ]);
 
             return new ScholarshipAdjustmentResult(
                 true,
                 ScholarshipSemesterAdjustment::STATUS_FINANCE_REVIEW_REQUIRED,
                 (int) $adjustment->id,
-                "Installment reconciliation refused the change: {$e->getMessage()}",
+                $note,
             );
         }
 
         if ($outcome === ScholarshipAdjustmentTimingGuard::OUTCOME_REVIEW) {
-            $adjustment->update(['status' => ScholarshipSemesterAdjustment::STATUS_FINANCE_REVIEW_REQUIRED]);
+            $note = $this->reviewNoteFor($guardReason);
+
+            $adjustment->update([
+                'status' => ScholarshipSemesterAdjustment::STATUS_FINANCE_REVIEW_REQUIRED,
+                'review_note' => $note,
+            ]);
 
             return new ScholarshipAdjustmentResult(
                 true,
                 ScholarshipSemesterAdjustment::STATUS_FINANCE_REVIEW_REQUIRED,
                 (int) $adjustment->id,
-                'Invoice has payments or active DNG activity — manual finance review required.',
+                $note,
             );
         }
 
         if ($outcome === ScholarshipAdjustmentTimingGuard::OUTCOME_NO_INVOICE) {
+            // "No invoice" has two very different meanings. Either the tuition
+            // invoice simply has not been issued yet (wait for it), or the
+            // tuition plan charges 0đ for this term, in which case no invoice
+            // will EVER exist and waiting is a lie. Only the plan can tell
+            // them apart.
+            if ($this->targetTermChargesNothing($adjustment)) {
+                $note = 'Kỳ này không thu học phí theo lộ trình đóng tiền nên điều chỉnh học bổng không áp dụng.';
+
+                $adjustment->update([
+                    'status' => ScholarshipSemesterAdjustment::STATUS_NOT_APPLICABLE,
+                    'review_note' => $note,
+                ]);
+
+                return new ScholarshipAdjustmentResult(
+                    true,
+                    ScholarshipSemesterAdjustment::STATUS_NOT_APPLICABLE,
+                    (int) $adjustment->id,
+                    $note,
+                );
+            }
+
             return new ScholarshipAdjustmentResult(true, (string) $adjustment->status, (int) $adjustment->id);
         }
 
         return new ScholarshipAdjustmentResult(true, ScholarshipSemesterAdjustment::STATUS_APPLIED, (int) $adjustment->id);
+    }
+
+    /**
+     * True when the tuition plan charges nothing for the adjustment's target
+     * term. Uses the same resolver the generation path uses to decide whether
+     * to bill at all, so the two can never disagree.
+     */
+    private function targetTermChargesNothing(ScholarshipSemesterAdjustment $adjustment): bool
+    {
+        $student = Student::query()->find((int) $adjustment->student_id);
+
+        if ($student === null) {
+            return false;
+        }
+
+        $term = $this->termResolver->getTuitionTermData($student, (int) $adjustment->target_semester_id);
+        $amount = $term['amount'] ?? null;
+
+        // A null amount means the term could not be resolved at all — that is
+        // "unknown", not "free", and must keep waiting rather than close out.
+        return $amount !== null && (float) $amount <= 0.0;
+    }
+
+    /**
+     * The blocked state in words, for whoever has to act on it — an academic
+     * officer reading the dossier and a finance officer working the queue see
+     * the same sentence.
+     */
+    private function reviewNoteFor(?string $guardReason): string
+    {
+        return match ($guardReason) {
+            ScholarshipAdjustmentTimingGuard::REASON_INVOICE_PAID => 'Sinh viên đã thanh toán học phí của học kỳ này nên hệ thống không tự điều chỉnh học bổng trên hoá đơn đã thu tiền. Phòng tài chính cần xử lý thủ công (truy thu phần chênh lệch hoặc hoàn tiền).',
+            ScholarshipAdjustmentTimingGuard::REASON_INVOICE_CANCELLED => 'Hoá đơn học phí của học kỳ này đã bị huỷ nên không áp dụng điều chỉnh học bổng lên đó được. Phòng tài chính cần kiểm tra lại hoá đơn.',
+            ScholarshipAdjustmentTimingGuard::REASON_BLOCKING_DNG => 'Hoá đơn học phí của học kỳ này đang có giao dịch thu hộ DNG chưa hoàn tất nên chưa điều chỉnh học bổng được. Phòng tài chính cần xử lý sau khi giao dịch kết thúc.',
+            default => 'Hoá đơn học phí của học kỳ này đang ở trạng thái không cho phép tự điều chỉnh học bổng. Phòng tài chính cần kiểm tra thủ công.',
+        };
     }
 
     /**

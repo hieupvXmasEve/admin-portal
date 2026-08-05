@@ -25,6 +25,19 @@ class ScholarshipAdjustmentTimingGuard
     public const OUTCOME_REVIEW = 'review';
 
     /**
+     * Why a review outcome was reached. The guard is the only place that knows
+     * WHICH state blocked the change, so it names it rather than leaving every
+     * caller to render one catch-all sentence.
+     */
+    public const REASON_INVOICE_CANCELLED = 'invoice_cancelled';
+
+    public const REASON_INVOICE_PAID = 'invoice_paid';
+
+    public const REASON_BLOCKING_DNG = 'blocking_dng';
+
+    public const REASON_INVOICE_STATUS_UNSAFE = 'invoice_status_unsafe';
+
+    /**
      * DNG states that must block a scholarship rewrite: everything still
      * holding collection (model-owned list) PLUS states where DNG already
      * captured money that has not been posted to the invoice yet (paid_*
@@ -38,7 +51,7 @@ class ScholarshipAdjustmentTimingGuard
     ];
 
     /**
-     * @return array{outcome: string, invoice: StudentInvoice|null}
+     * @return array{outcome: string, invoice: StudentInvoice|null, reason: string|null}
      */
     public function evaluate(int $studentId, int $semesterId): array
     {
@@ -57,16 +70,16 @@ class ScholarshipAdjustmentTimingGuard
             ->first();
 
         if ($invoice === null) {
-            return ['outcome' => self::OUTCOME_NO_INVOICE, 'invoice' => null];
+            return ['outcome' => self::OUTCOME_NO_INVOICE, 'invoice' => null, 'reason' => null];
         }
 
         if ($invoice->status === 'cancelled') {
-            return ['outcome' => self::OUTCOME_REVIEW, 'invoice' => $invoice];
+            return ['outcome' => self::OUTCOME_REVIEW, 'invoice' => $invoice, 'reason' => self::REASON_INVOICE_CANCELLED];
         }
 
         if ((float) $invoice->cached_paid_amount > 0
             || in_array($invoice->status, ['paid', 'partial', 'overdue'], true)) {
-            return ['outcome' => self::OUTCOME_REVIEW, 'invoice' => $invoice];
+            return ['outcome' => self::OUTCOME_REVIEW, 'invoice' => $invoice, 'reason' => self::REASON_INVOICE_PAID];
         }
 
         $chargeIds = $invoice->invoiceLines()
@@ -82,14 +95,14 @@ class ScholarshipAdjustmentTimingGuard
             ->exists();
 
         if ($hasBlockingDng) {
-            return ['outcome' => self::OUTCOME_REVIEW, 'invoice' => $invoice];
+            return ['outcome' => self::OUTCOME_REVIEW, 'invoice' => $invoice, 'reason' => self::REASON_BLOCKING_DNG];
         }
 
         // Explicit safe list — anything else is review (default-deny).
         if (! in_array($invoice->status, ['draft', 'pending'], true)) {
-            return ['outcome' => self::OUTCOME_REVIEW, 'invoice' => $invoice];
+            return ['outcome' => self::OUTCOME_REVIEW, 'invoice' => $invoice, 'reason' => self::REASON_INVOICE_STATUS_UNSAFE];
         }
 
-        return ['outcome' => self::OUTCOME_APPLY, 'invoice' => $invoice];
+        return ['outcome' => self::OUTCOME_APPLY, 'invoice' => $invoice, 'reason' => null];
     }
 }

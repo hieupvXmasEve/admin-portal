@@ -59,7 +59,7 @@ class ScholarshipAdjustmentDossierController extends Controller
         $campus = app()->bound('campus') ? app('campus') : null;
         $campusId = $campus?->id ?? session('current_campus_id');
 
-        abort_if($campusId === null, 403, 'No campus selected.');
+        abort_if($campusId === null, 403, 'Chưa chọn cơ sở.');
 
         $query = ScholarshipAdjustmentDossier::query()
             ->where('campus_id', $campusId)
@@ -90,7 +90,7 @@ class ScholarshipAdjustmentDossierController extends Controller
      * Dossier detail — evidence, needs_data_review banner, interview panel,
      * minutes editor, decision panel.
      */
-    public function show(ScholarshipAdjustmentDossier $dossier): Response
+    public function show(Request $request, ScholarshipAdjustmentDossier $dossier): Response
     {
         $this->authorize('view', $dossier);
 
@@ -108,6 +108,13 @@ class ScholarshipAdjustmentDossierController extends Controller
         return Inertia::render('ScholarshipAdjustments/Show', [
             'dossier' => $dossier,
             'preview' => [...(array) $preview, 'delta' => $preview->delta()],
+            // Mirrors the route gates on decide/approve. The decision panel is
+            // read-only for a checker who cannot decide, so an approver can no
+            // longer overwrite the maker's proposal on the way to approving it.
+            'can' => [
+                'decide' => $request->user()->can('decide_scholarship_adjustment'),
+                'approve' => $request->user()->can('approve_scholarship_adjustment'),
+            ],
         ]);
     }
 
@@ -146,7 +153,7 @@ class ScholarshipAdjustmentDossierController extends Controller
             return back()->withErrors(['error' => $e->getMessage()]);
         }
 
-        return back()->with('success', "Identified {$result['created']} new candidate(s); {$result['skipped_existing']} already had a dossier.");
+        return back()->with('success', "Đã mở đợt xét cho {$result['created']} sinh viên; {$result['skipped_existing']} sinh viên đã được xét từ trước.");
     }
 
     /**
@@ -231,7 +238,7 @@ class ScholarshipAdjustmentDossierController extends Controller
             return back()->withErrors(['error' => $e->getMessage()]);
         }
 
-        return back()->with('success', 'Candidate added manually.');
+        return back()->with('success', 'Đã thêm sinh viên vào danh sách xét.');
     }
 
     public function scheduleInterview(
@@ -248,7 +255,7 @@ class ScholarshipAdjustmentDossierController extends Controller
             (int) $request->user()->id,
         );
 
-        return back()->with('success', 'Interview scheduled.');
+        return back()->with('success', 'Đã đặt lịch phỏng vấn.');
     }
 
     public function completeInterview(
@@ -266,7 +273,7 @@ class ScholarshipAdjustmentDossierController extends Controller
 
         app(PublishConfirmationRequestNotificationAction::class)->run($dossier);
 
-        return back()->with('success', 'Interview completed — student confirmation requested.');
+        return back()->with('success', 'Đã ghi nhận buổi phỏng vấn — đã gửi yêu cầu xác nhận cho sinh viên.');
     }
 
     /**
@@ -288,7 +295,7 @@ class ScholarshipAdjustmentDossierController extends Controller
             app(PublishConfirmationRequestNotificationAction::class)->run($dossier);
         }
 
-        return back()->with('success', 'Minutes updated — the student has been asked to confirm the corrected notes.');
+        return back()->with('success', 'Đã cập nhật biên bản — đã gửi sinh viên xác nhận lại bản đã sửa.');
     }
 
     /**
@@ -309,7 +316,7 @@ class ScholarshipAdjustmentDossierController extends Controller
             return back()->withErrors(['error' => $e->getMessage()]);
         }
 
-        return back()->with('success', 'Dispute overruled — the reason is recorded and a decision can now be proposed.');
+        return back()->with('success', 'Đã bác bỏ phản đối — lý do đã được lưu vào hồ sơ và giờ có thể đề xuất quyết định.');
     }
 
     public function confirmOnBehalf(
@@ -326,7 +333,7 @@ class ScholarshipAdjustmentDossierController extends Controller
             return back()->withErrors(['error' => $e->getMessage()]);
         }
 
-        return back()->with('success', 'Confirmation recorded on behalf of the student.');
+        return back()->with('success', 'Đã ghi nhận xác nhận thay cho sinh viên.');
     }
 
     public function decide(
@@ -350,7 +357,7 @@ class ScholarshipAdjustmentDossierController extends Controller
 
         app(ScholarshipStaffNotificationPublisher::class)->readyForDecision($dossier->refresh());
 
-        return back()->with('success', 'Decision recorded — awaiting checker approval.');
+        return back()->with('success', 'Đã lưu quyết định — cần người có quyền duyệt phê duyệt.');
     }
 
     public function approve(
@@ -363,6 +370,18 @@ class ScholarshipAdjustmentDossierController extends Controller
             return back()->withErrors(['error' => $e->getMessage()]);
         }
 
-        return back()->with('success', "Decision approved — dossier status: {$updated->status}.");
+        // Approval can land in several places (fees updated, fees not billed
+        // yet, nothing to change, needs finance to look at it) — each one gets
+        // a sentence that says what happened, never the stored status value.
+        $outcome = match ($updated->status) {
+            ScholarshipAdjustmentDossier::STATUS_APPLIED => 'học phí mới đã được áp dụng.',
+            ScholarshipAdjustmentDossier::STATUS_NO_ADJUSTMENT => 'học bổng giữ nguyên nên học phí không thay đổi.',
+            ScholarshipAdjustmentDossier::STATUS_CANCELLED => 'học bổng đã bị huỷ.',
+            ScholarshipAdjustmentDossier::STATUS_NOT_APPLICABLE => 'kỳ áp dụng không thu học phí nên điều chỉnh không có gì để áp dụng.',
+            ScholarshipAdjustmentDossier::STATUS_FINANCE_REVIEW_REQUIRED => 'hệ thống chưa cập nhật được học phí — phòng tài chính cần kiểm tra hồ sơ này.',
+            default => 'học phí sẽ được cập nhật khi hoá đơn học phí của học kỳ đó được phát hành.',
+        };
+
+        return back()->with('success', "Đã duyệt quyết định — {$outcome}");
     }
 }

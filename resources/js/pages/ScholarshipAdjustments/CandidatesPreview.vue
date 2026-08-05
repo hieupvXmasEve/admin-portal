@@ -109,16 +109,16 @@ function submitCreate() {
                 reload();
             },
             onError: (errors: Errors) => {
-                toast.error(errors.error ?? Object.values(errors)[0] ?? 'Could not start the review.');
+                toast.error(errors.error ?? Object.values(errors)[0] ?? 'Không thể bắt đầu đợt xét.');
             },
         });
 }
 </script>
 
 <template>
-    <Head title="Find students to review" />
+    <Head title="Tìm sinh viên cần xét" />
 
-    <Heading title="Find students to review" description="See who failed a course in an earlier semester, then start a review only for the students you choose." />
+    <Heading title="Tìm sinh viên cần xét" description="Xem những sinh viên bị trượt môn ở một học kỳ trước, sau đó chỉ mở đợt xét cho những sinh viên bạn chọn." />
 
     <Alert v-if="error" variant="destructive" class="mt-4">
         <AlertDescription>{{ error }}</AlertDescription>
@@ -126,14 +126,14 @@ function submitCreate() {
 
     <Card class="mt-6">
         <CardHeader>
-            <CardTitle>Choose the semesters</CardTitle>
+            <CardTitle>Chọn học kỳ</CardTitle>
         </CardHeader>
         <CardContent class="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div class="space-y-2">
-                <Label for="target">Semester the change would apply to</Label>
+                <Label for="target">Học kỳ áp dụng điều chỉnh</Label>
                 <Select :model-value="targetSemesterId?.toString()" @update:model-value="onTargetChange">
                     <SelectTrigger id="target" class="w-full">
-                        <SelectValue placeholder="Choose a semester" />
+                        <SelectValue placeholder="Chọn học kỳ" />
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem v-for="s in semesters" :key="s.id" :value="s.id.toString()">{{ s.name }}</SelectItem>
@@ -141,10 +141,10 @@ function submitCreate() {
                 </Select>
             </div>
             <div class="space-y-2">
-                <Label for="source">Semester the student failed in</Label>
+                <Label for="source">Học kỳ sinh viên bị trượt môn</Label>
                 <Select :model-value="sourceSemesterId?.toString()" :disabled="!targetSemesterId" @update:model-value="onSourceChange">
                     <SelectTrigger id="source" class="w-full">
-                        <SelectValue :placeholder="targetSemesterId ? 'Choose an earlier semester' : 'Choose the semester above first'" />
+                        <SelectValue :placeholder="targetSemesterId ? 'Chọn một học kỳ trước đó' : 'Chọn học kỳ ở ô bên trên trước'" />
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem v-for="s in sourceOptions()" :key="s.id" :value="s.id.toString()">{{ s.name }}</SelectItem>
@@ -156,9 +156,9 @@ function submitCreate() {
 
     <Card v-if="preview" class="mt-6">
         <CardHeader>
-            <CardTitle>{{ preview.candidates.length }} student(s) can be reviewed</CardTitle>
+            <CardTitle>{{ preview.candidates.length }} sinh viên có thể đưa vào xét</CardTitle>
             <CardDescription v-if="preview.excluded_null_is_passed || preview.already_has_dossier">
-                Not shown: {{ preview.already_has_dossier }} already under review, {{ preview.excluded_null_is_passed }} course result(s) not graded yet.
+                Không hiển thị: {{ preview.already_has_dossier }} sinh viên đang được xét, {{ preview.excluded_null_is_passed }} kết quả môn học chưa có điểm.
             </CardDescription>
         </CardHeader>
         <CardContent>
@@ -166,14 +166,14 @@ function submitCreate() {
                 <TableHeader>
                     <TableRow>
                         <TableHead />
-                        <TableHead>Student</TableHead>
-                        <TableHead>Failed courses</TableHead>
+                        <TableHead>Sinh viên</TableHead>
+                        <TableHead>Môn bị trượt</TableHead>
                         <TableHead />
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                     <TableRow v-if="preview.candidates.length === 0">
-                        <TableCell colspan="4" class="text-muted-foreground text-center">No students need a review for these semesters.</TableCell>
+                        <TableCell colspan="4" class="text-muted-foreground text-center">Không có sinh viên nào cần xét cho cặp học kỳ này.</TableCell>
                     </TableRow>
                     <TableRow v-for="row in preview.candidates" :key="row.student_id">
                         <TableCell>
@@ -189,14 +189,14 @@ function submitCreate() {
                             </ul>
                         </TableCell>
                         <TableCell>
-                            <Badge v-if="row.needs_data_review" variant="destructive">Check grades manually</Badge>
+                            <Badge v-if="row.needs_data_review" variant="destructive">Cần kiểm tra điểm thủ công</Badge>
                         </TableCell>
                     </TableRow>
                 </TableBody>
             </Table>
 
             <div v-if="preview.candidates.length > 0" class="mt-4">
-                <Button :disabled="selected.size === 0 || createForm.processing" @click="submitCreate"> Start review for {{ selected.size }} student(s) </Button>
+                <Button :disabled="selected.size === 0 || createForm.processing" @click="submitCreate"> Mở đợt xét cho {{ selected.size }} sinh viên </Button>
             </div>
         </CardContent>
     </Card>

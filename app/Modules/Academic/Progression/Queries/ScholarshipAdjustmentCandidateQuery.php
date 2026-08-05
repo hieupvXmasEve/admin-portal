@@ -128,19 +128,19 @@ class ScholarshipAdjustmentCandidateQuery
         $target = $semesters->get($targetSemesterId);
 
         if ($source === null || $target === null) {
-            throw new \InvalidArgumentException('Source or target semester does not exist.');
+            throw new \InvalidArgumentException('Học kỳ bị trượt môn hoặc học kỳ áp dụng điều chỉnh không tồn tại.');
         }
 
         if ($source->is_archived || $target->is_archived) {
-            throw new \InvalidArgumentException('Source and target semesters must not be archived.');
+            throw new \InvalidArgumentException('Không dùng được học kỳ đã lưu trữ.');
         }
 
         if ($source->start_date === null || $target->start_date === null) {
-            throw new \InvalidArgumentException('Source and target semesters must have a start_date.');
+            throw new \InvalidArgumentException('Cả hai học kỳ đều phải có ngày bắt đầu.');
         }
 
         if (! $source->start_date->lessThan($target->start_date)) {
-            throw new \InvalidArgumentException('Source semester must start before target semester.');
+            throw new \InvalidArgumentException('Học kỳ bị trượt môn phải bắt đầu trước học kỳ áp dụng điều chỉnh.');
         }
     }
 

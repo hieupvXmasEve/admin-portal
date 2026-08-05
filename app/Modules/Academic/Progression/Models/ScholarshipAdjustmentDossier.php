@@ -52,6 +52,14 @@ class ScholarshipAdjustmentDossier extends AuditableModel
 
     public const STATUS_FINANCE_REVIEW_REQUIRED = 'finance_review_required';
 
+    /**
+     * Approved, but the target semester charges no tuition at all, so the
+     * reduction has nothing to act on. Terminal: nothing further will
+     * happen to this dossier, and saying "waiting for the invoice" would
+     * promise an invoice that is never issued for a 0đ term.
+     */
+    public const STATUS_NOT_APPLICABLE = 'not_applicable';
+
     /** Backend allow-list — status is varchar by design, not a DB enum. */
     public const STATUSES = [
         self::STATUS_IDENTIFIED,
@@ -68,6 +76,7 @@ class ScholarshipAdjustmentDossier extends AuditableModel
         self::STATUS_NO_ADJUSTMENT,
         self::STATUS_CANCELLED,
         self::STATUS_FINANCE_REVIEW_REQUIRED,
+        self::STATUS_NOT_APPLICABLE,
     ];
 
     public const SOURCE_SYSTEM = 'system';
@@ -174,6 +183,7 @@ class ScholarshipAdjustmentDossier extends AuditableModel
         'decision_type',
         'decision_adjusted_amount',
         'decision_reason',
+        'finance_review_note',
         'decision_estimated_impact',
         'proposed_by_user_id',
         'approved_by_user_id',

@@ -31,7 +31,7 @@ interface Props {
 const props = defineProps<Props>();
 
 function statusVariant(status: string) {
-    if (['applied', 'no_adjustment'].includes(status)) return 'default';
+    if (['applied', 'no_adjustment', 'not_applicable'].includes(status)) return 'default';
     if (['cancelled', 'finance_review_required', 'student_disputed'].includes(status)) return 'destructive';
     return 'secondary';
 }
@@ -50,35 +50,35 @@ function handlePageSizeChange(pageSize: number) {
 </script>
 
 <template>
-    <Head title="Scholarship adjustments" />
+    <Head title="Điều chỉnh học bổng" />
 
     <div class="flex items-center justify-between">
-        <Heading title="Scholarship adjustments" description="Review students who failed a course, record the interview, and decide whether their scholarship changes next semester." />
+        <Heading title="Điều chỉnh học bổng" description="Xét những sinh viên bị trượt môn, ghi nhận buổi phỏng vấn và quyết định học bổng của họ có thay đổi ở học kỳ sau hay không." />
         <Link :href="route('scholarship-adjustments.candidates.preview', { campus_id: props.campusId })">
-            <Button>Find students to review</Button>
+            <Button>Tìm sinh viên cần xét</Button>
         </Link>
     </div>
 
     <Card class="mt-6">
         <CardHeader>
-            <CardTitle>Students under review</CardTitle>
-            <CardDescription>{{ dossiers.total }} student(s) at this campus.</CardDescription>
+            <CardTitle>Sinh viên đang được xét</CardTitle>
+            <CardDescription>{{ dossiers.total }} sinh viên tại cơ sở này.</CardDescription>
         </CardHeader>
         <CardContent>
             <Table>
                 <TableHeader>
                     <TableRow>
-                        <TableHead>Student</TableHead>
-                        <TableHead>Failed in → Applies to</TableHead>
-                        <TableHead>Campus</TableHead>
-                        <TableHead>Added by</TableHead>
-                        <TableHead>Stage</TableHead>
+                        <TableHead>Sinh viên</TableHead>
+                        <TableHead>Trượt ở kỳ → Áp dụng cho kỳ</TableHead>
+                        <TableHead>Cơ sở</TableHead>
+                        <TableHead>Nguồn</TableHead>
+                        <TableHead>Giai đoạn</TableHead>
                         <TableHead />
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                     <TableRow v-if="dossiers.data.length === 0">
-                        <TableCell colspan="6" class="text-muted-foreground text-center"> No students under review yet. Use “Find students to review” to scan a semester. </TableCell>
+                        <TableCell colspan="6" class="text-muted-foreground text-center"> Chưa có sinh viên nào đang được xét. Bấm “Tìm sinh viên cần xét” để quét một học kỳ. </TableCell>
                     </TableRow>
                     <TableRow v-for="row in dossiers.data" :key="row.id">
                         <TableCell>
@@ -90,10 +90,10 @@ function handlePageSizeChange(pageSize: number) {
                         <TableCell>{{ labelFor(DOSSIER_SOURCE_LABELS, row.source) }}</TableCell>
                         <TableCell>
                             <Badge :variant="statusVariant(row.status)">{{ labelFor(DOSSIER_STATUS_LABELS, row.status) }}</Badge>
-                            <Badge v-if="row.needs_data_review" variant="destructive" class="ml-1">Check grades manually</Badge>
+                            <Badge v-if="row.needs_data_review" variant="destructive" class="ml-1">Cần kiểm tra điểm thủ công</Badge>
                         </TableCell>
                         <TableCell>
-                            <Link :href="route('scholarship-adjustments.show', row.id)" class="text-primary text-sm underline">Open</Link>
+                            <Link :href="route('scholarship-adjustments.show', row.id)" class="text-primary text-sm underline">Mở</Link>
                         </TableCell>
                     </TableRow>
                 </TableBody>

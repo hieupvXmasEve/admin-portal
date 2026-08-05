@@ -26,7 +26,7 @@ class ScholarshipAdjustmentInterviewGuard
     public static function assertPreDecision(ScholarshipAdjustmentDossier $dossier): void
     {
         if (! in_array($dossier->status, self::PRE_DECISION_STATUSES, true)) {
-            throw new \DomainException("Dossier is past the interview stage (status: {$dossier->status}) — interview actions are no longer permitted.");
+            throw new \DomainException('Hồ sơ đã qua giai đoạn phỏng vấn nên không thể thay đổi thông tin phỏng vấn nữa.');
         }
     }
 
@@ -46,7 +46,7 @@ class ScholarshipAdjustmentInterviewGuard
         ];
 
         if (! in_array($dossier->status, $editableStatuses, true)) {
-            throw new \DomainException("Dossier is past the decision stage (status: {$dossier->status}) — minutes are frozen.");
+            throw new \DomainException('Quyết định đã được duyệt nên không thể sửa biên bản phỏng vấn nữa.');
         }
     }
 }

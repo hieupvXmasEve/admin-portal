@@ -16,8 +16,11 @@ final class StaleMinutesVersionException extends \DomainException
         public readonly int $submittedVersion,
         public readonly int $currentVersion,
     ) {
+        // The version numbers stay on the exception for the transport layer and
+        // logs; the sentence itself is read by a student, so it says what to do
+        // rather than which version was submitted.
         parent::__construct(
-            "Minutes version {$submittedVersion} is stale; current is {$currentVersion}. Refetch and re-confirm.",
+            'These notes were updated after you opened them. Please reload the page and read the latest version before answering.',
         );
     }
 }

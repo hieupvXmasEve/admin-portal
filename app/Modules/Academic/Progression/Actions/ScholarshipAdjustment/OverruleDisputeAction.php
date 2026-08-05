@@ -34,7 +34,7 @@ class OverruleDisputeAction
     ): ScholarshipAdjustmentDossier {
         if ($dossier->confirmation_status !== ScholarshipAdjustmentDossier::CONFIRMATION_DISPUTED) {
             throw new \DomainException(
-                "Only a disputed confirmation can be overruled (confirmation_status: {$dossier->confirmation_status}).",
+                'Không có gì để bác bỏ — sinh viên không phản đối biên bản phỏng vấn.',
             );
         }
 
@@ -43,7 +43,7 @@ class OverruleDisputeAction
         $codes = $this->permissions->permissionCodesForUserId($approverUserId, (int) $dossier->campus_id);
 
         if (! in_array('approve_scholarship_adjustment', $codes, true)) {
-            throw new \DomainException('Overruling a dispute requires approve_scholarship_adjustment at the dossier campus.');
+            throw new \DomainException('Chỉ người có quyền duyệt quyết định học bổng tại cơ sở này mới được bác bỏ phản đối.');
         }
 
         $dossier->update([

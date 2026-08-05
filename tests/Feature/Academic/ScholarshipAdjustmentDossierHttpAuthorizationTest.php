@@ -161,3 +161,154 @@ it('excludes dossiers from other campuses in the index listing', function () {
     $response->assertOk();
     $response->assertInertia(fn ($page) => $page->where('dossiers.data', []));
 });
+
+it('tells the dossier page whether the viewer may decide or approve', function () {
+    $campus = Campus::factory()->create();
+    $source = Semester::factory()->create();
+    $target = Semester::factory()->create();
+
+    $student = Student::factory()->create([
+        'campus_id' => $campus->id,
+        'intake' => 1,
+        'intake_semester_id' => $source->id,
+    ]);
+    $definition = ScholarshipDefinition::create([
+        'code' => 'HTTP'.uniqid(),
+        'name' => 'HTTP test scholarship',
+        'description' => 'test',
+        'type' => 'percentage',
+        'amount' => 30,
+        'valid_from' => now()->subYear()->toDateString(),
+        'valid_until' => now()->addYear()->toDateString(),
+        'is_active' => true,
+    ]);
+    StudentScholarshipAward::create([
+        'student_id' => $student->id,
+        'scholarship_code' => $definition->code,
+        'awarded_at' => now()->toDateString(),
+    ]);
+
+    $creator = User::factory()->create();
+    $dossier = ScholarshipAdjustmentDossier::create([
+        'student_id' => $student->id,
+        'campus_id' => $campus->id,
+        'source_semester_id' => $source->id,
+        'target_semester_id' => $target->id,
+        'status' => ScholarshipAdjustmentDossier::STATUS_READY_FOR_DECISION,
+        'source' => ScholarshipAdjustmentDossier::SOURCE_SYSTEM,
+        'failed_courses_snapshot' => [],
+        'original_scholarship_code' => $definition->code,
+        'original_type' => $definition->type,
+        'original_amount' => $definition->amount,
+        'created_by_user_id' => $creator->id,
+        'decision_type' => ScholarshipAdjustmentDossier::DECISION_REDUCE,
+        'decision_adjusted_amount' => 15,
+        'decision_reason' => 'Proposed by the maker',
+        'proposed_by_user_id' => $creator->id,
+    ]);
+
+    $user = dossierHttpGrantedUser($campus);
+
+    session(['_token' => DOSSIER_HTTP_TEST_CSRF, 'current_campus_id' => $campus->id]);
+    app()->instance('campus', $campus);
+
+    // View-only: the decision panel must render read-only with no approve
+    // button, so a checker cannot rewrite the maker's proposal from this page.
+    $this->actingAs($user)
+        ->get(route('scholarship-adjustments.show', $dossier->id))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('can.decide', false)->where('can.approve', false));
+
+    $role = Role::where('code', 'dossier_http_test_role')->firstOrFail();
+
+    foreach (['decide_scholarship_adjustment', 'approve_scholarship_adjustment'] as $code) {
+        $permission = Permission::firstOrCreate(
+            ['code' => $code],
+            ['name' => $code, 'display_name' => $code, 'module' => 'scholarship_adjustments', 'description' => 'test'],
+        );
+
+        DB::table('role_permissions')->insertOrIgnore([
+            'role_id' => $role->id, 'permission_id' => $permission->id, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+    }
+
+    Cache::flush();
+    app(CampusPermissionReader::class)->forgetPermissionCodesForUserId((int) $user->id);
+
+    $this->actingAs($user)
+        ->get(route('scholarship-adjustments.show', $dossier->id))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('can.decide', true)->where('can.approve', true));
+});
+
+it('reads an approved decision back to the dossier page', function () {
+    $campus = Campus::factory()->create();
+    $source = Semester::factory()->create();
+    $target = Semester::factory()->create();
+
+    $student = Student::factory()->create([
+        'campus_id' => $campus->id,
+        'intake' => 1,
+        'intake_semester_id' => $source->id,
+    ]);
+    $definition = ScholarshipDefinition::create([
+        'code' => 'HTTP'.uniqid(),
+        'name' => 'HTTP test scholarship',
+        'description' => 'test',
+        'type' => 'percentage',
+        'amount' => 40,
+        'valid_from' => now()->subYear()->toDateString(),
+        'valid_until' => now()->addYear()->toDateString(),
+        'is_active' => true,
+    ]);
+    StudentScholarshipAward::create([
+        'student_id' => $student->id,
+        'scholarship_code' => $definition->code,
+        'awarded_at' => now()->toDateString(),
+    ]);
+
+    $maker = User::factory()->create();
+    $checker = User::factory()->create();
+
+    // A settled dossier: the decision form is gone by this point, so the page
+    // must carry the decision, both actors and both timestamps or the panel
+    // that reads it back renders blank.
+    $dossier = ScholarshipAdjustmentDossier::create([
+        'student_id' => $student->id,
+        'campus_id' => $campus->id,
+        'source_semester_id' => $source->id,
+        'target_semester_id' => $target->id,
+        'status' => ScholarshipAdjustmentDossier::STATUS_FINANCE_REVIEW_REQUIRED,
+        'source' => ScholarshipAdjustmentDossier::SOURCE_SYSTEM,
+        'failed_courses_snapshot' => [],
+        'original_scholarship_code' => $definition->code,
+        'original_type' => $definition->type,
+        'original_amount' => $definition->amount,
+        'created_by_user_id' => $maker->id,
+        'decision_type' => ScholarshipAdjustmentDossier::DECISION_REDUCE,
+        'decision_adjusted_amount' => 15,
+        'decision_reason' => 'Trượt hai môn ở học kỳ trước',
+        'proposed_by_user_id' => $maker->id,
+        'decided_at' => now()->subHour(),
+        'approved_by_user_id' => $checker->id,
+        'approved_at' => now(),
+    ]);
+
+    $user = dossierHttpGrantedUser($campus);
+
+    session(['_token' => DOSSIER_HTTP_TEST_CSRF, 'current_campus_id' => $campus->id]);
+    app()->instance('campus', $campus);
+
+    $this->actingAs($user)
+        ->get(route('scholarship-adjustments.show', $dossier->id))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('dossier.decision_type', ScholarshipAdjustmentDossier::DECISION_REDUCE)
+            ->where('dossier.decision_adjusted_amount', '15.00')
+            ->where('dossier.original_amount', '40.00')
+            ->where('dossier.decision_reason', 'Trượt hai môn ở học kỳ trước')
+            ->where('dossier.proposed_by.name', $maker->name)
+            ->where('dossier.approved_by.name', $checker->name)
+            ->whereNot('dossier.decided_at', null)
+            ->whereNot('dossier.approved_at', null));
+});

@@ -33,11 +33,11 @@ final class RecordOnBehalfConfirmationAction
 
         if (! in_array($dossier->confirmation_status, $confirmable, true)) {
             $hint = $dossier->confirmation_status === ScholarshipAdjustmentDossier::CONFIRMATION_DISPUTED
-                ? ' The student disputed the minutes — correct the minutes and ask again, or have an approver overrule the dispute.'
+                ? ' Sinh viên đã phản đối biên bản — hãy sửa biên bản rồi gửi hỏi lại, hoặc để người có quyền duyệt bác bỏ phản đối.'
                 : '';
 
             throw new \DomainException(
-                "Cannot confirm on behalf (confirmation_status: {$dossier->confirmation_status}).".$hint,
+                'Sinh viên này không có yêu cầu xác nhận nào đang mở để trả lời.'.$hint,
             );
         }
 

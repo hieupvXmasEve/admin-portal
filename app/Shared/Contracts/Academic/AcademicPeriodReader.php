@@ -29,6 +29,13 @@ interface AcademicPeriodReader
     public function countStartingBetween(CarbonImmutable $start, CarbonImmutable $end): int;
 
     /**
+     * The nth period (1-based) starting on or after $start — the inverse of
+     * countStartingBetween(), over the same set, so a term number derived from
+     * one can be turned back into the period it belongs to.
+     */
+    public function nthStartingFrom(CarbonImmutable $start, int $nth): ?AcademicPeriodReference;
+
+    /**
      * @return list<AcademicPeriodReference>
      */
     public function selectable(): array;

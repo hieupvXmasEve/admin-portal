@@ -505,6 +505,8 @@ class GetStudentFeeSummaryQuery implements StudentFeeSummaryReader
                 'term_number' => $linkedTerm?->term_number,
                 'semester_id' => $charge->semester_id,
                 'semester_name' => $chargeSemester?->name,
+                // Recorded on the charge itself, not derived.
+                'is_projected_semester' => false,
                 'required_amount' => $gross,
                 'discount_amount' => $discountAmount,
                 'credit_amount' => $creditAmount,
@@ -523,10 +525,20 @@ class GetStudentFeeSummaryQuery implements StudentFeeSummaryReader
             ];
         })->values();
 
-        // Append unmatched plan terms as projected — no semester assigned to avoid false inference
+        // Ungenerated terms carry a PROJECTED semester, derived with the same
+        // counting rule the billing path uses to turn a semester into a term
+        // number. Without it a 0đ term reads as "Term 2 — Dự kiến — không thu
+        // học phí" and nobody can tell which semester was waived.
         $projectedItems = $tuitionPlan->terms
             ->filter(fn (TuitionPlanTerm $term) => ! in_array($term->id, $usedPlanTermIds))
-            ->map(function (TuitionPlanTerm $term) use ($scholarshipAward) {
+            ->map(function (TuitionPlanTerm $term) use ($scholarshipAward, $intakeMajorSemester) {
+                $projectedSemester = $intakeMajorSemester?->start_date === null
+                    ? null
+                    : $this->academicPeriods->nthStartingFrom(
+                        $intakeMajorSemester->start_date,
+                        (int) $term->term_number,
+                    );
+
                 $isWaived = (float) $term->amount === 0.0;
                 $discountAmount = 0.0;
                 $isEstimatedDiscount = false;
@@ -541,8 +553,11 @@ class GetStudentFeeSummaryQuery implements StudentFeeSummaryReader
 
                 return [
                     'term_number' => $term->term_number,
-                    'semester_id' => null,
-                    'semester_name' => null, // Intentionally null: no semester inferred for ungenerated terms
+                    'semester_id' => $projectedSemester?->id,
+                    'semester_name' => $projectedSemester?->name,
+                    // The term has no charge yet, so the semester is derived,
+                    // not recorded — surfaces must not present it as settled.
+                    'is_projected_semester' => $projectedSemester !== null,
                     'required_amount' => (float) $term->amount,
                     'discount_amount' => $discountAmount,
                     'is_estimated_discount' => $isEstimatedDiscount,

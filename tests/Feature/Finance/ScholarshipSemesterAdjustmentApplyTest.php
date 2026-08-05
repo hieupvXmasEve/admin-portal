@@ -9,6 +9,8 @@ use App\Models\ScholarshipDefinition;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentScholarshipAward;
+use App\Models\TuitionPlan;
+use App\Models\TuitionPlanTerm;
 use App\Models\User;
 use App\Modules\Finance\Actions\CreateFinanceChargeAction;
 use App\Modules\Finance\Actions\ReverseScholarshipSemesterAdjustmentAction;
@@ -16,6 +18,8 @@ use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceDiscount;
 use App\Modules\Finance\Models\ScholarshipSemesterAdjustment;
+use App\Modules\Finance\Queries\GetActiveScholarshipAdjustmentQuery;
+use App\Modules\Finance\Support\StudentChargeTimingResolver;
 use App\Services\StudentFinancialImportService;
 use App\Shared\Contracts\Finance\DTO\ScholarshipAdjustmentData;
 use App\Shared\Contracts\Finance\ScholarshipAdjustmentContract;
@@ -315,6 +319,13 @@ it('routes an invoice with payments to finance_review_required without touching 
     // Approval survives; ledger untouched.
     expect((float) adjustmentScholarshipDiscount($ctx)->amount)->toBe(6_000_000.0)
         ->and(ScholarshipSemesterAdjustment::query()->count())->toBe(1);
+
+    // The blocker is named, and stored — a finance officer working this row
+    // must not have to re-derive why it stopped.
+    $stored = ScholarshipSemesterAdjustment::query()->sole();
+
+    expect($stored->review_note)->toContain('đã thanh toán học phí')
+        ->and($result->message)->toBe($stored->review_note);
 });
 
 it('hard-refuses a financial import row for a student with an active adjustment', function () {
@@ -428,4 +439,63 @@ it('exposes the scholarship breakdown in the fee summary without touching settle
 
     expect($discountLines)->toHaveCount(1)
         ->and((float) $discountLines->first()['amount'])->toBe(-3_000_000.0);
+});
+
+it('closes the adjustment as not applicable when the target term charges no tuition', function () {
+    $ctx = adjustmentApplyContext();
+
+    // Tuition pricing only resolves once the student has started their major
+    // and the semesters are ordered; without that the resolver reports
+    // "unknown", which is deliberately NOT treated as free.
+    $ctx['student']->forceFill([
+        'intake_major' => $ctx['source']->id,
+        'status' => 'intake_major',
+    ])->save();
+    $ctx['source']->forceFill(['start_date' => '2026-01-05', 'is_archived' => false])->save();
+    $ctx['target']->forceFill(['start_date' => '2026-05-04', 'is_archived' => false])->save();
+
+    $plan = TuitionPlan::create([
+        'curriculum_version_id' => $ctx['student']->curriculum_version_id,
+        'intake_semester_id' => $ctx['student']->intake_semester_id,
+        'total_amount' => 45_000_000,
+        'currency' => 'VND',
+        'is_active' => true,
+    ]);
+
+    foreach (range(1, 6) as $number) {
+        TuitionPlanTerm::create([
+            'tuition_plan_id' => $plan->id,
+            'term_number' => $number,
+            'amount' => 45_000_000,
+        ]);
+    }
+
+    // Zero out exactly the term the target semester maps to — read from the
+    // same resolver the generation path uses, so the fixture cannot drift.
+    $resolver = app(StudentChargeTimingResolver::class);
+    $termNumber = $resolver->getTuitionTermData($ctx['student'], (int) $ctx['target']->id)['term_number'];
+
+    expect($termNumber)->not->toBeNull();
+
+    TuitionPlanTerm::query()
+        ->where('tuition_plan_id', $plan->id)
+        ->where('term_number', $termNumber)
+        ->update(['amount' => 0]);
+
+    $result = app(ScholarshipAdjustmentContract::class)->apply(adjustmentApplyData($ctx));
+
+    // Accepted (an approval is never destroyed) but terminal: a 0đ term will
+    // never produce an invoice, so "waiting to apply" would be a lie.
+    expect($result->accepted)->toBeTrue()
+        ->and($result->status)->toBe(ScholarshipSemesterAdjustment::STATUS_NOT_APPLICABLE);
+
+    $stored = ScholarshipSemesterAdjustment::query()->sole();
+
+    expect($stored->status)->toBe(ScholarshipSemesterAdjustment::STATUS_NOT_APPLICABLE)
+        ->and($stored->review_note)->toContain('không thu học phí')
+        ->and($stored->applied_at)->toBeNull();
+
+    // Terminal means it leaves the set that drives money.
+    expect(app(GetActiveScholarshipAdjustmentQuery::class)
+        ->handle((int) $ctx['student']->id, (int) $ctx['target']->id))->toBeNull();
 });
