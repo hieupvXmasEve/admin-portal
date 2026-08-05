@@ -11,7 +11,8 @@
         },
         "laravel-boost": {
             "command": "./scripts/dev.sh",
-            "args": ["artisan", "boost:mcp"]
+            "args": ["artisan", "boost:mcp"],
+            "enabled": false
         }
     }
 }

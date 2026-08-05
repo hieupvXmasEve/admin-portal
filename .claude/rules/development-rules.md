@@ -50,3 +50,12 @@ FormRequests, and its route registration — must live under ONE owner module.
 - Use current docs only when the API/tooling may have changed.
 - Use relevant skills by reading their descriptions first, then opening only the needed `SKILL.md`.
 - Use `/ak:preview` only when a visual explanation will materially help the user understand the change.
+- **Never call bare `php`, `composer`, `npm`, or raw `docker exec`** — app runs
+  inside Docker (`swinx-app-dev`), not on host. Route every command through
+  `./scripts/dev.sh`:
+  - `./scripts/dev.sh artisan <cmd>` (migrate, tinker, test, boost:mcp, ...)
+  - `./scripts/dev.sh composer <cmd>`
+  - `./scripts/dev.sh npm <cmd>` / `pnpm <cmd>`
+  - `./scripts/dev.sh mysql` for a DB shell, or `./scripts/dev.sh mysql -e "SQL"` for one-off queries
+  - `./scripts/dev.sh shell` to get an app-container shell
+  - See `scripts/dev.sh` usage line for the full subcommand list.
