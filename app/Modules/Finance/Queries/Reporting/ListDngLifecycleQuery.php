@@ -10,6 +10,8 @@ use App\Modules\Finance\Dng\Models\DngWebhookEvent;
 use App\Modules\Finance\Support\Reporting\DngLifecycleCatalog as Catalog;
 use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use App\Shared\Contracts\Academic\DTO\AcademicPeriodReference;
+use App\Shared\Contracts\Academic\DTO\ProgramEnrollmentSummary;
+use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Database\Eloquent\Builder;
@@ -40,6 +42,7 @@ class ListDngLifecycleQuery
 
     public function __construct(
         private readonly StudentReferenceReader $studentReferences,
+        private readonly ProgramEnrollmentReader $programEnrollments,
         private readonly AcademicPeriodReader $academicPeriods,
     ) {}
 
@@ -135,6 +138,7 @@ class ListDngLifecycleQuery
         $students = $this->studentReferences->findMany(
             $requests->pluck('student_id')->map(static fn (int|string $id): int => (int) $id)->unique()->values()->all(),
         );
+        $enrollments = $this->programEnrollments->forStudentIds(array_keys($students));
         $periodIds = $requests
             ->pluck('semester_id')
             ->merge($requests->flatMap(fn (DngPaymentRequest $request) => $request->chargeLinks->pluck('financeCharge.semester_id')))
@@ -149,6 +153,7 @@ class ListDngLifecycleQuery
             ->map(fn (DngPaymentRequest $request): ?array => $this->buildRow(
                 $request,
                 $students[(int) $request->student_id] ?? null,
+                $enrollments[(int) $request->student_id] ?? null,
                 $periods,
                 $selectedSemesterId,
                 $now,
@@ -296,6 +301,7 @@ class ListDngLifecycleQuery
     private function buildRow(
         DngPaymentRequest $request,
         ?StudentReference $student,
+        ?ProgramEnrollmentSummary $enrollment,
         array $periods,
         ?int $selectedSemesterId,
         Carbon $now,
@@ -332,7 +338,8 @@ class ListDngLifecycleQuery
                 'id' => $student->id,
                 'student_code' => $student->studentCode,
                 'full_name' => $student->fullName,
-                'status' => $student->status,
+                // students.status is legacy; prefer the live enrollment projection.
+                'status' => $enrollment?->legacyCompatibleStatus() ?? $student->status,
                 'status_label' => $student->statusLabel,
             ],
             'fee_type' => $request->fee_type,

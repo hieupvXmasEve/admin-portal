@@ -15,6 +15,8 @@ use App\Modules\Finance\Support\SettlementPosition\SettlementPositionAmounts;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionRawEvidence;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionScope;
 use App\Shared\Contracts\Academic\AcademicPeriodReader;
+use App\Shared\Contracts\Academic\DTO\ProgramEnrollmentSummary;
+use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
 use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
@@ -39,6 +41,7 @@ final class ListCollectionProgressQuery
         private readonly SettlementPositionReader $settlementPositionReader,
         private readonly CurrentSettlementPositionPresenter $positionPresenter,
         private readonly StudentReferenceReader $studentReferences,
+        private readonly ProgramEnrollmentReader $programEnrollments,
         private readonly AcademicPeriodReader $academicPeriods,
         private readonly UnappliedCashReader $unappliedCashReader,
     ) {}
@@ -78,11 +81,13 @@ final class ListCollectionProgressQuery
         $invoices = $this->loadInvoices($semesterId, $filters, $asOf);
         $studentIds = $invoices->pluck('student_id')->map(static fn (mixed $id): int => (int) $id)->unique()->values()->all();
         $students = $this->studentReferences->findMany($studentIds);
+        $enrollments = $this->programEnrollments->forStudentIds(array_keys($students));
         $invoices = $invoices
             ->filter(fn (StudentInvoice $invoice): bool => isset($students[(int) $invoice->student_id])
                 && ($campusId === null || $students[(int) $invoice->student_id]->campusId === $campusId)
                 && $this->matchesStudentFilters(
                     $students[(int) $invoice->student_id],
+                    $enrollments[(int) $invoice->student_id] ?? null,
                     $filters,
                 ))
             ->values();
@@ -92,7 +97,7 @@ final class ListCollectionProgressQuery
             : [];
         $positionsByInvoice = $this->positionsForInvoices($invoices, $filters, $asOf);
 
-        $rows = $byStudent->map(function (Collection $studentInvoices, mixed $studentId) use ($semesterId, $unappliedByStudent, $positionsByInvoice, $asOf, $students): ?array {
+        $rows = $byStudent->map(function (Collection $studentInvoices, mixed $studentId) use ($semesterId, $unappliedByStudent, $positionsByInvoice, $asOf, $students, $enrollments): ?array {
             $student = $students[(int) $studentId] ?? null;
             if (! $student instanceof StudentReference) {
                 return null;
@@ -104,6 +109,7 @@ final class ListCollectionProgressQuery
 
             return $this->buildRow(
                 $student,
+                $enrollments[(int) $studentId] ?? null,
                 $studentInvoices,
                 $positions,
                 $semesterId,
@@ -191,6 +197,7 @@ final class ListCollectionProgressQuery
      */
     private function buildRow(
         StudentReference $student,
+        ?ProgramEnrollmentSummary $enrollment,
         Collection $studentInvoices,
         array $positions,
         int $semesterId,
@@ -275,6 +282,9 @@ final class ListCollectionProgressQuery
         $balanceState = $isValid
             ? $this->primaryBalanceState($cash, $credit, (float) $outstanding, (float) $overdue)
             : Catalog::STATE_INVALID;
+        // students.status is a legacy column progression transitions don't
+        // write back to; prefer the live program_enrollments projection.
+        $liveStatus = $enrollment?->legacyCompatibleStatus() ?? (string) $student->status;
 
         return [
             'row_key' => 'student-'.$student->id.'-sem-'.$semesterId,
@@ -282,7 +292,7 @@ final class ListCollectionProgressQuery
                 'id' => $student->id,
                 'student_code' => $student->studentCode,
                 'full_name' => $student->fullName,
-                'status' => $student->status,
+                'status' => $liveStatus,
                 'status_label' => $student->statusLabel,
             ],
             'program_code' => $student->programCode,
@@ -323,7 +333,7 @@ final class ListCollectionProgressQuery
             'aging_bucket' => $isValid ? Catalog::classifyAging($maxDaysOverdue) : Catalog::BUCKET_NOT_DUE,
             'aging_bucket_label' => $isValid ? Catalog::agingBucketLabel(Catalog::classifyAging($maxDaysOverdue)) : 'Cần kiểm tra',
             'max_days_overdue' => $isValid ? $maxDaysOverdue : null,
-            'is_lifecycle_exception' => LifecycleDueItemPredicate::isLifecycleExceptionStatus($student->status),
+            'is_lifecycle_exception' => LifecycleDueItemPredicate::isLifecycleExceptionStatus($liveStatus),
             'drilldowns' => [
                 'student_360_focus' => $focusInvoiceId !== null ? 'invoice:'.$focusInvoiceId : null,
                 'lookup_invoice_id' => $focusInvoiceId,
@@ -450,6 +460,7 @@ final class ListCollectionProgressQuery
             ->all();
         $students = collect($this->studentReferences->findMany($studentIds))
             ->filter(fn (StudentReference $student): bool => $campusId === null || $student->campusId === $campusId);
+        $enrollments = $this->programEnrollments->forStudentIds($students->keys()->all());
         $intakeIds = $students
             ->map(fn (StudentReference $student): ?int => $student->intakeSemesterId)
             ->filter()
@@ -479,9 +490,13 @@ final class ListCollectionProgressQuery
             'balance_states' => collect(Catalog::balanceStates())->map(fn (string $label, string $value) => ['value' => $value, 'label' => $label])->values()->all(),
             'aging_buckets' => collect(Catalog::agingBuckets())->map(fn (array $meta, string $value) => ['value' => $value, 'label' => $meta['label']])->values()->all(),
             'student_statuses' => $students
-                ->filter(fn (StudentReference $student): bool => $student->status !== null)
-                ->unique(fn (StudentReference $student): ?string => $student->status)
-                ->map(fn (StudentReference $student): array => ['value' => $student->status, 'label' => $student->statusLabel])
+                ->map(fn (StudentReference $student): array => [
+                    'status' => $enrollments[$student->id]?->legacyCompatibleStatus() ?? $student->status,
+                    'label' => $student->statusLabel,
+                ])
+                ->filter(fn (array $entry): bool => $entry['status'] !== null)
+                ->unique(fn (array $entry): string => $entry['status'])
+                ->map(fn (array $entry): array => ['value' => $entry['status'], 'label' => $entry['label']])
                 ->values()
                 ->all(),
             'semester_id' => $semesterId,
@@ -508,6 +523,7 @@ final class ListCollectionProgressQuery
     /** @param array<string, mixed> $filters */
     private function matchesStudentFilters(
         StudentReference $student,
+        ?ProgramEnrollmentSummary $enrollment,
         array $filters,
     ): bool {
         if (! empty($filters['program_id']) && $filters['program_id'] !== 'all'
@@ -523,7 +539,7 @@ final class ListCollectionProgressQuery
             return false;
         }
         if (! empty($filters['student_status']) && $filters['student_status'] !== 'all'
-            && $student->status !== (string) $filters['student_status']) {
+            && ($enrollment?->legacyCompatibleStatus() ?? $student->status) !== (string) $filters['student_status']) {
             return false;
         }
         if (! empty($filters['search'])) {

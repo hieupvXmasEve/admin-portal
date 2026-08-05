@@ -10,6 +10,7 @@ use App\Modules\Finance\Services\SettlementService;
 use App\Modules\Finance\Support\DngInstallmentContextResolver;
 use App\Modules\Finance\Support\ExamResitDngLinkResolver;
 use App\Modules\Finance\Support\LifecycleDueItemPredicate;
+use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use App\Shared\Contracts\Notification\EmailContentResolver;
 use Illuminate\Support\Facades\DB;
 
@@ -53,12 +54,18 @@ class SendDueItemRemindersAction
                 }
 
                 $student = $dngRequest->student;
+                // students.status is a legacy column progression transitions don't
+                // write back to; resolve the live study_stage instead so a student
+                // who has actually progressed isn't wrongly skipped.
+                $liveStatus = $student === null
+                    ? null
+                    : app(ProgramEnrollmentReader::class)->forStudentId((int) $student->id)->legacyCompatibleStatus();
 
-                if (LifecycleDueItemPredicate::isLifecycleException($student)) {
+                if (LifecycleDueItemPredicate::isLifecycleExceptionStatus($liveStatus)) {
                     \Log::info('Skipping DNG reminder - lifecycle exception', [
                         'dng_request_id' => $id,
                         'student_id' => $student?->id,
-                        'student_status' => $student?->status,
+                        'student_status' => $liveStatus,
                     ]);
                     $skippedLifecycleExceptionCount++;
 

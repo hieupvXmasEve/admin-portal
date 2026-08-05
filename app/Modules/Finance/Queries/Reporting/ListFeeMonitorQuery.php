@@ -289,7 +289,7 @@ class ListFeeMonitorQuery
     private function rowsFromAdmissionExpectation(int $semesterId, ?int $campusId, array $filters): Collection
     {
         $students = $this->candidateStudents($campusId, $filters)
-            ->filter(fn (StudentReference $student): bool => in_array($student->status, ['intake_pre_uni_gc', 'intake_course', 'intake_major'], true)
+            ->filter(fn (StudentReference $student): bool => in_array($this->liveStatus($student), ['intake_pre_uni_gc', 'intake_course', 'intake_major'], true)
                 && ($this->enrollmentIndex[$student->id]->intakeSemesterId ?? null) === $semesterId);
 
         return $students->map(function (StudentReference $student) use ($semesterId): array {
@@ -320,7 +320,7 @@ class ListFeeMonitorQuery
         $candidateIds = array_values(array_unique([...$registrationIds, ...$chargedIds]));
         $students = $this->candidateStudents($campusId, $filters)
             ->filter(fn (StudentReference $student): bool => in_array($student->id, $candidateIds, true)
-                && in_array($student->status, ['intake_pre_uni_gc', 'intake_course', 'intake_major'], true)
+                && in_array($this->liveStatus($student), ['intake_pre_uni_gc', 'intake_course', 'intake_major'], true)
                 && $this->timingResolver->shouldIncludeStudentForChargeGeneration(
                     $this->enrollmentIndex[$student->id],
                     $semesterId,
@@ -495,7 +495,7 @@ class ListFeeMonitorQuery
                 'id' => $student->id,
                 'student_code' => $student->studentCode,
                 'full_name' => $student->fullName,
-                'status' => $student->status,
+                'status' => $this->liveStatus($student),
                 'status_label' => $student->statusLabel,
             ],
             'program_code' => $this->enrollmentIndex[$student->id]->programCode ?? null,
@@ -675,6 +675,17 @@ class ListFeeMonitorQuery
         };
     }
 
+    /**
+     * `StudentReference->status` comes from the legacy `students.status`
+     * column, which program-enrollment transitions don't write back to.
+     * `enrollmentIndex` is always primed alongside `studentIndex`, so prefer
+     * its live projection.
+     */
+    private function liveStatus(StudentReference $student): string
+    {
+        return $this->enrollmentIndex[$student->id]?->legacyCompatibleStatus() ?? (string) $student->status;
+    }
+
     private function resolveChargeForStudent(int $studentId, string $chargeType): ?FinanceCharge
     {
         return $this->chargeIndex[$this->chargeKey($studentId, $chargeType)] ?? null;
@@ -765,13 +776,15 @@ class ListFeeMonitorQuery
                     return false;
                 }
 
+                $liveStatus = $enrollment->legacyCompatibleStatus();
+
                 if ($lane === 'tuition') {
-                    return in_array($student->status, ['intake_course', 'intake_major'], true)
+                    return in_array($liveStatus, ['intake_course', 'intake_major'], true)
                         && (in_array($studentId, $chargedStudentIds, true)
                             || ($enrollment->intakeMajorSemesterId !== null && $enrollment->intakeMajorSemesterId <= $semesterId));
                 }
 
-                return $student->status === 'intake_pre_uni_gc'
+                return $liveStatus === 'intake_pre_uni_gc'
                     && (in_array($studentId, $chargedStudentIds, true)
                         || $enrollment->intakeMajorSemesterId === null
                         || $enrollment->intakeMajorSemesterId > $semesterId);
@@ -901,7 +914,7 @@ class ListFeeMonitorQuery
             return false;
         }
         if (! empty($filters['student_status']) && $filters['student_status'] !== 'all'
-            && $student->status !== (string) $filters['student_status']) {
+            && ($enrollment?->legacyCompatibleStatus() ?? $student->status) !== (string) $filters['student_status']) {
             return false;
         }
         if (! empty($filters['search'])) {

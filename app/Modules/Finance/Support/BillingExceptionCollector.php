@@ -492,7 +492,8 @@ final class BillingExceptionCollector
             context: [
                 'course_registration_id' => $registration->id,
                 'semester_id' => $resolvedSemesterId,
-                'student_status' => $this->studentReference($registration->student_id)?->status,
+                // students.status is legacy; prefer the live enrollment projection.
+                'student_status' => $this->programEnrollments->forStudentId($registration->student_id)->legacyCompatibleStatus(),
                 'defer_case_id' => $deferCase?->id,
                 'fee_policy' => $deferCase?->fee_policy,
             ],

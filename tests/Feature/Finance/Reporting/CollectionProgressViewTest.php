@@ -415,6 +415,9 @@ it('uses one canonical batch read for multiple student rows', function () {
     $queryCount = count(DB::getQueryLog());
     DB::disableQueryLog();
 
+    // Budget includes one extra batched ProgramEnrollmentReader::forStudentIds()
+    // call (a few fixed queries, not per-row) so student_status resolves from the
+    // live program_enrollments projection instead of the stale students.status column.
     expect($rows)->toHaveCount(4)
-        ->and($queryCount)->toBeLessThanOrEqual(12);
+        ->and($queryCount)->toBeLessThanOrEqual(17);
 });

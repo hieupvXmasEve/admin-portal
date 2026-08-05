@@ -10,6 +10,7 @@ use App\Modules\Finance\Enums\LifecycleDueExceptionReviewStatus;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceLifecycleDueExceptionReview;
 use App\Shared\Contracts\Academic\DTO\StudentLifecycleActionSummary;
+use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use Carbon\CarbonInterface;
 
 final class LifecycleDueExceptionRowMapper
@@ -74,7 +75,11 @@ final class LifecycleDueExceptionRowMapper
         bool $canVoidCharges,
     ): array {
         $student = $request->student;
-        $exceptionReason = LifecycleDueExceptionReasonResolver::resolve($student);
+        // students.status is legacy; prefer the live program_enrollments projection.
+        $liveStatus = $student === null
+            ? null
+            : app(ProgramEnrollmentReader::class)->forStudentId((int) $student->id)->legacyCompatibleStatus();
+        $exceptionReason = LifecycleDueExceptionReasonResolver::forStatus($liveStatus);
         $dueDate = $request->due_date;
         $daysUntilDue = $dueDate ? $today->diffInDays($dueDate, false) : 0;
 
@@ -108,7 +113,7 @@ final class LifecycleDueExceptionRowMapper
                 'id' => $student->id,
                 'student_code' => $student->student_id,
                 'full_name' => $student->full_name,
-                'status' => $student->status,
+                'status' => $liveStatus,
                 'status_label' => $student->status_label,
                 'status_color' => $student->status_color,
             ] : null,

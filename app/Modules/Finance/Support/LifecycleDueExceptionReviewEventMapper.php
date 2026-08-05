@@ -10,6 +10,7 @@ use App\Modules\Finance\Enums\LifecycleDueExceptionResolutionAction;
 use App\Modules\Finance\Enums\LifecycleDueExceptionReviewEventType;
 use App\Modules\Finance\Models\FinanceLifecycleDueExceptionReview;
 use App\Modules\Finance\Models\FinanceLifecycleDueExceptionReviewEvent;
+use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 
 final class LifecycleDueExceptionReviewEventMapper
 {
@@ -98,7 +99,8 @@ final class LifecycleDueExceptionReviewEventMapper
             'id' => $student->id,
             'student_code' => $student->student_id,
             'full_name' => $student->full_name,
-            'status' => $student->status,
+            // students.status is legacy; prefer the live enrollment projection.
+            'status' => app(ProgramEnrollmentReader::class)->forStudentId((int) $student->id)->legacyCompatibleStatus(),
             'status_label' => $student->status_label,
             'status_color' => $student->status_color,
         ];
