@@ -12,6 +12,7 @@ use App\Models\Student;
 use App\Models\Unit;
 use App\Shared\Contracts\Academic\AcademicReportReader;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\Relation;
 
 final class GetAcademicReportQuery implements AcademicReportReader
 {
@@ -56,12 +57,12 @@ final class GetAcademicReportQuery implements AcademicReportReader
         $curriculumUnitIds = $curriculumUnitsByVersion->flatten()->unique()->values();
 
         $studentsQuery->with([
-            'academicRecords' => function (Builder $query) use ($semesterId, $curriculumUnitIds): void {
+            'academicRecords' => function (Relation $query) use ($semesterId, $curriculumUnitIds): void {
                 $query
                     ->where('semester_id', $semesterId)
                     ->whereIn('unit_id', $curriculumUnitIds);
             },
-            'gpaCalculations' => static fn (Builder $query) => $query->where('is_current', true),
+            'gpaCalculations' => static fn (Relation $query) => $query->where('is_current', true),
         ]);
 
         $units = Unit::query()
