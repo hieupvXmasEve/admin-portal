@@ -133,6 +133,8 @@ class AssembleBatchChargePreviewQuery
                 'scholarship_type' => $row['scholarship_type'] ?? null,
                 'scholarship_raw_value' => isset($row['scholarship_raw_value']) ? (float) $row['scholarship_raw_value'] : null,
                 'scholarship_amount' => (float) ($row['scholarship_amount'] ?? 0),
+                'scholarship_reduction_amount' => (float) ($row['scholarship_reduction_amount'] ?? 0),
+                'scholarship_adjusted_raw_value' => isset($row['scholarship_adjusted_raw_value']) ? (float) $row['scholarship_adjusted_raw_value'] : null,
                 'voucher_codes' => array_values((array) ($row['voucher_codes'] ?? [])),
                 'voucher_amount' => (float) ($row['voucher_amount'] ?? 0),
                 'reason' => $reason,
@@ -344,8 +346,10 @@ class AssembleBatchChargePreviewQuery
                 ->sum(fn (mixed $level): float => is_array($level) ? (float) ($level['amount'] ?? 0) : 0.0);
             $normalized['estimated_amount'] = $row['estimated_amount'] ?? $row['net_amount'] ?? $chargeableLevelAmount;
             $normalized['gross_amount'] = $row['gross_amount'] ?? $row['amount'] ?? $normalized['estimated_amount'];
+            // Actual money delta, not the scholarship display split (which shows
+            // the unadjusted grant, separate from a decided reduction).
             $normalized['discount_amount'] = $row['discount_amount']
-                ?? ((float) ($row['scholarship_amount'] ?? 0) + (float) ($row['voucher_amount'] ?? 0));
+                ?? max(0.0, (float) $normalized['gross_amount'] - (float) $normalized['estimated_amount']);
             $normalized['warning'] = $row['warning'] ?? $row['eligibility_reason'] ?? null;
             $normalized['has_existing_charge'] = $row['has_existing_charge']
                 ?? (($row['eligibility_reason'] ?? null) === 'already_charged');

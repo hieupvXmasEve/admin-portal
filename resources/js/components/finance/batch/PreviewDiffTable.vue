@@ -67,6 +67,26 @@ function displayAmount(line: BatchPreviewLineClient): number {
 
     return Number(line.display.net ?? 0);
 }
+
+function hasDiscountBreakdown(line: BatchPreviewLineClient): boolean {
+    return Number(line.display.scholarship_amount ?? 0) > 0 || Number(line.display.voucher_amount ?? 0) > 0;
+}
+
+function scholarshipLabel(line: BatchPreviewLineClient): string {
+    const { scholarship_type: type, scholarship_raw_value: raw } = line.display;
+    if (raw === null || raw === undefined) return '';
+    return type === 'percentage' ? `${raw}%` : formatCurrency(raw);
+}
+
+function hasReduction(line: BatchPreviewLineClient): boolean {
+    return Number(line.display.scholarship_reduction_amount ?? 0) > 0;
+}
+
+function adjustedLabel(line: BatchPreviewLineClient): string {
+    const { scholarship_type: type, scholarship_adjusted_raw_value: raw } = line.display;
+    if (raw === null || raw === undefined) return '';
+    return type === 'percentage' ? `còn ${raw}%` : `còn ${formatCurrency(raw)}`;
+}
 </script>
 
 <template>
@@ -153,7 +173,26 @@ function displayAmount(line: BatchPreviewLineClient): number {
                                         <span v-else class="text-muted-foreground text-sm">—</span>
                                     </TableCell>
                                     <TableCell class="px-4 py-3 text-right align-middle font-mono text-sm tabular-nums">
-                                        {{ formatCurrency(displayAmount(l)) }}
+                                        <template v-if="hasDiscountBreakdown(l)">
+                                            <div class="text-muted-foreground text-xs line-through">{{ formatCurrency(l.display.gross ?? 0) }}</div>
+                                            <div class="font-semibold">{{ formatCurrency(displayAmount(l)) }}</div>
+                                            <div class="text-muted-foreground mt-0.5 space-y-0.5 font-sans text-xs normal-case">
+                                                <div v-if="Number(l.display.scholarship_amount ?? 0) > 0">
+                                                    🎓 {{ l.display.scholarship_name }}<template v-if="scholarshipLabel(l)"> ({{ scholarshipLabel(l) }})</template>: -{{
+                                                        formatCurrency(l.display.scholarship_amount ?? 0)
+                                                    }}
+                                                </div>
+                                                <div v-if="hasReduction(l)" class="text-amber-600">
+                                                    📉 Bị giảm học bổng<template v-if="adjustedLabel(l)"> ({{ adjustedLabel(l) }})</template>: +{{
+                                                        formatCurrency(l.display.scholarship_reduction_amount ?? 0)
+                                                    }}
+                                                </div>
+                                                <div v-if="Number(l.display.voucher_amount ?? 0) > 0">
+                                                    🎟️ {{ (l.display.voucher_codes ?? []).join(', ') }}: -{{ formatCurrency(l.display.voucher_amount ?? 0) }}
+                                                </div>
+                                            </div>
+                                        </template>
+                                        <template v-else>{{ formatCurrency(displayAmount(l)) }}</template>
                                     </TableCell>
                                     <TableCell class="text-muted-foreground px-4 py-3 align-middle text-sm leading-relaxed">
                                         {{ batchReasonLabel(l.display.reason) }}

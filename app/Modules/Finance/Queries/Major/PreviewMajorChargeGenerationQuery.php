@@ -234,7 +234,9 @@ class PreviewMajorChargeGenerationQuery
             'scholarship_name' => $scholarship['name'],
             'scholarship_type' => $scholarship['type'],
             'scholarship_raw_value' => $scholarship['raw_value'],
-            'scholarship_amount' => $scholarship['amount'],
+            'scholarship_amount' => $scholarship['unadjusted_amount'],
+            'scholarship_reduction_amount' => $scholarship['reduction_amount'],
+            'scholarship_adjusted_raw_value' => $scholarship['adjusted_raw_value'],
             'voucher_codes' => $voucher['codes'],
             'voucher_amount' => $voucher['amount'],
             'net_amount' => max(0.0, (float) $amount - $scholarship['amount'] - $voucher['amount']),
@@ -288,11 +290,11 @@ class PreviewMajorChargeGenerationQuery
     }
 
     /**
-     * @return array{name: string|null, type: string|null, raw_value: float|null, amount: float}
+     * @return array{name: string|null, type: string|null, raw_value: float|null, amount: float, unadjusted_amount: float, reduction_amount: float, adjusted_raw_value: float|null}
      */
     private function resolveScholarship(?StudentScholarshipAward $award, float $baseAmount, int $studentId, int $semesterId): array
     {
-        $empty = ['name' => null, 'type' => null, 'raw_value' => null, 'amount' => 0.0];
+        $empty = ['name' => null, 'type' => null, 'raw_value' => null, 'amount' => 0.0, 'unadjusted_amount' => 0.0, 'reduction_amount' => 0.0, 'adjusted_raw_value' => null];
 
         if (! $award || $baseAmount <= 0) {
             return $empty;
@@ -304,6 +306,7 @@ class PreviewMajorChargeGenerationQuery
         }
 
         $rawValue = (float) $definition->amount;
+        $resolver = app(ScholarshipDiscountResolver::class);
 
         // Preview must mirror execution: honor the per-semester adjustment.
         $adjustment = app(GetActiveScholarshipAdjustmentQuery::class)
@@ -317,11 +320,24 @@ class PreviewMajorChargeGenerationQuery
         }
 
         // FIN-04/07: shared resolver owns the capped scholarship math.
-        $discount = app(ScholarshipDiscountResolver::class)
-            ->resolveAdjusted($definition, $baseAmount, $adjustment);
+        $discount = $resolver->resolveAdjusted($definition, $baseAmount, $adjustment);
 
         if ($discount <= 0 && $adjustment === null) {
             return $empty;
+        }
+
+        // The scholarship line always shows the original definition (rate the
+        // student was awarded, i.e. unadjusted_amount). A decided reduction is
+        // a separate, distinct line — how much LESS is being deducted than
+        // that original grant — so staff sees both facts instead of one
+        // silently overwriting the other. `amount` (unadjusted_amount minus
+        // reduction_amount) is what net_amount actually subtracts.
+        $unadjustedDiscount = $resolver->resolve($definition, $baseAmount);
+        $reductionAmount = 0.0;
+        $adjustedRawValue = null;
+        if ($adjustment !== null) {
+            $reductionAmount = max(0.0, $unadjustedDiscount - $discount);
+            $adjustedRawValue = (float) $adjustment->adjusted_amount;
         }
 
         return [
@@ -329,6 +345,9 @@ class PreviewMajorChargeGenerationQuery
             'type' => $definition->type,
             'raw_value' => $rawValue,
             'amount' => $discount,
+            'unadjusted_amount' => $unadjustedDiscount,
+            'reduction_amount' => $reductionAmount,
+            'adjusted_raw_value' => $adjustedRawValue,
         ];
     }
 

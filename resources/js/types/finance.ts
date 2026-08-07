@@ -449,6 +449,8 @@ export interface BatchPreviewLineDisplay {
     scholarship_type?: string | null;
     scholarship_raw_value?: number | null;
     scholarship_amount?: number;
+    scholarship_reduction_amount?: number;
+    scholarship_adjusted_raw_value?: number | null;
     voucher_codes?: string[];
     voucher_amount?: number;
     installment_aware_total?: number;
