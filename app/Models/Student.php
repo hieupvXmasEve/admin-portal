@@ -9,7 +9,6 @@ use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\StudentInvoice;
-use App\Traits\HasNotifications;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -22,9 +21,7 @@ use Laravel\Sanctum\HasApiTokens;
 
 class Student extends StudentAuditableModel
 {
-    use HasApiTokens, HasFactory, HasNotifications, Notifiable {
-        HasNotifications::notifications insteadof Notifiable;
-    }
+    use HasApiTokens, HasFactory, Notifiable;
 
     /**
      * All possible values for the students.status column.

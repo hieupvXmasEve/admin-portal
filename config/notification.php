@@ -3,7 +3,6 @@
 return [
     'v2_enabled' => (bool) env('NOTIFICATION_V2_ENABLED', false),
 
-    'read_mode' => env('NOTIFICATION_V2_READ_MODE', 'legacy'),
     'write_mode' => env('NOTIFICATION_V2_WRITE_MODE', 'v2'),
 
     'outbox' => [

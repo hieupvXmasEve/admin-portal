@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Decommission legacy notifications"
-status: pending
+status: completed
 priority: P1
 effort: "1-2d"
 dependencies: [1, 2]
@@ -62,3 +62,15 @@ Delete the legacy `notifications` table's write path (`SendWelcomeStudents`), BO
 ## Risk Assessment
 
 Medium-high — this is a product change plus a subtle Laravel trait-resolution hazard, not pure dead-code deletion. [Red-team F2] Blocking risk: incorrectly removing `HasNotifications` either fatals the whole app at compile time or silently swaps to a schema-incompatible fallback that only breaks after Phase 5's table drop. [Red-team F3] Deleting `SendManualNotificationAction` without removing its still-injected controller parameter breaks the admin send endpoint unconditionally. [Red-team F4] The student-portal read path is as live as the parent-portal one and was originally missing from this phase entirely. Mitigate by treating all four sub-risks as hard gates, not simplifications of "delete the model."
+
+## Execution Evidence (2026-08-07)
+
+- **Gate 1 (prod write_mode):** SSH tinker confirmed `config('notification.write_mode')` = `v2` on prod. Admin manual-notify already routed through v2 before this change — no flag flip/soak needed.
+- **Gate 2 (product sign-off):** user confirmed directly in-chat, accepting all 3 losses (parent unread count, student unread count, welcome notifications). Admin manual-notify unaffected (already v2).
+- **F2 (trait removal):** removed `HasNotifications` + its `insteadof Notifiable` clause as one atomic block from `User`/`Student`/`Lecture` (not partial — avoids the PHP fatal). Kept `Notifiable` — still required for password-reset (`CanResetPassword::sendPasswordResetNotification`) and email-verification mail-channel notifications, both unaffected by the DB-relation removal. Verified 0 remaining `->notifications()`/`insteadof`/`DatabaseNotification` references repo-wide, so `Notifiable`'s native fallback relation is unreachable — no schema-mismatch risk.
+- **F3 (controller DI):** `NotificationController::send()` no longer injects `SendManualNotificationAction` — always calls `SendManualNotificationV2Action` (matches prod's actual `v2` mode).
+- **F4 (student-portal read):** removed alongside the parent-portal read in the same commit.
+- **Audit finding beyond original scope:** all 4 `app/Notifications/*` classes using `via() => ['database']` had zero dispatch sites anywhere in the repo (confirmed by exact-class grep, not just filename match) — deleted as dead code.
+- **FE:** no FE consumer found in this repo for either removed `unread_count` field; code-reviewer flagged a crash risk for an out-of-repo parent-portal FE destructuring the key unguarded — mitigated by keeping `notifications.unread_count` in both response shapes hardcoded to `0` instead of dropping the key outright.
+- **Deferred to Phase 4/5 (code-reviewer LOW findings, not blocking):** `routes/channels.php` `notifications.{id}` broadcast channel and `FE/student-nuxt/app/composables/useRealtime.ts`'s `useRealtimeNotification` (0 consumers) were fed only by the now-deleted `NotificationBroadcast` — orphaned but harmless; clean up when touching email/broadcast surfaces in Phase 4. `NOTIFICATION_V2_READ_MODE` env var may still exist in prod `.env` — harmless now that the config key reading it is gone; strip during Phase 5.
+- Tests: identical pre-existing failures before/after (git-stash compared) across Architecture, Identity, Registry, Notification, Lecturer suites — zero regression.

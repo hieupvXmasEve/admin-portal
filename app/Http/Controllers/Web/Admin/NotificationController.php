@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web\Admin;
 
-use App\Actions\Notification\SendManualNotificationAction;
 use App\Enums\NotificationCategory;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Notification\SendManualNotificationRequest;
@@ -41,27 +40,14 @@ class NotificationController extends Controller
 
     public function send(
         SendManualNotificationRequest $request,
-        SendManualNotificationAction $legacyAction,
         SendManualNotificationV2Action $v2Action
     ): \Illuminate\Http\JsonResponse {
-        $data = $request->validated();
-
-        if (config('notification.write_mode') === 'v2') {
-            $eventId = $v2Action->run($data);
-
-            return ApiResponse::success(
-                ['event_id' => $eventId],
-                [],
-                'Notification queued for delivery.'
-            );
-        }
-
-        $legacyAction->execute($data);
+        $eventId = $v2Action->run($request->validated());
 
         return ApiResponse::success(
-            null,
+            ['event_id' => $eventId],
             [],
-            'Notification sent successfully.'
+            'Notification queued for delivery.'
         );
     }
 

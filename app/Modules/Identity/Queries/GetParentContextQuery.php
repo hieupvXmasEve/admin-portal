@@ -24,16 +24,14 @@ class GetParentContextQuery
             'students.program',
         ]);
 
-        // 2. Get Notification Summary (for the parent user)
-        $unreadNotifications = $parentProfile->user->notifications()->unread()->count();
-
         return [
             'user' => (new ParentResource($parentProfile))->resolve(),
             'settings' => $this->getDefaultSettings(),
             'feature_flags' => $this->getFeatureFlags(),
             'permissions' => $this->getPermissions(),
+            // Legacy unread-count read removed; key kept at 0 so older FE builds destructuring it don't crash.
             'notifications' => [
-                'unread_count' => $unreadNotifications,
+                'unread_count' => 0,
             ],
         ];
     }

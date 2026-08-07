@@ -43,7 +43,7 @@ Real task: **deliberate staged decommission** of legacy notification/email surfa
 |---|-------|--------|
 | 1 | [Phase 1: Delete dead services](./phase-01-start.md) | Completed |
 | 2 | [Phase 2: Delete dead event chains](./phase-02-delete-dead-event-chains.md) | Completed |
-| 3 | [Phase 3: Decommission legacy notifications](./phase-03-decommission-legacy-notifications.md) | Pending |
+| 3 | [Phase 3: Decommission legacy notifications](./phase-03-decommission-legacy-notifications.md) | Completed |
 | 4 | [Phase 4: Decommission legacy email surfaces](./phase-04-decommission-legacy-email-surfaces.md) | Pending |
 | 5 | [Phase 5: Soak and drop tables](./phase-05-soak-and-drop-tables.md) | Pending |
 

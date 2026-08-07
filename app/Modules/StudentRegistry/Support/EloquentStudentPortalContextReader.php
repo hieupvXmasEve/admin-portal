@@ -52,8 +52,9 @@ final class EloquentStudentPortalContextReader implements StudentPortalContextRe
                 'can_register_courses' => ! in_array($lifecycleStatus, Student::BLOCKED_STATUSES, true)
                     && ! $student->hasActiveHolds(),
             ],
+            // Legacy unread-count read removed; key kept at 0 so older FE builds destructuring it don't crash.
             'notifications' => [
-                'unread_count' => $student->notifications()->unread()->count(),
+                'unread_count' => 0,
             ],
             'academic' => [
                 'active_holds_count' => $activeHoldsCount,
