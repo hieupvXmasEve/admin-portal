@@ -43,6 +43,8 @@ use App\Modules\Academic\Progression\Queries\GetStudentAcademicRecordsQuery;
 use App\Modules\Academic\Progression\Queries\GetStudentGpaTrendQuery;
 use App\Modules\Academic\Progression\Queries\Reporting\GetAcademicReportQuery;
 use App\Modules\Academic\Progression\Queries\Reporting\GetStudentCompletedUnitsQuery;
+use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\PublishTuitionDeferredNotificationAction;
+use App\Modules\Academic\Progression\Queries\PendingScholarshipAdjustmentQuery;
 use App\Modules\Academic\Progression\Queries\ScholarshipRestorationVerdictQuery;
 use App\Modules\Academic\Progression\Support\EloquentProgramEnrollmentLifecycleWriter;
 use App\Modules\Academic\Progression\Support\EloquentProgramEnrollmentReader;
@@ -91,6 +93,8 @@ use App\Shared\Contracts\Academic\ProgramEnrollmentWriter;
 use App\Shared\Contracts\Academic\ProgramReferenceReader;
 use App\Shared\Contracts\Academic\RetakeRegistrationPaymentSyncer;
 use App\Shared\Contracts\Academic\ScholarshipDossierCloser;
+use App\Shared\Contracts\Academic\PendingScholarshipAdjustmentReader;
+use App\Shared\Contracts\Academic\ScholarshipReviewDeferralNotifier;
 use App\Shared\Contracts\Academic\ScholarshipRestorationVerdictReader;
 use App\Shared\Contracts\Academic\StudentAcademicHoldReader;
 use App\Shared\Contracts\Academic\StudentAcademicRecordsReader;
@@ -176,6 +180,8 @@ class AcademicServiceProvider extends ServiceProvider
         $this->app->bind(ExamResitAttemptPaymentSyncer::class, SyncPaidExamResitAttemptsAction::class);
         $this->app->bind(FinanceCancellationCompletionContract::class, CompleteFinanceCancellationOperationAction::class);
         $this->app->bind(ScholarshipRestorationVerdictReader::class, ScholarshipRestorationVerdictQuery::class);
+        $this->app->bind(PendingScholarshipAdjustmentReader::class, PendingScholarshipAdjustmentQuery::class);
+        $this->app->bind(ScholarshipReviewDeferralNotifier::class, PublishTuitionDeferredNotificationAction::class);
         $this->app->bind(ScholarshipDossierCloser::class, CloseDossierAction::class);
     }
 

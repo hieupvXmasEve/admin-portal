@@ -15,6 +15,7 @@ use App\Modules\Finance\Support\ScholarshipDiscountResolver;
 use App\Modules\Finance\Support\StudentChargeTimingResolver;
 use App\Modules\Finance\Support\VoucherDiscountAmountResolver;
 use App\Shared\Contracts\Academic\DTO\ProgramEnrollmentSummary;
+use App\Shared\Contracts\Academic\PendingScholarshipAdjustmentReader;
 use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
 use App\Shared\Contracts\StudentRegistry\StudentCollectionEligibilityReader;
@@ -95,6 +96,8 @@ class PreviewMajorChargeGenerationQuery
 
         $references = app(StudentReferenceReader::class)->findMany($eligibleStudentIds);
         $enrollments = app(ProgramEnrollmentReader::class)->forStudentIds(array_keys($references));
+        $inFlightByStudent = app(PendingScholarshipAdjustmentReader::class)
+            ->inFlightByStudent(array_keys($references), $semesterId);
         $awards = StudentScholarshipAward::query()
             ->with('scholarshipDefinition')
             ->whereIn('student_id', array_keys($references))
@@ -115,6 +118,7 @@ class PreviewMajorChargeGenerationQuery
                 $awards->get($reference->id),
                 $vouchers->get($reference->id, collect()),
                 $semesterId,
+                $inFlightByStudent[$reference->id] ?? false,
             ));
     }
 
@@ -124,6 +128,7 @@ class PreviewMajorChargeGenerationQuery
         ?StudentScholarshipAward $award,
         Collection $voucherApplications,
         int $semesterId,
+        bool $hasInFlightScholarshipDossier,
     ): array {
         $base = $this->baseRow($student);
 
@@ -170,6 +175,15 @@ class PreviewMajorChargeGenerationQuery
                 'eligibility_status' => 'ineligible',
                 'eligibility_reason' => 'already_charged',
                 'existing_charge_amount' => (float) $existingCharge->amount,
+            ]);
+        }
+
+        // In-flight scholarship-adjustment dossier for this semester: tuition
+        // generation must wait until the dossier resolves (timing invariant).
+        if ($hasInFlightScholarshipDossier) {
+            return array_merge($base, [
+                'eligibility_status' => 'ineligible',
+                'eligibility_reason' => 'scholarship_review_pending',
             ]);
         }
 

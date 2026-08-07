@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Modules\Academic\Progression\Actions\ScholarshipAdjustment\IdentifyCandidatesAction;
 use App\Modules\Academic\Progression\Models\ScholarshipAdjustmentDossier;
 use App\Modules\Academic\Progression\Queries\ScholarshipAdjustmentCandidateQuery;
+use App\Modules\Finance\Models\FinanceCharge;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -269,6 +270,48 @@ it('is idempotent: a second identification run does not duplicate the dossier', 
         ->and($second['created'])->toBe(0)
         ->and($second['skipped_existing'])->toBe(1)
         ->and(ScholarshipAdjustmentDossier::query()->where('student_id', $fixture['student']->id)->count())->toBe(1);
+});
+
+it('excludes a candidate who already has an active tuition_term charge for the target semester', function () {
+    $ctx = candidateBaseContext();
+    $fixture = candidateEligibleStudent($ctx);
+
+    FinanceCharge::query()->create([
+        'student_id' => $fixture['student']->id,
+        'semester_id' => $ctx['target']->id,
+        'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'amount' => 10000000,
+        'description' => 'Tuition term',
+        'effective_at' => now(),
+        'status' => FinanceCharge::STATUS_ACTIVE,
+    ]);
+
+    $result = app(ScholarshipAdjustmentCandidateQuery::class)
+        ->handle($ctx['campus']->id, $ctx['source']->id, $ctx['target']->id);
+
+    expect($result['candidates'])->toHaveCount(0)
+        ->and($result['excluded_already_charged'])->toBe(1);
+});
+
+it('keeps a candidate with a voided tuition_term charge for the target semester', function () {
+    $ctx = candidateBaseContext();
+    $fixture = candidateEligibleStudent($ctx);
+
+    FinanceCharge::query()->create([
+        'student_id' => $fixture['student']->id,
+        'semester_id' => $ctx['target']->id,
+        'charge_type' => FinanceCharge::TYPE_TUITION_TERM,
+        'amount' => 10000000,
+        'description' => 'Tuition term',
+        'effective_at' => now(),
+        'status' => FinanceCharge::STATUS_VOID,
+    ]);
+
+    $result = app(ScholarshipAdjustmentCandidateQuery::class)
+        ->handle($ctx['campus']->id, $ctx['source']->id, $ctx['target']->id);
+
+    expect($result['candidates']->pluck('student_id'))->toContain($fixture['student']->id)
+        ->and($result['excluded_already_charged'])->toBe(0);
 });
 
 it('runs identification with no session (artisan context) and produces the same result', function () {

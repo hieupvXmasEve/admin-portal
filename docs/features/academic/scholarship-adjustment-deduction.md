@@ -260,3 +260,8 @@ Tài liệu trên là đề xuất nghiệp vụ. Những điểm dưới đây 
 
 Chưa làm: mẫu email cho thông báo xác nhận (hiện chỉ bắn realtime trong app).
 - Bắt buộc hai người lập–duyệt cho mọi quyết định (người có quyền)
+
+## Follow-up: chặn tạo học phí khi đang xét học bổng (2026-08-07)
+
+Xem plan [260807-0110-skip-tuition-generation-pending-scholarship-review](../../../plans/260807-0110-skip-tuition-generation-pending-scholarship-review/plan.md).
+Bổ sung ràng buộc "generate XOR reduce": batch-studio (`GenerateMajorChargesAction` — đường live; `GenerateBatchChargesAction` — công cụ sửa lỗi billing) không tạo `tuition_term` cho sinh viên đang có hồ sơ điều chỉnh chưa chốt (`IN_FLIGHT_STATUSES`) ở học kỳ đích; ngược lại, sinh viên đã có `tuition_term` active thì không còn được đưa vào danh sách ứng viên xét học bổng (kể cả thêm thủ công). Mỗi lần hoãn gửi realtime + email cho sinh viên, không lặp lại khi chạy lại batch cùng phiên bản biên bản. Hai contract mới: `App\Shared\Contracts\Academic\PendingScholarshipAdjustmentReader`, `App\Shared\Contracts\Finance\TuitionChargeExistenceReader`.

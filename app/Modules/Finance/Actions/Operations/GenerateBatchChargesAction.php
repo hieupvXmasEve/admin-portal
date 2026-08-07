@@ -25,6 +25,7 @@ use App\Modules\Finance\Support\ScholarshipDiscountResolver;
 use App\Modules\Finance\Support\SettlementMutationGuard;
 use App\Modules\Finance\Support\StudentChargeTimingResolver;
 use App\Modules\Finance\Support\VoucherDiscountAmountResolver;
+use App\Shared\Contracts\Academic\PendingScholarshipAdjustmentReader;
 use App\Shared\Contracts\StudentRegistry\StudentCollectionEligibilityReader;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -79,6 +80,12 @@ class GenerateBatchChargesAction
             ->filter(fn (Student $student) => $studentChargeTimingResolver->shouldIncludeStudentForChargeGeneration($student, $semesterId, $chargeTypes))
             ->values();
 
+        // Set-based, once per run: students with an in-flight scholarship-
+        // adjustment dossier for this semester must not get a new tuition_term
+        // charge (timing invariant — see plan skip-tuition-generation-pending-scholarship-review).
+        $inFlightByStudent = app(PendingScholarshipAdjustmentReader::class)
+            ->inFlightByStudent($students->pluck('id')->all(), $semesterId);
+
         $stats = [
             'total_students' => $students->count(),
             'created_count' => 0,
@@ -87,6 +94,7 @@ class GenerateBatchChargesAction
             'skipped_count' => 0,
             'failed_count' => 0,
             'errors' => [],
+            'deferred_scholarship_review' => [],
         ];
 
         DB::beginTransaction();
@@ -95,8 +103,18 @@ class GenerateBatchChargesAction
                 try {
                     $canGenerateEgc = in_array(FinanceCharge::TYPE_EGC_LEVEL_FEE, $chargeTypes, true)
                         && $studentChargeTimingResolver->shouldGenerateEgcForSemester($student, $semesterId);
-                    $canGenerateTuition = in_array(FinanceCharge::TYPE_TUITION_TERM, $chargeTypes, true)
+                    $blockTuitionForScholarshipReview = $inFlightByStudent[$student->id] ?? false;
+                    $tuitionOtherwiseDue = in_array(FinanceCharge::TYPE_TUITION_TERM, $chargeTypes, true)
                         && $studentChargeTimingResolver->shouldGenerateTuitionForSemester($student, $semesterId);
+                    $canGenerateTuition = $tuitionOtherwiseDue && ! $blockTuitionForScholarshipReview;
+                    // Only a student whose tuition was actually due gets counted/
+                    // notified as deferred — otherwise a not-due student would be
+                    // wrongly told their (never-going-to-exist) tuition is on hold.
+                    // Recorded once here, not at each exit branch, so a mixed
+                    // EGC+tuition run still reports the tuition-side deferral.
+                    if ($tuitionOtherwiseDue && $blockTuitionForScholarshipReview) {
+                        $stats['deferred_scholarship_review'][] = $student->id;
+                    }
                     // FIN-REV-020-02 (M2): a fully deferred semester enrollment is
                     // non-billable (PRESERVE and FORFEIT alike), so no charge is
                     // generated and an M1-voided obligation is never resurrected.
@@ -173,6 +191,10 @@ class GenerateBatchChargesAction
 
                     // Decision: If no reusable invoice exists and no new charges are expected -> skip.
                     if (! $reusableInvoice && ! $shouldGenInvoice) {
+                        if ($blockTuitionForScholarshipReview) {
+                            $stats['skipped_count']++;
+                        }
+
                         continue;
                     }
 
@@ -354,6 +376,10 @@ class GenerateBatchChargesAction
                             app(SettlementMutationGuard::class)->handle($billingAccountId, function () use ($invoice): void {
                                 $invoice->delete();
                             });
+                        }
+
+                        if ($blockTuitionForScholarshipReview) {
+                            $stats['skipped_count']++;
                         }
 
                         continue;

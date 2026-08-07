@@ -145,3 +145,25 @@ it('keeps the P5 restoration proposal in Finance and the verdict/dossier-close i
             ->not->toContain('App\\Models\\AcademicRecord');
     }
 });
+
+/**
+ * Skip-tuition-generation-pending-scholarship-review: the two new
+ * cross-module readers and the deferral publisher must land in their owner
+ * modules, not at global/top-level, and no stray copy may reappear elsewhere.
+ */
+it('keeps the pending-dossier reader and deferral publisher in Academic Progression, and the tuition-charge reader in Finance', function (): void {
+    $workspace = dirname(__DIR__, 3);
+
+    expect(file_exists($workspace.'/app/Modules/Academic/Progression/Queries/PendingScholarshipAdjustmentQuery.php'))->toBeTrue()
+        ->and(file_exists($workspace.'/app/Modules/Academic/Progression/Actions/ScholarshipAdjustment/PublishTuitionDeferredNotificationAction.php'))->toBeTrue()
+        ->and(file_exists($workspace.'/app/Modules/Finance/Queries/TuitionChargeExistenceQuery.php'))->toBeTrue()
+        ->and(file_exists($workspace.'/app/Shared/Contracts/Academic/PendingScholarshipAdjustmentReader.php'))->toBeTrue()
+        ->and(file_exists($workspace.'/app/Shared/Contracts/Academic/ScholarshipReviewDeferralNotifier.php'))->toBeTrue()
+        ->and(file_exists($workspace.'/app/Shared/Contracts/Finance/TuitionChargeExistenceReader.php'))->toBeTrue();
+
+    $strayAcademic = glob($workspace.'/app/Modules/Academic/Queries/PendingScholarshipAdjustment*.php') ?: [];
+    $strayFinance = glob($workspace.'/app/Modules/Finance/Queries/Major/TuitionChargeExistence*.php') ?: [];
+
+    expect($strayAcademic)->toBeEmpty('The pending-dossier reader is Academic-owned — Progression, not Academic top-level.')
+        ->and($strayFinance)->toBeEmpty('The tuition-charge reader must not be duplicated elsewhere in Finance/Queries.');
+});

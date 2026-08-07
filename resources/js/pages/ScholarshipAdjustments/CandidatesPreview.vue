@@ -34,7 +34,12 @@ interface Props {
     sourceSemesterId: number | null;
     targetSemesterId: number | null;
     semesters: SemesterOption[];
-    preview: { candidates: CandidateRow[]; excluded_null_is_passed: number; already_has_dossier: number } | null;
+    preview: {
+        candidates: CandidateRow[];
+        excluded_null_is_passed: number;
+        excluded_already_charged: number;
+        already_has_dossier: number;
+    } | null;
     error: string | null;
 }
 
@@ -157,8 +162,8 @@ function submitCreate() {
     <Card v-if="preview" class="mt-6">
         <CardHeader>
             <CardTitle>{{ preview.candidates.length }} sinh viên có thể đưa vào xét</CardTitle>
-            <CardDescription v-if="preview.excluded_null_is_passed || preview.already_has_dossier">
-                Không hiển thị: {{ preview.already_has_dossier }} sinh viên đang được xét, {{ preview.excluded_null_is_passed }} kết quả môn học chưa có điểm.
+            <CardDescription v-if="preview.excluded_null_is_passed || preview.already_has_dossier || preview.excluded_already_charged">
+                Không hiển thị: {{ preview.already_has_dossier }} sinh viên đang được xét, {{ preview.excluded_null_is_passed }} kết quả môn học chưa có điểm, {{ preview.excluded_already_charged }} đã phát sinh học phí kỳ này.
             </CardDescription>
         </CardHeader>
         <CardContent>

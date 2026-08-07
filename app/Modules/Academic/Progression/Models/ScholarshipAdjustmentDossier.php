@@ -79,6 +79,21 @@ class ScholarshipAdjustmentDossier extends AuditableModel
         self::STATUS_NOT_APPLICABLE,
     ];
 
+    /**
+     * Money not yet finalized for this dossier — batch-studio must not
+     * generate a tuition_term charge while a student is in one of these.
+     */
+    public const IN_FLIGHT_STATUSES = [
+        self::STATUS_IDENTIFIED,
+        self::STATUS_INTERVIEW_SCHEDULED,
+        self::STATUS_INTERVIEWED,
+        self::STATUS_AWAITING_STUDENT_CONFIRMATION,
+        self::STATUS_READY_FOR_DECISION,
+        self::STATUS_STUDENT_DISPUTED,
+        self::STATUS_STUDENT_NO_SHOW,
+        self::STATUS_CONFIRMATION_OVERDUE,
+    ];
+
     public const SOURCE_SYSTEM = 'system';
 
     public const SOURCE_MANUAL = 'manual';

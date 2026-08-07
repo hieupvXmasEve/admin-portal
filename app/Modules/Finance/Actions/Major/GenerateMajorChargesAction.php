@@ -12,6 +12,7 @@ use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\InvoiceGenerationService;
 use App\Modules\Finance\Support\StudentChargeTimingResolver;
 use App\Modules\Finance\Support\VoucherDiscountAmountResolver;
+use App\Shared\Contracts\Academic\PendingScholarshipAdjustmentReader;
 use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Carbon\Carbon;
@@ -22,7 +23,7 @@ class GenerateMajorChargesAction
 {
     /**
      * @param  array{semester_id: int, due_date: string, student_ids: array<int, int>}  $data
-     * @return array{created: int, skipped: int, failed: int, errors: array<int, string>}
+     * @return array{created: int, skipped: int, failed: int, errors: array<int, string>, deferred_scholarship_review: array<int, int>}
      */
     public static function run(array $data): array
     {
@@ -44,6 +45,7 @@ class GenerateMajorChargesAction
             'skipped' => 0,
             'failed' => 0,
             'errors' => [],
+            'deferred_scholarship_review' => [],
         ];
 
         if ($studentIds->isEmpty()) {
@@ -52,6 +54,12 @@ class GenerateMajorChargesAction
 
         $students = app(StudentReferenceReader::class)->findMany($studentIds->all());
         $enrollments = app(ProgramEnrollmentReader::class)->forStudentIds(array_keys($students));
+
+        // Set-based, once per run: students with an in-flight scholarship-
+        // adjustment dossier for this semester must not get a new tuition_term
+        // charge (timing invariant — see plan skip-tuition-generation-pending-scholarship-review).
+        $inFlightByStudent = app(PendingScholarshipAdjustmentReader::class)
+            ->inFlightByStudent($studentIds->all(), $semesterId);
 
         DB::beginTransaction();
         try {
@@ -79,6 +87,16 @@ class GenerateMajorChargesAction
 
                     if (! $submitTuition->isChargeable((int) $studentId, $semesterId)) {
                         $stats['skipped']++;
+
+                        continue;
+                    }
+
+                    // Checked only after confirming tuition was actually due this
+                    // semester — otherwise a not-due student would be reported as
+                    // "deferred" and wrongly notified that tuition is on hold.
+                    if ($inFlightByStudent[$studentId] ?? false) {
+                        $stats['skipped']++;
+                        $stats['deferred_scholarship_review'][] = (int) $studentId;
 
                         continue;
                     }

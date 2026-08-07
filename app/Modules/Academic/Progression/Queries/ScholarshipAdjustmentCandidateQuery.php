@@ -9,6 +9,7 @@ use App\Models\AssessmentComponentDetailScore;
 use App\Models\CourseRegistration;
 use App\Models\Semester;
 use App\Models\StudentScholarshipAward;
+use App\Shared\Contracts\Finance\TuitionChargeExistenceReader;
 use Illuminate\Support\Collection;
 
 /**
@@ -33,7 +34,7 @@ class ScholarshipAdjustmentCandidateQuery
     private const IS_PASSED_GATE_FIX_DATE = '2026-07-04';
 
     /**
-     * @return array{candidates: Collection<int, array{student_id: int, failed_records: Collection}>, excluded_null_is_passed: int}
+     * @return array{candidates: Collection<int, array{student_id: int, failed_records: Collection}>, excluded_null_is_passed: int, excluded_already_charged: int}
      */
     public function handle(int $campusId, int $sourceSemesterId, int $targetSemesterId): array
     {
@@ -99,6 +100,22 @@ class ScholarshipAdjustmentCandidateQuery
             fn (AcademicRecord $record) => $continuingStudentIds->contains($record->student_id)
         );
 
+        // Timing invariant: once tuition_term is generated for the target
+        // semester, the reduction window is closed (see plan
+        // skip-tuition-generation-pending-scholarship-review).
+        $alreadyCharged = app(TuitionChargeExistenceReader::class)
+            ->tuitionTermChargedByStudent($continuingStudentIds->all(), $targetSemesterId);
+
+        $excludedAlreadyCharged = $eligibleFailures
+            ->pluck('student_id')
+            ->unique()
+            ->filter(fn (int $studentId) => $alreadyCharged[$studentId] ?? false)
+            ->count();
+
+        $eligibleFailures = $eligibleFailures->reject(
+            fn (AcademicRecord $record) => $alreadyCharged[$record->student_id] ?? false
+        );
+
         $candidates = $eligibleFailures
             ->groupBy('student_id')
             ->map(fn (Collection $records, int $studentId) => [
@@ -110,6 +127,7 @@ class ScholarshipAdjustmentCandidateQuery
         return [
             'candidates' => $candidates,
             'excluded_null_is_passed' => $excludedNullIsPassed,
+            'excluded_already_charged' => $excludedAlreadyCharged,
         ];
     }
 

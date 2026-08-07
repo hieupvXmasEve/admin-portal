@@ -31,6 +31,8 @@ enum NotificationTemplateTypeKey: string
 
     case ScholarshipAdjustmentConfirmationRequested = 'scholarship_adjustment_confirmation_requested';
 
+    case ScholarshipAdjustmentTuitionDeferred = 'scholarship_adjustment_tuition_deferred';
+
     /**
      * Per-case variable allow-list consumed by the FormRequest validator,
      * the admin editor's variable picker, and the preview pane sample render.
@@ -108,6 +110,18 @@ enum NotificationTemplateTypeKey: string
                 'student_code' => ['label' => 'Student code', 'sample' => 'SE12345'],
                 'semester_code' => ['label' => 'Semester the adjustment would apply to', 'sample' => 'SUMMER2026'],
                 'deadline' => ['label' => 'Response deadline', 'sample' => '16/06/2026 09:00'],
+                'action_url' => ['label' => 'Portal link to the review', 'sample' => '/scholarship-review/12'],
+            ],
+            // Variables mirror the payload built by
+            // AcademicLifecycleEventFactory::scholarshipAdjustmentTuitionDeferred().
+            // No money figures here on purpose: the fee was never generated,
+            // so there is nothing to quote yet.
+            self::ScholarshipAdjustmentTuitionDeferred => [
+                'student_name' => ['label' => 'Student name', 'sample' => 'Nguyễn Văn A'],
+                'student_code' => ['label' => 'Student code', 'sample' => 'SE12345'],
+                'semester_code' => ['label' => 'Semester tuition was due', 'sample' => 'SUMMER2026'],
+                'scholarship_name' => ['label' => 'Scholarship under review', 'sample' => 'Asia Pioneer'],
+                'deferral_reason' => ['label' => 'Reason for the hold', 'sample' => 'Đang chờ xét duyệt điều chỉnh học bổng cho học kỳ này.'],
                 'action_url' => ['label' => 'Portal link to the review', 'sample' => '/scholarship-review/12'],
             ],
         };

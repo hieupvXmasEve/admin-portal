@@ -9,6 +9,7 @@ use App\Models\Student;
 use App\Modules\Academic\Progression\Models\ScholarshipAdjustmentDossier;
 use App\Modules\Academic\Progression\Queries\ScholarshipAdjustmentCandidateQuery;
 use App\Modules\Academic\Progression\Support\ScholarshipAdjustmentDossierFactory;
+use App\Shared\Contracts\Finance\TuitionChargeExistenceReader;
 
 class AddCandidateManuallyAction
 {
@@ -40,6 +41,17 @@ class AddCandidateManuallyAction
 
         if ($exists) {
             throw new \DomainException('Sinh viên này đã được xét cho cặp học kỳ này rồi.');
+        }
+
+        // Timing invariant (skip-tuition-generation-pending-scholarship-review):
+        // once tuition_term is generated for the target semester, the reduction
+        // window is closed — manual add must not bypass this the way it
+        // deliberately bypasses the auto criteria below.
+        $alreadyCharged = app(TuitionChargeExistenceReader::class)
+            ->tuitionTermChargedByStudent([$student->id], $targetSemesterId);
+
+        if ($alreadyCharged[$student->id] ?? false) {
+            throw new \DomainException('Sinh viên này đã phát sinh học phí cho học kỳ áp dụng — không thể mở đợt xét học bổng nữa.');
         }
 
         // Manual add bypasses the AUTO CRITERIA (EGC/override/appeal/award

@@ -195,6 +195,7 @@ class ScholarshipAdjustmentDossierController extends Controller
 
                 $preview = [
                     'excluded_null_is_passed' => $result['excluded_null_is_passed'],
+                    'excluded_already_charged' => $result['excluded_already_charged'],
                     'already_has_dossier' => $studentIdsWithDossier->count(),
                     'candidates' => $candidatesWithoutDossier->map(fn (array $candidate) => [
                         'student_id' => $candidate['student_id'],

@@ -428,6 +428,45 @@ class NotificationEmailTemplateProvisioner
                 </html>
                 HTML,
             ],
+            NotificationTemplateTypeKey::ScholarshipAdjustmentTuitionDeferred->value => [
+                'subject' => '[Asia Việt Nam] Học phí kỳ {{semester_code}} đang tạm hoãn - Chờ xét học bổng',
+                'body_html' => <<<'HTML'
+                <!DOCTYPE html>
+                <html lang="vi">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                </head>
+                <body style="font-family: Arial, sans-serif; color: #222; font-size: 14px; line-height: 1.6; max-width: 680px; margin: 0 auto; padding: 24px;">
+
+                    <p>Thân gửi <strong>{{student_name}} {{student_code}}</strong>,</p>
+
+                    <p>Học phí học kỳ <strong>{{semester_code}}</strong> của bạn đang được tạm hoãn phát sinh vì <strong>{{scholarship_name}}</strong> đang trong quá trình xét lại.</p>
+
+                    <p>{{deferral_reason}}</p>
+
+                    <p><strong>Bạn chưa phải đóng khoản nào cho học kỳ này</strong> và chưa có quyết định nào được đưa ra. Học phí sẽ được tạo lại sau khi đợt xét hoàn tất.</p>
+
+                    <p>Nếu bạn có bất kỳ thắc mắc nào, vui lòng phản hồi email này hoặc gửi yêu cầu qua hệ thống queries.</p>
+                    <p>Trân trọng.</p>
+
+                    <hr style="border: none; border-top: 1px solid #ccc; margin: 24px 0;">
+
+                    <p>Dear <strong>{{student_name}} {{student_code}}</strong>,</p>
+
+                    <p>Tuition generation for <strong>{{semester_code}}</strong> is on hold while <strong>{{scholarship_name}}</strong> is under review.</p>
+
+                    <p>{{deferral_reason}}</p>
+
+                    <p><strong>Nothing is owed for this semester yet</strong> and no decision has been made. Tuition will be generated once the review is complete.</p>
+
+                    <p>If you have any questions, please reply to this email or submit a query via the system.</p>
+                    <p><em>Regards.</em></p>
+
+                </body>
+                </html>
+                HTML,
+            ],
         ];
     }
 }

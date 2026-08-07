@@ -226,6 +226,59 @@ final class AcademicLifecycleEventFactory
     }
 
     /**
+     * Batch-studio skipped tuition_term generation because a scholarship-
+     * adjustment dossier is still in flight (timing invariant — see plan
+     * skip-tuition-generation-pending-scholarship-review). Dedup key includes
+     * minutes_version: a re-run of the same unresolved dossier is a no-op,
+     * but edited minutes make it a legitimately new notice.
+     */
+    public static function scholarshipAdjustmentTuitionDeferred(
+        Student $student,
+        int $dossierId,
+        int $minutesVersion,
+        ?string $targetSemesterName,
+        ?string $scholarshipName,
+    ): DomainEvent {
+        $semester = $targetSemesterName !== null && $targetSemesterName !== ''
+            ? " for {$targetSemesterName}"
+            : '';
+        $scholarship = $scholarshipName !== null && $scholarshipName !== ''
+            ? $scholarshipName
+            : 'your scholarship';
+
+        return self::event(
+            name: 'academic.scholarship_adjustment_tuition_deferred',
+            deduplicationKey: implode(':', [
+                'academic.scholarship_adjustment_tuition_deferred',
+                'dossier', $dossierId,
+                'student', $student->id,
+                'minutes_version', $minutesVersion,
+            ]),
+            student: $student,
+            aggregateType: 'scholarship_adjustment_dossier',
+            aggregateId: (string) $dossierId,
+            data: [
+                'title' => 'Tuition on hold pending scholarship review',
+                'body' => "Your tuition{$semester} is on hold while {$scholarship} is under review. Nothing is owed yet — no decision has been made.",
+                'category' => 'academic',
+                'is_important' => true,
+                'action_url' => "/scholarship-review/{$dossierId}",
+                'action_text' => 'View review status',
+                'dossier_id' => $dossierId,
+                'minutes_version' => $minutesVersion,
+                // Consumed by the admin-editable email template
+                // (NotificationTemplateTypeKey::ScholarshipAdjustmentTuitionDeferred).
+                'student_name' => (string) $student->full_name,
+                'student_code' => (string) $student->student_id,
+                'semester_code' => $targetSemesterName ?? '',
+                'scholarship_name' => $scholarshipName ?? '',
+                'deferral_reason' => 'Đang chờ xét duyệt điều chỉnh học bổng cho học kỳ này.',
+            ],
+            channels: ['email', 'realtime'],
+        );
+    }
+
+    /**
      * @param  array<int, string>  $requestedChannels
      * @param  array<string, mixed>  $data
      */

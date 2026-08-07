@@ -25,6 +25,7 @@ use App\Modules\Finance\Services\Batch\BatchPreviewTokenService;
 use App\Modules\Finance\Support\Batch\BatchChargeCampusScope;
 use App\Modules\Finance\Support\Batch\BatchJobType;
 use App\Modules\Finance\Support\Batch\BatchPreviewLine;
+use App\Shared\Contracts\Academic\ScholarshipReviewDeferralNotifier;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\RedirectResponse;
@@ -151,6 +152,15 @@ class BatchStudioController extends Controller
             $chargeScope,
             (array) $request->input('block_overrides', []),
         );
+
+        // Post-commit only: GenerateMajorChargesAction has already committed
+        // its own transaction by the time this returns, so the notice never
+        // fires ahead of the actual skip.
+        $deferredStudentIds = (array) ($summary['deferred_scholarship_review'] ?? []);
+        if ($deferredStudentIds !== []) {
+            app(ScholarshipReviewDeferralNotifier::class)
+                ->notifyTuitionDeferred($deferredStudentIds, $semesterId);
+        }
 
         return Inertia::flash('batch_result', [
             'job' => 'charge_generation',
