@@ -14,6 +14,8 @@ source:
   - resources/js/pages/TuitionPlans/Index.vue
   - resources/js/pages/Scholarships/Index.vue
   - resources/js/pages/StudentScholarships/Index.vue
+  - resources/js/pages/ScholarshipAdjustments/Index.vue
+  - resources/js/pages/ScholarshipAdjustments/Show.vue
   - resources/js/pages/Vouchers/Index.vue
 ---
 
@@ -187,6 +189,14 @@ A separate menu group that decides how much a student actually pays.
 **Steps.** Go to **Discounts & Funding → Student Scholarships**, use the **Filter Assignments** panel, then assign or remove.
 
 **Note.** Assign scholarships **before** generating charges. Assigned afterwards, existing charges do not reduce themselves and must be adjusted by hand.
+
+### Scholarship Adjustments
+
+**What it's for.** Review students who failed a course, log interview sessions, and decide whether their scholarship gets reduced for the next term. The original scholarship is never edited or deleted — the system creates a separate adjustment for the affected term, and the next term it auto-proposes restoring the original rate if the student stops failing.
+
+**Who can access.** Users with permission to view/process scholarship adjustment dossiers (`view_scholarship_adjustment`, `approve_scholarship_adjustment`).
+
+**Step-by-step guide:** [Scholarship Adjustments](/en/finance-office/scholarship-adjustments/) (find candidates, schedule the interview, get student confirmation, decide, apply, and restore next term).
 
 ### Vouchers
 

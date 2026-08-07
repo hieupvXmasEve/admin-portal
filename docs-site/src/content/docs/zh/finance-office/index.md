@@ -14,6 +14,8 @@ source:
   - resources/js/pages/TuitionPlans/Index.vue
   - resources/js/pages/Scholarships/Index.vue
   - resources/js/pages/StudentScholarships/Index.vue
+  - resources/js/pages/ScholarshipAdjustments/Index.vue
+  - resources/js/pages/ScholarshipAdjustments/Show.vue
   - resources/js/pages/Vouchers/Index.vue
 ---
 
@@ -187,6 +189,14 @@ source:
 **操作步骤。** 进入 **Discounts & Funding → Student Scholarships**，使用 **Filter Assignments** 面板查找，然后分配或取消。
 
 **注意事项。** 应在生成收费项 **之前** 分配奖学金。事后分配的话，已生成的收费项不会自动减少，必须手动调整。
+
+### Scholarship Adjustments — 奖学金调整
+
+**用途。** 审查因挂科被列入名单的学生，记录面谈过程，决定下一学期是否降低其奖学金比例。系统不修改或删除原始奖学金——只针对受影响学期单独创建一条调整记录，若学生下学期不再挂科，系统会自动提议恢复原比例。
+
+**谁能访问。** 拥有奖学金调整档案查看/处理权限的人员（`view_scholarship_adjustment`、`approve_scholarship_adjustment`）。
+
+**分步指南：** [Scholarship Adjustments — 奖学金调整](/zh/finance-office/scholarship-adjustments/)（查找待审学生、安排面谈、学生确认、决定与审批、应用学费、下学期恢复）。
 
 ### Vouchers — 优惠券
 

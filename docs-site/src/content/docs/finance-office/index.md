@@ -14,6 +14,8 @@ source:
   - resources/js/pages/TuitionPlans/Index.vue
   - resources/js/pages/Scholarships/Index.vue
   - resources/js/pages/StudentScholarships/Index.vue
+  - resources/js/pages/ScholarshipAdjustments/Index.vue
+  - resources/js/pages/ScholarshipAdjustments/Show.vue
   - resources/js/pages/Vouchers/Index.vue
 ---
 
@@ -187,6 +189,14 @@ Nhóm menu riêng, quyết định sinh viên phải trả bao nhiêu.
 **Các bước.** Vào **Discounts & Funding → Student Scholarships**, dùng khung **Filter Assignments** để tìm, rồi gán hoặc gỡ.
 
 **Lưu ý.** Gán học bổng **trước khi** sinh phí. Gán sau thì khoản phí đã sinh không tự giảm, phải điều chỉnh tay.
+
+### Scholarship Adjustments — Điều chỉnh học bổng
+
+**Dùng để làm gì.** Xét những sinh viên bị trượt môn, ghi nhận buổi phỏng vấn và quyết định học bổng của họ có bị giảm ở học kỳ sau hay không. Không sửa hoặc xóa học bổng gốc — chỉ tạo một điều chỉnh riêng cho học kỳ bị ảnh hưởng, học kỳ sau hệ thống tự đề xuất khôi phục nếu sinh viên không trượt môn nữa.
+
+**Ai vào được.** Người có quyền xem/xử lý hồ sơ điều chỉnh học bổng (`view_scholarship_adjustment`, `approve_scholarship_adjustment`).
+
+**Hướng dẫn từng bước:** [Scholarship Adjustments — Điều chỉnh học bổng](/finance-office/scholarship-adjustments/) (tìm sinh viên, đặt lịch phỏng vấn, xác nhận, ra quyết định, áp dụng và khôi phục kỳ sau).
 
 ### Vouchers
 

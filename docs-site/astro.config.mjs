@@ -61,13 +61,28 @@ export default defineConfig({
           ],
         },
         {
+          label: 'Finance Office',
+          translations: { ko: '재무처', zh: '财务处' },
+          items: [
+            {
+              label: 'Tổng quan khu vực',
+              translations: { en: 'Area overview', ko: '영역 개요', zh: '区域概述' },
+              slug: 'finance-office',
+            },
+            {
+              label: 'Scholarship Adjustments',
+              translations: { ko: '장학금 조정', zh: '奖学金调整' },
+              slug: 'finance-office/scholarship-adjustments',
+            },
+          ],
+        },
+        {
           label: 'Các khu vực khác',
           translations: { en: 'Other areas', ko: '기타 영역', zh: '其他区域' },
           items: [
             { label: 'Student Services', translations: { ko: '학생 서비스', zh: '学生服务' }, slug: 'student-services' },
             { label: 'Reports & Audits', translations: { ko: '보고서 및 감사', zh: '报表与核对' }, slug: 'reports-audits' },
             { label: 'Faculty & Teaching', translations: { ko: '교원 및 강의', zh: '教师与教学' }, slug: 'faculty-teaching' },
-            { label: 'Finance Office', translations: { ko: '재무처', zh: '财务处' }, slug: 'finance-office' },
             { label: 'Forms & Quality', translations: { ko: '양식 및 품질', zh: '表单与质量' }, slug: 'forms-quality' },
             { label: 'Campus Operations', translations: { ko: '캠퍼스 운영', zh: '校园运营' }, slug: 'campus-operations' },
             { label: 'Communications', translations: { ko: '커뮤니케이션', zh: '通讯' }, slug: 'communications' },

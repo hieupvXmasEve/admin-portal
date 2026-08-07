@@ -14,6 +14,8 @@ source:
   - resources/js/pages/TuitionPlans/Index.vue
   - resources/js/pages/Scholarships/Index.vue
   - resources/js/pages/StudentScholarships/Index.vue
+  - resources/js/pages/ScholarshipAdjustments/Index.vue
+  - resources/js/pages/ScholarshipAdjustments/Show.vue
   - resources/js/pages/Vouchers/Index.vue
 ---
 
@@ -187,6 +189,14 @@ source:
 **절차.** **Discounts & Funding → Student Scholarships**로 이동해 **Filter Assignments** 영역으로 찾은 뒤 배정하거나 해제합니다.
 
 **유의 사항.** 장학금은 부과금 생성 **전에** 배정하십시오. 나중에 배정하면 이미 생성된 부과금은 자동으로 줄지 않아 수동으로 조정해야 합니다.
+
+### Scholarship Adjustments — 장학금 조정
+
+**용도.** 낙제 과목이 있는 학생을 검토하고, 면담 내용을 기록하며, 다음 학기 장학금을 줄일지 결정합니다. 원래 장학금은 수정하거나 삭제하지 않고, 영향받는 학기에만 별도 조정을 생성합니다. 학생이 더 이상 낙제하지 않으면 다음 학기에 시스템이 자동으로 원래 비율 복원을 제안합니다.
+
+**접근 권한.** 장학금 조정 건 조회/처리 권한 보유자(`view_scholarship_adjustment`, `approve_scholarship_adjustment`).
+
+**단계별 가이드:** [Scholarship Adjustments — 장학금 조정](/ko/finance-office/scholarship-adjustments/) (대상 학생 찾기, 면담 일정, 학생 확인, 결정/승인, 학비 반영, 다음 학기 복원).
 
 ### Vouchers — 할인 쿠폰
 
