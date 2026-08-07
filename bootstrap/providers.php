@@ -16,11 +16,9 @@ use App\Modules\Platform\Providers\PlatformServiceProvider;
 use App\Modules\StudentRegistry\Providers\StudentRegistryServiceProvider;
 use App\Modules\Upload\Providers\UploadServiceProvider;
 use App\Providers\AppServiceProvider;
-use App\Providers\EventServiceProvider;
 
 return [
     AppServiceProvider::class,
-    EventServiceProvider::class,
     AIServiceProvider::class,
     IdentityServiceProvider::class,
     InstitutionServiceProvider::class,
