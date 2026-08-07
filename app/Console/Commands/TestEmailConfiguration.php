@@ -157,7 +157,6 @@ class TestEmailConfiguration extends Command
         $services = [
             'EmailService' => \App\Services\EmailService::class,
             'SmtpConfigurationService' => \App\Services\SmtpConfigurationService::class,
-            'EmailTemplateService' => \App\Services\EmailTemplateService::class,
             'NotificationService' => \App\Services\NotificationService::class,
         ];
 

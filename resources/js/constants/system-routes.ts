@@ -40,14 +40,10 @@ export const SYSTEM_AI_COPILOT_ROUTE_PATHS = {
 
 export const SYSTEM_EMAIL_CONFIGURATION_ROUTE_NAMES = {
     INDEX: 'system.email-configuration.index',
-    TEMPLATES: 'system.email-templates.index',
-    BULK_EMAIL: 'system.bulk-email.index',
     EMAIL_HISTORY: 'system.email-history.index',
 } as const;
 
 export const SYSTEM_EMAIL_CONFIGURATION_ROUTE_PATHS = {
     INDEX: '/system/email-configuration',
-    TEMPLATES: '/system/email-templates',
-    BULK_EMAIL: '/system/bulk-email',
     EMAIL_HISTORY: '/system/email-history',
 } as const;

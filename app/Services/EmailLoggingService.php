@@ -269,10 +269,6 @@ class EmailLoggingService
         }
 
         // Apply additional filters
-        if (isset($filters['template_id'])) {
-            $query->where('template_id', $filters['template_id']);
-        }
-
         if (isset($filters['sender'])) {
             $query->where('sender', $filters['sender']);
         }
@@ -289,17 +285,6 @@ class EmailLoggingService
             ->select('status', DB::raw('count(*) as count'))
             ->groupBy('status')
             ->pluck('count', 'status')
-            ->toArray();
-
-        $templateBreakdown = $query->clone()
-            ->select('template_id', DB::raw('count(*) as count'))
-            ->whereNotNull('template_id')
-            ->groupBy('template_id')
-            ->with('template:id,name')
-            ->get()
-            ->mapWithKeys(function ($item) {
-                return [$item->template->name ?? 'Unknown' => $item->count];
-            })
             ->toArray();
 
         $hourlyBreakdown = $query->clone()
@@ -324,7 +309,6 @@ class EmailLoggingService
         return array_merge($basicStats, [
             'detailed_breakdown' => [
                 'by_status' => $statusBreakdown,
-                'by_template' => $templateBreakdown,
                 'by_hour' => $hourlyBreakdown,
                 'by_day' => $dailyBreakdown,
             ],

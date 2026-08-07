@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Decommission legacy email surfaces"
-status: pending
+status: completed
 priority: P2
 effort: "1-2d"
 dependencies: [3]
@@ -68,3 +68,20 @@ Delete the legacy email template/bulk-send/monitoring surfaces that the Notifica
 ## Risk Assessment
 
 Medium-high. [Red-team F5] Biggest risk is treating `EmailConfigurationController` as fully "kept" when it also carries the deleted template surface — verify per-method, not per-class. [Red-team F1] The `email_logs.template_id` FK must be severed here, not discovered as a migration failure in Phase 5. [Red-team F10] Frontend breakage (Ziggy route-not-found) surfaces as a browser JS error, not a server log entry — Phase 5's log-only soak check cannot see it, so this phase's own test/click-through verification is the only gate. Queue drain remains a hard prerequisite.
+
+## Execution Evidence (2026-08-07)
+
+- **F5 (controller split):** `Web\EmailConfigurationController` trimmed to `index()` only (config-management page); `templates`/`createTemplate`/`editTemplate`/`previewTemplate`/`deleteTemplate`/`bulkEmail` deleted. Code-reviewer confirmed no leak through traits/base class.
+- **F1 (FK severance):** migration `2026_08_07_114654_drop_template_id_fk_from_email_logs_table.php` drops FK → composite index `[template_id, status]` → column, in that order (verified via `artisan migrate --pretend` before running; ran clean on dev DB). `EmailLog::template()` relation removed; 3 render sites fixed: `EmailLogController::index()`, `Api\V1\Admin\EmailController::showLog()`/`retryEmail()`.
+- **F7 (anchored regex):** confirmed zero accidental touches under `app/Modules/Notification/`; `NotificationEmailTemplate` (v2, kept) untouched.
+- **F8 (missing from original plan):** `ManageEmailTemplateVersions` command, `EmailTemplateSeeder`, `EmailTemplateFactory`, and the 8-route `Api\V1\Admin\EmailTemplateController` all deleted, zero lingering references.
+- **F10 (FE):** deleted `resources/js/pages/Admin/{EmailTemplate,BulkEmail,EmailMonitoring}/**` + 3 composables; removed 3 nav entries from `menu-sidebar.ts` (+ unused `MailPlus` icon import); trimmed `system-routes.ts`/`utils/routes.ts`; removed dead `emailLog.template_id` display field from kept `EmailLogDetailModal.vue`; ran `artisan ziggy:generate`, confirmed zero stale route names in `resources/js/ziggy.js`.
+- **F13 boundary:** `EmailService`/`EmailLoggingService` kept per plan, but 3 genuine bugs surfaced during code review (all now fixed) from severing the FK/model — these were **correctness fixes required by this phase's own deletions**, not scope creep:
+  1. **CRITICAL** `EmailService::getEmailLogs()` still did `->with(['template', 'user'])` — would have thrown `RelationNotFoundException` on the live `GET api/emails/logs` route. Fixed to `->with(['user'])`, verified via tinker (`total=1467`, no error).
+  2. **HIGH** `TestEmailConfiguration` command listed `EmailTemplateService::class` in its service-resolution check — silently caught exception, made `email:test-configuration` report failure forever. Fixed by removing that array entry.
+  3. **MEDIUM** `EmailLoggingService::getDetailedEmailStatistics()` (dead code, 0 callers, correctly left in place per F13) referenced the dropped `template_id` column in a filter and a `templateBreakdown` block — removed both so the dead method doesn't fatal if ever called again.
+  Also trimmed 4 fully-dead `EmailService` methods (`sendBulkEmail`, `getBulkEmailProgress`, `cancelBulkEmailBatch`, `renderTemplate`) + 3 orphaned private helpers, whose only callers were surfaces deleted this phase (`sendBulkEmail` had zero callers even before this phase — dead on arrival). Fixed `sendSingleEmail()`'s dangling `?EmailTemplate` typehint to `mixed` (this live method is the only caller of `EmailLoggingService::logEmailSendingAttempt`). `EmailLoggingService.php` itself left otherwise untouched per red-team F13's explicit "keep unconditionally, no delete step" — confirmed safe (nullable typehints to the deleted class are never invoked with a non-null value).
+- **Known pre-existing bug (unrelated, not fixed):** `email:test-configuration` crashes with "An option named 'verbose' already exists" — the command defines a custom `--verbose` option colliding with Symfony Console's built-in flag. Confirmed via git-stash comparison to pre-exist on `dev` before this phase; out of scope.
+- **Deferred (LOW, not blocking):** orphaned FE types `EmailTemplate` interface in `resources/js/types/models.ts`/`index.d.ts`, plus zero-consumer `components/EmailEditor.vue`, `composables/useStudentEmailVariables.ts`, `types/email.ts` — dead but harmless, candidate for a follow-up FE sweep, not required by this phase's file list.
+- **Migration `down()` caveat:** its rollback re-adds the FK against `email_templates`, which Phase 5 drops — rollback will fail after Phase 5 runs. Noted for Phase 5.
+- Tests: `tests/Feature/Feature/EmailConfiguration` (21/21), `tests/Feature/Notification/ExternalEmailApiTest.php`, full `tests/Feature/Architecture` — identical 5 pre-existing baseline failures before/after, zero regression from this phase.

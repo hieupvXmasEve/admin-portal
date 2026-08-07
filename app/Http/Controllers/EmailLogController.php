@@ -23,7 +23,7 @@ class EmailLogController extends Controller
 
         // Build query with eager loading for performance
         $query = EmailLog::query()
-            ->with(['template:id,name,type', 'user:id,name,email'])
+            ->with(['user:id,name,email'])
             ->latest('created_at');
 
         // Apply filters
@@ -54,11 +54,6 @@ class EmailLogController extends Controller
                 'error_message' => $log->error_message,
                 'created_at' => $log->created_at->toISOString(),
                 'updated_at' => $log->updated_at->toISOString(),
-                'template' => $log->template ? [
-                    'id' => $log->template->id,
-                    'name' => $log->template->name,
-                    'type' => $log->template->type,
-                ] : null,
                 'user' => $log->user ? [
                     'id' => $log->user->id,
                     'name' => $log->user->name,

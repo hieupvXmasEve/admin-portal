@@ -19,7 +19,6 @@ class EmailLog extends AuditableModel
         'recipient',
         'sender',
         'subject',
-        'template_id',
         'status',
         'queued_at',
         'sent_at',
@@ -74,14 +73,6 @@ class EmailLog extends AuditableModel
             self::STATUS_BOUNCED => 'Bounced',
             self::STATUS_REJECTED => 'Rejected',
         ];
-    }
-
-    /**
-     * Template relationship
-     */
-    public function template(): BelongsTo
-    {
-        return $this->belongsTo(EmailTemplate::class);
     }
 
     /**

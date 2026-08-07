@@ -3,15 +3,12 @@
 namespace App\Services;
 
 use App\Jobs\SendSingleEmailJob;
-use App\Jobs\SendBulkEmailJob;
 use App\Models\EmailConfiguration;
 use App\Models\EmailLog;
-use App\Models\EmailTemplate;
 use App\Models\User;
 use App\Models\UserEmailPreference;
 use App\Services\EmailLoggingService;
 use App\Services\UserEmailPreferenceService;
-use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
@@ -35,7 +32,7 @@ class EmailService
         string $recipient,
         string $subject,
         string $content,
-        ?EmailTemplate $template = null,
+        mixed $template = null,
         array $attachments = [],
         ?User $sender = null,
         array $templateVariables = [],
@@ -310,303 +307,6 @@ class EmailService
     }
 
     /**
-     * Send bulk emails with comprehensive validation and progress tracking
-     */
-    public function sendBulkEmail(
-        array $recipients,
-        string $subject,
-        string $content,
-        ?EmailTemplate $template = null,
-        array $attachments = [],
-        ?User $sender = null,
-        array $templateVariables = [],
-        int $chunkSize = 100,
-        array $options = []
-    ): array {
-        // Validate bulk email parameters
-        $this->validateBulkEmailParameters($recipients, $subject, $content, $chunkSize);
-
-        // Process and validate recipients
-        $processedRecipients = $this->processRecipients($recipients);
-
-        if (empty($processedRecipients['valid'])) {
-            throw new \InvalidArgumentException('No valid email addresses provided');
-        }
-
-        // Validate content and attachments
-        $this->validateEmailContent($subject, $content);
-        $this->validateAttachments($attachments);
-
-        // Generate batch ID and create batch metadata
-        $batchId = Str::uuid()->toString();
-        $batchMetadata = [
-            'batch_id' => $batchId,
-            'total_recipients' => count($processedRecipients['valid']),
-            'invalid_recipients' => count($processedRecipients['invalid']),
-            'subject' => $subject,
-            'template_id' => $template?->id,
-            'sender_id' => $sender?->id,
-            'created_at' => now()->toISOString(),
-            'options' => $options,
-        ];
-
-        try {
-            // Use the provided content directly and perform variable substitution if needed
-            $htmlContent = $content;
-            $textContent = null;
-            $finalSubject = $subject;
-
-            // IMPORTANT: Do NOT substitute global variables here for bulk.
-            // We will pass global variables to the job so that, per recipient,
-            // we can merge per-recipient variables over these fallbacks and
-            // substitute once. This avoids "first student" values being baked
-            // into all emails.
-
-            // Validate rendered content
-            $this->validateRenderedContent($htmlContent, $textContent);
-
-            // Create jobs for chunks of recipients
-            $chunks = array_chunk($processedRecipients['valid'], $chunkSize);
-            $jobs = [];
-
-            foreach ($chunks as $chunkIndex => $chunk) {
-                $jobs[] = new SendBulkEmailJob(
-                    $chunk,
-                    $finalSubject,
-                    $htmlContent,
-                    $textContent,
-                    $template?->id,
-                    $attachments,
-                    $sender?->id,
-                    $batchId,
-                    $chunkIndex,
-                    $options['template_variables_per_recipient'] ?? null,
-                    $templateVariables // global fallbacks
-                );
-            }
-
-            // Configure batch options
-            $batchName = $options['batch_name'] ?? 'Bulk Email: ' . $subject;
-            $queue = $options['queue'] ?? 'bulk-emails';
-
-            // Dispatch as batch for better tracking
-            $batch = Bus::batch($jobs)
-                ->name($batchName)
-                ->onQueue($queue)
-                ->allowFailures()
-                ->then(function () use ($batchId) {
-                    Log::info('Bulk email batch completed successfully', ['batch_id' => $batchId]);
-                })
-                ->catch(function () use ($batchId) {
-                    Log::error('Bulk email batch failed', ['batch_id' => $batchId]);
-                })
-                ->finally(function () use ($batchId) {
-                    Log::info('Bulk email batch finished', ['batch_id' => $batchId]);
-                })
-                ->dispatch();
-
-            // Store batch metadata for tracking
-            $this->storeBatchMetadata($batchId, $batchMetadata, $batch->id);
-
-            Log::info('Bulk email batch dispatched', [
-                'batch_id' => $batchId,
-                'laravel_batch_id' => $batch->id,
-                'total_recipients' => count($processedRecipients['valid']),
-                'invalid_recipients' => count($processedRecipients['invalid']),
-                'chunks' => count($chunks),
-                'subject' => $subject,
-                'template_id' => $template?->id,
-            ]);
-
-            return [
-                'batch_id' => $batchId,
-                'laravel_batch_id' => $batch->id,
-                'total_recipients' => count($processedRecipients['valid']),
-                'invalid_recipients' => count($processedRecipients['invalid']),
-                'invalid_emails' => $processedRecipients['invalid'],
-                'chunks' => count($chunks),
-                'estimated_completion' => now()->addMinutes(count($chunks) * 2)->toISOString(),
-            ];
-        } catch (\Exception $e) {
-            Log::error('Failed to dispatch bulk email batch', [
-                'batch_id' => $batchId,
-                'error' => $e->getMessage(),
-                'recipients_count' => count($processedRecipients['valid']),
-            ]);
-
-            throw $e;
-        }
-    }
-
-    /**
-     * Validate bulk email parameters
-     */
-    protected function validateBulkEmailParameters(array $recipients, string $subject, string $content, int $chunkSize): void
-    {
-        if (empty($recipients)) {
-            throw new \InvalidArgumentException('Recipients list cannot be empty');
-        }
-
-        if (count($recipients) > 10000) {
-            throw new \InvalidArgumentException('Too many recipients (max 10,000 per batch)');
-        }
-
-        if ($chunkSize < 1 || $chunkSize > 1000) {
-            throw new \InvalidArgumentException('Invalid chunk size (must be between 1 and 1000)');
-        }
-
-        // Check rate limits
-        $activeConfig = $this->getActiveConfiguration();
-        if ($activeConfig && $activeConfig->daily_limit) {
-            $todaysSentCount = EmailLog::whereDate('created_at', today())
-                ->whereIn('status', [EmailLog::STATUS_SENT, EmailLog::STATUS_DELIVERED])
-                ->count();
-
-            if ($todaysSentCount + count($recipients) > $activeConfig->daily_limit) {
-                throw new \InvalidArgumentException(
-                    'Bulk email would exceed daily limit of ' . $activeConfig->daily_limit . ' emails'
-                );
-            }
-        }
-    }
-
-    /**
-     * Process and validate recipients list
-     */
-    protected function processRecipients(array $recipients): array
-    {
-        $valid = [];
-        $invalid = [];
-        $seen = [];
-
-        foreach ($recipients as $recipient) {
-            $email = is_array($recipient) ? $recipient['email'] : $recipient;
-            $email = trim(strtolower($email));
-
-            // Skip duplicates
-            if (isset($seen[$email])) {
-                continue;
-            }
-            $seen[$email] = true;
-
-            try {
-                $this->validateEmailAddress($email);
-
-                // Check if user has opted out
-                if ($user = User::where('email', $email)->first()) {
-                    if (!$this->canUserReceiveNotification($user, 'bulk')) {
-                        Log::info('Skipping recipient due to email preferences', ['email' => $email]);
-                        continue;
-                    }
-                }
-
-                $valid[] = $email;
-            } catch (\InvalidArgumentException $e) {
-                $invalid[] = [
-                    'email' => $email,
-                    'reason' => $e->getMessage(),
-                ];
-            }
-        }
-
-        return [
-            'valid' => $valid,
-            'invalid' => $invalid,
-        ];
-    }
-
-    /**
-     * Store batch metadata for tracking
-     */
-    protected function storeBatchMetadata(string $batchId, array $metadata, string $laravelBatchId): void
-    {
-        // Store in cache for quick access
-        cache()->put("bulk_email_batch:{$batchId}", $metadata, now()->addDays(7));
-
-        // Also store Laravel batch ID mapping
-        cache()->put("bulk_email_laravel_batch:{$laravelBatchId}", $batchId, now()->addDays(7));
-    }
-
-    /**
-     * Get bulk email batch progress
-     */
-    public function getBulkEmailProgress(string $batchId): array
-    {
-        $metadata = cache()->get("bulk_email_batch:{$batchId}");
-
-        if (!$metadata) {
-            throw new \InvalidArgumentException('Batch not found: ' . $batchId);
-        }
-
-        // Get email logs for this batch
-        $logs = EmailLog::where('batch_id', $batchId)->get();
-
-        $statusCounts = $logs->groupBy('status')->map->count();
-
-        $progress = [
-            'batch_id' => $batchId,
-            'metadata' => $metadata,
-            'total_emails' => $logs->count(),
-            'status_breakdown' => $statusCounts->toArray(),
-            'progress_percentage' => $logs->count() > 0
-                ? round(($logs->whereIn('status', [
-                    EmailLog::STATUS_SENT,
-                    EmailLog::STATUS_DELIVERED,
-                    EmailLog::STATUS_FAILED,
-                    EmailLog::STATUS_BOUNCED,
-                    EmailLog::STATUS_REJECTED
-                ])->count() / $logs->count()) * 100, 2)
-                : 0,
-            'completed_at' => $logs->whereIn('status', [
-                EmailLog::STATUS_SENT,
-                EmailLog::STATUS_DELIVERED,
-                EmailLog::STATUS_FAILED,
-                EmailLog::STATUS_BOUNCED,
-                EmailLog::STATUS_REJECTED
-            ])->count() === $logs->count() ? now()->toISOString() : null,
-        ];
-
-        return $progress;
-    }
-
-    /**
-     * Cancel bulk email batch
-     */
-    public function cancelBulkEmailBatch(string $batchId): bool
-    {
-        $metadata = cache()->get("bulk_email_batch:{$batchId}");
-
-        if (!$metadata) {
-            throw new \InvalidArgumentException('Batch not found: ' . $batchId);
-        }
-
-        // Find Laravel batch by ID mapping
-        $laravelBatchId = null;
-        foreach (cache()->get("bulk_email_laravel_batch:*", []) as $key => $value) {
-            if ($value === $batchId) {
-                $laravelBatchId = str_replace('bulk_email_laravel_batch:', '', $key);
-                break;
-            }
-        }
-
-        if ($laravelBatchId) {
-            $batch = Bus::findBatch($laravelBatchId);
-            if ($batch && !$batch->finished()) {
-                $batch->cancel();
-
-                Log::info('Bulk email batch cancelled', [
-                    'batch_id' => $batchId,
-                    'laravel_batch_id' => $laravelBatchId,
-                ]);
-
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
      * Queue email for later processing
      */
     public function queueEmail(array $emailData): EmailLog
@@ -725,22 +425,6 @@ class EmailService
     }
 
     /**
-     * Render email template with variables
-     */
-    public function renderTemplate(EmailTemplate $template, array $variables = []): array
-    {
-        // Validate required variables
-        $missingVariables = $template->validateVariables($variables);
-        if (!empty($missingVariables)) {
-            throw new \InvalidArgumentException(
-                'Missing required template variables: ' . implode(', ', $missingVariables)
-            );
-        }
-
-        return $template->render($variables);
-    }
-
-    /**
      * Substitute variables in content using {{ variable }} syntax
      */
     public function substituteVariables(string $content, array $variables): string
@@ -756,7 +440,7 @@ class EmailService
      */
     public function getEmailLogs(array $filters = []): \Illuminate\Contracts\Pagination\LengthAwarePaginator
     {
-        $query = EmailLog::query()->with(['template', 'user']);
+        $query = EmailLog::query()->with(['user']);
 
         if (isset($filters['status'])) {
             $query->where('status', $filters['status']);

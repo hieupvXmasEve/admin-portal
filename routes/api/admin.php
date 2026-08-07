@@ -6,7 +6,6 @@ use App\Http\Controllers\Api\StudentController;
 use App\Http\Controllers\Api\StudentWalletController;
 use App\Http\Controllers\Api\V1\Admin\EmailConfigurationController;
 use App\Http\Controllers\Api\V1\Admin\EmailController;
-use App\Http\Controllers\Api\V1\Admin\EmailTemplateController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Modules\Academic\FacultyWorkforce\Http\Web\LectureController;
 use App\Modules\Notification\Http\Api\V1\Admin\NotificationTemplateController as NotificationTemplateApiController;
@@ -39,20 +38,6 @@ Route::middleware(['web', 'auth'])->name('api.admin.')->group(function () {
         Route::post('/{configuration}/test', [EmailConfigurationController::class, 'test'])->name('email-configurations.test');
         Route::post('/test-data', [EmailConfigurationController::class, 'testData'])->name('email-configurations.test-data');
         Route::post('/{configuration}/activate', [EmailConfigurationController::class, 'setActive'])->name('email-configurations.activate');
-    });
-
-    // Email Template Management
-    Route::prefix('email-templates')->group(function () {
-        Route::get('/', [EmailTemplateController::class, 'index'])->name('email-templates.index');
-        Route::post('/', [EmailTemplateController::class, 'store'])->name('email-templates.store');
-        Route::get('/types', [EmailTemplateController::class, 'getTypes'])->name('email-templates.types');
-        Route::post('/validate', [EmailTemplateController::class, 'validateTemplate'])->name('email-templates.validate');
-        Route::get('/type/{type}', [EmailTemplateController::class, 'getByType'])->name('email-templates.by-type');
-        Route::get('/{template}', [EmailTemplateController::class, 'show'])->name('email-templates.show');
-        Route::put('/{template}', [EmailTemplateController::class, 'update'])->name('email-templates.update');
-        Route::delete('/{template}', [EmailTemplateController::class, 'destroy'])->name('email-templates.destroy');
-        Route::post('/{template}/version', [EmailTemplateController::class, 'createVersion'])->name('email-templates.version');
-        Route::post('/{template}/preview', [EmailTemplateController::class, 'preview'])->name('email-templates.preview');
     });
 
     // Email Sending and Management

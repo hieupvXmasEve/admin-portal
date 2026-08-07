@@ -187,11 +187,6 @@ const formatDate = (dateString: string | null) => {
                         </div>
 
                         <div class="space-y-2">
-                            <label class="text-muted-foreground text-sm font-medium">Template ID</label>
-                            <p class="text-sm">{{ emailLog.template_id || 'N/A' }}</p>
-                        </div>
-
-                        <div class="space-y-2">
                             <label class="text-muted-foreground text-sm font-medium">User ID</label>
                             <p class="text-sm">{{ emailLog.user_id || 'N/A' }}</p>
                         </div>

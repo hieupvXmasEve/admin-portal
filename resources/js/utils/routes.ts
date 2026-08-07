@@ -117,8 +117,6 @@ export const systemRoutes = {
     // email
     emailConfiguration: {
         index: () => route(SYSTEM_EMAIL_CONFIGURATION_ROUTE_NAMES.INDEX),
-        templates: () => route(SYSTEM_EMAIL_CONFIGURATION_ROUTE_NAMES.TEMPLATES),
-        bulkEmail: () => route(SYSTEM_EMAIL_CONFIGURATION_ROUTE_NAMES.BULK_EMAIL),
         emailHistory: () => route(SYSTEM_EMAIL_CONFIGURATION_ROUTE_NAMES.EMAIL_HISTORY),
     },
     // form

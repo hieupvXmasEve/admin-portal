@@ -43,7 +43,6 @@ Route::get('/health', function () {
 // require __DIR__ . '/web/student.php';
 require __DIR__.'/web/failed-students.php';
 require __DIR__.'/web/systems.php';
-require __DIR__.'/web/email-monitoring.php';
 // @deprecated Syllabus template routes migrated to Academic Catalog.
 // Forms, surveys, and student-support routes are owned by Engagement.
 require __DIR__.'/web/scholarships.php';

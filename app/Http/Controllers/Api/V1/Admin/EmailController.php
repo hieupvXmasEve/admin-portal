@@ -319,7 +319,7 @@ class EmailController extends Controller
      */
     public function showLog(EmailLog $emailLog): JsonResponse
     {
-        $emailLog->load(['template', 'user']);
+        $emailLog->load(['user']);
 
         return response()->json([
             'success' => true,
@@ -348,7 +348,7 @@ class EmailController extends Controller
                 $emailLog->recipient,
                 $emailLog->subject,
                 'Retry: '.$emailLog->subject,
-                $emailLog->template,
+                null,
                 [],
                 Auth::user()
             );
