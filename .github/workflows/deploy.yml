@@ -217,6 +217,15 @@ jobs:
 
             dc build app queue scheduler
 
+            # cache_data is a named volume that outlives image rebuilds; a
+            # stale bootstrap/cache/config.php from an older commit can
+            # reference classes removed since. Laravel's config bootstrapper
+            # loads that cache file (and re-registers its provider list)
+            # before ANY artisan command runs — so `artisan optimize:clear`
+            # itself would crash the same way. Delete the cache files
+            # directly instead, bypassing Laravel bootstrap entirely.
+            dc run --rm --entrypoint sh app -c 'rm -f bootstrap/cache/*.php' || true
+
             if [ "${RUN_MIGRATIONS}" = "true" ]; then
               dc run --rm app php artisan migrate --force
             fi
