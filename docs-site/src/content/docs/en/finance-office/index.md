@@ -75,9 +75,18 @@ This group creates the receivables. It carries the most risk in the area.
 **Steps**
 
 1. Go to **Finance Office → Sinh phí → Batch Studio**.
-2. Choose the student group and the charge type.
-3. **Preview the result** before running for real.
-4. Run, and wait for it to finish.
+2. Pick the **billing semester** — choose it explicitly, don't rely on the default (the default is the current semester, which can differ from the semester a scholarship reduction decision targets).
+3. Choose the student group and the charge type.
+4. **Preview the result** before running for real.
+5. Run, and wait for it to finish.
+
+**Reading the Amount column in preview.** For HP (tuition) charges, if a student has a scholarship, the Amount cell shows:
+
+- Original tuition (struck through) and the amount actually due after discount (bold).
+- 🎓 the scholarship line — name, original rate/amount, and the discount at that original rate.
+- 📉 a "Scholarship reduced" line (only shown when an active adjustment decision targets the exact semester selected) — the reduced rate and how much less is being deducted compared to the original.
+
+No scholarship line even though the student has one → check step 2, the selected semester may not match the adjustment's target semester.
 
 **Notes**
 

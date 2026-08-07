@@ -75,9 +75,18 @@ Nhóm này tạo ra các khoản phải thu. Đây là bước rủi ro nhất t
 **Các bước**
 
 1. Vào **Finance Office → Sinh phí → Batch Studio**.
-2. Chọn nhóm sinh viên và loại phí cần sinh.
-3. **Xem trước kết quả** trước khi chạy thật.
-4. Chạy và đợi hoàn tất.
+2. Chọn **học kỳ sinh phí** — chọn đúng học kỳ, không dùng mặc định (mặc định là học kỳ hiện tại, có thể khác học kỳ mà một quyết định giảm học bổng đang nhắm tới).
+3. Chọn nhóm sinh viên và loại phí cần sinh.
+4. **Xem trước kết quả** trước khi chạy thật.
+5. Chạy và đợi hoàn tất.
+
+**Đọc dòng Số tiền khi xem trước.** Với phí HP (học phí), nếu sinh viên có học bổng, dòng Số tiền hiển thị:
+
+- Học phí gốc (gạch ngang) và số tiền phải thu sau giảm (in đậm).
+- 🎓 dòng học bổng — tên, tỉ lệ/mức gốc, số tiền được giảm theo mức gốc.
+- 📉 dòng "Bị giảm học bổng" (chỉ hiện khi có quyết định điều chỉnh đang hiệu lực cho đúng học kỳ đã chọn) — mức còn lại sau quyết định và phần bị cắt bớt so với mức gốc.
+
+Không thấy dòng học bổng dù sinh viên có học bổng → kiểm tra lại đã chọn đúng học kỳ đích của quyết định điều chỉnh chưa (bước 2).
 
 **Lưu ý**
 

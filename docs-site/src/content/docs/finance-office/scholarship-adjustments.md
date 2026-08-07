@@ -24,6 +24,8 @@ Tính năng dùng để xét những sinh viên bị trượt môn, ghi nhận b
 5. Áp dụng vào học phí  →  6. Kỳ sau: khôi phục hoặc xét lại
 ```
 
+![Sơ đồ quy trình điều chỉnh giảm học bổng](/finance-office/flow-giam-hoc-bong.svg)
+
 ## 1. Tìm sinh viên cần xét
 
 **Màn hình.** Bấm nút **Tìm sinh viên cần xét** ở góc trên phải trang danh sách — mở màn hình **Tìm sinh viên cần xét**.
