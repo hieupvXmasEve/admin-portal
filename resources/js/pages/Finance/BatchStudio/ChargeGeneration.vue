@@ -43,7 +43,16 @@ const props = defineProps<{
     prefill?: ChargePrefill;
 }>();
 
-const { selectedId: semesterId, labelFor: semesterLabelFor } = useFinanceSemester();
+const { selectedId: semesterId, context: semesterContext } = useFinanceSemester();
+
+const semesterOptions = computed(() => semesterContext.value?.options ?? []);
+
+const semesterSelection = computed({
+    get: () => (wizard.setup.semester_id ?? semesterId.value)?.toString() ?? '',
+    set: (value: string) => {
+        wizard.setup.semester_id = value ? Number(value) : null;
+    },
+});
 
 const defaultSetup: ChargeSetup = {
     fee_category: props.prefill?.fee_category ?? 'major',
@@ -85,8 +94,9 @@ const nonAcademicReady = computed(() => {
     return Boolean(wizard.setup.scope.fee_type && Number(wizard.setup.scope.amount) > 0);
 });
 const nextDisabled = computed(() => {
-    if (wizard.step.value === 1 && isNonAcademic.value) {
-        return !nonAcademicReady.value;
+    if (wizard.step.value === 1) {
+        if (!semesterSelection.value) return true;
+        if (isNonAcademic.value) return !nonAcademicReady.value;
     }
 
     return wizard.step.value === 3 && needsAck.value && !ack.value;
@@ -199,7 +209,7 @@ function prepareNonAcademicScope(): boolean {
                 <Card v-if="step === 1" class="border-0 shadow-none">
                     <CardHeader>
                         <CardTitle class="text-base">Thiết lập phạm vi</CardTitle>
-                        <CardDescription>Chọn loại phí. Kỳ học lấy từ thanh trên cùng.</CardDescription>
+                        <CardDescription>Chọn loại phí và kỳ sinh phí.</CardDescription>
                     </CardHeader>
                     <CardContent class="grid gap-5">
                         <div class="space-y-2">
@@ -215,9 +225,18 @@ function prepareNonAcademicScope(): boolean {
                                 </SelectContent>
                             </Select>
                         </div>
-                        <div class="bg-muted/40 rounded-lg border px-4 py-3 text-sm">
-                            <span class="text-muted-foreground">Kỳ đang chọn:</span>
-                            <span class="ml-2 font-medium">{{ semesterLabelFor(wizard.setup.semester_id ?? semesterId) }}</span>
+                        <div class="space-y-2">
+                            <Label>Kỳ sinh phí</Label>
+                            <Select v-model="semesterSelection">
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Chọn kỳ" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem v-for="option in semesterOptions" :key="option.id" :value="option.id.toString()">
+                                        {{ option.name }} ({{ option.code }})<template v-if="option.is_active"> · hiện tại</template>
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
                         <div v-if="isNonAcademic" class="bg-muted/20 grid gap-4 rounded-lg border p-4 sm:grid-cols-2">
                             <div class="space-y-2">
