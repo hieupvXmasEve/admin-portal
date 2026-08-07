@@ -32,6 +32,7 @@ export interface NavGroup {
 
 export interface SharedData extends PageProps {
     name: string;
+    user_guide_url: string | null;
     quote: { message: string; author: string };
     auth: Auth;
     ziggy: Config & { location: string };

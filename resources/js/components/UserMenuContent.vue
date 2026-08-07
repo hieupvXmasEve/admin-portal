@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import UserInfo from '@/components/UserInfo.vue';
 import { DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import type { User } from '@/types';
+import type { SharedData, User } from '@/types';
 import { CAMPUS_ROUTE_NAMES } from '@/constants';
-import { Link, router } from '@inertiajs/vue3';
-import { LogOut, MapPin, Settings } from 'lucide-vue-next';
+import { Link, router, usePage } from '@inertiajs/vue3';
+import { HelpCircle, LogOut, MapPin, Settings } from 'lucide-vue-next';
 
 interface Props {
     user: User;
 }
+
+const page = usePage<SharedData>();
 
 const handleLogout = () => {
     router.flushAll();
@@ -36,6 +38,12 @@ defineProps<Props>();
                 <MapPin class="mr-2 h-4 w-4" />
                 Change Campus
             </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem v-if="page.props.user_guide_url" :as-child="true">
+            <a class="flex w-full items-center" :href="page.props.user_guide_url" target="_blank" rel="noopener noreferrer">
+                <HelpCircle class="mr-2 h-4 w-4" />
+                Hướng dẫn
+            </a>
         </DropdownMenuItem>
     </DropdownMenuGroup>
     <DropdownMenuSeparator />
