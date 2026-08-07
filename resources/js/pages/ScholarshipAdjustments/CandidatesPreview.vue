@@ -11,9 +11,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
 
 interface SemesterOption {
     id: number;
@@ -96,6 +98,28 @@ function toggle(studentId: number, checked: boolean) {
 
 const createForm = useForm({ student_ids: [] as number[] });
 
+const manualForm = useForm({ student_code: '', exception_reason: '' });
+
+function submitManualAdd() {
+    manualForm
+        .transform((data) => ({
+            ...data,
+            source_semester_id: sourceSemesterId.value,
+            target_semester_id: targetSemesterId.value,
+        }))
+        .post(route('scholarship-adjustments.add-manually'), {
+            preserveScroll: true,
+            onSuccess: (visited: Page) => {
+                const flash = visited.props.flash as { success?: string } | undefined;
+                if (flash?.success) toast.success(flash.success);
+                manualForm.reset();
+            },
+            onError: (errors: Errors) => {
+                toast.error(errors.error ?? Object.values(errors)[0] ?? 'Không thể thêm sinh viên.');
+            },
+        });
+}
+
 function submitCreate() {
     createForm.student_ids = Array.from(selected.value);
     createForm
@@ -157,6 +181,27 @@ function submitCreate() {
                 </Select>
             </div>
         </CardContent>
+    </Card>
+
+    <Card class="mt-6">
+        <CardHeader>
+            <CardTitle>Thêm thủ công theo mã sinh viên</CardTitle>
+            <CardDescription>Dùng khi sinh viên không nằm trong danh sách quét tự động ở trên nhưng cần được xét. Bắt buộc nêu lý do ngoại lệ.</CardDescription>
+        </CardHeader>
+        <CardContent class="grid grid-cols-1 gap-4 md:grid-cols-[1fr_2fr_auto] md:items-end">
+            <div class="space-y-2">
+                <Label for="manual-student-code">Mã sinh viên</Label>
+                <Input id="manual-student-code" v-model="manualForm.student_code" placeholder="VD: SV001234" />
+                <p v-if="manualForm.errors.student_code" class="text-destructive text-xs">{{ manualForm.errors.student_code }}</p>
+            </div>
+            <div class="space-y-2">
+                <Label for="manual-reason">Lý do ngoại lệ</Label>
+                <Textarea id="manual-reason" v-model="manualForm.exception_reason" placeholder="Vì sao sinh viên này cần được xét thủ công" rows="1" />
+                <p v-if="manualForm.errors.exception_reason" class="text-destructive text-xs">{{ manualForm.errors.exception_reason }}</p>
+            </div>
+            <Button :disabled="!targetSemesterId || !sourceSemesterId || manualForm.processing" @click="submitManualAdd">Thêm vào danh sách xét</Button>
+        </CardContent>
+        <CardContent v-if="!targetSemesterId || !sourceSemesterId" class="text-muted-foreground -mt-4 text-xs">Chọn học kỳ áp dụng và học kỳ trượt môn ở trên trước.</CardContent>
     </Card>
 
     <Card v-if="preview" class="mt-6">
