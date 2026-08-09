@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Merchandise\Policies;
 
-use App\Models\MerchandiseVariant;
 use App\Models\User;
+use App\Modules\Merchandise\Models\MerchandiseVariant;
 use App\Shared\Contracts\Identity\CampusPermissionReader;
 
 /**

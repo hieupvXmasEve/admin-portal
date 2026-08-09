@@ -6,12 +6,12 @@ namespace App\Modules\Merchandise\Http\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
-use App\Models\Merchandise;
 use App\Modules\Merchandise\Actions\ArchiveMerchandiseAction;
 use App\Modules\Merchandise\Actions\CreateMerchandiseAction;
 use App\Modules\Merchandise\Actions\UpdateMerchandiseAction;
 use App\Modules\Merchandise\Http\Requests\StoreMerchandiseRequest;
 use App\Modules\Merchandise\Http\Requests\UpdateMerchandiseRequest;
+use App\Modules\Merchandise\Models\Merchandise;
 use App\Modules\Merchandise\Support\MerchandiseCatalogNotificationPublisher;
 use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;

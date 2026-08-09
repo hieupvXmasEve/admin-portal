@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Merchandise\Http\Requests\Student;
 
-use App\Models\MerchandiseVariant;
-use App\Models\RedemptionOrder;
+use App\Modules\Merchandise\Models\MerchandiseVariant;
+use App\Modules\Merchandise\Models\RedemptionOrder;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;

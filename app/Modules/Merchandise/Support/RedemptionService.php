@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace App\Modules\Merchandise\Support;
 
-use App\Models\GoldTransaction;
-use App\Models\Merchandise;
-use App\Models\MerchandiseVariant;
-use App\Models\RedemptionOrder;
-use App\Models\RedemptionOrderItem;
-use App\Models\StockMovement;
 use App\Models\Student;
 use App\Modules\Merchandise\Exceptions\RedemptionStateConflictException;
+use App\Modules\Merchandise\Models\GoldTransaction;
+use App\Modules\Merchandise\Models\Merchandise;
+use App\Modules\Merchandise\Models\MerchandiseVariant;
+use App\Modules\Merchandise\Models\RedemptionOrder;
+use App\Modules\Merchandise\Models\RedemptionOrderItem;
+use App\Modules\Merchandise\Models\StockMovement;
 use App\Services\GoldService;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;

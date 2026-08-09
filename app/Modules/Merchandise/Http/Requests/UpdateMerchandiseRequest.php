@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Merchandise\Http\Requests;
 
-use App\Models\Merchandise;
+use App\Modules\Merchandise\Models\Merchandise;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 

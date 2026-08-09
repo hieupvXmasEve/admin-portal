@@ -6,8 +6,8 @@ namespace App\Modules\Merchandise\Http\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
-use App\Models\RedemptionOrder;
 use App\Modules\Merchandise\Exceptions\RedemptionStateConflictException;
+use App\Modules\Merchandise\Models\RedemptionOrder;
 use App\Modules\Merchandise\Support\RedemptionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

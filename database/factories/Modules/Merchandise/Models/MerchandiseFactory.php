@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Database\Factories;
+namespace Database\Factories\Modules\Merchandise\Models;
 
-use App\Models\Merchandise;
+use App\Modules\Merchandise\Models\Merchandise;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

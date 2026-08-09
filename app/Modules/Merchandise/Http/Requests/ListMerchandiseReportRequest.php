@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Merchandise\Http\Requests;
 
-use App\Models\RedemptionOrder;
+use App\Modules\Merchandise\Models\RedemptionOrder;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 

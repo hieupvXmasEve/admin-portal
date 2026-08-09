@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Merchandise\Actions;
 
-use App\Models\Merchandise;
-use App\Models\MerchandiseVariant;
+use App\Modules\Merchandise\Models\Merchandise;
+use App\Modules\Merchandise\Models\MerchandiseVariant;
 
 class CreateMerchandiseVariantAction
 {

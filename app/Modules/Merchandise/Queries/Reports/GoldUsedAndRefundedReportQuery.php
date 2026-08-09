@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Merchandise\Queries\Reports;
 
-use App\Models\RedemptionOrder;
+use App\Modules\Merchandise\Models\RedemptionOrder;
 
 /**
  * Gold spend summary derived straight from redemption_orders.total_gold —

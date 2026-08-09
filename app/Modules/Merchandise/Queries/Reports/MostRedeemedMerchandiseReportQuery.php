@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Merchandise\Queries\Reports;
 
-use App\Models\RedemptionOrder;
-use App\Models\RedemptionOrderItem;
+use App\Modules\Merchandise\Models\RedemptionOrder;
+use App\Modules\Merchandise\Models\RedemptionOrderItem;
 use Illuminate\Support\Facades\DB;
 
 /**

@@ -6,14 +6,14 @@ namespace App\Modules\Merchandise\Http\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
-use App\Models\Merchandise;
-use App\Models\MerchandiseImage;
 use App\Modules\Merchandise\Actions\AttachMerchandiseImageAction;
 use App\Modules\Merchandise\Actions\DetachMerchandiseImageAction;
 use App\Modules\Merchandise\Actions\ReorderMerchandiseImagesAction;
 use App\Modules\Merchandise\Actions\SetPrimaryMerchandiseImageAction;
 use App\Modules\Merchandise\Http\Requests\AttachMerchandiseImageRequest;
 use App\Modules\Merchandise\Http\Requests\ReorderMerchandiseImagesRequest;
+use App\Modules\Merchandise\Models\Merchandise;
+use App\Modules\Merchandise\Models\MerchandiseImage;
 use App\Shared\Contracts\Upload\FileUploadGateway;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;

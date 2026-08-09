@@ -6,8 +6,8 @@ namespace App\Modules\Merchandise\Http\Api\Student;
 
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
-use App\Models\Merchandise;
 use App\Models\Student;
+use App\Modules\Merchandise\Models\Merchandise;
 use App\Modules\Merchandise\Queries\GetMerchandiseAvailabilityQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

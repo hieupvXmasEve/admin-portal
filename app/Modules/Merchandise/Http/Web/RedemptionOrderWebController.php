@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Merchandise\Http\Web;
 
 use App\Http\Controllers\Controller;
-use App\Models\RedemptionOrder;
+use App\Modules\Merchandise\Models\RedemptionOrder;
 use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;

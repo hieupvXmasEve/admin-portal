@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Merchandise\Actions;
 
-use App\Models\Merchandise;
+use App\Modules\Merchandise\Models\Merchandise;
 
 /**
  * Archiving hides an item from the store without deleting it. Redemption

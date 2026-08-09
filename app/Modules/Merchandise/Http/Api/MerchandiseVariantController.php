@@ -6,13 +6,13 @@ namespace App\Modules\Merchandise\Http\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
-use App\Models\Merchandise;
-use App\Models\MerchandiseVariant;
 use App\Modules\Merchandise\Actions\CreateMerchandiseVariantAction;
 use App\Modules\Merchandise\Actions\UpdateMerchandiseVariantAction;
 use App\Modules\Merchandise\Http\Requests\AdjustMerchandiseVariantStockRequest;
 use App\Modules\Merchandise\Http\Requests\StoreMerchandiseVariantRequest;
 use App\Modules\Merchandise\Http\Requests\UpdateMerchandiseVariantRequest;
+use App\Modules\Merchandise\Models\Merchandise;
+use App\Modules\Merchandise\Models\MerchandiseVariant;
 use App\Modules\Merchandise\Support\StockService;
 use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Http\JsonResponse;

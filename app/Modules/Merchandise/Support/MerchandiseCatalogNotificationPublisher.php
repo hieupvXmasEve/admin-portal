@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Merchandise\Support;
 
-use App\Models\Merchandise;
 use App\Models\Student;
+use App\Modules\Merchandise\Models\Merchandise;
 use App\Shared\Contracts\DomainEvents\DomainEvent;
 use App\Shared\Contracts\DomainEvents\DomainEventPublisher;
 use App\Shared\Contracts\Notification\NotificationPayloadFactory;

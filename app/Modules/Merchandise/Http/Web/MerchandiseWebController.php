@@ -6,9 +6,9 @@ namespace App\Modules\Merchandise\Http\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Campus;
-use App\Models\Merchandise;
-use App\Models\MerchandiseVariant;
-use App\Models\StockMovement;
+use App\Modules\Merchandise\Models\Merchandise;
+use App\Modules\Merchandise\Models\MerchandiseVariant;
+use App\Modules\Merchandise\Models\StockMovement;
 use App\Modules\Merchandise\Queries\GetMerchandiseAvailabilityQuery;
 use Illuminate\Http\Request;
 use Inertia\Inertia;

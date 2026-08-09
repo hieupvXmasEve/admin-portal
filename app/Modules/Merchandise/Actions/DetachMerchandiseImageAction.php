@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Merchandise\Actions;
 
-use App\Models\MerchandiseImage;
+use App\Modules\Merchandise\Models\MerchandiseImage;
 
 class DetachMerchandiseImageAction
 {

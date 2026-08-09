@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Merchandise\Support;
 
-use App\Models\MerchandiseVariant;
-use App\Models\StockMovement;
+use App\Modules\Merchandise\Models\MerchandiseVariant;
+use App\Modules\Merchandise\Models\StockMovement;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 

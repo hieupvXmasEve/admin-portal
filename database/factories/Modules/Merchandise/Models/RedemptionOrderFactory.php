@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Database\Factories;
+namespace Database\Factories\Modules\Merchandise\Models;
 
 use App\Models\Campus;
-use App\Models\RedemptionOrder;
 use App\Models\Student;
+use App\Modules\Merchandise\Models\RedemptionOrder;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
