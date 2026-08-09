@@ -1,7 +1,7 @@
 ---
 title: "Cut Student legacy Finance reverse relations"
 description: "Remove Student.php's 3 reverse Finance model relations (financeCharges/payments/invoices), one PR each, replacing sole caller with Finance-owned existence contracts"
-status: pending
+status: completed
 priority: P1
 effort: "3x ~2h"
 tags: [finance, student-registry, boundary-cleanup]
@@ -51,7 +51,7 @@ pattern, swaps the one caller, then deletes the relation from `Student.php`.
 |---|-------|--------|
 | 1 | [Phase 1: Cut Student::financeCharges() reverse relation](./phase-01-start.md) | Completed |
 | 2 | [Phase 2: Cut Student::payments() reverse relation](./phase-02-cut-studentpayments-reverse-relation.md) | Completed |
-| 3 | [Phase 3: Cut Student::invoices() reverse relation](./phase-03-cut-studentinvoices-reverse-relation.md) | Pending |
+| 3 | [Phase 3: Cut Student::invoices() reverse relation](./phase-03-cut-studentinvoices-reverse-relation.md) | Completed |
 
 ## Non-Goals
 

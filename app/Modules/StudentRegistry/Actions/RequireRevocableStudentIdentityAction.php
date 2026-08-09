@@ -6,6 +6,7 @@ namespace App\Modules\StudentRegistry\Actions;
 
 use App\Models\Student;
 use App\Shared\Contracts\Finance\StudentFinanceChargeExistenceReader;
+use App\Shared\Contracts\Finance\StudentInvoiceExistenceReader;
 use App\Shared\Contracts\Finance\StudentPaymentExistenceReader;
 use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
 use RuntimeException;
@@ -20,7 +21,7 @@ final class RequireRevocableStudentIdentityAction
         'courseRegistrations', 'enrollments', 'academicRecords', 'attendances',
         'gpaCalculations', 'academicStandings', 'academicHolds', 'programChangeRequests',
         'academicProgressionEvents', 'actionLogs', 'ieltsCertificates', 'egcProgress',
-        'invoices', 'deferCases', 'voucherApplications',
+        'deferCases', 'voucherApplications',
         'dngPaymentRequests', 'goldTransactions', 'wallet', 'scholarshipAward',
         'clubMemberships', 'formResponses',
     ];
@@ -39,6 +40,10 @@ final class RequireRevocableStudentIdentityAction
         }
 
         if (app(StudentPaymentExistenceReader::class)->hasAnyPaymentFor((int) $student->id)) {
+            throw new RuntimeException(self::ACTIVITY_BLOCK_MESSAGE);
+        }
+
+        if (app(StudentInvoiceExistenceReader::class)->hasAnyInvoiceFor((int) $student->id)) {
             throw new RuntimeException(self::ACTIVITY_BLOCK_MESSAGE);
         }
 

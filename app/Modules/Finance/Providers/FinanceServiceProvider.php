@@ -26,6 +26,7 @@ use App\Modules\Finance\Queries\TuitionChargeExistenceQuery;
 use App\Modules\Finance\Queries\GetStudentPortalFinanceSummaryQuery;
 use App\Modules\Finance\Queries\PreviewScholarshipAdjustmentQuery;
 use App\Modules\Finance\Queries\StudentFinanceChargeExistenceQuery;
+use App\Modules\Finance\Queries\StudentInvoiceExistenceQuery;
 use App\Modules\Finance\Queries\StudentLifecycleFinanceQuery;
 use App\Modules\Finance\Queries\StudentPaymentExistenceQuery;
 use App\Modules\Finance\Services\DeferCaseService;
@@ -58,6 +59,7 @@ use App\Shared\Contracts\Finance\ScholarshipAdjustmentPreviewReader;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
 use App\Shared\Contracts\Finance\StudentFeeSummaryReader;
 use App\Shared\Contracts\Finance\StudentFinanceChargeExistenceReader;
+use App\Shared\Contracts\Finance\StudentInvoiceExistenceReader;
 use App\Shared\Contracts\Finance\StudentPaymentExistenceReader;
 use App\Shared\Contracts\Finance\TuitionChargeExistenceReader;
 use App\Shared\Contracts\Finance\StudentLifecycleFinanceCommand;
@@ -94,6 +96,7 @@ class FinanceServiceProvider extends ServiceProvider
         $this->app->bind(TuitionChargeExistenceReader::class, TuitionChargeExistenceQuery::class);
         $this->app->bind(StudentFinanceChargeExistenceReader::class, StudentFinanceChargeExistenceQuery::class);
         $this->app->bind(StudentPaymentExistenceReader::class, StudentPaymentExistenceQuery::class);
+        $this->app->bind(StudentInvoiceExistenceReader::class, StudentInvoiceExistenceQuery::class);
         $this->app->bind(StudentPortalFinanceSummaryReader::class, GetStudentPortalFinanceSummaryQuery::class);
         $this->app->bind(StudentLifecycleFinanceCommand::class, ApplyStudentLifecycleDeferAction::class);
         $this->app->bind(

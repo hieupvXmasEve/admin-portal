@@ -36,7 +36,6 @@ class BillingScopeHelper
         $query->with([
             'scholarshipAward.scholarshipDefinition',
             'voucherApplications' => fn ($q) => $q->where('semester_id', $semesterId),
-            'invoices' => fn ($q) => $q->where('semester_id', $semesterId),
         ]);
 
         switch ($scopeType) {

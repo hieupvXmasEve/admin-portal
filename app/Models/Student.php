@@ -6,7 +6,6 @@ namespace App\Models;
 
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Models\BillingAccount;
-use App\Modules\Finance\Models\StudentInvoice;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -445,14 +444,6 @@ class Student extends StudentAuditableModel
     public function deferCases(): HasMany
     {
         return $this->hasMany(DeferCase::class);
-    }
-
-    /**
-     * Get the student's invoices.
-     */
-    public function invoices(): HasMany
-    {
-        return $this->hasMany(StudentInvoice::class);
     }
 
     /**

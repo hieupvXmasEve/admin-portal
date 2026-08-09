@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Cut Student::invoices() reverse relation"
-status: pending
+status: completed
 priority: P1
 effort: "2h"
 dependencies: [2]
@@ -82,18 +82,18 @@ call on a `Student` instance found there).
 
 ## Success Criteria
 
-- [ ] `Student.php` has no `invoices()` method, no `StudentInvoice` import.
-- [ ] `Student.php` has zero remaining `use App\Modules\Finance\...` imports for
+- [x] `Student.php` has no `invoices()` method, no `StudentInvoice` import.
+- [x] `Student.php` has zero remaining `use App\Modules\Finance\...` imports for
       `FinanceCharge`, `Payment`, `StudentInvoice`, `DngPaymentRequest` (confirm
       `DngPaymentRequest`/`dngPaymentRequests()` was out of scope per task — leave
       as-is unless user scope expands).
-- [ ] `RequireRevocableStudentIdentityAction::DOWNSTREAM_ACTIVITY_RELATIONS` no
+- [x] `RequireRevocableStudentIdentityAction::DOWNSTREAM_ACTIVITY_RELATIONS` no
       longer contains `financeCharges`/`payments`/`invoices` — all 3 replaced by
       explicit contract calls.
-- [ ] `grep -rn "->invoices(" app --include="*.php"` returns zero matches outside
+- [x] `grep -rn "->invoices(" app --include="*.php"` returns zero matches outside
       `app/Modules/Finance/`.
-- [ ] New `invoices`-branch revoke-block test passes; all 3 revoke-block tests green together.
-- [ ] Full plan Success Criteria in `plan.md` all checked.
+- [x] New `invoices`-branch revoke-block test passes; all 3 revoke-block tests green together.
+- [x] Full plan Success Criteria in `plan.md` all checked.
 
 ## Risk Assessment
 
@@ -105,3 +105,14 @@ call on a `Student` instance found there).
 - Verified: `StudentInvoice` model has no `SoftDeletes` trait and no visible
   global scopes — raw `where('student_id', ...)->exists()` is equivalent to the
   old `hasMany()->exists()`.
+
+## Post-Review Fix
+
+First code-review pass found a CONFIRMED blocker missed by scout: `app/Modules/Finance/Support/BillingScopeHelper.php:39`
+eager-loaded `'invoices' => fn ($q) => ...` on `Student` — broke `GenerateBatchChargesAction`
+and `AssembleBatchChargePreviewQuery` (both consume `BillingScopeHelper`'s query) with
+`RelationNotFoundException`, silent on empty result sets. Fixed by deleting the dead
+eager-load line (verified neither caller reads `$student->invoices`). Re-reviewed clean;
+`GenerateBatchChargesScholarshipAdjustmentTest` (3/3), `StaffLifecycleTest` (22/22), and
+Batch unit+feature suites (42/42, excluding 3 pre-existing unrelated `egc_blocks` schema-drift
+failures confirmed via `git stash` against HEAD) all green.

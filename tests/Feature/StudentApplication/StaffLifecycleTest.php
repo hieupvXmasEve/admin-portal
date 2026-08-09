@@ -14,6 +14,7 @@ use App\Modules\Academic\Progression\Models\ProgramEnrollment;
 use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\Payment;
+use App\Modules\Finance\Models\StudentInvoice;
 use App\Shared\Contracts\Academic\ProgramEnrollmentWriter;
 use App\Shared\Contracts\Identity\CampusPermissionReader;
 use App\Shared\Contracts\Identity\GuardianAccessGrantWriter;
@@ -592,6 +593,34 @@ it('blocks revoke when the student has a payment on record', function () {
     expect($application->fresh()->status)->toBe(StudentApplication::STATUS_ENROLLED)
         ->and(Student::query()->whereKey($student->id)->exists())->toBeTrue()
         ->and(Payment::query()->where('student_id', $student->id)->exists())->toBeTrue();
+});
+
+it('blocks revoke when the student has an invoice on record', function () {
+    setupApprovalMapping($this->campus);
+    $staff = makeStaff();
+    $application = approveViaHttp(makePendingApplication($this->campus, [
+        'email' => 'invoice-activity@example.com',
+        'student_code' => 'SREV0008',
+    ]), $staff);
+    $student = Student::findOrFail($application->student_id);
+
+    StudentInvoice::query()->create([
+        'invoice_number' => 'INV-SREV0008',
+        'student_id' => $student->id,
+        'billing_cycle_id' => null,
+        'semester_id' => $student->intake_semester_id,
+        'status' => 'draft',
+        'due_date' => now()->addDays(30)->toDateString(),
+    ]);
+
+    $this->actingAs($staff)
+        ->withHeader('X-CSRF-TOKEN', SA_CSRF)
+        ->post(route('student-applications.revoke', $application))
+        ->assertSessionHas('error');
+
+    expect($application->fresh()->status)->toBe(StudentApplication::STATUS_ENROLLED)
+        ->and(Student::query()->whereKey($student->id)->exists())->toBeTrue()
+        ->and(StudentInvoice::query()->where('student_id', $student->id)->exists())->toBeTrue();
 });
 
 it('cannot revoke an application that is not enrolled', function () {
