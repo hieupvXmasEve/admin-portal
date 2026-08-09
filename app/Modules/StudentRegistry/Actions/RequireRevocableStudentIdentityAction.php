@@ -5,17 +5,21 @@ declare(strict_types=1);
 namespace App\Modules\StudentRegistry\Actions;
 
 use App\Models\Student;
+use App\Shared\Contracts\Finance\StudentFinanceChargeExistenceReader;
 use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
 use RuntimeException;
 
 final class RequireRevocableStudentIdentityAction
 {
+    private const ACTIVITY_BLOCK_MESSAGE = 'This student already has academic or financial activity and cannot be revoked. '
+        .'Use the Withdraw process to remove a student who has already studied.';
+
     /** @var list<string> */
     private const DOWNSTREAM_ACTIVITY_RELATIONS = [
         'courseRegistrations', 'enrollments', 'academicRecords', 'attendances',
         'gpaCalculations', 'academicStandings', 'academicHolds', 'programChangeRequests',
         'academicProgressionEvents', 'actionLogs', 'ieltsCertificates', 'egcProgress',
-        'financeCharges', 'payments', 'invoices', 'deferCases', 'voucherApplications',
+        'payments', 'invoices', 'deferCases', 'voucherApplications',
         'dngPaymentRequests', 'goldTransactions', 'wallet', 'scholarshipAward',
         'clubMemberships', 'formResponses',
     ];
@@ -29,20 +33,18 @@ final class RequireRevocableStudentIdentityAction
             throw new RuntimeException('This application has no linked student to revoke.');
         }
 
+        if (app(StudentFinanceChargeExistenceReader::class)->hasAnyChargeFor((int) $student->id)) {
+            throw new RuntimeException(self::ACTIVITY_BLOCK_MESSAGE);
+        }
+
         foreach (self::DOWNSTREAM_ACTIVITY_RELATIONS as $relation) {
             if ($student->{$relation}()->exists()) {
-                throw new RuntimeException(
-                    'This student already has academic or financial activity and cannot be revoked. '
-                    .'Use the Withdraw process to remove a student who has already studied.'
-                );
+                throw new RuntimeException(self::ACTIVITY_BLOCK_MESSAGE);
             }
         }
 
         if ($student->user?->last_login_at !== null) {
-            throw new RuntimeException(
-                'This student already has academic or financial activity and cannot be revoked. '
-                .'Use the Withdraw process to remove a student who has already studied.'
-            );
+            throw new RuntimeException(self::ACTIVITY_BLOCK_MESSAGE);
         }
 
         return new StudentReference(

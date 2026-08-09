@@ -6,7 +6,6 @@ namespace App\Models;
 
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Models\BillingAccount;
-use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\StudentInvoice;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -431,14 +430,6 @@ class Student extends StudentAuditableModel
     public function billingAccount(): HasOne
     {
         return $this->hasOne(BillingAccount::class);
-    }
-
-    /**
-     * Get the student's finance charges (tuition, fees, credits).
-     */
-    public function financeCharges(): HasMany
-    {
-        return $this->hasMany(FinanceCharge::class);
     }
 
     /**
