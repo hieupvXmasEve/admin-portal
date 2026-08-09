@@ -8,19 +8,6 @@ use App\Modules\Facilities\Http\Web\RoomController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['web', 'auth', 'verified'])->group(function () {
-    Route::prefix('buildings')->name('buildings.')->group(function () {
-        Route::get('/', [BuildingController::class, 'index'])
-            ->middleware('can:view_building')
-            ->name('index');
-
-        Route::get('/api', [BuildingController::class, 'api'])
-            ->name('api');
-
-        Route::get('/{building}', [BuildingController::class, 'show'])
-            ->middleware('can:view_building')
-            ->name('show');
-    });
-
     Route::prefix('campuses/{campus}/buildings')->name('campuses.buildings.')->group(function () {
         Route::get('/create', [BuildingController::class, 'create'])
             ->middleware('can:create_building')
