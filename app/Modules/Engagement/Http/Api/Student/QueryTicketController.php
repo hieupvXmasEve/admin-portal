@@ -6,12 +6,12 @@ namespace App\Modules\Engagement\Http\Api\Student;
 
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
-use App\Models\QueryTicket;
 use App\Modules\Engagement\Actions\Support\CreateStudentQueryReplyAction;
 use App\Modules\Engagement\Http\Requests\Support\ListStudentQueryTicketsRequest;
 use App\Modules\Engagement\Http\Requests\Support\StoreQueryReplyRequest;
 use App\Modules\Engagement\Http\Resources\QueryReplyResource;
 use App\Modules\Engagement\Http\Resources\QueryTicketResource;
+use App\Modules\Engagement\Models\QueryTicket;
 use App\Modules\Engagement\Support\QueryTicketWorkflow;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Http\JsonResponse;

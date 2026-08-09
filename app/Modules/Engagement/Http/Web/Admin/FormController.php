@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\Engagement\Http\Web\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\QueryTopic;
 use App\Models\Role;
 use App\Modules\Engagement\Http\Requests\Forms\CloneFormRequest;
 use App\Modules\Engagement\Http\Requests\Forms\CreateFormRequest;
@@ -14,6 +13,7 @@ use App\Modules\Engagement\Http\Requests\Forms\PublishFormRequest;
 use App\Modules\Engagement\Http\Requests\Forms\UpdateFormRequest;
 use App\Modules\Engagement\Models\Form;
 use App\Modules\Engagement\Models\FormVersion;
+use App\Modules\Engagement\Models\QueryTopic;
 use App\Modules\Engagement\Support\FormWorkflow;
 use App\Shared\Contracts\Institution\CampusReferenceReader;
 use Illuminate\Http\Request;

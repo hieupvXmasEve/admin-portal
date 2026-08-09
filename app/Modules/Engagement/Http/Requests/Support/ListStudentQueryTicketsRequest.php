@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Engagement\Http\Requests\Support;
 
-use App\Models\QueryTicket;
+use App\Modules\Engagement\Models\QueryTicket;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 

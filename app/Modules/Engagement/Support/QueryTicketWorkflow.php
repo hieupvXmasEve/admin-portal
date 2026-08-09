@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Engagement\Support;
 
-use App\Models\QueryReply;
-use App\Models\QueryTicket;
 use App\Models\Student;
 use App\Models\User;
+use App\Modules\Engagement\Models\QueryReply;
+use App\Modules\Engagement\Models\QueryTicket;
 use App\Shared\Contracts\Upload\FileUploadGateway;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\UploadedFile;

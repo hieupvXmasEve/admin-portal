@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Engagement\Actions\Support;
 
-use App\Models\QueryReply;
-use App\Models\QueryTicket;
+use App\Modules\Engagement\Models\QueryReply;
+use App\Modules\Engagement\Models\QueryTicket;
 use App\Shared\Contracts\DomainEvents\DomainEvent;
 use App\Shared\Contracts\DomainEvents\DomainEventPublisher;
 use App\Shared\Contracts\Institution\DepartmentReferenceReader;

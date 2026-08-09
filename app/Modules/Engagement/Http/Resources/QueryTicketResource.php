@@ -6,7 +6,7 @@ namespace App\Modules\Engagement\Http\Resources;
 
 use App\Http\Resources\AnswerResource;
 use App\Http\Resources\AttachmentResource;
-use App\Models\QueryTicket;
+use App\Modules\Engagement\Models\QueryTicket;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Str;

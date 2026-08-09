@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Engagement\Actions\Support;
 
-use App\Models\QueryAssignment;
 use App\Models\User;
 use App\Modules\Engagement\Models\FormResponse;
+use App\Modules\Engagement\Models\QueryAssignment;
 use App\Shared\Contracts\DomainEvents\DomainEvent;
 use App\Shared\Contracts\DomainEvents\DomainEventPublisher;
 use App\Shared\Contracts\Notification\NotificationPayloadFactory;

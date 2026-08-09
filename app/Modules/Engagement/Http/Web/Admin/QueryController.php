@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\Engagement\Http\Web\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\QueryTicket;
 use App\Models\User;
 use App\Modules\Engagement\Actions\Support\AssignQueryAction;
 use App\Modules\Engagement\Actions\Support\ReplyToQueryAction;
@@ -13,6 +12,7 @@ use App\Modules\Engagement\Http\Requests\Support\AssignQueryRequest;
 use App\Modules\Engagement\Http\Requests\Support\ReplyToQueryRequest;
 use App\Modules\Engagement\Http\Requests\Support\UpdateQueryStatusRequest;
 use App\Modules\Engagement\Models\FormResponse;
+use App\Modules\Engagement\Models\QueryTicket;
 use App\Shared\Contracts\Identity\DTO\StaffActorReference;
 use App\Shared\Contracts\Institution\DepartmentReferenceReader;
 use App\Shared\Contracts\Upload\FileUploadGateway;

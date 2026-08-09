@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace App\Modules\Engagement\Http\Web\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\QueryTicket;
 use App\Modules\Engagement\Http\Requests\Support\StoreAdminQueryTicketReplyRequest;
 use App\Modules\Engagement\Http\Requests\Support\UpdateQueryStatusRequest;
 use App\Modules\Engagement\Http\Resources\QueryTicketResource;
 use App\Modules\Engagement\Models\Form;
+use App\Modules\Engagement\Models\QueryTicket;
 use App\Modules\Engagement\Support\QueryTicketWorkflow;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
