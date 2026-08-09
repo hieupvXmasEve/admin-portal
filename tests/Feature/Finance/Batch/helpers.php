@@ -11,9 +11,12 @@ use App\Models\Student;
 use App\Models\TuitionPlan;
 use App\Models\TuitionPlanTerm;
 use App\Models\User;
+use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
+use App\Modules\Finance\Support\EgcBlockFinanceResolver;
 use App\Shared\Contracts\Identity\CampusPermissionReader;
 
 const BATCH_STUDIO_CSRF = 'batch-studio-test-csrf';
@@ -150,7 +153,23 @@ function seedBatchEgcBlockCharge(
     string $lineStatus = 'active',
     string $invoiceStatus = 'draft',
 ): EgcBlock {
+    $billingAccount = BillingAccount::query()->firstOrCreate(['student_id' => $student->id]);
+    $obligation = FinanceObligation::query()->create([
+        'billing_account_id' => $billingAccount->id,
+        'source_system' => 'test',
+        'source_kind' => 'batch_egc_block_charge_setup',
+        'source_ref' => 'batch-egc-setup:'.$student->id.'-'.$semester->id.'-'.$blockNumber.'-'.random_int(1000, 9999),
+        'obligation_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
+        'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+        'amount' => 15_000_000,
+        'currency' => 'VND',
+        'pricing_rule_version' => 'batch-egc-test:1',
+        'pricing_snapshot' => [],
+        'accepted_at' => now(),
+    ]);
+
     $charge = FinanceCharge::create([
+        'finance_obligation_id' => $obligation->id,
         'student_id' => $student->id,
         'semester_id' => $semester->id,
         'charge_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
@@ -181,14 +200,17 @@ function seedBatchEgcBlockCharge(
         'void_reason' => $lineStatus === 'void' ? 'Batch EGC regression setup' : null,
     ]);
 
-    return EgcBlock::factory()->state([
+    $block = EgcBlock::factory()->state([
         'student_id' => $student->id,
         'semester_id' => $semester->id,
         'block_number' => $blockNumber,
         'level_number' => $levelNumber,
         'result' => EgcBlock::RESULT_PENDING,
-        'finance_charge_id' => $charge->id,
     ])->create();
+
+    app(EgcBlockFinanceResolver::class)->bindExistingCharge($block, $charge);
+
+    return $block;
 }
 
 function seedBatchActiveCharge(Student $student, Semester $semester, string $chargeType): FinanceCharge
