@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Facilities\Http\Requests\RoomBooking;
 
-use App\Models\RoomBooking;
+use App\Modules\Facilities\Models\RoomBooking;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 

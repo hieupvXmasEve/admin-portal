@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Facilities\Queries;
 
-use App\Models\Room;
-use App\Models\RoomBooking;
+use App\Modules\Facilities\Models\Room;
+use App\Modules\Facilities\Models\RoomBooking;
 use App\Modules\Facilities\Support\RoomBookingSlotValidator;
 use App\Shared\Contracts\Academic\AcademicSpaceOccupancyReader;
 use Carbon\Carbon;

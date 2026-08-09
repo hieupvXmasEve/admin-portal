@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Database\Factories;
+namespace Database\Factories\Modules\Facilities\Models;
 
-use App\Models\Building;
 use App\Models\Campus;
-use App\Models\Room;
+use App\Modules\Facilities\Models\Building;
+use App\Modules\Facilities\Models\Room;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

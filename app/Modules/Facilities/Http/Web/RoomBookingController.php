@@ -6,10 +6,6 @@ namespace App\Modules\Facilities\Http\Web;
 
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
-use App\Models\Building;
-use App\Models\Room;
-use App\Models\RoomBooking;
-use App\Models\RoomBookingAction;
 use App\Modules\Facilities\Actions\CreateRoomBookingSeriesAction;
 use App\Modules\Facilities\Exceptions\RoomBookingSeriesConflictException;
 use App\Modules\Facilities\Http\Requests\RoomBooking\ApproveRoomBookingRequest;
@@ -18,6 +14,10 @@ use App\Modules\Facilities\Http\Requests\RoomBooking\PreviewRoomBookingSeriesReq
 use App\Modules\Facilities\Http\Requests\RoomBooking\RejectRoomBookingRequest;
 use App\Modules\Facilities\Http\Requests\RoomBooking\StoreRoomBookingRequest;
 use App\Modules\Facilities\Http\Requests\RoomBooking\UpdateRoomBookingRequest;
+use App\Modules\Facilities\Models\Building;
+use App\Modules\Facilities\Models\Room;
+use App\Modules\Facilities\Models\RoomBooking;
+use App\Modules\Facilities\Models\RoomBookingAction;
 use App\Modules\Facilities\Queries\GetRoomAvailabilityBoardQuery;
 use App\Modules\Facilities\Queries\GetRoomBookingCloneDraftQuery;
 use App\Modules\Facilities\Queries\PreviewRoomBookingSeriesAvailabilityQuery;

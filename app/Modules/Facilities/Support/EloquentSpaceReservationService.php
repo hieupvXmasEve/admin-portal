@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Facilities\Support;
 
-use App\Models\Room;
-use App\Models\RoomBooking;
+use App\Modules\Facilities\Models\Room;
+use App\Modules\Facilities\Models\RoomBooking;
 use App\Shared\Contracts\Facilities\DTO\SpaceAvailability;
 use App\Shared\Contracts\Facilities\DTO\SpaceReservation;
 use App\Shared\Contracts\Facilities\DTO\SpaceReservationRequest;

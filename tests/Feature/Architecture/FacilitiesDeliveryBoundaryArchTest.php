@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 it('keeps Facilities availability off Delivery persistence and implementation types', function (): void {
     $facilitiesRoot = dirname(__DIR__, 3).'/app/Modules/Facilities';
+    $modelsRoot = $facilitiesRoot.'/Models';
     $forbiddenImports = [
         'App\\Models\\ClassSession',
         'App\\Models\\ExamResitSession',
@@ -18,8 +19,17 @@ it('keeps Facilities availability off Delivery persistence and implementation ty
             continue;
         }
 
+        // Models/ is exempt from the App\Models\Campus ban only: Eloquent FK
+        // relations (belongsTo(Campus::class)) are a persistence concern,
+        // not the business-logic coupling this guard targets. Every other
+        // Facilities layer still must go through CampusReferenceReader, and
+        // Models/ still cannot reach into Delivery/Academic internals.
+        $forbiddenForFile = str_starts_with($file->getPathname(), $modelsRoot.'/')
+            ? array_diff($forbiddenImports, ['App\\Models\\Campus'])
+            : $forbiddenImports;
+
         $contents = file_get_contents($file->getPathname()) ?: '';
-        foreach ($forbiddenImports as $forbiddenImport) {
+        foreach ($forbiddenForFile as $forbiddenImport) {
             if (str_contains($contents, $forbiddenImport)) {
                 $violations[] = $file->getPathname().' uses '.$forbiddenImport;
             }

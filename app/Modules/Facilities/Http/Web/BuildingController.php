@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Modules\Facilities\Http\Web;
 
 use App\Http\Controllers\Controller;
-use App\Models\Building;
 use App\Modules\Facilities\Actions\CreateBuildingAction;
 use App\Modules\Facilities\Actions\DeleteBuildingAction;
 use App\Modules\Facilities\Actions\UpdateBuildingAction;
 use App\Modules\Facilities\Http\Requests\Building\StoreBuildingRequest;
 use App\Modules\Facilities\Http\Requests\Building\UpdateBuildingRequest;
+use App\Modules\Facilities\Models\Building;
 use App\Modules\Facilities\Queries\ListBuildingsQuery;
 use App\Shared\Contracts\Institution\CampusReferenceReader;
 use Illuminate\Http\JsonResponse;

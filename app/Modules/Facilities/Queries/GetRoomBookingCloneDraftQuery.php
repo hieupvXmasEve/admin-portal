@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Facilities\Queries;
 
-use App\Models\RoomBooking;
+use App\Modules\Facilities\Models\RoomBooking;
 use Carbon\Carbon;
 
 class GetRoomBookingCloneDraftQuery

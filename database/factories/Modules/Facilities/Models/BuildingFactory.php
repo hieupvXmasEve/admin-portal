@@ -1,13 +1,13 @@
 <?php
 
-namespace Database\Factories;
+namespace Database\Factories\Modules\Facilities\Models;
 
-use App\Models\Building;
 use App\Models\Campus;
+use App\Modules\Facilities\Models\Building;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Building>
+ * @extends Factory<Building>
  */
 class BuildingFactory extends Factory
 {

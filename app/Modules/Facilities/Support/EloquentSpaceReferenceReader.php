@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Facilities\Support;
 
-use App\Models\Room;
+use App\Modules\Facilities\Models\Room;
 use App\Shared\Contracts\Facilities\DTO\SpaceReference;
 use App\Shared\Contracts\Facilities\SpaceReferenceReader;
 

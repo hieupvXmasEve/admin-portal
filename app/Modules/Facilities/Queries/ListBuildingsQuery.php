@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Facilities\Queries;
 
-use App\Models\Building;
+use App\Modules\Facilities\Models\Building;
 use App\Shared\Contracts\Institution\CampusReferenceReader;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;

@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Facilities\Support;
 
-use App\Models\Room;
-use App\Models\RoomBooking;
-use App\Models\RoomBookingAction;
 use App\Models\User;
+use App\Modules\Facilities\Models\Room;
+use App\Modules\Facilities\Models\RoomBooking;
+use App\Modules\Facilities\Models\RoomBookingAction;
 use App\Shared\Contracts\Academic\AcademicSpaceOccupancyReader;
 use App\Shared\Contracts\Platform\SystemConfigurationReader;
 use Illuminate\Database\Eloquent\Builder;

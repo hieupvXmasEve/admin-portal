@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Facilities\Queries;
 
-use App\Models\Room;
+use App\Modules\Facilities\Models\Room;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 class ListRoomsQuery

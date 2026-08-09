@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Facilities\Actions;
 
-use App\Models\Building;
+use App\Modules\Facilities\Models\Building;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
