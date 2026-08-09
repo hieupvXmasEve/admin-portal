@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\EmailLog;
-use App\Models\EmailTemplate;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -55,7 +54,7 @@ class EmailLoggingService
     public function logEmailSendingAttempt(
         string $recipient,
         string $subject,
-        ?EmailTemplate $template = null,
+        mixed $template = null,
         ?User $sender = null,
         array $metadata = []
     ): EmailLog {
@@ -72,30 +71,6 @@ class EmailLoggingService
                 'user_agent' => request()?->userAgent(),
                 'session_id' => session()->getId(),
             ]),
-        ]);
-    }
-
-    /**
-     * Log bulk email batch creation
-     */
-    public function logBulkEmailBatch(
-        string $batchId,
-        array $recipients,
-        string $subject,
-        ?EmailTemplate $template = null,
-        ?User $sender = null,
-        array $options = []
-    ): void {
-        $this->logEmailOperation('bulk_email_batch_created', [
-            'batch_id' => $batchId,
-            'recipient_count' => count($recipients),
-            'subject' => $subject,
-            'template_id' => $template?->id,
-            'sender_id' => $sender?->id,
-            'options' => $options,
-        ], 'info', null, [
-            'batch_type' => 'bulk_email',
-            'estimated_completion' => now()->addMinutes(count($recipients) / 10)->toISOString(),
         ]);
     }
 
@@ -185,27 +160,6 @@ class EmailLoggingService
         ], 'info', null, [
             'security_sensitive' => $this->hasSecuritySensitiveChanges($changes),
             'requires_testing' => true,
-        ]);
-    }
-
-    /**
-     * Log template operations
-     */
-    public function logTemplateOperation(
-        string $operation,
-        EmailTemplate $template,
-        ?User $user = null,
-        array $changes = []
-    ): void {
-        $this->logEmailOperation("template_{$operation}", [
-            'template_id' => $template->id,
-            'template_name' => $template->name,
-            'template_type' => $template->type,
-            'user_id' => $user?->id,
-            'changes' => $changes,
-        ], 'info', null, [
-            'template_version' => $template->version,
-            'affects_active_emails' => $template->is_active,
         ]);
     }
 
