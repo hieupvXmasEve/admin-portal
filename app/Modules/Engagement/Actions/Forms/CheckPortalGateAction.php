@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Engagement\Actions\Forms;
 
 use App\Models\CourseOffering;
-use App\Models\FormResponse;
 use App\Models\StudentFormAssignment;
+use App\Modules\Engagement\Models\FormResponse;
 use Illuminate\Database\Eloquent\Builder;
 
 class CheckPortalGateAction

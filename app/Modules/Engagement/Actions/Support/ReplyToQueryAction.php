@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Engagement\Actions\Support;
 
-use App\Models\FormResponse;
 use App\Models\QueryReply;
+use App\Modules\Engagement\Models\FormResponse;
 use App\Shared\Contracts\DomainEvents\DomainEvent;
 use App\Shared\Contracts\DomainEvents\DomainEventPublisher;
 use App\Shared\Contracts\Identity\DTO\StaffActorReference;

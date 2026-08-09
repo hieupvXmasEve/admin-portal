@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Engagement\Queries\Forms;
 
-use App\Models\Form;
+use App\Modules\Engagement\Models\Form;
 use Illuminate\Support\Collection;
 
 final class ListActiveSurveyFormsQuery

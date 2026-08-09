@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Engagement\Actions\Forms;
 
-use App\Models\Form;
-use App\Models\FormTarget;
+use App\Modules\Engagement\Models\Form;
+use App\Modules\Engagement\Models\FormTarget;
 use Illuminate\Validation\ValidationException;
 
 class CreateFormTargetAction

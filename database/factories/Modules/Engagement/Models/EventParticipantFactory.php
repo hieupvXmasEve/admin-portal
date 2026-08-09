@@ -13,6 +13,8 @@ use Illuminate\Database\Eloquent\Factories\Factory;
  */
 class EventParticipantFactory extends Factory
 {
+    protected $model = EventParticipant::class;
+
     /**
      * Define the model's default state.
      *

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Engagement\Http\Requests\Forms;
 
-use App\Models\Form;
+use App\Modules\Engagement\Models\Form;
 use Illuminate\Foundation\Http\FormRequest;
 
 class SubmitFormRequest extends FormRequest

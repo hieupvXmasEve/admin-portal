@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Engagement\Actions\Forms;
 
-use App\Models\FormTarget;
 use App\Models\StudentFormAssignment;
+use App\Modules\Engagement\Models\FormTarget;
 use App\Shared\Contracts\Academic\CourseRosterReader;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 

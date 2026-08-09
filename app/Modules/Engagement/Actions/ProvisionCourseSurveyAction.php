@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Engagement\Actions;
 
-use App\Models\Form;
-use App\Models\FormTarget;
 use App\Modules\Engagement\Actions\Forms\CreateFormTargetAction;
 use App\Modules\Engagement\Actions\Forms\GenerateStudentAssignmentsAction;
+use App\Modules\Engagement\Models\Form;
+use App\Modules\Engagement\Models\FormTarget;
 use App\Shared\Contracts\Academic\DTO\CourseOfferingSurveyContext;
 use App\Shared\Contracts\Platform\SystemConfigurationReader;
 use Carbon\Carbon;

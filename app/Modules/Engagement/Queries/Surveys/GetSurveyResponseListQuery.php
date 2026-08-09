@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Engagement\Queries\Surveys;
 
-use App\Models\FormTarget;
 use App\Models\StudentFormAssignment;
+use App\Modules\Engagement\Models\FormTarget;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 final class GetSurveyResponseListQuery

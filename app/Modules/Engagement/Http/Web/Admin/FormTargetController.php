@@ -6,12 +6,12 @@ namespace App\Modules\Engagement\Http\Web\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\CourseOffering;
-use App\Models\Form;
-use App\Models\FormTarget;
 use App\Modules\Engagement\Actions\Forms\ActivateFormTargetAction;
 use App\Modules\Engagement\Actions\Forms\CreateFormTargetAction;
 use App\Modules\Engagement\Http\Requests\Forms\ListFormTargetsRequest;
 use App\Modules\Engagement\Http\Requests\Forms\StoreFormTargetRequest;
+use App\Modules\Engagement\Models\Form;
+use App\Modules\Engagement\Models\FormTarget;
 use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use App\Shared\Contracts\Institution\DepartmentReferenceReader;
 use Inertia\Inertia;

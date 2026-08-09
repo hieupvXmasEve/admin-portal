@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Engagement\Actions\Forms;
 
-use App\Models\FormTarget;
+use App\Modules\Engagement\Models\FormTarget;
 use Illuminate\Support\Facades\DB;
 
 class ActivateFormTargetAction

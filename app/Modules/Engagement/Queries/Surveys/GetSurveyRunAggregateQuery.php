@@ -6,7 +6,7 @@ namespace App\Modules\Engagement\Queries\Surveys;
 
 use App\Models\Answer;
 use App\Models\CourseOffering;
-use App\Models\FormTarget;
+use App\Modules\Engagement\Models\FormTarget;
 use Illuminate\Support\Facades\DB;
 
 final class GetSurveyRunAggregateQuery

@@ -12,6 +12,8 @@ use Illuminate\Database\Eloquent\Factories\Factory;
  */
 class ClubMemberRoleHistoryFactory extends Factory
 {
+    protected $model = ClubMemberRoleHistory::class;
+
     /**
      * Define the model's default state.
      *
