@@ -298,7 +298,7 @@ class TimetableService
                 });
 
                 $timeSlots[$timeSlot]['sessions'][$day] = $sessionsInSlot->map(function ($session) {
-                    return $this->formatSessionForTimeBlock($session);
+                    return $this->formatSessionForSchedule($session);
                 })->values()->toArray();
             }
         }
@@ -334,22 +334,6 @@ class TimetableService
                 'name' => $session->room?->name,
                 'building' => $roomBuilding,
             ],
-            'color' => $this->generateSessionColor($session->courseOffering->unit->code),
-        ];
-    }
-
-    /**
-     * Format session for time block display
-     */
-    protected function formatSessionForTimeBlock(ClassSession $session): array
-    {
-        return [
-            'id' => $session->id,
-            'course_code' => $session->courseOffering->unit->code,
-            'session_type' => $session->session_type,
-            'room' => $session->room?->code,
-            'start_time' => $session->start_time,
-            'end_time' => $session->end_time,
             'color' => $this->generateSessionColor($session->courseOffering->unit->code),
         ];
     }

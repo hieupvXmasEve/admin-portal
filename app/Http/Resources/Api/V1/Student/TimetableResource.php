@@ -80,32 +80,7 @@ class TimetableResource extends JsonResource
                         'is_upcoming' => $this->isUpcomingEvent($event),
                     ];
                 })->toArray(),
-                'sessions' => collect($dayData['sessions'])->map(function ($session) use ($day) {
-                    return [
-                        'id' => $session['id'],
-                        'course_code' => $session['course_code'],
-                        'course_name' => $session['course_name'],
-                        'session_type' => $session['session_type'],
-                        'session_type_display' => ucfirst($session['session_type']),
-                        'time' => [
-                            'start' => $session['start_time'],
-                            'end' => $session['end_time'],
-                            'display' => $this->formatTimeRange($session['start_time'], $session['end_time']),
-                            'duration_minutes' => $session['duration_minutes'],
-                            'duration_display' => $this->formatDuration($session['duration_minutes']),
-                        ],
-                        'lecturer' => $session['lecturer'],
-                        'room' => [
-                            'code' => $session['room']['code'],
-                            'name' => $session['room']['name'],
-                            'building' => $session['room']['building'] ?? null, // This may be building data object or null
-                            'full_location' => $this->formatRoomLocation($session['room']),
-                        ],
-                        'color' => $session['color'],
-                        'is_current' => $this->isCurrentSession($session, $day),
-                        'is_upcoming' => $this->isUpcomingSession($session, $day),
-                    ];
-                })->toArray(),
+                'sessions' => collect($dayData['sessions'])->map(fn ($session) => $this->formatSessionEntry($session, $day))->toArray(),
                 // Assigned exam-resit (thi lại) sittings for this student, already
                 // formatted by ExamResitTimetableQuery (ACAD-RET-001 slice 9).
                 'exam_resits' => $dayData['exam_resits'] ?? [],
@@ -165,22 +140,42 @@ class TimetableResource extends JsonResource
         $formatted = [];
 
         foreach ($sessions as $day => $daySessions) {
-            $formatted[$day] = collect($daySessions)->map(function ($session) {
-                return [
-                    'id' => $session['id'],
-                    'course_code' => $session['course_code'],
-                    'session_type' => $session['session_type'],
-                    'room' => $session['room'],
-                    'color' => $session['color'],
-                    'time_span' => [
-                        'start' => $session['start_time'],
-                        'end' => $session['end_time'],
-                    ],
-                ];
-            })->toArray();
+            $formatted[$day] = collect($daySessions)->map(fn ($session) => $this->formatSessionEntry($session, $day))->toArray();
         }
 
         return $formatted;
+    }
+
+    /**
+     * Format a single class session into the SessionItem shape shared by
+     * weekly_schedule[day].sessions and time_blocks[].sessions[day].
+     */
+    protected function formatSessionEntry(array $session, string $day): array
+    {
+        return [
+            'id' => $session['id'],
+            'course_code' => $session['course_code'],
+            'course_name' => $session['course_name'],
+            'session_type' => $session['session_type'],
+            'session_type_display' => ucfirst($session['session_type']),
+            'time' => [
+                'start' => $session['start_time'],
+                'end' => $session['end_time'],
+                'display' => $this->formatTimeRange($session['start_time'], $session['end_time']),
+                'duration_minutes' => $session['duration_minutes'],
+                'duration_display' => $this->formatDuration($session['duration_minutes']),
+            ],
+            'lecturer' => $session['lecturer'],
+            'room' => [
+                'code' => $session['room']['code'],
+                'name' => $session['room']['name'],
+                'building' => $session['room']['building'] ?? null, // This may be building data object or null
+                'full_location' => $this->formatRoomLocation($session['room']),
+            ],
+            'color' => $session['color'],
+            'is_current' => $this->isCurrentSession($session, $day),
+            'is_upcoming' => $this->isUpcomingSession($session, $day),
+        ];
     }
 
     /**
