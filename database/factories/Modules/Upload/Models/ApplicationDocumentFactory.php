@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Database\Factories;
+namespace Database\Factories\Modules\Upload\Models;
 
-use App\Models\ApplicationDocument;
-use App\Models\ApplicationDocumentType;
 use App\Models\StudentApplication;
+use App\Modules\Upload\Models\ApplicationDocument;
+use App\Modules\Upload\Models\ApplicationDocumentType;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

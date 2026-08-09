@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Upload\Support;
 
-use App\Models\UploadRecord;
+use App\Modules\Upload\Models\UploadRecord;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;

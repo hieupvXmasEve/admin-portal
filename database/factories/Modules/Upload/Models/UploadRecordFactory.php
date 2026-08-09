@@ -1,13 +1,13 @@
 <?php
 
-namespace Database\Factories;
+namespace Database\Factories\Modules\Upload\Models;
 
-use App\Models\UploadRecord;
 use App\Models\User;
+use App\Modules\Upload\Models\UploadRecord;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\UploadRecord>
+ * @extends Factory<UploadRecord>
  */
 class UploadRecordFactory extends Factory
 {
@@ -31,12 +31,12 @@ class UploadRecordFactory extends Factory
             'image/png',
             'image/gif',
             'image/webp',
-            'image/svg+xml'
+            'image/svg+xml',
         ];
 
         $context = $this->faker->randomElement($contexts);
         $mimeType = $this->faker->randomElement($mimeTypes);
-        $extension = match($mimeType) {
+        $extension = match ($mimeType) {
             'image/jpeg' => 'jpg',
             'image/png' => 'png',
             'image/gif' => 'gif',
@@ -45,9 +45,9 @@ class UploadRecordFactory extends Factory
             default => 'jpg'
         };
 
-        $filename = $this->faker->uuid() . '.' . $extension;
-        $originalName = $this->faker->words(2, true) . '.' . $extension;
-        $path = $context . '/' . date('Y/m/d') . '/' . $filename;
+        $filename = $this->faker->uuid().'.'.$extension;
+        $originalName = $this->faker->words(2, true).'.'.$extension;
+        $path = $context.'/'.date('Y/m/d').'/'.$filename;
 
         return [
             'filename' => $filename,
@@ -57,7 +57,7 @@ class UploadRecordFactory extends Factory
             'context' => $context,
             'path' => $path,
             'disk' => 'public',
-            'url' => '/storage/' . $path,
+            'url' => '/storage/'.$path,
             'hash' => hash('sha256', $this->faker->text()),
             'user_id' => User::factory(),
             'metadata' => [
@@ -76,8 +76,8 @@ class UploadRecordFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'context' => 'avatar',
-            'path' => 'avatars/' . date('Y/m/d') . '/' . $attributes['filename'],
-            'url' => '/storage/avatars/' . date('Y/m/d') . '/' . $attributes['filename'],
+            'path' => 'avatars/'.date('Y/m/d').'/'.$attributes['filename'],
+            'url' => '/storage/avatars/'.date('Y/m/d').'/'.$attributes['filename'],
             'metadata' => [
                 'width' => $this->faker->numberBetween(100, 500),
                 'height' => $this->faker->numberBetween(100, 500),
@@ -93,8 +93,8 @@ class UploadRecordFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'context' => 'assignment',
-            'path' => 'assignments/' . date('Y/m/d') . '/' . $attributes['filename'],
-            'url' => '/storage/assignments/' . date('Y/m/d') . '/' . $attributes['filename'],
+            'path' => 'assignments/'.date('Y/m/d').'/'.$attributes['filename'],
+            'url' => '/storage/assignments/'.date('Y/m/d').'/'.$attributes['filename'],
             'metadata' => [
                 'width' => $this->faker->numberBetween(500, 2000),
                 'height' => $this->faker->numberBetween(500, 2000),
@@ -111,8 +111,8 @@ class UploadRecordFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'expires_at' => now()->addHours(24),
             'context' => 'temporary',
-            'path' => 'temp/' . date('Y/m/d') . '/' . $attributes['filename'],
-            'url' => '/storage/temp/' . date('Y/m/d') . '/' . $attributes['filename'],
+            'path' => 'temp/'.date('Y/m/d').'/'.$attributes['filename'],
+            'url' => '/storage/temp/'.date('Y/m/d').'/'.$attributes['filename'],
         ]);
     }
 

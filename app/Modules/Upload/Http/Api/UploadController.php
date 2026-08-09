@@ -6,7 +6,6 @@ namespace App\Modules\Upload\Http\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Student;
-use App\Models\UploadRecord;
 use App\Models\User;
 use App\Modules\Upload\Actions\DeleteUploadAction;
 use App\Modules\Upload\Actions\StoreMultipleUploadsAction;
@@ -14,6 +13,7 @@ use App\Modules\Upload\Actions\StoreUploadAction;
 use App\Modules\Upload\Http\Requests\Upload\ListUploadsRequest;
 use App\Modules\Upload\Http\Requests\Upload\UploadMultipleRequest;
 use App\Modules\Upload\Http\Requests\Upload\UploadRequest;
+use App\Modules\Upload\Models\UploadRecord;
 use App\Modules\Upload\Queries\GetUploadConfigurationQuery;
 use App\Modules\Upload\Queries\GetUploadContextsQuery;
 use App\Modules\Upload\Queries\ListUploadsQuery;

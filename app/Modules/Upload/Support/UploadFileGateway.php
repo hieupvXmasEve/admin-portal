@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Upload\Support;
 
-use App\Models\UploadRecord;
+use App\Modules\Upload\Models\UploadRecord;
 use App\Shared\Contracts\Upload\FileUploadGateway;
 use App\Shared\Contracts\Upload\StoredUpload;
 use Illuminate\Http\UploadedFile;
