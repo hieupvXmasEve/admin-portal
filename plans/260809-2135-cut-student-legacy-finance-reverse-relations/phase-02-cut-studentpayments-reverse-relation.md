@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Cut Student::payments() reverse relation"
-status: pending
+status: completed
 priority: P1
 effort: "2h"
 dependencies: [1]
@@ -80,11 +80,11 @@ Verified: `Payment.php:103` already has `scopeForStudent($query, int $studentId)
 
 ## Success Criteria
 
-- [ ] `Student.php` has no `payments()` method, no `Payment` import.
-- [ ] `RequireRevocableStudentIdentityAction` behavior unchanged.
-- [ ] `grep -rn "->payments(" app --include="*.php"` returns zero matches outside
+- [x] `Student.php` has no `payments()` method, no `Payment` import.
+- [x] `RequireRevocableStudentIdentityAction` behavior unchanged.
+- [x] `grep -rn "->payments(" app --include="*.php"` returns zero matches outside
       `app/Modules/Finance/`.
-- [ ] New `payments`-branch revoke-block test passes; existing `StaffLifecycleTest.php` green.
+- [x] New `payments`-branch revoke-block test passes; existing `StaffLifecycleTest.php` green.
 
 ## Risk Assessment
 

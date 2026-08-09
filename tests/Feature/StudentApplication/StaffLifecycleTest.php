@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Modules\Academic\Progression\Models\ProgramEnrollment;
 use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\Payment;
 use App\Shared\Contracts\Academic\ProgramEnrollmentWriter;
 use App\Shared\Contracts\Identity\CampusPermissionReader;
 use App\Shared\Contracts\Identity\GuardianAccessGrantWriter;
@@ -563,6 +564,34 @@ it('blocks revoke when Finance activity exists without deleting any owner record
     expect($application->fresh()->status)->toBe(StudentApplication::STATUS_ENROLLED)
         ->and(Student::query()->whereKey($student->id)->exists())->toBeTrue()
         ->and(FinanceCharge::query()->where('student_id', $student->id)->exists())->toBeTrue();
+});
+
+it('blocks revoke when the student has a payment on record', function () {
+    setupApprovalMapping($this->campus);
+    $staff = makeStaff();
+    $application = approveViaHttp(makePendingApplication($this->campus, [
+        'email' => 'payment-activity@example.com',
+        'student_code' => 'SREV0007',
+    ]), $staff);
+    $student = Student::findOrFail($application->student_id);
+
+    Payment::query()->create([
+        'student_id' => $student->id,
+        'amount' => 100000,
+        'method' => Payment::METHOD_IMPORT,
+        'source' => 'import',
+        'paid_at' => now(),
+        'status' => Payment::STATUS_COMPLETED,
+    ]);
+
+    $this->actingAs($staff)
+        ->withHeader('X-CSRF-TOKEN', SA_CSRF)
+        ->post(route('student-applications.revoke', $application))
+        ->assertSessionHas('error');
+
+    expect($application->fresh()->status)->toBe(StudentApplication::STATUS_ENROLLED)
+        ->and(Student::query()->whereKey($student->id)->exists())->toBeTrue()
+        ->and(Payment::query()->where('student_id', $student->id)->exists())->toBeTrue();
 });
 
 it('cannot revoke an application that is not enrolled', function () {

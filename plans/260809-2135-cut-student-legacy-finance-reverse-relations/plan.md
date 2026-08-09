@@ -50,7 +50,7 @@ pattern, swaps the one caller, then deletes the relation from `Student.php`.
 | # | Phase | Status |
 |---|-------|--------|
 | 1 | [Phase 1: Cut Student::financeCharges() reverse relation](./phase-01-start.md) | Completed |
-| 2 | [Phase 2: Cut Student::payments() reverse relation](./phase-02-cut-studentpayments-reverse-relation.md) | Pending |
+| 2 | [Phase 2: Cut Student::payments() reverse relation](./phase-02-cut-studentpayments-reverse-relation.md) | Completed |
 | 3 | [Phase 3: Cut Student::invoices() reverse relation](./phase-03-cut-studentinvoices-reverse-relation.md) | Pending |
 
 ## Non-Goals

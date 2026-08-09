@@ -6,7 +6,6 @@ namespace App\Models;
 
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Models\BillingAccount;
-use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\StudentInvoice;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -438,14 +437,6 @@ class Student extends StudentAuditableModel
     public function voucherApplications(): HasMany
     {
         return $this->hasMany(VoucherApplication::class);
-    }
-
-    /**
-     * Get the student's payments.
-     */
-    public function payments(): HasMany
-    {
-        return $this->hasMany(Payment::class);
     }
 
     /**
