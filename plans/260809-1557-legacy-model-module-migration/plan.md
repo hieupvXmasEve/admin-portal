@@ -1,7 +1,7 @@
 ---
 title: "Legacy Model Module Migration"
 description: "Move legacy app/Models/*.php into owning app/Modules/<Owner>/Models — mechanical, no behavior change"
-status: pending
+status: done
 priority: P1
 effort: "5 PRs, ~1-2h each"
 tags: [modularization, arch-test, php]
@@ -54,11 +54,11 @@ Student alone has 1,340 references, needs its own follow-up plan).
 
 | # | Phase | Status |
 |---|-------|--------|
-| 1 | [Phase 1: Facilities module migration](./phase-01-start.md) | Pending |
-| 2 | [Phase 2: Upload module migration](./phase-02-upload-module-migration.md) | Pending |
-| 3 | [Phase 3: Merchandise module migration](./phase-03-merchandise-module-migration.md) | Pending |
-| 4 | [Phase 4: Engagement module migration](./phase-04-engagement-module-migration.md) | Pending |
-| 5 | [Phase 5: Academic module scoping (deferred)](./phase-05-academic-module-scoping-deferred.md) | Pending |
+| 1 | [Phase 1: Facilities module migration](./phase-01-start.md) | Done (90f7ef02) |
+| 2 | [Phase 2: Upload module migration](./phase-02-upload-module-migration.md) | Done (c6c4bedc) |
+| 3 | [Phase 3: Merchandise module migration](./phase-03-merchandise-module-migration.md) | Done (09c48d83) |
+| 4 | [Phase 4: Engagement module migration](./phase-04-engagement-module-migration.md) | Done (50ed50a4, 81ed1304, ebfda3ff) |
+| 5 | [Phase 5: Academic module scoping (deferred)](./phase-05-academic-module-scoping-deferred.md) | Done — [scoping note](./phase-05-scoping-note.md) |
 
 ## Success Criteria
 

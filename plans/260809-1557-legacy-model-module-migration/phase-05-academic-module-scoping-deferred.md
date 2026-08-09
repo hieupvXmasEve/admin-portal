@@ -1,11 +1,13 @@
 ---
 phase: 5
 title: "Academic module scoping (deferred)"
-status: pending
+status: done
 priority: P2
 effort: "0.5h (planning only, no code)"
 dependencies: [4]
 ---
+
+**Deliverable:** [phase-05-scoping-note.md](./phase-05-scoping-note.md).
 
 # Phase 5: Academic module scoping (deferred)
 
