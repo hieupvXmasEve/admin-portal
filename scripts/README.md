@@ -46,6 +46,7 @@ target before running them.
 | `deploy-ubuntu.sh` | Ubuntu branch deployment helper |
 | `deploy.sh` | Existing deployment helper; inspect active workflow before use |
 | `deploy-production.sh` | Existing production helper; inspect active workflow before use |
+| `deploy-fe.sh` | Deploy FE/student-nuxt + FE/lecturer-nuxt for one school or all (see `schools.list`) |
 | `server-setup.sh` | Server bootstrap |
 | `backup-database.sh` | Database backup implementation |
 | `monitor-production.sh` | Production monitoring helper |
