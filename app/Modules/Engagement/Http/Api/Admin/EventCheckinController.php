@@ -6,12 +6,12 @@ namespace App\Modules\Engagement\Http\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
-use App\Models\Event;
-use App\Models\EventParticipant;
 use App\Modules\Engagement\Actions\EventParticipationOperations;
 use App\Modules\Engagement\Http\Requests\EventCheckinRequest;
 use App\Modules\Engagement\Http\Requests\EventParticipantSearchRequest;
 use App\Modules\Engagement\Http\Requests\ListEventParticipantsRequest;
+use App\Modules\Engagement\Models\Event;
+use App\Modules\Engagement\Models\EventParticipant;
 use App\Services\QRCodeService;
 use App\Shared\Contracts\Academic\StudentLifecycleStatusReader;
 use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;

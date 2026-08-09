@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Engagement\Jobs;
 
-use App\Models\Event;
 use App\Modules\Engagement\Actions\EventNotificationPublisher;
+use App\Modules\Engagement\Models\Event;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;

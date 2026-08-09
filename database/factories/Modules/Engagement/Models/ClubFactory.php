@@ -1,13 +1,13 @@
 <?php
 
-namespace Database\Factories;
+namespace Database\Factories\Modules\Engagement\Models;
 
 use App\Models\Campus;
-use App\Models\Club;
+use App\Modules\Engagement\Models\Club;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Club>
+ * @extends Factory<Club>
  */
 class ClubFactory extends Factory
 {
@@ -20,13 +20,13 @@ class ClubFactory extends Factory
     {
         $clubTypes = [
             'Academic', 'Sports', 'Cultural', 'Technology', 'Arts', 'Music',
-            'Drama', 'Science', 'Literature', 'Photography', 'Gaming', 'Volunteer'
+            'Drama', 'Science', 'Literature', 'Photography', 'Gaming', 'Volunteer',
         ];
 
         $clubNames = [
             'Debate Society', 'Chess Club', 'Basketball Team', 'Photography Club',
             'Drama Society', 'Computer Science Club', 'Environmental Club', 'Music Band',
-            'Art Society', 'Literature Club', 'Robotics Club', 'Volunteer Corps'
+            'Art Society', 'Literature Club', 'Robotics Club', 'Volunteer Corps',
         ];
 
         $socialPlatforms = ['facebook', 'instagram', 'twitter', 'linkedin', 'youtube', 'discord'];
@@ -48,7 +48,7 @@ class ClubFactory extends Factory
                 'title' => fake()->sentence(3),
                 'description' => fake()->sentence(8),
                 'date' => fake()->dateTimeBetween('-2 years', 'now')->format('Y-m-d'),
-                'category' => fake()->randomElement(['competition', 'community_service', 'academic', 'cultural'])
+                'category' => fake()->randomElement(['competition', 'community_service', 'academic', 'cultural']),
             ];
         }
 
@@ -99,28 +99,28 @@ class ClubFactory extends Factory
                 'descriptions' => [
                     'A club dedicated to academic excellence and intellectual discourse among students.',
                     'Fostering academic achievement and scholarly activities within the campus community.',
-                ]
+                ],
             ],
             'sports' => [
                 'names' => ['Basketball Team', 'Soccer Club', 'Tennis Club', 'Athletics Club'],
                 'descriptions' => [
                     'Promoting physical fitness and competitive sports among students.',
                     'Building teamwork and sportsmanship through various athletic activities.',
-                ]
+                ],
             ],
             'technology' => [
                 'names' => ['Computer Science Club', 'Robotics Club', 'Tech Innovation Society', 'Coding Club'],
                 'descriptions' => [
                     'Exploring the latest in technology and computer science innovations.',
                     'Bringing together tech enthusiasts to learn, build, and innovate.',
-                ]
+                ],
             ],
             'cultural' => [
                 'names' => ['Cultural Society', 'International Club', 'Heritage Club', 'Multicultural Association'],
                 'descriptions' => [
                     'Celebrating diversity and promoting cultural understanding among students.',
                     'Organizing cultural events and fostering cross-cultural friendships.',
-                ]
+                ],
             ],
         ];
 
@@ -128,7 +128,7 @@ class ClubFactory extends Factory
 
         return $this->state(fn (array $attributes) => [
             'name' => fake()->randomElement($data['names']),
-            'description' => fake()->randomElement($data['descriptions']) . ' ' . fake()->sentence(),
+            'description' => fake()->randomElement($data['descriptions']).' '.fake()->sentence(),
         ]);
     }
 
@@ -145,7 +145,7 @@ class ClubFactory extends Factory
                 'title' => fake()->sentence(3),
                 'description' => fake()->sentence(8),
                 'date' => fake()->dateTimeBetween('-2 years', 'now')->format('Y-m-d'),
-                'category' => fake()->randomElement(['competition', 'community_service', 'academic', 'cultural'])
+                'category' => fake()->randomElement(['competition', 'community_service', 'academic', 'cultural']),
             ];
         }
 
@@ -161,12 +161,12 @@ class ClubFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'social_links' => [
-                'facebook' => 'https://facebook.com/' . fake()->userName(),
-                'instagram' => 'https://instagram.com/' . fake()->userName(),
-                'twitter' => 'https://twitter.com/' . fake()->userName(),
-                'linkedin' => 'https://linkedin.com/company/' . fake()->slug(),
-                'youtube' => 'https://youtube.com/channel/' . fake()->uuid(),
-                'discord' => 'https://discord.gg/' . fake()->lexify('???????'),
+                'facebook' => 'https://facebook.com/'.fake()->userName(),
+                'instagram' => 'https://instagram.com/'.fake()->userName(),
+                'twitter' => 'https://twitter.com/'.fake()->userName(),
+                'linkedin' => 'https://linkedin.com/company/'.fake()->slug(),
+                'youtube' => 'https://youtube.com/channel/'.fake()->uuid(),
+                'discord' => 'https://discord.gg/'.fake()->lexify('???????'),
             ],
         ]);
     }

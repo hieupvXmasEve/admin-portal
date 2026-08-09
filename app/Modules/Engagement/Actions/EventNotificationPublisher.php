@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Engagement\Actions;
 
-use App\Models\Event;
-use App\Models\EventParticipant;
+use App\Modules\Engagement\Models\Event;
+use App\Modules\Engagement\Models\EventParticipant;
 use App\Shared\Contracts\Academic\StudentLifecycleStatusReader;
 use App\Shared\Contracts\DomainEvents\DomainEvent;
 use App\Shared\Contracts\DomainEvents\DomainEventPublisher;

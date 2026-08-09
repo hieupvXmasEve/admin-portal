@@ -1,14 +1,14 @@
 <?php
 
-namespace Database\Factories;
+namespace Database\Factories\Modules\Engagement\Models;
 
-use App\Models\ClubMember;
-use App\Models\ClubMemberRoleHistory;
 use App\Models\Student;
+use App\Modules\Engagement\Models\ClubMember;
+use App\Modules\Engagement\Models\ClubMemberRoleHistory;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\ClubMemberRoleHistory>
+ * @extends Factory<ClubMemberRoleHistory>
  */
 class ClubMemberRoleHistoryFactory extends Factory
 {
@@ -26,7 +26,7 @@ class ClubMemberRoleHistoryFactory extends Factory
 
         // Ensure old and new roles are different if old role exists
         if ($oldRole !== null && $oldRole === $newRole) {
-            $availableRoles = array_filter($roles, fn($role) => $role !== $oldRole);
+            $availableRoles = array_filter($roles, fn ($role) => $role !== $oldRole);
             $newRole = fake()->randomElement($availableRoles);
         }
 
@@ -57,6 +57,7 @@ class ClubMemberRoleHistoryFactory extends Factory
                 'Club formation - founding member role assignment',
                 'Membership application approved with designated role',
             ];
+
             return fake()->randomElement($initialReasons);
         }
 
@@ -85,7 +86,7 @@ class ClubMemberRoleHistoryFactory extends Factory
                 'Stepped down to focus on academic priorities',
                 'Personal circumstances required role change',
                 'Completed term of service in leadership role',
-            ]
+            ],
         ];
 
         // Determine change type based on role hierarchy
@@ -208,7 +209,7 @@ class ClubMemberRoleHistoryFactory extends Factory
     {
         $officerRoles = ['vice_president', 'secretary', 'treasurer'];
         $oldRole = fake()->randomElement($officerRoles);
-        $availableRoles = array_filter($officerRoles, fn($role) => $role !== $oldRole);
+        $availableRoles = array_filter($officerRoles, fn ($role) => $role !== $oldRole);
         $newRole = fake()->randomElement($availableRoles);
 
         return $this->state(fn (array $attributes) => [

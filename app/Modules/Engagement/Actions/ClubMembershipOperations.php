@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Engagement\Actions;
 
 use App\Exceptions\BusinessLogicException;
-use App\Models\Club;
-use App\Models\ClubMember;
-use App\Models\ClubMemberRoleHistory;
+use App\Modules\Engagement\Models\Club;
+use App\Modules\Engagement\Models\ClubMember;
+use App\Modules\Engagement\Models\ClubMemberRoleHistory;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;

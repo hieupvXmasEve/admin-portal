@@ -1,11 +1,15 @@
 <?php
 
-namespace Database\Factories;
+namespace Database\Factories\Modules\Engagement\Models;
 
+use App\Models\Student;
+use App\Models\User;
+use App\Modules\Engagement\Models\Event;
+use App\Modules\Engagement\Models\EventParticipant;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\EventParticipant>
+ * @extends Factory<EventParticipant>
  */
 class EventParticipantFactory extends Factory
 {
@@ -19,8 +23,8 @@ class EventParticipantFactory extends Factory
         $registeredAt = $this->faker->dateTimeBetween('-14 days', 'now');
 
         return [
-            'event_id' => \App\Models\Event::factory(),
-            'student_id' => \App\Models\Student::factory(),
+            'event_id' => Event::factory(),
+            'student_id' => Student::factory(),
             'status' => 'registered',
             'registered_at' => $registeredAt,
             'checkin_time' => null,
@@ -48,7 +52,7 @@ class EventParticipantFactory extends Factory
                     'ip_address' => $this->faker->ipv4(),
                     'user_agent' => $this->faker->userAgent(),
                 ],
-                'checkin_staff_id' => \App\Models\User::factory(),
+                'checkin_staff_id' => User::factory(),
             ];
         });
     }
@@ -71,7 +75,7 @@ class EventParticipantFactory extends Factory
                     'ip_address' => $this->faker->ipv4(),
                     'user_agent' => $this->faker->userAgent(),
                 ],
-                'checkin_staff_id' => \App\Models\User::factory(),
+                'checkin_staff_id' => User::factory(),
                 'gold_awarded' => true,
                 'awarded_at' => $awardedAt,
             ];
@@ -122,7 +126,7 @@ class EventParticipantFactory extends Factory
     /**
      * Indicate that the participant was checked in by a specific staff member.
      */
-    public function checkedInBy(\App\Models\User $staff): static
+    public function checkedInBy(User $staff): static
     {
         return $this->state(fn (array $attributes) => [
             'checkin_staff_id' => $staff->id,
@@ -132,7 +136,7 @@ class EventParticipantFactory extends Factory
     /**
      * Create a participant for a specific event and student.
      */
-    public function forEventAndStudent(\App\Models\Event $event, \App\Models\Student $student): static
+    public function forEventAndStudent(Event $event, Student $student): static
     {
         return $this->state(fn (array $attributes) => [
             'event_id' => $event->id,

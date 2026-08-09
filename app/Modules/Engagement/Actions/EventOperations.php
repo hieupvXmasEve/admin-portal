@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Engagement\Actions;
 
 use App\Models\Campus;
-use App\Models\Event;
 use App\Models\User;
 use App\Modules\Engagement\Jobs\ProcessEventNotificationJob;
+use App\Modules\Engagement\Models\Event;
 use App\Services\QRCodeService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;

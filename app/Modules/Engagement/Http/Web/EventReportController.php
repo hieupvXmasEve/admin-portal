@@ -6,7 +6,7 @@ namespace App\Modules\Engagement\Http\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Campus;
-use App\Models\Event;
+use App\Modules\Engagement\Models\Event;
 use App\Modules\Engagement\Queries\EventReportingQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

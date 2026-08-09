@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Engagement\Actions;
 
-use App\Models\Event;
-use App\Models\EventParticipant;
 use App\Models\GoldTransaction;
 use App\Models\User;
+use App\Modules\Engagement\Models\Event;
+use App\Modules\Engagement\Models\EventParticipant;
 use App\Services\GoldService;
 use App\Shared\Contracts\Academic\StudentLifecycleStatusReader;
 use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;

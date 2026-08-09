@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Engagement\Console;
 
-use App\Models\EventParticipant;
 use App\Modules\Engagement\Actions\EventParticipationOperations;
+use App\Modules\Engagement\Models\EventParticipant;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 

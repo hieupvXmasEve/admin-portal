@@ -1,11 +1,14 @@
 <?php
 
-namespace Database\Factories;
+namespace Database\Factories\Modules\Engagement\Models;
 
+use App\Models\Campus;
+use App\Models\User;
+use App\Modules\Engagement\Models\Event;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Event>
+ * @extends Factory<Event>
  */
 class EventFactory extends Factory
 {
@@ -17,10 +20,10 @@ class EventFactory extends Factory
     public function definition(): array
     {
         $startTime = $this->faker->dateTimeBetween('+1 day', '+30 days');
-        $endTime = $this->faker->dateTimeBetween($startTime, $startTime->format('Y-m-d H:i:s') . ' +4 hours');
+        $endTime = $this->faker->dateTimeBetween($startTime, $startTime->format('Y-m-d H:i:s').' +4 hours');
 
         return [
-            'campus_id' => \App\Models\Campus::factory(),
+            'campus_id' => Campus::factory(),
             'title' => $this->faker->sentence(3),
             'description' => $this->faker->paragraph(3),
             'start_time' => $startTime,
@@ -37,7 +40,7 @@ class EventFactory extends Factory
             'published_at' => function (array $attributes) {
                 return $attributes['status'] === 'published' ? $this->faker->dateTimeBetween('-7 days', 'now') : null;
             },
-            'created_by_user_id' => \App\Models\User::factory(),
+            'created_by_user_id' => User::factory(),
             'is_manual' => false,
             'is_historical' => false,
             'created_by_admin_id' => null,
@@ -141,7 +144,7 @@ class EventFactory extends Factory
     public function future(): static
     {
         $startTime = $this->faker->dateTimeBetween('+1 day', '+30 days');
-        $endTime = $this->faker->dateTimeBetween($startTime, $startTime->format('Y-m-d H:i:s') . ' +4 hours');
+        $endTime = $this->faker->dateTimeBetween($startTime, $startTime->format('Y-m-d H:i:s').' +4 hours');
 
         return $this->state(fn (array $attributes) => [
             'start_time' => $startTime,
@@ -155,7 +158,7 @@ class EventFactory extends Factory
     public function past(): static
     {
         $startTime = $this->faker->dateTimeBetween('-7 days', '-2 days');
-        $endTime = $this->faker->dateTimeBetween($startTime, $startTime->format('Y-m-d H:i:s') . ' +4 hours');
+        $endTime = $this->faker->dateTimeBetween($startTime, $startTime->format('Y-m-d H:i:s').' +4 hours');
 
         return $this->state(fn (array $attributes) => [
             'start_time' => $startTime,
@@ -170,7 +173,7 @@ class EventFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'is_manual' => true,
-            'created_by_admin_id' => \App\Models\User::factory(),
+            'created_by_admin_id' => User::factory(),
             'status' => 'completed',
             'completed_at' => $this->faker->dateTimeBetween('-1 day', 'now'),
         ]);
@@ -182,7 +185,7 @@ class EventFactory extends Factory
     public function historical(): static
     {
         $startTime = $this->faker->dateTimeBetween('-1 year', '-1 month');
-        $endTime = $this->faker->dateTimeBetween($startTime, $startTime->format('Y-m-d H:i:s') . ' +4 hours');
+        $endTime = $this->faker->dateTimeBetween($startTime, $startTime->format('Y-m-d H:i:s').' +4 hours');
 
         return $this->state(fn (array $attributes) => [
             'is_historical' => true,
@@ -192,7 +195,7 @@ class EventFactory extends Factory
             'status' => 'completed',
             'published_at' => $startTime,
             'completed_at' => $endTime,
-            'created_by_admin_id' => \App\Models\User::factory(),
+            'created_by_admin_id' => User::factory(),
         ]);
     }
 

@@ -7,7 +7,6 @@ namespace App\Modules\Engagement\Http\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\EventParticipantResource;
 use App\Http\Responses\ApiResponse;
-use App\Models\Event;
 use App\Models\Program;
 use App\Models\Specialization;
 use App\Modules\Engagement\Actions\EventParticipationOperations;
@@ -16,6 +15,7 @@ use App\Modules\Engagement\Http\Requests\BulkUpdateEventParticipantsRequest;
 use App\Modules\Engagement\Http\Requests\ListEventParticipantsRequest;
 use App\Modules\Engagement\Http\Requests\ManualEventParticipantSearchRequest;
 use App\Modules\Engagement\Http\Requests\RemoveManualEventParticipantsRequest;
+use App\Modules\Engagement\Models\Event;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 

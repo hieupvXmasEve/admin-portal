@@ -1,14 +1,14 @@
 <?php
 
-namespace Database\Factories;
+namespace Database\Factories\Modules\Engagement\Models;
 
-use App\Models\Club;
-use App\Models\ClubMember;
 use App\Models\Student;
+use App\Modules\Engagement\Models\Club;
+use App\Modules\Engagement\Models\ClubMember;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\ClubMember>
+ * @extends Factory<ClubMember>
  */
 class ClubMemberFactory extends Factory
 {
@@ -74,37 +74,38 @@ class ClubMemberFactory extends Factory
                 'Represent the club in official matters',
                 'Oversee club operations and strategic planning',
                 'Coordinate with other club officers',
-                'Manage club budget and resources'
+                'Manage club budget and resources',
             ],
             'vice_president' => [
                 'Assist the president in club operations',
                 'Lead meetings in president\'s absence',
                 'Coordinate special projects and events',
-                'Support member recruitment efforts'
+                'Support member recruitment efforts',
             ],
             'secretary' => [
                 'Maintain meeting minutes and records',
                 'Handle club correspondence',
                 'Manage membership records',
-                'Coordinate communication with members'
+                'Coordinate communication with members',
             ],
             'treasurer' => [
                 'Manage club finances and budget',
                 'Track expenses and income',
                 'Prepare financial reports',
-                'Handle fundraising activities'
+                'Handle fundraising activities',
             ],
             'member' => [
                 'Participate in club activities and meetings',
                 'Support club initiatives and events',
-                'Contribute to club goals and objectives'
-            ]
+                'Contribute to club goals and objectives',
+            ],
         ];
 
         $baseResponsibilities = $responsibilityMap[$role] ?? $responsibilityMap['member'];
 
         // Randomly select 2-4 responsibilities
         $numResponsibilities = fake()->numberBetween(2, min(4, count($baseResponsibilities)));
+
         return fake()->randomElements($baseResponsibilities, $numResponsibilities);
     }
 
@@ -196,7 +197,7 @@ class ClubMemberFactory extends Factory
                 'Represent the club in official matters',
                 'Oversee club operations and strategic planning',
                 'Coordinate with other club officers',
-                'Manage club budget and resources'
+                'Manage club budget and resources',
             ],
             'participation_score' => fake()->numberBetween(80, 100),
             'joined_at' => fake()->dateTimeBetween('-2 years', '-6 months'),
@@ -216,7 +217,7 @@ class ClubMemberFactory extends Factory
                 'Assist the president in club operations',
                 'Lead meetings in president\'s absence',
                 'Coordinate special projects and events',
-                'Support member recruitment efforts'
+                'Support member recruitment efforts',
             ],
             'participation_score' => fake()->numberBetween(70, 95),
             'joined_at' => fake()->dateTimeBetween('-2 years', '-3 months'),
@@ -236,7 +237,7 @@ class ClubMemberFactory extends Factory
                 'Maintain meeting minutes and records',
                 'Handle club correspondence',
                 'Manage membership records',
-                'Coordinate communication with members'
+                'Coordinate communication with members',
             ],
             'participation_score' => fake()->numberBetween(60, 90),
             'joined_at' => fake()->dateTimeBetween('-18 months', '-2 months'),
@@ -256,7 +257,7 @@ class ClubMemberFactory extends Factory
                 'Manage club finances and budget',
                 'Track expenses and income',
                 'Prepare financial reports',
-                'Handle fundraising activities'
+                'Handle fundraising activities',
             ],
             'participation_score' => fake()->numberBetween(65, 90),
             'joined_at' => fake()->dateTimeBetween('-18 months', '-2 months'),
@@ -275,7 +276,7 @@ class ClubMemberFactory extends Factory
             'responsibilities' => [
                 'Participate in club activities and meetings',
                 'Support club initiatives and events',
-                'Contribute to club goals and objectives'
+                'Contribute to club goals and objectives',
             ],
             'participation_score' => fake()->numberBetween(20, 80),
             'joined_at' => fake()->dateTimeBetween('-1 year', '-1 week'),
@@ -315,11 +316,11 @@ class ClubMemberFactory extends Factory
             'I have relevant experience and skills that would benefit the organization.',
             'I am looking to develop my leadership abilities and learn from other members.',
             'I want to be part of a community that shares my interests and values.',
-            'I believe I can help the club achieve its goals and grow its impact.'
+            'I believe I can help the club achieve its goals and grow its impact.',
         ];
 
         return $this->state(fn (array $attributes) => [
-            'application_notes' => fake()->randomElement($motivations) . ' ' . fake()->paragraph(),
+            'application_notes' => fake()->randomElement($motivations).' '.fake()->paragraph(),
         ]);
     }
 

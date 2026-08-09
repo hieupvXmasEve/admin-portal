@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Engagement\Queries;
 
 use App\Models\Campus;
-use App\Models\Event;
-use App\Models\EventParticipant;
+use App\Modules\Engagement\Models\Event;
+use App\Modules\Engagement\Models\EventParticipant;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 
