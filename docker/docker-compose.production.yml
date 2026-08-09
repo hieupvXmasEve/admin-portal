@@ -4,8 +4,14 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.production
       args:
+        VITE_APP_NAME: ${VITE_APP_NAME:-Asia University}
         VITE_APP_URL_FE: ${VITE_APP_URL_FE:-http://localhost:3000}
         VITE_APP_URL_FE_LECTURE: ${VITE_APP_URL_FE_LECTURE:-http://localhost:3001}
+        VITE_BROADCASTER: ${VITE_BROADCASTER:-}
+        VITE_BROADCAST_KEY: ${VITE_BROADCAST_KEY:-}
+        VITE_PUSH_CLUSTER: ${VITE_PUSH_CLUSTER:-mt1}
+        VITE_SOCKET_HOST: ${VITE_SOCKET_HOST:-}
+        VITE_SOCKET_PORT: ${VITE_SOCKET_PORT:-443}
     env_file:
       - ../.env
     ports:
@@ -37,8 +43,14 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.production
       args:
+        VITE_APP_NAME: ${VITE_APP_NAME:-Asia University}
         VITE_APP_URL_FE: ${VITE_APP_URL_FE:-http://localhost:3000}
         VITE_APP_URL_FE_LECTURE: ${VITE_APP_URL_FE_LECTURE:-http://localhost:3001}
+        VITE_BROADCASTER: ${VITE_BROADCASTER:-}
+        VITE_BROADCAST_KEY: ${VITE_BROADCAST_KEY:-}
+        VITE_PUSH_CLUSTER: ${VITE_PUSH_CLUSTER:-mt1}
+        VITE_SOCKET_HOST: ${VITE_SOCKET_HOST:-}
+        VITE_SOCKET_PORT: ${VITE_SOCKET_PORT:-443}
     env_file:
       - ../.env
     working_dir: /app
@@ -67,8 +79,14 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.production
       args:
+        VITE_APP_NAME: ${VITE_APP_NAME:-Asia University}
         VITE_APP_URL_FE: ${VITE_APP_URL_FE:-http://localhost:3000}
         VITE_APP_URL_FE_LECTURE: ${VITE_APP_URL_FE_LECTURE:-http://localhost:3001}
+        VITE_BROADCASTER: ${VITE_BROADCASTER:-}
+        VITE_BROADCAST_KEY: ${VITE_BROADCAST_KEY:-}
+        VITE_PUSH_CLUSTER: ${VITE_PUSH_CLUSTER:-mt1}
+        VITE_SOCKET_HOST: ${VITE_SOCKET_HOST:-}
+        VITE_SOCKET_PORT: ${VITE_SOCKET_PORT:-443}
     env_file:
       - ../.env
     working_dir: /app
