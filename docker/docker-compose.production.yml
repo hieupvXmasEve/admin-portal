@@ -3,6 +3,9 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.production
+      args:
+        VITE_APP_URL_FE: ${VITE_APP_URL_FE:-http://localhost:3000}
+        VITE_APP_URL_FE_LECTURE: ${VITE_APP_URL_FE_LECTURE:-http://localhost:3001}
     env_file:
       - ../.env
     ports:
@@ -33,6 +36,9 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.production
+      args:
+        VITE_APP_URL_FE: ${VITE_APP_URL_FE:-http://localhost:3000}
+        VITE_APP_URL_FE_LECTURE: ${VITE_APP_URL_FE_LECTURE:-http://localhost:3001}
     env_file:
       - ../.env
     working_dir: /app
@@ -60,6 +66,9 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.production
+      args:
+        VITE_APP_URL_FE: ${VITE_APP_URL_FE:-http://localhost:3000}
+        VITE_APP_URL_FE_LECTURE: ${VITE_APP_URL_FE_LECTURE:-http://localhost:3001}
     env_file:
       - ../.env
     working_dir: /app

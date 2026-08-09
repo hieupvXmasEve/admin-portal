@@ -56,6 +56,11 @@ RUN if [ -d "vendor/barryvdh/laravel-debugbar" ]; then \
         echo "ERROR: Debugbar found in production build!" && exit 1; \
     fi
 
+ARG VITE_APP_URL_FE=http://localhost:3000
+ARG VITE_APP_URL_FE_LECTURE=http://localhost:3001
+ENV VITE_APP_URL_FE=$VITE_APP_URL_FE \
+    VITE_APP_URL_FE_LECTURE=$VITE_APP_URL_FE_LECTURE
+
 RUN composer dump-autoload --optimize --classmap-authoritative --no-scripts \
     && rm -rf bootstrap/cache/*.php || true \
     && npm run build \
