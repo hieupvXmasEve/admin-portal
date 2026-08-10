@@ -16,6 +16,7 @@ Route::middleware(['web', 'auth'])->prefix('student-applications')->name('studen
     // to the show route instead ("No query results ... crm-mappings").
     Route::get('/crm-mappings', [CrmMappingController::class, 'index'])->middleware('can:manage_crm_value_mapping')->name('crm-mappings.index');
     Route::post('/crm-mappings', [CrmMappingController::class, 'store'])->middleware('can:manage_crm_value_mapping')->name('crm-mappings.store');
+    Route::post('/crm-mappings/integration', [CrmMappingController::class, 'storeIntegration'])->middleware('can:manage_crm_value_mapping')->name('crm-mappings.integration.store');
     Route::post('/', [StudentApplicationController::class, 'store'])->middleware('can:create_student_application')->name('store');
     Route::get('/{studentApplication}', [StudentApplicationController::class, 'show'])->middleware('can:view_student_application')->name('show');
     Route::get('/{studentApplication}/documents', [StudentApplicationController::class, 'documents'])->middleware('can:view_student_application')->name('documents');

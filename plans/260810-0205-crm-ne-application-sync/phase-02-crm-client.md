@@ -85,3 +85,32 @@ The client validates envelope shape but does **not** validate record contents; t
 
 - **Silent credential leak in logs** (high): mitigated by an explicit assertion, not by convention.
 - **CRM login rate limit under repeated retries** (low): single retry only, no loop.
+
+## Addendum: dynamic config (2026-08-10, post-implementation)
+
+Follow-up request: make the connection config staff-editable without a deploy. `system_settings`
+(Platform's closed, all-keys-required registry, plaintext JSON values) was considered and rejected — no
+place for an optional integration credential, and no encryption. Instead:
+
+- New Admissions-owned table `crm_integration_settings` (single row, `id=1`): `base_url`, `username`,
+  `password` (Eloquent `encrypted` cast — precedent: `AiProviderSetting::encrypted_api_key`), `timeout`.
+- `CrmIntegrationSettings::resolve()` — DB row wins; any field left blank falls back to
+  `config('services.crm.*')` (`.env`), so an unconfigured environment keeps working.
+- `CrmIntegrationSettings::forDisplay()` — UI-facing read, exposes `has_password: bool` only, never the
+  value.
+- `CrmClient` now takes `CrmIntegrationSettings` via constructor injection instead of reading `config()`
+  directly.
+- UI: a "CRM connection" card on the existing mapping screen (`CrmMappings.vue`), gated behind the same
+  `manage_crm_value_mapping` permission. Password field is write-only — starts blank, a blank submit means
+  "keep the current password" (`CrmIntegrationSettings::save()`).
+- Gotcha hit during implementation: `id` is not in `$fillable`, so
+  `updateOrCreate(['id' => 1], $attributes)` silently dropped the id on the create path and inserted an
+  autoincrement row instead of row 1. Fixed by setting `$row->id` directly (bypasses the fillable guard)
+  before `fill()->save()`.
+
+Files: `database/migrations/2026_08_10_143700_create_crm_integration_settings_table.php`,
+`app/Modules/Admissions/Models/CrmIntegrationSetting.php`,
+`app/Modules/Admissions/Support/Crm/CrmIntegrationSettings.php`,
+`app/Modules/Admissions/Http/Requests/Admissions/SaveCrmIntegrationSettingsRequest.php`,
+`tests/Feature/Admissions/CrmIntegrationSettingsTest.php`. Modified: `CrmClient.php`,
+`CrmMappingController.php` (+`storeIntegration`), `routes/web.php`, `CrmMappings.vue`.

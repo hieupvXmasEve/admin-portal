@@ -23,7 +23,7 @@ it('logs in and stores the token', function () {
         'https://crm.test/api/login' => Http::response(['status' => 'success', 'data' => ['token' => 'tok-1', 'token_type' => 'Bearer']], 200),
     ]);
 
-    (new CrmClient)->login();
+    app(CrmClient::class)->login();
 
     Http::assertSentCount(1);
 });
@@ -33,7 +33,7 @@ it('throws CrmAuthenticationException on a non-2xx login', function () {
         'https://crm.test/api/login' => Http::response(['message' => 'bad credentials'], 401),
     ]);
 
-    expect(fn () => (new CrmClient)->login())->toThrow(CrmAuthenticationException::class);
+    expect(fn () => app(CrmClient::class)->login())->toThrow(CrmAuthenticationException::class);
 });
 
 it('throws CrmAuthenticationException when data.token is missing', function () {
@@ -41,7 +41,7 @@ it('throws CrmAuthenticationException when data.token is missing', function () {
         'https://crm.test/api/login' => Http::response(['status' => 'success', 'data' => []], 200),
     ]);
 
-    expect(fn () => (new CrmClient)->login())->toThrow(CrmAuthenticationException::class);
+    expect(fn () => app(CrmClient::class)->login())->toThrow(CrmAuthenticationException::class);
 });
 
 it('fetches new enrollments after an implicit login', function () {
@@ -50,7 +50,7 @@ it('fetches new enrollments after an implicit login', function () {
         'https://crm.test/api/ne' => Http::response(['data' => [['student_code' => 'S1'], ['student_code' => 'S2']]], 200),
     ]);
 
-    $records = (new CrmClient)->fetchNewEnrollments();
+    $records = app(CrmClient::class)->fetchNewEnrollments();
 
     expect($records)->toHaveCount(2);
     Http::assertSentCount(2);
@@ -62,7 +62,7 @@ it('throws CrmResponseException when data is empty but present', function () {
         'https://crm.test/api/ne' => Http::response(['data' => []], 200),
     ]);
 
-    $records = (new CrmClient)->fetchNewEnrollments();
+    $records = app(CrmClient::class)->fetchNewEnrollments();
 
     expect($records)->toBe([]);
 });
@@ -73,7 +73,7 @@ it('throws CrmResponseException when data is not an array', function () {
         'https://crm.test/api/ne' => Http::response(['data' => 'not-a-list'], 200),
     ]);
 
-    expect(fn () => (new CrmClient)->fetchNewEnrollments())->toThrow(CrmResponseException::class);
+    expect(fn () => app(CrmClient::class)->fetchNewEnrollments())->toThrow(CrmResponseException::class);
 });
 
 it('throws CrmRequestException on a 500 from /ne', function () {
@@ -82,7 +82,7 @@ it('throws CrmRequestException on a 500 from /ne', function () {
         'https://crm.test/api/ne' => Http::response(['message' => 'server error'], 500),
     ]);
 
-    expect(fn () => (new CrmClient)->fetchNewEnrollments())->toThrow(CrmRequestException::class);
+    expect(fn () => app(CrmClient::class)->fetchNewEnrollments())->toThrow(CrmRequestException::class);
 });
 
 it('throws CrmRequestException on a connection timeout to /ne', function () {
@@ -91,7 +91,7 @@ it('throws CrmRequestException on a connection timeout to /ne', function () {
         'https://crm.test/api/ne' => fn () => throw new ConnectionException('timed out'),
     ]);
 
-    expect(fn () => (new CrmClient)->fetchNewEnrollments())->toThrow(CrmRequestException::class);
+    expect(fn () => app(CrmClient::class)->fetchNewEnrollments())->toThrow(CrmRequestException::class);
 });
 
 it('retries login exactly once after a 401 on /ne and then succeeds', function () {
@@ -107,7 +107,7 @@ it('retries login exactly once after a 401 on /ne and then succeeds', function (
         },
     ]);
 
-    $records = (new CrmClient)->fetchNewEnrollments();
+    $records = app(CrmClient::class)->fetchNewEnrollments();
 
     expect($records)->toHaveCount(1);
     // login, /ne (401), login again, /ne (200)
@@ -120,7 +120,7 @@ it('throws CrmAuthenticationException when the retried login still gets a 401', 
         'https://crm.test/api/ne' => Http::response(['message' => 'expired'], 401),
     ]);
 
-    expect(fn () => (new CrmClient)->fetchNewEnrollments())->toThrow(CrmAuthenticationException::class);
+    expect(fn () => app(CrmClient::class)->fetchNewEnrollments())->toThrow(CrmAuthenticationException::class);
     Http::assertSentCount(4);
 });
 
@@ -130,7 +130,7 @@ it('never leaks the password in an exception message', function () {
     ]);
 
     try {
-        (new CrmClient)->login();
+        app(CrmClient::class)->login();
         expect(false)->toBeTrue('expected CrmAuthenticationException to be thrown');
     } catch (CrmAuthenticationException $exception) {
         expect($exception->getMessage())->not->toContain('super-secret-password');

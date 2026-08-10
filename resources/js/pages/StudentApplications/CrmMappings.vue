@@ -20,10 +20,18 @@ interface Semester {
     name: string;
 }
 
+interface IntegrationSettings {
+    base_url: string | null;
+    username: string | null;
+    has_password: boolean;
+    timeout: number;
+}
+
 interface Props {
     unmapped: UnmappedRow[];
     intake: { crm_value: string; local_code: string | null };
     semesters: Semester[];
+    integration: IntegrationSettings;
 }
 
 const props = defineProps<Props>();
@@ -82,6 +90,26 @@ function saveIntake(): void {
         onError: () => toast.error(intakeForm.errors.local_code ?? 'Could not save the target intake.'),
     });
 }
+
+// Password is write-only: the server never sends the real value back, so the
+// field starts blank and a blank submit means "keep the current password".
+const integrationForm = useForm({
+    base_url: props.integration.base_url ?? '',
+    username: props.integration.username ?? '',
+    password: '',
+    timeout: props.integration.timeout,
+});
+
+function saveIntegration(): void {
+    integrationForm.post(route('student-applications.crm-mappings.integration.store'), {
+        preserveScroll: true,
+        onSuccess: () => {
+            integrationForm.password = '';
+            toast.success('CRM connection settings saved.');
+        },
+        onError: () => toast.error('Could not save the CRM connection settings — check the fields below.'),
+    });
+}
 </script>
 
 <template>
@@ -95,6 +123,41 @@ function saveIntake(): void {
                 application that carries the raw value — no re-sync needed.
             </p>
         </div>
+
+        <Card>
+            <CardHeader>
+                <CardTitle>CRM connection</CardTitle>
+                <CardDescription>Credentials used to log in to the CRM and pull New Enrollment records. Changes take effect on the next sync run — no deploy needed.</CardDescription>
+            </CardHeader>
+            <CardContent class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div class="space-y-1">
+                    <label class="text-sm font-medium" for="crm-base-url">Base URL</label>
+                    <Input id="crm-base-url" v-model="integrationForm.base_url" placeholder="https://crm.example.com" />
+                    <p v-if="integrationForm.errors.base_url" class="text-destructive text-xs">{{ integrationForm.errors.base_url }}</p>
+                </div>
+                <div class="space-y-1">
+                    <label class="text-sm font-medium" for="crm-username">Username</label>
+                    <Input id="crm-username" v-model="integrationForm.username" />
+                    <p v-if="integrationForm.errors.username" class="text-destructive text-xs">{{ integrationForm.errors.username }}</p>
+                </div>
+                <div class="space-y-1">
+                    <label class="text-sm font-medium" for="crm-password">
+                        Password
+                        <span class="text-muted-foreground font-normal">{{ integration.has_password ? '(set — leave blank to keep it)' : '(not set)' }}</span>
+                    </label>
+                    <Input id="crm-password" v-model="integrationForm.password" type="password" placeholder="••••••••" autocomplete="new-password" />
+                    <p v-if="integrationForm.errors.password" class="text-destructive text-xs">{{ integrationForm.errors.password }}</p>
+                </div>
+                <div class="space-y-1">
+                    <label class="text-sm font-medium" for="crm-timeout">Timeout (seconds)</label>
+                    <Input id="crm-timeout" v-model.number="integrationForm.timeout" type="number" min="1" max="600" />
+                    <p v-if="integrationForm.errors.timeout" class="text-destructive text-xs">{{ integrationForm.errors.timeout }}</p>
+                </div>
+                <div class="md:col-span-2">
+                    <Button :disabled="integrationForm.processing" @click="saveIntegration">Save connection settings</Button>
+                </div>
+            </CardContent>
+        </Card>
 
         <Card>
             <CardHeader>

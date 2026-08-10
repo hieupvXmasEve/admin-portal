@@ -7,6 +7,7 @@ namespace App\Modules\Admissions\Integrations\Crm;
 use App\Modules\Admissions\Exceptions\CrmAuthenticationException;
 use App\Modules\Admissions\Exceptions\CrmRequestException;
 use App\Modules\Admissions\Exceptions\CrmResponseException;
+use App\Modules\Admissions\Support\Crm\CrmIntegrationSettings;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
@@ -15,6 +16,10 @@ use Illuminate\Support\Facades\Http;
  * Logs in, holds the bearer token for the duration of one run, and fetches
  * `/api/ne`. Validates envelope shape only — record contents are the
  * mapper's job (Phase 3), so one malformed record never fails the whole fetch.
+ *
+ * Connection details resolve through {@see CrmIntegrationSettings} (DB row,
+ * falling back to `.env`) rather than `config()` directly, so staff can
+ * change them without a deploy.
  */
 class CrmClient
 {
@@ -30,12 +35,13 @@ class CrmClient
 
     private ?string $tokenType = null;
 
-    public function __construct()
+    public function __construct(CrmIntegrationSettings $settings)
     {
-        $this->baseUrl = (string) config('services.crm.base_url');
-        $this->username = (string) config('services.crm.username');
-        $this->password = (string) config('services.crm.password');
-        $this->timeout = (int) config('services.crm.timeout', 120);
+        $resolved = $settings->resolve();
+        $this->baseUrl = $resolved['base_url'];
+        $this->username = $resolved['username'];
+        $this->password = $resolved['password'];
+        $this->timeout = $resolved['timeout'];
     }
 
     public function login(): void
