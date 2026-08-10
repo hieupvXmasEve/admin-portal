@@ -109,7 +109,7 @@ class FormController extends Controller
     /**
      * Show the form for editing the specified form.
      */
-    public function edit(Form $form)
+    public function edit(Request $request, Form $form)
     {
         $form->load([
             'versions.sections.questions.options',
@@ -131,6 +131,7 @@ class FormController extends Controller
             'questionTypes' => $this->getQuestionTypes(),
             'visibilityLevels' => $this->getVisibilityLevels(),
             'scopeTypes' => $this->getScopeTypes(),
+            'can_configure_aggregate' => (bool) $request->user()?->can('configure_survey_aggregate'),
         ]);
     }
 

@@ -41,6 +41,11 @@ interface AggregateOverall {
     positive_percent: number;
     neutral_percent: number;
     negative_percent: number;
+    is_custom: boolean;
+    positive_min: number;
+    negative_max: number;
+    included_count: number;
+    configured_count: number;
 }
 
 interface AggregateSection {
@@ -161,9 +166,11 @@ const navigateQuestion = (direction: 'prev' | 'next') => {
 };
 
 // --- Helpers ---
+// Thresholds are config-driven (per-form Overall Rating config) — section and
+// question coloring must stay in sync with the Overall card, never hardcode 4/2 here.
 const getRatingColor = (avg: number) => {
-    if (avg >= 4) return 'text-green-600';
-    if (avg >= 3) return 'text-amber-500';
+    if (avg >= props.overall.positive_min) return 'text-green-600';
+    if (avg > props.overall.negative_max) return 'text-amber-500';
     return 'text-red-500';
 };
 
@@ -557,11 +564,25 @@ const responseColumns: ColumnDef<StudentAssignment>[] = [
                 <div :class="{ 'opacity-60': reloading }">
                     <!-- SUMMARY TAB -->
                     <div v-if="activeTab === 'summary'" class="space-y-8">
+                        <!-- Stale custom config: some or all selected questions no longer resolve -->
+                        <div v-if="overall.is_custom && overall.included_count < overall.configured_count" class="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
+                            <template v-if="overall.included_count === 0">
+                                This form's custom Overall Rating configuration doesn't match any question in the current published version. Reopen the form builder to update the selection.
+                            </template>
+                            <template v-else>
+                                Only {{ overall.included_count }} of {{ overall.configured_count }} configured questions matched the current published version — the Overall Rating below is
+                                narrower than intended. Reopen the form builder to review the selection.
+                            </template>
+                        </div>
+
                         <!-- Overall Rating KPI (Only if valid) -->
-                        <div v-if="overall.average > 0" class="grid grid-cols-1 gap-6 md:grid-cols-3">
+                        <div v-if="overall.included_count > 0 && overall.average > 0" class="grid grid-cols-1 gap-6 md:grid-cols-3">
                             <Card class="bg-primary text-primary-foreground border-none shadow-lg">
                                 <CardHeader class="pb-2">
-                                    <CardTitle class="text-sm font-medium tracking-wider uppercase opacity-90">Overall Rating</CardTitle>
+                                    <CardTitle class="flex items-center gap-2 text-sm font-medium tracking-wider uppercase opacity-90">
+                                        Overall Rating
+                                        <Badge v-if="overall.is_custom" variant="secondary" class="text-primary normal-case">Custom formula ({{ overall.included_count }} questions)</Badge>
+                                    </CardTitle>
                                 </CardHeader>
                                 <CardContent>
                                     <div class="flex items-baseline gap-2">

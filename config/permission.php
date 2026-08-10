@@ -474,6 +474,7 @@ return [
             'view_survey_analytics' => 'view_survey_analytics',
             'view_survey_results_aggregate' => 'view_survey_results_aggregate',
             'view_survey_results_raw' => 'view_survey_results_raw',
+            'configure_survey_aggregate' => 'configure_survey_aggregate',
         ],
         'notifications' => [
             'send_manual_notification' => 'send_manual_notification',

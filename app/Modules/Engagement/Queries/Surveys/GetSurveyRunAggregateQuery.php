@@ -7,6 +7,8 @@ namespace App\Modules\Engagement\Queries\Surveys;
 use App\Models\Answer;
 use App\Models\CourseOffering;
 use App\Modules\Engagement\Models\FormTarget;
+use App\Modules\Engagement\Support\SurveyAggregateConfig;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 final class GetSurveyRunAggregateQuery
@@ -41,13 +43,27 @@ final class GetSurveyRunAggregateQuery
         $responsesDone = $responseIds->count();
         $responsePercent = $responsesTotal > 0 ? round(($responsesDone / $responsesTotal) * 100) : 0;
 
-        // Overall rating KPIs
-        $ratingAnswers = Answer::whereIn('response_id', $responseIds)->whereNotNull('answer_number')->where('answer_number', '>', 0)->get();
-        $overallTotal = $ratingAnswers->count();
-        $overallAvg = $ratingAnswers->avg('answer_number');
-        $overallPositive = $ratingAnswers->where('answer_number', '>=', 4)->count();
-        $overallNeutral = $ratingAnswers->where('answer_number', 3)->count();
-        $overallNegative = $ratingAnswers->where('answer_number', '<=', 2)->count();
+        $cfg = SurveyAggregateConfig::fromForm($target->form);
+
+        $ratingAnswersQuery = Answer::query()
+            ->join('questions', 'questions.id', '=', 'answers.question_id')
+            ->whereIn('answers.response_id', $responseIds)
+            ->where('questions.type', 'rating')
+            ->whereNotNull('answers.answer_number')
+            ->where('answers.answer_number', '>', 0)
+            ->select('answers.*');
+
+        if ($cfg->questionCodes !== null) {
+            $ratingAnswersQuery->whereIn('questions.code', $cfg->questionCodes);
+        }
+
+        $ratingAnswers = $ratingAnswersQuery->get();
+
+        $includedCount = DB::table('questions')
+            ->where('form_version_id', $target->form_version_id)
+            ->where('type', 'rating')
+            ->when($cfg->questionCodes !== null, fn ($q) => $q->whereIn('code', $cfg->questionCodes))
+            ->count();
 
         return [
             'header' => [
@@ -60,11 +76,33 @@ final class GetSurveyRunAggregateQuery
                 'responses_percent' => (int) $responsePercent,
             ],
             'overall' => [
-                'average' => $overallAvg !== null ? (float) round($overallAvg, 1) : 0.0,
-                'positive_percent' => $overallTotal > 0 ? (int) round(($overallPositive / $overallTotal) * 100) : 0,
-                'neutral_percent' => $overallTotal > 0 ? (int) round(($overallNeutral / $overallTotal) * 100) : 0,
-                'negative_percent' => $overallTotal > 0 ? (int) round(($overallNegative / $overallTotal) * 100) : 0,
+                ...$this->overallKpis($ratingAnswers, $cfg),
+                'is_custom' => $cfg->isCustom,
+                'positive_min' => $cfg->positiveMin,
+                'negative_max' => $cfg->negativeMax,
+                'included_count' => $includedCount,
+                'configured_count' => $cfg->questionCodes !== null ? count($cfg->questionCodes) : $includedCount,
             ],
+        ];
+    }
+
+    /**
+     * @param  Collection<int, Answer>  $ratingAnswers
+     * @return array{average: float, positive_percent: int, neutral_percent: int, negative_percent: int}
+     */
+    private function overallKpis(Collection $ratingAnswers, SurveyAggregateConfig $cfg): array
+    {
+        $overallTotal = $ratingAnswers->count();
+        $overallAvg = $ratingAnswers->avg('answer_number');
+        $overallPositive = $ratingAnswers->filter(fn ($a) => $cfg->isPositive((float) $a->answer_number))->count();
+        $overallNegative = $ratingAnswers->filter(fn ($a) => $cfg->isNegative((float) $a->answer_number))->count();
+        $overallNeutral = $overallTotal - $overallPositive - $overallNegative;
+
+        return [
+            'average' => $overallAvg !== null ? (float) round((float) $overallAvg, 1) : 0.0,
+            'positive_percent' => $overallTotal > 0 ? (int) round(($overallPositive / $overallTotal) * 100) : 0,
+            'neutral_percent' => $overallTotal > 0 ? (int) round(($overallNeutral / $overallTotal) * 100) : 0,
+            'negative_percent' => $overallTotal > 0 ? (int) round(($overallNegative / $overallTotal) * 100) : 0,
         ];
     }
 
@@ -73,7 +111,7 @@ final class GetSurveyRunAggregateQuery
      */
     public function executeSections(FormTarget $target): array
     {
-        $target->loadMissing(['formVersion']);
+        $target->loadMissing(['formVersion', 'form']);
 
         $assignments = DB::table('student_form_assignments')->where('form_target_id', $target->id)->get();
         $responseIds = $assignments->whereNotNull('response_id')->pluck('response_id');
@@ -83,6 +121,7 @@ final class GetSurveyRunAggregateQuery
             return ['sections' => []];
         }
 
+        $cfg = SurveyAggregateConfig::fromForm($target->form);
         $allAnswers = Answer::whereIn('response_id', $responseIds)->with(['selectedOptions'])->get();
 
         $sections = [];
@@ -96,8 +135,8 @@ final class GetSurveyRunAggregateQuery
                 $count = $sectionRatingAnswers->count();
                 $sectionStats = [
                     'average' => (float) round($sectionRatingAnswers->avg('answer_number'), 1),
-                    'positive_percent' => $count > 0 ? round(($sectionRatingAnswers->where('answer_number', '>=', 4)->count() / $count) * 100) : 0,
-                    'negative_percent' => $count > 0 ? round(($sectionRatingAnswers->where('answer_number', '<=', 2)->count() / $count) * 100) : 0,
+                    'positive_percent' => $count > 0 ? round(($sectionRatingAnswers->filter(fn ($a) => $cfg->isPositive((float) $a->answer_number))->count() / $count) * 100) : 0,
+                    'negative_percent' => $count > 0 ? round(($sectionRatingAnswers->filter(fn ($a) => $cfg->isNegative((float) $a->answer_number))->count() / $count) * 100) : 0,
                     'distribution' => $this->getRatingDistribution($sectionRatingAnswers),
                 ];
             }
@@ -128,134 +167,6 @@ final class GetSurveyRunAggregateQuery
         }
 
         return ['sections' => $sections];
-    }
-
-    /**
-     * Full execute (kept for backward compatibility).
-     *
-     * @deprecated Prefer executeHeader() + executeSections() separately.
-     */
-    public function execute(FormTarget $target): array
-    {
-        // 1. Load context info
-        $target->load(['form', 'semester', 'formVersion']);
-
-        $courseInfo = null;
-        if ($target->scope_type === 'course') {
-            $offering = CourseOffering::with(['unit', 'lecture'])->find($target->scope_id);
-            if ($offering) {
-                // Determine instructor name from physical columns as display_name might be an accessor
-                $instructor = $offering->lecture
-                    ? trim(($offering->lecture->title ? $offering->lecture->title.' ' : '').$offering->lecture->first_name.' '.$offering->lecture->last_name)
-                    : null;
-
-                $courseInfo = [
-                    'code' => $offering->unit?->code,
-                    'name' => $offering->unit?->name,
-                    'section' => $offering->section_code,
-                    'instructor' => $instructor,
-                ];
-            }
-        }
-
-        // 2. Response counts
-        $assignments = DB::table('student_form_assignments')
-            ->where('form_target_id', $target->id)
-            ->get();
-
-        $responsesTotal = $assignments->count();
-        $responseIds = $assignments->whereNotNull('response_id')->pluck('response_id');
-        $responsesDone = $responseIds->count();
-        $responsePercent = $responsesTotal > 0 ? round(($responsesDone / $responsesTotal) * 100) : 0;
-
-        // 3. Load Version with Sections and Questions
-        $version = $target->formVersion()->with(['sections.questions.options'])->first();
-        if (! $version) {
-            return [];
-        }
-
-        // 4. Fetch All Answers
-        // We fetch all answers for these responses to aggregate locally
-        $allAnswers = Answer::whereIn('response_id', $responseIds)
-            ->with(['selectedOptions'])
-            ->get();
-
-        // 5. Calculate Overall Rating Stats (KPIs)
-        // Filter only rating answers for the global KPI
-        $ratingAnswers = $allAnswers->whereNotNull('answer_number')->where('answer_number', '>', 0);
-
-        $overallAvg = $ratingAnswers->avg('answer_number');
-        $overallTotal = $ratingAnswers->count();
-        $overallPositive = $ratingAnswers->where('answer_number', '>=', 4)->count();
-        $overallNeutral = $ratingAnswers->where('answer_number', 3)->count();
-        $overallNegative = $ratingAnswers->where('answer_number', '<=', 2)->count();
-
-        // 6. Aggregate by Section -> Question
-        $sections = [];
-
-        foreach ($version->sections as $section) {
-            $questionsData = [];
-
-            // Section-level rating stats (only if section has rating questions)
-            $sectionRatingQuestionIds = $section->questions->where('type', 'rating')->pluck('id');
-            $sectionRatingAnswers = $allAnswers->whereIn('question_id', $sectionRatingQuestionIds)->whereNotNull('answer_number');
-            $sectionStats = null;
-
-            if ($sectionRatingAnswers->isNotEmpty()) {
-                $count = $sectionRatingAnswers->count();
-                $sectionStats = [
-                    'average' => (float) round($sectionRatingAnswers->avg('answer_number'), 1),
-                    'positive_percent' => $count > 0 ? round(($sectionRatingAnswers->where('answer_number', '>=', 4)->count() / $count) * 100) : 0,
-                    'negative_percent' => $count > 0 ? round(($sectionRatingAnswers->where('answer_number', '<=', 2)->count() / $count) * 100) : 0,
-                    'distribution' => $this->getRatingDistribution($sectionRatingAnswers),
-                ];
-            }
-
-            foreach ($section->questions as $question) {
-                $qAnswers = $allAnswers->where('question_id', $question->id);
-                $aggregation = $this->aggregateQuestion($question, $qAnswers);
-
-                if ($aggregation) {
-                    $questionsData[] = [
-                        'id' => $question->id,
-                        'text' => $question->text,
-                        'type' => $question->type,
-                        'order' => $question->order_index,
-                        'total_responses' => $qAnswers->count(),
-                        'data' => $aggregation,
-                    ];
-                }
-            }
-
-            // Only add section if it has questions
-            if (count($questionsData) > 0) {
-                $sections[] = [
-                    'id' => $section->id,
-                    'title' => $section->title,
-                    'stats' => $sectionStats, // Can be null if no rating questions
-                    'questions' => $questionsData,
-                ];
-            }
-        }
-
-        return [
-            'header' => [
-                'course_info' => $courseInfo,
-                'semester' => $target->semester?->name,
-                'form_title' => $target->form?->title,
-                'form_version' => $target->formVersion?->version_name ?? '#'.$target->formVersion?->id,
-                'responses_done' => $responsesDone,
-                'responses_total' => $responsesTotal,
-                'responses_percent' => (int) $responsePercent,
-            ],
-            'overall' => [
-                'average' => $overallAvg !== null ? (float) round($overallAvg, 1) : 0.0,
-                'positive_percent' => $overallTotal > 0 ? (int) round(($overallPositive / $overallTotal) * 100) : 0,
-                'neutral_percent' => $overallTotal > 0 ? (int) round(($overallNeutral / $overallTotal) * 100) : 0,
-                'negative_percent' => $overallTotal > 0 ? (int) round(($overallNegative / $overallTotal) * 100) : 0,
-            ],
-            'sections' => $sections,
-        ];
     }
 
     private function aggregateQuestion($question, $answers)

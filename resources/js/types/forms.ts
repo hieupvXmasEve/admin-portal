@@ -25,9 +25,20 @@ export interface Form {
     is_available?: boolean;
     has_responses?: boolean;
     active_targets_count?: number;
+    aggregate_config?: AggregateConfig | null;
     created_at: string;
     updated_at: string;
     deleted_at?: string;
+}
+
+export interface AggregateConfig {
+    overall: {
+        question_codes: string[];
+        thresholds: {
+            positive_min: number;
+            negative_max: number;
+        };
+    };
 }
 
 export interface FormVersion {

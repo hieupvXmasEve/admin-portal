@@ -30,6 +30,7 @@ class Form extends Model
     protected $casts = [
         'type' => 'string',
         'status' => 'string',
+        'aggregate_config' => 'array',
     ];
 
     /**

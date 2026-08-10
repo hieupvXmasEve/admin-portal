@@ -27,7 +27,7 @@ beforeEach(function (): void {
     ]);
     app()->singleton('campus', fn (): Campus => $this->campus);
 
-    bindFormManagementPermissions(['view_form', 'edit_form']);
+    bindFormManagementPermissions(['view_form', 'edit_form', 'create_survey', 'edit_survey', 'delete_survey']);
 });
 
 function bindFormManagementPermissions(array $permissions): void

@@ -7,6 +7,7 @@ use App\Modules\Engagement\Http\Web\Admin\FormController;
 use App\Modules\Engagement\Http\Web\Admin\FormTargetController;
 use App\Modules\Engagement\Http\Web\Admin\QueryController;
 use App\Modules\Engagement\Http\Web\Admin\QueryTicketController;
+use App\Modules\Engagement\Http\Web\Admin\SurveyAggregateConfigController;
 use App\Modules\Engagement\Http\Web\Admin\SurveyResultController;
 use App\Modules\Engagement\Http\Web\ClubController;
 use App\Modules\Engagement\Http\Web\CourseOfferingSurveyController;
@@ -82,18 +83,20 @@ Route::middleware('auth')->group(function (): void {
             });
 
             Route::get('/', [FormController::class, 'index'])->name('index');
-            Route::get('/create', [FormController::class, 'create'])->name('create');
-            Route::post('/', [FormController::class, 'store'])->name('store');
+            Route::get('/create', [FormController::class, 'create'])->middleware('can:create_survey')->name('create');
+            Route::post('/', [FormController::class, 'store'])->middleware('can:create_survey')->name('store');
             Route::get('/{form}', [FormController::class, 'show'])->name('show');
-            Route::get('/{form}/edit', [FormController::class, 'edit'])->name('edit');
-            Route::put('/{form}', [FormController::class, 'update'])->name('update');
-            Route::delete('/{form}', [FormController::class, 'destroy'])->name('destroy');
+            Route::get('/{form}/edit', [FormController::class, 'edit'])->middleware('can:edit_survey')->name('edit');
+            Route::put('/{form}', [FormController::class, 'update'])->middleware('can:edit_survey')->name('update');
+            Route::delete('/{form}', [FormController::class, 'destroy'])->middleware('can:delete_survey')->name('destroy');
             Route::post('/{form}/clone', [FormController::class, 'clone'])->name('clone');
             Route::post('/{form}/activate', [FormController::class, 'activate'])->name('activate');
             Route::post('/{form}/archive', [FormController::class, 'archive'])->name('archive');
             Route::post('/{form}/restore', [FormController::class, 'restore'])->name('restore');
             Route::post('/{form}/versions/{version}/publish', [FormController::class, 'publish'])->name('version.publish');
             Route::post('/{form}/targets', [FormController::class, 'createTarget'])->name('targets.store');
+            Route::put('/{form}/aggregate-config', [SurveyAggregateConfigController::class, 'update'])->middleware('can:configure_survey_aggregate')->name('aggregate-config.update');
+            Route::delete('/{form}/aggregate-config', [SurveyAggregateConfigController::class, 'destroy'])->middleware('can:configure_survey_aggregate')->name('aggregate-config.destroy');
         });
 
         Route::prefix('queries')->name('queries.')->middleware('can:review_form')->group(function (): void {

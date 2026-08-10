@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AggregateRatingSettings from '@/components/forms/AggregateRatingSettings.vue';
 import FormBuilder from '@/components/forms/FormBuilder.vue';
 import FormPreviewModal from '@/components/forms/FormPreviewModal.vue';
 import TargetingSettings from '@/components/forms/TargetingSettings.vue';
@@ -37,6 +38,7 @@ interface Props {
     questionTypes: Record<string, string>;
     visibilityLevels: Record<string, string>;
     scopeTypes: Record<string, string>;
+    can_configure_aggregate: boolean;
 }
 
 const props = defineProps<Props>();
@@ -103,6 +105,9 @@ const editForm = useForm({
 
 // Get the latest version (first one in versions array, or use current_version if available)
 const latestVersion = props.form.current_version || (props.form.versions && props.form.versions.length > 0 ? props.form.versions[props.form.versions.length - 1] : null);
+
+// Latest *published* version — the Overall Rating config validates codes against this one.
+const latestPublishedVersion = props.form.versions?.filter((v) => v.is_published).sort((a, b) => b.version_no - a.version_no)[0] ?? null;
 
 // Local state
 const currentTab = ref('basic');
@@ -436,10 +441,11 @@ editForm.targets = props.form.targets || [];
             <!-- Main Content -->
             <div class="lg:col-span-3">
                 <Tabs v-model:default-value="currentTab" class="w-full">
-                    <TabsList class="grid w-full grid-cols-3">
+                    <TabsList class="grid w-full" :class="can_configure_aggregate ? 'grid-cols-4' : 'grid-cols-3'">
                         <TabsTrigger value="basic">Basic Info</TabsTrigger>
                         <TabsTrigger value="visibility">Visibility</TabsTrigger>
                         <TabsTrigger value="targeting">Targeting</TabsTrigger>
+                        <TabsTrigger v-if="can_configure_aggregate" value="aggregate">Overall Rating</TabsTrigger>
                     </TabsList>
 
                     <!-- Basic Information Tab -->
@@ -802,6 +808,17 @@ editForm.targets = props.form.targets || [];
                     <!-- Targeting Tab -->
                     <TabsContent value="targeting">
                         <TargetingSettings v-model:targets="editForm.targets" :campuses="campuses" :scope-types="scopeTypes" />
+                    </TabsContent>
+
+                    <!-- Overall Rating Config Tab -->
+                    <TabsContent v-if="can_configure_aggregate" value="aggregate">
+                        <AggregateRatingSettings
+                            :form-id="form.id"
+                            :sections="latestPublishedVersion?.sections ?? []"
+                            :questions="latestPublishedVersion?.questions ?? []"
+                            :aggregate-config="form.aggregate_config"
+                            :can-configure="can_configure_aggregate"
+                        />
                     </TabsContent>
                 </Tabs>
             </div>
