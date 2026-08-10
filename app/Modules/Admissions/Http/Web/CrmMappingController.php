@@ -41,8 +41,11 @@ final class CrmMappingController extends Controller
             // data (see SaveCrmValueMappingRequest docblock).
             'campuses' => Campus::query()->orderBy('name')->get(['code', 'name']),
             'programs' => Program::query()->orderBy('name')->get(['code', 'name']),
-            'scholarships' => ScholarshipDefinition::query()->orderBy('name')->get(['code', 'name']),
-            'vouchers' => VoucherDefinition::query()->orderBy('name')->get(['code', 'name']),
+            // type/amount + voucher_type/discount_type/discount_value ride
+            // along so the UI can show what a code is actually worth once
+            // picked — a bare code/name pair reads as an opaque ID otherwise.
+            'scholarships' => ScholarshipDefinition::query()->orderBy('name')->get(['code', 'name', 'type', 'amount']),
+            'vouchers' => VoucherDefinition::query()->orderBy('name')->get(['code', 'name', 'voucher_type', 'discount_type', 'discount_value']),
         ]);
     }
 

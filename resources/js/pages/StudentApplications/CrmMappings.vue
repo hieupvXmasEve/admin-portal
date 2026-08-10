@@ -38,6 +38,19 @@ interface CatalogOption {
     name: string;
 }
 
+// `amount`/`discount_value` are decimal-cast columns — Laravel serializes
+// those as strings, not numbers.
+interface ScholarshipOption extends CatalogOption {
+    type: 'percentage' | 'fixed_amount';
+    amount: string;
+}
+
+interface VoucherOption extends CatalogOption {
+    voucher_type: 'informational' | 'discount';
+    discount_type: 'percentage' | 'fixed_amount' | null;
+    discount_value: string | null;
+}
+
 interface IntegrationSettings {
     login_url: string | null;
     data_url: string | null;
@@ -65,8 +78,8 @@ interface Props {
     integration: IntegrationSettings;
     campuses: CatalogOption[];
     programs: CatalogOption[];
-    scholarships: CatalogOption[];
-    vouchers: CatalogOption[];
+    scholarships: ScholarshipOption[];
+    vouchers: VoucherOption[];
 }
 
 const props = defineProps<Props>();
@@ -136,6 +149,41 @@ function catalogFor(kind: string): CatalogOption[] | null {
     }
     if (kind === 'pathway_gateway' || kind === 'uu_dai_gc') {
         return props.vouchers;
+    }
+
+    return null;
+}
+
+const currencyFormatter = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 });
+
+// What the currently-selected code is actually worth — shown under the Select
+// only after a choice is made, so the dropdown list itself stays short (the
+// option label is just "name (code)"; the value/percentage would make every
+// row wrap on a long scholarship/voucher list).
+function previewFor(kind: string, code: string | undefined): string | null {
+    if (!code) {
+        return null;
+    }
+
+    if (kind === 'scholarship') {
+        const option = props.scholarships.find((s) => s.code === code);
+        if (!option) {
+            return null;
+        }
+
+        return option.type === 'percentage' ? `${option.amount}%` : currencyFormatter.format(Number(option.amount));
+    }
+
+    if (kind === 'pathway_gateway' || kind === 'uu_dai_gc') {
+        const option = props.vouchers.find((v) => v.code === code);
+        if (!option) {
+            return null;
+        }
+        if (option.voucher_type === 'informational' || !option.discount_type || option.discount_value === null) {
+            return 'Informational — no discount';
+        }
+
+        return option.discount_type === 'percentage' ? `${option.discount_value}%` : currencyFormatter.format(Number(option.discount_value));
     }
 
     return null;
@@ -420,23 +468,28 @@ function syncNow(): void {
                                 <div class="truncate font-medium">{{ row.crm_value }}</div>
                                 <Badge variant="outline" class="mt-1 text-xs">{{ row.affected_count }} application(s)</Badge>
                             </div>
-                            <Select v-if="catalogFor(kind)" v-model="localCodeDrafts[rowKey(kind, row.crm_value)]">
-                                <SelectTrigger class="w-56">
-                                    <SelectValue placeholder="Select…" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem v-for="option in catalogFor(kind) ?? []" :key="option.code" :value="option.code">
-                                        {{ option.name }} ({{ option.code }})
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <Input
-                                v-else
-                                v-model="localCodeDrafts[rowKey(kind, row.crm_value)]"
-                                placeholder="Local code"
-                                class="w-48"
-                                @keyup.enter="saveMapping(kind, row.crm_value)"
-                            />
+                            <div class="space-y-1">
+                                <Select v-if="catalogFor(kind)" v-model="localCodeDrafts[rowKey(kind, row.crm_value)]">
+                                    <SelectTrigger class="w-56">
+                                        <SelectValue placeholder="Select…" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem v-for="option in catalogFor(kind) ?? []" :key="option.code" :value="option.code">
+                                            {{ option.name }} ({{ option.code }})
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <Input
+                                    v-else
+                                    v-model="localCodeDrafts[rowKey(kind, row.crm_value)]"
+                                    placeholder="Local code"
+                                    class="w-48"
+                                    @keyup.enter="saveMapping(kind, row.crm_value)"
+                                />
+                                <p v-if="previewFor(kind, localCodeDrafts[rowKey(kind, row.crm_value)])" class="text-muted-foreground text-xs">
+                                    {{ previewFor(kind, localCodeDrafts[rowKey(kind, row.crm_value)]) }}
+                                </p>
+                            </div>
                             <Button size="sm" @click="saveMapping(kind, row.crm_value)">Save</Button>
                         </div>
                     </div>

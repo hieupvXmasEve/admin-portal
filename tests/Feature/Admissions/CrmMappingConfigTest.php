@@ -119,8 +119,8 @@ it('exposes the scholarship and voucher catalogs for select-driven mapping', fun
     $response = $this->actingAs($staff)->get(route('student-applications.crm-mappings.index'));
 
     $response->assertInertia(fn ($page) => $page
-        ->has('scholarships', 1, fn ($page) => $page->where('code', 'SCH_A')->etc())
-        ->has('vouchers', 1, fn ($page) => $page->where('code', 'TAIWAN_GATEWAY')->etc())
+        ->has('scholarships', 1, fn ($page) => $page->where('code', 'SCH_A')->where('type', 'fixed_amount')->where('amount', '1000000')->etc())
+        ->has('vouchers', 1, fn ($page) => $page->where('code', 'TAIWAN_GATEWAY')->where('voucher_type', 'informational')->etc())
     );
 });
 
