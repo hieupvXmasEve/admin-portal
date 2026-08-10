@@ -142,6 +142,9 @@ class RoleAndPermissionSeeder extends Seeder
                 // campus when querying AI metrics. Domain data stays gated per-domain.
                 'view_ai_metrics',
                 'view_ai_all_campus',
+                // CRM value mapping writes campus_code across every campus's pending
+                // applications — org-wide only, never a campus-scoped role.
+                'manage_crm_value_mapping',
             ],
             'truong_phong' => [
                 'view_user',

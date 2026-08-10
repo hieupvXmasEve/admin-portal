@@ -111,6 +111,16 @@ class StudentApplicationFactory extends Factory
     }
 
     /**
+     * A CRM-synced application with no campus mapped yet.
+     */
+    public function withoutCampus(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'campus_code' => null,
+        ]);
+    }
+
+    /**
      * Create application with complete birth date.
      */
     public function withBirthDate(int $year, int $month, int $day): static

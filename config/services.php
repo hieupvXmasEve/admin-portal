@@ -63,4 +63,13 @@ return [
         'timeout' => (int) env('DNG_API_TIMEOUT', 30),
     ],
 
+    'crm' => [
+        // No hardcoded prod fallback: a missing env var must fail loudly
+        // (empty base_url), never silently point at the real CRM host.
+        'base_url' => env('CRM_BASE_URL'),
+        'username' => env('CRM_USERNAME'),
+        'password' => env('CRM_PASSWORD'),
+        'timeout' => (int) env('CRM_TIMEOUT', 120),
+    ],
+
 ];

@@ -23,6 +23,7 @@ use App\Modules\Admissions\Http\Requests\Admissions\RevokeApplicationRequest;
 use App\Modules\Admissions\Http\Requests\Admissions\StoreApplicationRequest;
 use App\Modules\Admissions\Http\Requests\Admissions\UpdateApplicationRequest;
 use App\Modules\Admissions\Queries\GetApplicantDocumentChecklistQuery;
+use App\Modules\Admissions\Queries\GetApplicationConversionReadinessQuery;
 use App\Modules\Admissions\Queries\ListApplicationsQuery;
 use App\Shared\Contracts\Admissions\ApplicationProgramMappingReader;
 use Illuminate\Database\QueryException;
@@ -84,7 +85,7 @@ final class StudentApplicationController extends Controller
         return redirect()->route('student-applications.show', $application);
     }
 
-    public function show(StudentApplication $studentApplication, GetApplicantDocumentChecklistQuery $documentChecklist): mixed
+    public function show(StudentApplication $studentApplication, GetApplicantDocumentChecklistQuery $documentChecklist, GetApplicationConversionReadinessQuery $readiness): mixed
     {
         $studentApplication->load([
             'student:id,student_id,full_name,email,status',
@@ -99,6 +100,7 @@ final class StudentApplicationController extends Controller
             'application' => $studentApplication,
             'guardianRelationships' => ApplicationGuardian::relationships(),
             'documentChecklist' => $documentChecklist->handle($studentApplication),
+            'conversionReadiness' => $studentApplication->isPending() ? $readiness->handle($studentApplication) : null,
         ]);
     }
 

@@ -182,6 +182,10 @@ return [
             'approve_student_application' => 'approve_student_application',
             'reject_student_application' => 'reject_student_application',
             'revoke_student_application' => 'revoke_student_application',
+            // Global (org-wide only): mapping rows write campus_code across every
+            // campus's pending applications, so this is deliberately not a
+            // campus-scoped permission — see phase-04-mapping-config-ui.md.
+            'manage_crm_value_mapping' => 'manage_crm_value_mapping',
         ],
 
         // Attendance Management

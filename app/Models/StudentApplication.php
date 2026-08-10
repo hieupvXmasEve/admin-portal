@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Modules\Admissions\Models\ApplicationAcademicScore;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -70,6 +71,26 @@ class StudentApplication extends AuditableModel
         'rejected_reason',
         'revoked_by',
         'revoked_at',
+        'crm_campus',
+        'crm_major',
+        'province',
+        'new_province',
+        'new_street',
+        'new_ward',
+        'permanent_address',
+        'birth_place',
+        'nationality',
+        'religion',
+        'id_card_place_of_issue',
+        'school',
+        'graduation_year',
+        'gpa',
+        'gpa_type',
+        'scholarship',
+        'pathway_gateway',
+        'uu_dai_gc',
+        'crm_paid_amount',
+        'last_synced_at',
     ];
 
     protected $casts = [
@@ -87,6 +108,9 @@ class StudentApplication extends AuditableModel
         'approved_at' => 'datetime',
         'rejected_at' => 'datetime',
         'revoked_at' => 'datetime',
+        'gpa' => 'decimal:2',
+        'crm_paid_amount' => 'decimal:2',
+        'last_synced_at' => 'datetime',
     ];
 
     /**
@@ -120,6 +144,15 @@ class StudentApplication extends AuditableModel
     public function documents(): HasMany
     {
         return $this->hasMany(ApplicationDocument::class);
+    }
+
+    /**
+     * Per-subject academic scores (school report + national exam), from the
+     * CRM sync. Absence of a row means "not reported".
+     */
+    public function academicScores(): HasMany
+    {
+        return $this->hasMany(ApplicationAcademicScore::class, 'student_application_id');
     }
 
     /**

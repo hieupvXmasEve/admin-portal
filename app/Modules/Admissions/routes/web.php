@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Admissions\Http\Web\ApplicationGuardianController;
+use App\Modules\Admissions\Http\Web\CrmMappingController;
 use App\Modules\Admissions\Http\Web\StudentApplicationController;
 use Illuminate\Support\Facades\Route;
 
@@ -10,6 +11,11 @@ Route::middleware(['web', 'auth'])->prefix('student-applications')->name('studen
     Route::get('/', [StudentApplicationController::class, 'index'])->middleware('can:view_student_application')->name('index');
     Route::get('/create', [StudentApplicationController::class, 'create'])->middleware('can:create_student_application')->name('create');
     Route::get('/export', [StudentApplicationController::class, 'export'])->middleware('can:view_student_application')->name('export');
+    // Must precede the `/{studentApplication}` wildcard below — Laravel matches
+    // route registration order, and an appended static segment would resolve
+    // to the show route instead ("No query results ... crm-mappings").
+    Route::get('/crm-mappings', [CrmMappingController::class, 'index'])->middleware('can:manage_crm_value_mapping')->name('crm-mappings.index');
+    Route::post('/crm-mappings', [CrmMappingController::class, 'store'])->middleware('can:manage_crm_value_mapping')->name('crm-mappings.store');
     Route::post('/', [StudentApplicationController::class, 'store'])->middleware('can:create_student_application')->name('store');
     Route::get('/{studentApplication}', [StudentApplicationController::class, 'show'])->middleware('can:view_student_application')->name('show');
     Route::get('/{studentApplication}/documents', [StudentApplicationController::class, 'documents'])->middleware('can:view_student_application')->name('documents');

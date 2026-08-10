@@ -7,6 +7,7 @@ namespace App\Modules\Admissions\Actions;
 use App\Models\ApplicationGuardian;
 use App\Models\StudentApplication;
 use App\Modules\Admissions\Exceptions\ApplicationLifecycleException;
+use App\Modules\Admissions\Queries\GetApplicationConversionReadinessQuery;
 use App\Shared\Contracts\Academic\ProgramEnrollmentWriter;
 use App\Shared\Contracts\Admissions\ApplicationProgramMappingReader;
 use App\Shared\Contracts\Identity\GuardianAccessGrantWriter;
@@ -28,6 +29,7 @@ final class ApproveApplicationAction
         private readonly StudentGuardianRelationshipWriter $guardianRelationshipWriter,
         private readonly GuardianAccessGrantWriter $guardianAccessGrantWriter,
         private readonly ProgramEnrollmentWriter $programEnrollmentWriter,
+        private readonly GetApplicationConversionReadinessQuery $readinessQuery,
     ) {}
 
     /** @param array{application: StudentApplication, actor_id: int, options?: array{admission_date?: string, expected_graduation_date?: string|null}} $data */
@@ -49,8 +51,8 @@ final class ApproveApplicationAction
             throw new ApplicationLifecycleException('Student code is not available on the application.');
         }
 
+        $this->assertConversionReady($application);
         $mappingData = $this->mappingData($application);
-        $this->assertValidMapping($mappingData);
 
         return DB::transaction(function () use ($application, $actorId, $options, $mappingData): StudentReference {
             $account = $this->studentAccessWriter->provision(
@@ -101,29 +103,39 @@ final class ApproveApplicationAction
         ];
     }
 
-    /** @param array{campus_id: int, program_id: int, curriculum_version_id: int, specialization_id: int|null, intake_semester_id: int, curriculum_match_count: int} $mappingData */
-    private function assertValidMapping(array $mappingData): void
+    /**
+     * The readiness query is the single source of truth shared with the
+     * list/detail UI badge — this guard returns its errors verbatim so a
+     * CRM-mapping problem reads as "Campus CRM value X is not mapped", not a
+     * generic FK failure.
+     */
+    private function assertConversionReady(StudentApplication $application): void
     {
-        $errors = [];
+        $readiness = $this->readinessQuery->handle($application);
 
-        if ($mappingData['campus_id'] === 0) {
-            $errors[] = 'A valid campus could not be resolved for this application.';
-        }
-        if ($mappingData['program_id'] === 0) {
-            $errors[] = 'A valid program could not be resolved for this application. Check the program code.';
-        }
-        if ($mappingData['intake_semester_id'] === 0) {
-            $errors[] = 'A valid intake (semester) could not be resolved for this application. Check the intake code.';
-        }
-        if ($mappingData['curriculum_match_count'] === 0) {
-            $errors[] = 'No curriculum version exists for this program and intake. Set one up before approving.';
-        } elseif ($mappingData['curriculum_match_count'] > 1) {
-            $errors[] = 'The curriculum version could not be uniquely determined for this program and intake (multiple specializations match). Resolve the ambiguity before approving.';
+        if ($readiness['ready']) {
+            return;
         }
 
-        if ($errors !== []) {
-            throw new ApplicationLifecycleException(implode(' ', $errors));
-        }
+        $messages = array_map(fn (array $missing): string => $this->readinessMessage($missing), $readiness['missing']);
+
+        throw new ApplicationLifecycleException(implode(' ', $messages));
+    }
+
+    /** @param array{field: string, crm_value: string|null, kind: string|null, reason: string} $missing */
+    private function readinessMessage(array $missing): string
+    {
+        return match ($missing['reason']) {
+            'unmapped' => $missing['crm_value'] !== null
+                ? "CRM value \"{$missing['crm_value']}\" for {$missing['field']} is not mapped to a local code yet. Map it before approving."
+                : "This application's {$missing['field']} could not be resolved. Check the CRM mapping.",
+            'unset' => 'The target intake has not been configured yet in the CRM mapping screen.',
+            'no_curriculum' => 'No curriculum version exists for this program and intake. Set one up before approving.',
+            'ambiguous_curriculum' => 'The curriculum version could not be uniquely determined for this program and intake (multiple specializations match). Resolve the ambiguity before approving.',
+            'blank_email' => 'This application has no email on file. Add one before approving — it is required to provision the student account.',
+            'duplicate_email' => "The email \"{$missing['crm_value']}\" is already in use by another account. Correct it before approving.",
+            default => 'This application is not ready for conversion.',
+        };
     }
 
     /**

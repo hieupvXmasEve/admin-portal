@@ -30,6 +30,12 @@ interface DocRef {
     page_index: number;
 }
 
+interface ConversionReadiness {
+    ready: boolean;
+    missing: { field: string; crm_value: string | null; kind: string | null; reason: string }[];
+    warnings: { field: string; crm_value: string; kind: string }[];
+}
+
 interface ApplicationRow {
     id: number;
     full_name: string;
@@ -43,6 +49,7 @@ interface ApplicationRow {
     documents_by_type: Record<string, DocRef[]>;
     created_at: string;
     student?: LinkedStudent | null;
+    conversion_readiness: ConversionReadiness | null;
 }
 
 interface DocumentType {
@@ -312,9 +319,19 @@ const submitReject = () => {
             <template #cell-intake="{ row }">{{ row.original.intake ?? '—' }}</template>
 
             <template #cell-status="{ row }">
-                <span class="rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize" :class="statusBadgeClass(row.original.status)">
-                    {{ row.original.status }}
-                </span>
+                <div class="flex flex-wrap items-center gap-1">
+                    <span class="rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize" :class="statusBadgeClass(row.original.status)">
+                        {{ row.original.status }}
+                    </span>
+                    <a
+                        v-if="row.original.conversion_readiness && !row.original.conversion_readiness.ready"
+                        :href="route('student-applications.crm-mappings.index')"
+                        class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 hover:bg-amber-200"
+                        :title="row.original.conversion_readiness.missing.map((m) => m.crm_value ?? m.field).join(', ')"
+                    >
+                        Chưa map
+                    </a>
+                </div>
             </template>
 
             <template #cell-created_at="{ row }">

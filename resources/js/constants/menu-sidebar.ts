@@ -231,6 +231,12 @@ export const mainNavGroups: NavGroup[] = [
                 icon: ClipboardCheck,
                 requiredPermissions: ['view_student_application'],
             },
+            {
+                title: 'CRM Value Mappings',
+                href: '/student-applications/crm-mappings',
+                icon: Link2,
+                requiredPermissions: ['manage_crm_value_mapping'],
+            },
         ],
     },
     {

@@ -10,6 +10,8 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 final class ListApplicationsQuery
 {
+    public function __construct(private readonly GetApplicationConversionReadinessQuery $readinessQuery) {}
+
     /** @param array{search: mixed, status: mixed, intake: mixed, per_page: int, sort: string, direction: string} $filters */
     public function handle(array $filters, ?string $campusCode): LengthAwarePaginator
     {
@@ -32,6 +34,9 @@ final class ListApplicationsQuery
             fn (StudentApplication $application): array => [
                 'id' => $application->id, 'full_name' => $application->full_name, 'student_code' => $application->student_code, 'email' => $application->email, 'national_id' => $application->national_id, 'phone' => $application->phone, 'intended_program' => $application->intended_program, 'intake' => $application->intake, 'status' => $application->status, 'created_at' => $application->created_at, 'student' => $application->student,
                 'documents_by_type' => $application->documents->groupBy('file_type_code')->map(fn ($documents) => $documents->map(fn ($document): array => ['id' => $document->id, 'link' => $document->link, 'original_name' => $document->original_name, 'page_index' => $document->page_index])->values()),
+                // Only a pending application can ever be approved, so readiness
+                // is only meaningful — and only computed — for those rows.
+                'conversion_readiness' => $application->isPending() ? $this->readinessQuery->handle($application) : null,
             ],
         );
     }
