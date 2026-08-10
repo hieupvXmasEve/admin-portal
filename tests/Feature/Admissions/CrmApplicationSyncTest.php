@@ -6,6 +6,7 @@ use App\Models\ApplicationDocument;
 use App\Models\ApplicationGuardian;
 use App\Models\StudentApplication;
 use App\Modules\Admissions\Models\ApplicationAcademicScore;
+use App\Modules\Admissions\Support\Crm\CrmIntegrationSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 
@@ -13,11 +14,16 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     config([
-        'services.crm.base_url' => 'https://crm.test',
+        'services.crm.login_url' => 'https://crm.test/api/login',
+        'services.crm.data_url' => 'https://crm.test/api/ne',
         'services.crm.username' => 'crm-user',
         'services.crm.password' => 'secret',
         'services.crm.timeout' => 5,
     ]);
+    // Login is explicit and one-time (Phase 3 addendum): a sync run reuses a
+    // stored token rather than logging in implicitly, so tests simulate an
+    // operator who already logged in once.
+    app(CrmIntegrationSettings::class)->saveToken('tok', 'Bearer');
     Http::fake([
         'https://crm.test/api/login' => Http::response(['status' => 'success', 'data' => ['token' => 'tok', 'token_type' => 'Bearer']], 200),
     ]);

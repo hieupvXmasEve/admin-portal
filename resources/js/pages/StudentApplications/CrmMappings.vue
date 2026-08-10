@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Head, router, useForm } from '@inertiajs/vue3';
-import { computed, reactive } from 'vue';
+import { Head, router, useForm, usePage } from '@inertiajs/vue3';
+import { computed, reactive, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
 
@@ -21,10 +21,23 @@ interface Semester {
 }
 
 interface IntegrationSettings {
-    base_url: string | null;
+    login_url: string | null;
+    data_url: string | null;
     username: string | null;
     has_password: boolean;
     timeout: number;
+    logged_in: boolean;
+    token_obtained_at: string | null;
+}
+
+interface SyncSummary {
+    total: number;
+    created: number;
+    updated: number;
+    skipped: number;
+    failed: number;
+    elapsed_seconds: number;
+    failures: { student_code: string | null; error_class: string; field: string | null }[];
 }
 
 interface Props {
@@ -94,7 +107,8 @@ function saveIntake(): void {
 // Password is write-only: the server never sends the real value back, so the
 // field starts blank and a blank submit means "keep the current password".
 const integrationForm = useForm({
-    base_url: props.integration.base_url ?? '',
+    login_url: props.integration.login_url ?? '',
+    data_url: props.integration.data_url ?? '',
     username: props.integration.username ?? '',
     password: '',
     timeout: props.integration.timeout,
@@ -109,6 +123,61 @@ function saveIntegration(): void {
         },
         onError: () => toast.error('Could not save the CRM connection settings — check the fields below.'),
     });
+}
+
+// Login is explicit and one-time: the token persists server-side
+// (CrmIntegrationSettings), so Sync never logs in implicitly and is blocked
+// client-side (and, authoritatively, server-side) until integration.logged_in.
+const isLoggingIn = ref(false);
+
+function loginNow(): void {
+    isLoggingIn.value = true;
+    router.post(
+        route('student-applications.crm-mappings.login'),
+        {},
+        {
+            preserveScroll: true,
+            onSuccess: () => toast.success('Logged in to CRM.'),
+            onError: () => toast.error('CRM login failed — check the message below.'),
+            onFinish: () => {
+                isLoggingIn.value = false;
+            },
+        },
+    );
+}
+
+// Synchronous by design (plan addendum): the request blocks until the whole
+// batch is processed, so the button stays disabled with a spinner for the
+// full duration rather than optimistically re-enabling.
+const isSyncing = ref(false);
+const lastSync = computed<SyncSummary | null>(() => (usePage().props.flash as Record<string, unknown>)?.crm_sync_summary as SyncSummary | null);
+
+function syncNow(): void {
+    if (!props.integration.logged_in) {
+        toast.error('Log in to the CRM first.');
+        return;
+    }
+
+    isSyncing.value = true;
+    router.post(
+        route('student-applications.crm-mappings.sync'),
+        {},
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                const summary = lastSync.value;
+                if (summary && summary.failed > 0) {
+                    toast.warning(`Sync finished with ${summary.failed} failure(s) — see details below.`);
+                } else {
+                    toast.success('Sync finished.');
+                }
+            },
+            onError: () => toast.error('Sync failed — check the message below.'),
+            onFinish: () => {
+                isSyncing.value = false;
+            },
+        },
+    );
 }
 </script>
 
@@ -126,14 +195,73 @@ function saveIntegration(): void {
 
         <Card>
             <CardHeader>
+                <CardTitle>Sync now</CardTitle>
+                <CardDescription>Log in once, then sync as many times as needed — sync reuses the stored token and never logs in on its own.</CardDescription>
+            </CardHeader>
+            <CardContent class="space-y-4">
+                <div class="flex flex-wrap items-center gap-3">
+                    <Button variant="outline" :disabled="isLoggingIn" @click="loginNow">
+                        {{ isLoggingIn ? 'Logging in…' : integration.logged_in ? 'Re-login' : 'Login' }}
+                    </Button>
+                    <span class="text-sm" :class="integration.logged_in ? 'text-emerald-700' : 'text-muted-foreground'">
+                        {{ integration.logged_in ? `Logged in${integration.token_obtained_at ? ' at ' + new Date(integration.token_obtained_at).toLocaleString() : ''}` : 'Not logged in' }}
+                    </span>
+                </div>
+
+                <Button :disabled="isSyncing || !integration.logged_in" :title="!integration.logged_in ? 'Log in to the CRM first' : undefined" @click="syncNow">
+                    {{ isSyncing ? 'Syncing…' : 'Sync now' }}
+                </Button>
+
+                <div v-if="lastSync" class="space-y-3">
+                    <div class="grid grid-cols-2 gap-2 text-sm sm:grid-cols-5">
+                        <div class="rounded-md border px-3 py-2">
+                            <div class="text-muted-foreground text-xs">Total</div>
+                            <div class="font-semibold">{{ lastSync.total }}</div>
+                        </div>
+                        <div class="rounded-md border px-3 py-2">
+                            <div class="text-muted-foreground text-xs">Created</div>
+                            <div class="font-semibold">{{ lastSync.created }}</div>
+                        </div>
+                        <div class="rounded-md border px-3 py-2">
+                            <div class="text-muted-foreground text-xs">Updated</div>
+                            <div class="font-semibold">{{ lastSync.updated }}</div>
+                        </div>
+                        <div class="rounded-md border px-3 py-2">
+                            <div class="text-muted-foreground text-xs">Skipped</div>
+                            <div class="font-semibold">{{ lastSync.skipped }}</div>
+                        </div>
+                        <div class="rounded-md border px-3 py-2" :class="lastSync.failed > 0 ? 'border-destructive' : ''">
+                            <div class="text-muted-foreground text-xs">Failed</div>
+                            <div class="font-semibold" :class="lastSync.failed > 0 ? 'text-destructive' : ''">{{ lastSync.failed }}</div>
+                        </div>
+                    </div>
+                    <p class="text-muted-foreground text-xs">Elapsed: {{ lastSync.elapsed_seconds }}s</p>
+
+                    <div v-if="lastSync.failures.length > 0" class="space-y-1">
+                        <div v-for="(failure, index) in lastSync.failures" :key="index" class="rounded-md bg-red-50 px-3 py-2 text-sm">
+                            <span class="font-medium">{{ failure.student_code ?? '(no student_code)' }}</span>
+                            — {{ failure.error_class }}<span v-if="failure.field"> ({{ failure.field }})</span>
+                        </div>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+
+        <Card>
+            <CardHeader>
                 <CardTitle>CRM connection</CardTitle>
                 <CardDescription>Credentials used to log in to the CRM and pull New Enrollment records. Changes take effect on the next sync run — no deploy needed.</CardDescription>
             </CardHeader>
             <CardContent class="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div class="space-y-1">
-                    <label class="text-sm font-medium" for="crm-base-url">Base URL</label>
-                    <Input id="crm-base-url" v-model="integrationForm.base_url" placeholder="https://crm.example.com" />
-                    <p v-if="integrationForm.errors.base_url" class="text-destructive text-xs">{{ integrationForm.errors.base_url }}</p>
+                    <label class="text-sm font-medium" for="crm-login-url">Login URL</label>
+                    <Input id="crm-login-url" v-model="integrationForm.login_url" placeholder="https://crm.example.com/api/login" />
+                    <p v-if="integrationForm.errors.login_url" class="text-destructive text-xs">{{ integrationForm.errors.login_url }}</p>
+                </div>
+                <div class="space-y-1">
+                    <label class="text-sm font-medium" for="crm-data-url">New Enrollment data URL</label>
+                    <Input id="crm-data-url" v-model="integrationForm.data_url" placeholder="https://crm.example.com/api/ne" />
+                    <p v-if="integrationForm.errors.data_url" class="text-destructive text-xs">{{ integrationForm.errors.data_url }}</p>
                 </div>
                 <div class="space-y-1">
                     <label class="text-sm font-medium" for="crm-username">Username</label>

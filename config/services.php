@@ -64,9 +64,12 @@ return [
     ],
 
     'crm' => [
-        // No hardcoded prod fallback: a missing env var must fail loudly
-        // (empty base_url), never silently point at the real CRM host.
-        'base_url' => env('CRM_BASE_URL'),
+        // .env is only the fallback for an environment not yet configured
+        // through the UI (app/Modules/Admissions/Support/Crm/CrmIntegrationSettings).
+        // Full endpoint URLs, not a host + hardcoded path — the CRM's own
+        // routing is not this codebase's to assume.
+        'login_url' => env('CRM_LOGIN_URL'),
+        'data_url' => env('CRM_DATA_URL'),
         'username' => env('CRM_USERNAME'),
         'password' => env('CRM_PASSWORD'),
         'timeout' => (int) env('CRM_TIMEOUT', 120),

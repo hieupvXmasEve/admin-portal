@@ -38,13 +38,44 @@ duplicate the ingest endpoint or delete something that may just be missing a rou
 
 ### Run mode
 
-**Manual only for now (validation V1).** Ship the command; no scheduler entry, no UI button. Automating a
-nightly overwrite before anyone has checked real CRM data against real applications is how a mapping
-mistake gets multiplied 300×. Add the schedule after the first supervised runs look right.
+**Manual only (validation V1) — superseded by the addendum below.** No scheduler entry: automating a
+nightly overwrite before anyone has checked real CRM data against real applications is still how a mapping
+mistake gets multiplied 300×. What changed is *how* a manual run is triggered — a UI button on top of the
+artisan command, not instead of it.
 
 Failure visibility (validation V6): the command's summary table plus the log file. No failure table, no
 failure screen — the operator running it by hand sees the result immediately, so persisting failures would
 be infrastructure for a consumer that does not exist yet. Revisit when scheduling lands.
+
+### Addendum: UI-triggered sync (2026-08-10, post-implementation)
+
+Follow-up request: staff must be able to run a sync from the mapping screen instead of a shell. Decisions
+confirmed with the user:
+
+- **Synchronous (blocking) request**, not a queued job. The button posts, the request blocks until
+  `CrmApplicationSyncService::run(false, null)` returns, the response carries the summary. Matches the
+  existing volume assumption (validation V5: a few hundred records, no pagination) — accepted risk: if CRM
+  volume grows enough to approach PHP-FPM/nginx's request timeout, that is the same signal Phase 2 already
+  named for adding batching, not a reason to add job-queue infrastructure now (ponytail).
+- **Same permission** as mapping (`manage_crm_value_mapping`) — one screen, one org-wide-only gate, no new
+  permission to seed.
+- **Same route/controller** as the mapping screen (`CrmMappingController`), not a new console-triggering
+  surface — keeps the arch-test boundary (`AdmissionsCrmSyncPlacementArchTest`) trivially satisfied.
+- Result surfaces through a new Inertia shared flash key (`crm_sync_summary`), not a redirect to a
+  different page — the operator stays on the mapping screen and sees counts + failures inline, same
+  information shape as the artisan command's summary table.
+- `CrmSyncException` (login/request/response failures) is caught in the controller and flashed as a plain
+  `error` message — the exception messages already carry no credentials (Phase 2 assertion), so they are
+  safe to show as-is.
+
+Files: `app/Http/Middleware/HandleInertiaRequests.php` (new `crm_sync_summary` flash key), `CrmMappingController.php`
+(+`syncNow`), `routes/web.php` (+ `POST /student-applications/crm-mappings/sync`), `CrmMappings.vue`
+(Sync button + result panel), `tests/Feature/Admissions/CrmMappingSyncActionTest.php`.
+
+**Superseded same day** by Phase 2's Addendum 2: login became an explicit, persisted, one-time action
+(separate "Login" button + `POST /crm-mappings/login`), and `syncNow` no longer logs in at all — it fails
+fast with `CrmAuthenticationException` if no token is stored. The summary-flash mechanics described above
+are unchanged.
 
 ### Match key — a branch, not a fallback
 

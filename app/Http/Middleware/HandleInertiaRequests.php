@@ -117,6 +117,7 @@ class HandleInertiaRequests extends Middleware
                     'batch_errors' => session('batch_errors'),
                     'conversion_summary' => session('conversion_summary'),
                     'success_details' => session('success_details'),
+                    'crm_sync_summary' => session('crm_sync_summary'),
                 ];
             },
         ];

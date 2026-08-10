@@ -21,7 +21,8 @@ final class SaveCrmIntegrationSettingsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'base_url' => ['required', 'url', 'max:255'],
+            'login_url' => ['required', 'url', 'max:255'],
+            'data_url' => ['required', 'url', 'max:255'],
             'username' => ['required', 'string', 'max:255'],
             'password' => ['nullable', 'string', 'max:255'],
             'timeout' => ['required', 'integer', 'min:1', 'max:600'],

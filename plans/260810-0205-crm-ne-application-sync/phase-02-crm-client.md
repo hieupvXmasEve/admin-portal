@@ -114,3 +114,33 @@ Files: `database/migrations/2026_08_10_143700_create_crm_integration_settings_ta
 `app/Modules/Admissions/Http/Requests/Admissions/SaveCrmIntegrationSettingsRequest.php`,
 `tests/Feature/Admissions/CrmIntegrationSettingsTest.php`. Modified: `CrmClient.php`,
 `CrmMappingController.php` (+`storeIntegration`), `routes/web.php`, `CrmMappings.vue`.
+
+## Addendum 2: full endpoint URLs + persisted login (2026-08-10, same day, second follow-up)
+
+Two further corrections from the user, both landed in the same migration
+(`2026_08_10_152500_restructure_crm_integration_settings_table.php`):
+
+1. **No hardcoded path.** `base_url` + `CrmClient` concatenating `/api/login` and `/api/ne` assumed a URL
+   shape the CRM does not actually follow (confirmed live: the real login endpoint already includes a path
+   segment beyond the host). Replaced `base_url` with two staff-supplied **full** URLs: `login_url`,
+   `data_url`. `CrmClient` now does `Http::post($this->loginUrl, ...)` / `Http::get($this->dataUrl)`
+   directly — no `Http::baseUrl()`, no assumed path, anywhere.
+2. **Login is explicit and persisted, sync never logs in implicitly.** `crm_integration_settings` gained
+   `token`, `token_type`, `token_obtained_at` (`token` encrypted, same as `password`). A "Login" button
+   calls `CrmClient::login()`, which now also calls `CrmIntegrationSettings::saveToken()`. `CrmClient`'s
+   constructor loads any stored token; `fetchNewEnrollments()` throws `CrmAuthenticationException`
+   immediately (no HTTP call) if no token is held — the implicit `if ($this->token === null) { $this->login(); }`
+   from Addendum 1's design is gone. A 401 mid-run still triggers one automatic *refresh* of an
+   already-held token (renewing a session, not the gated initial login) and persists the refreshed token.
+3. UI: "Login"/"Re-login" button + "Logged in at …" / "Not logged in" status, both above the "Sync now"
+   button, which is disabled client-side (and blocked authoritatively server-side, via the exception above)
+   until `integration.logged_in`.
+
+Root cause of the bug that triggered this addendum: a staff member pasted the *full* login URL (including
+`/api/login`) into the old single "Base URL" field, producing a doubled path — silently wrong, no
+validation caught it because `url` format validation accepts any well-formed URL regardless of path shape.
+
+Files: `database/migrations/2026_08_10_152500_restructure_crm_integration_settings_table.php`. Modified:
+`CrmIntegrationSetting.php`, `CrmIntegrationSettings.php` (+`resolveToken`, `saveToken`), `CrmClient.php`,
+`SaveCrmIntegrationSettingsRequest.php`, `CrmMappingController.php` (+`login`), `routes/web.php`,
+`CrmMappings.vue`, `config/services.php`, `.env.example`, all CRM test files.
