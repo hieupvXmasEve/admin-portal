@@ -8,8 +8,10 @@ use App\Models\Permission;
 use App\Models\Program;
 use App\Models\Role;
 use App\Models\RolePermission;
+use App\Models\ScholarshipDefinition;
 use App\Models\Semester;
 use App\Models\StudentApplication;
+use App\Models\VoucherDefinition;
 use App\Modules\Admissions\Models\CrmValueMapping;
 use App\Modules\Admissions\Queries\ListUnmappedCrmValuesQuery;
 use App\Modules\Admissions\Services\CrmMappingResolver;
@@ -35,6 +37,31 @@ function crmMappingGrantPermission(User $user, ?Campus $campus, string $permissi
     $role = Role::factory()->create(['code' => 'crm_map_'.Str::lower(Str::random(10))]);
     RolePermission::create(['role_id' => $role->id, 'permission_id' => $permission->id]);
     CampusUserRole::create(['user_id' => $user->id, 'campus_id' => $campus?->id, 'role_id' => $role->id]);
+}
+
+function crmMappingScholarship(string $code): ScholarshipDefinition
+{
+    return ScholarshipDefinition::create([
+        'code' => $code,
+        'name' => $code,
+        'type' => 'fixed_amount',
+        'amount' => 1000000,
+        'valid_from' => now()->subYear(),
+        'valid_until' => now()->addYear(),
+        'is_active' => true,
+    ]);
+}
+
+function crmMappingVoucher(string $code): VoucherDefinition
+{
+    return VoucherDefinition::create([
+        'code' => $code,
+        'name' => $code,
+        'voucher_type' => 'informational',
+        'valid_from' => now()->subYear(),
+        'valid_until' => now()->addYear(),
+        'is_active' => true,
+    ]);
 }
 
 it('returns 403 on index for a user without manage_crm_value_mapping', function () {
@@ -66,12 +93,43 @@ it('GET /student-applications/crm-mappings resolves to the mapping screen, not t
     $response->assertInertia(fn ($page) => $page->component('StudentApplications/CrmMappings'));
 });
 
+it('exposes the campus and program catalogs for select-driven mapping (not free-text)', function () {
+    $staff = User::factory()->create(['type' => UserType::STAFF]);
+    $campus = Campus::factory()->create(['code' => 'HCM', 'name' => 'Ho Chi Minh']);
+    Program::factory()->create(['code' => 'IT', 'name' => 'Information Technology']);
+    crmMappingGrantPermission($staff, $campus, 'manage_crm_value_mapping');
+    session(['current_campus_id' => $campus->id]);
+
+    $response = $this->actingAs($staff)->get(route('student-applications.crm-mappings.index'));
+
+    $response->assertInertia(fn ($page) => $page
+        ->has('campuses', 1, fn ($page) => $page->where('code', 'HCM')->etc())
+        ->has('programs', 1, fn ($page) => $page->where('code', 'IT')->etc())
+    );
+});
+
+it('exposes the scholarship and voucher catalogs for select-driven mapping', function () {
+    $staff = User::factory()->create(['type' => UserType::STAFF]);
+    $campus = Campus::factory()->create();
+    crmMappingScholarship('SCH_A');
+    crmMappingVoucher('TAIWAN_GATEWAY');
+    crmMappingGrantPermission($staff, $campus, 'manage_crm_value_mapping');
+    session(['current_campus_id' => $campus->id]);
+
+    $response = $this->actingAs($staff)->get(route('student-applications.crm-mappings.index'));
+
+    $response->assertInertia(fn ($page) => $page
+        ->has('scholarships', 1, fn ($page) => $page->where('code', 'SCH_A')->etc())
+        ->has('vouchers', 1, fn ($page) => $page->where('code', 'TAIWAN_GATEWAY')->etc())
+    );
+});
+
 it('groups unmapped values by kind with the correct affected count', function () {
     StudentApplication::factory()->pending()->withoutCampus()->create(['student_code' => 'C1', 'crm_campus' => 'Unmapped X']);
     StudentApplication::factory()->pending()->withoutCampus()->create(['student_code' => 'C2', 'crm_campus' => 'Unmapped X']);
     StudentApplication::factory()->pending()->withoutCampus()->create(['student_code' => 'C3', 'crm_campus' => 'Unmapped X']);
 
-    $rows = app(ListUnmappedCrmValuesQuery::class)->handle(null);
+    $rows = app(ListUnmappedCrmValuesQuery::class)->handle();
 
     $row = collect($rows)->firstWhere('crm_value', 'Unmapped X');
     expect($row)->not->toBeNull()
@@ -82,30 +140,30 @@ it('groups unmapped values by kind with the correct affected count', function ()
 it('excludes seeded major labels from the unmapped list', function () {
     StudentApplication::factory()->pending()->create(['student_code' => 'M1', 'crm_major' => 'Trí tuệ nhân tạo']);
 
-    $rows = app(ListUnmappedCrmValuesQuery::class)->handle(null);
+    $rows = app(ListUnmappedCrmValuesQuery::class)->handle();
 
     expect(collect($rows)->firstWhere('crm_value', 'Trí tuệ nhân tạo'))->toBeNull();
 });
 
-it('a campus-scoped actor never sees unmapped campus values (unattributable to any campus)', function () {
-    $campus = Campus::factory()->create();
+it('shows unmapped campus values regardless of the viewer current campus session (no attributable campus to scope by)', function () {
+    Campus::factory()->create();
     StudentApplication::factory()->pending()->withoutCampus()->create(['student_code' => 'CS1', 'crm_campus' => 'Other Campus Value']);
 
-    $rows = app(ListUnmappedCrmValuesQuery::class)->handle($campus->code);
+    $rows = app(ListUnmappedCrmValuesQuery::class)->handle();
 
-    expect(collect($rows)->where('kind', 'campus'))->toBeEmpty();
+    expect(collect($rows)->where('kind', 'campus')->pluck('crm_value'))->toContain('Other Campus Value');
 });
 
-it('a campus-scoped actor sees only their own campus unmapped major values', function () {
+it('shows unmapped major values from every campus, since the permission is already org-wide-only', function () {
     $campusA = Campus::factory()->create();
     $campusB = Campus::factory()->create();
     StudentApplication::factory()->pending()->forCampus($campusA->code)->create(['student_code' => 'MA1', 'crm_major' => 'Major A']);
     StudentApplication::factory()->pending()->forCampus($campusB->code)->create(['student_code' => 'MB1', 'crm_major' => 'Major B']);
 
-    $rowsForA = app(ListUnmappedCrmValuesQuery::class)->handle($campusA->code);
+    $rows = app(ListUnmappedCrmValuesQuery::class)->handle();
 
-    expect(collect($rowsForA)->pluck('crm_value'))->toContain('Major A')
-        ->and(collect($rowsForA)->pluck('crm_value'))->not->toContain('Major B');
+    expect(collect($rows)->pluck('crm_value'))->toContain('Major A')
+        ->and(collect($rows)->pluck('crm_value'))->toContain('Major B');
 });
 
 it('saving a mapping fills campus_code on all affected pending applications with no re-sync', function () {
@@ -205,6 +263,68 @@ it('rejects a major mapping with a program code that does not exist', function (
     $response = $this->actingAs($staff)
         ->withHeader('X-CSRF-TOKEN', CRM_MAPPING_CSRF)
         ->post(route('student-applications.crm-mappings.store'), ['kind' => 'major', 'crm_value' => 'Some Major', 'local_code' => 'NOPE']);
+
+    $response->assertSessionHasErrors('local_code');
+});
+
+it('accepts and validates a scholarship_definitions code for a scholarship mapping', function () {
+    $staff = User::factory()->create(['type' => UserType::STAFF]);
+    $campus = Campus::factory()->create();
+    crmMappingGrantPermission($staff, $campus, 'manage_crm_value_mapping');
+    session(['current_campus_id' => $campus->id]);
+    crmMappingScholarship('SCH_A');
+
+    $response = $this->actingAs($staff)
+        ->withHeader('X-CSRF-TOKEN', CRM_MAPPING_CSRF)
+        ->post(route('student-applications.crm-mappings.store'), ['kind' => 'scholarship', 'crm_value' => 'Asia Pioneer', 'local_code' => 'SCH_A']);
+
+    $response->assertRedirect();
+    expect(CrmValueMapping::query()->where('kind', 'scholarship')->where('crm_value', 'Asia Pioneer')->value('local_code'))->toBe('SCH_A');
+});
+
+it('rejects a scholarship mapping with a code that does not exist in scholarship_definitions', function () {
+    $staff = User::factory()->create(['type' => UserType::STAFF]);
+    $campus = Campus::factory()->create();
+    crmMappingGrantPermission($staff, $campus, 'manage_crm_value_mapping');
+    session(['current_campus_id' => $campus->id]);
+
+    $response = $this->actingAs($staff)
+        ->withHeader('X-CSRF-TOKEN', CRM_MAPPING_CSRF)
+        ->post(route('student-applications.crm-mappings.store'), ['kind' => 'scholarship', 'crm_value' => 'Asia Pioneer', 'local_code' => 'NOPE']);
+
+    $response->assertSessionHasErrors('local_code');
+});
+
+it('accepts and validates a voucher_definitions code for pathway_gateway and uu_dai_gc mappings', function () {
+    $staff = User::factory()->create(['type' => UserType::STAFF]);
+    $campus = Campus::factory()->create();
+    crmMappingGrantPermission($staff, $campus, 'manage_crm_value_mapping');
+    session(['current_campus_id' => $campus->id]);
+    crmMappingVoucher('TAIWAN_GATEWAY');
+    crmMappingVoucher('DISCOUNT50_1ST_SEMESTER_ONLY');
+
+    $this->actingAs($staff)
+        ->withHeader('X-CSRF-TOKEN', CRM_MAPPING_CSRF)
+        ->post(route('student-applications.crm-mappings.store'), ['kind' => 'pathway_gateway', 'crm_value' => 'Taiwan Gateway', 'local_code' => 'TAIWAN_GATEWAY'])
+        ->assertRedirect();
+    $this->actingAs($staff)
+        ->withHeader('X-CSRF-TOKEN', CRM_MAPPING_CSRF)
+        ->post(route('student-applications.crm-mappings.store'), ['kind' => 'uu_dai_gc', 'crm_value' => '50% học phí kỳ GC', 'local_code' => 'DISCOUNT50_1ST_SEMESTER_ONLY'])
+        ->assertRedirect();
+
+    expect(CrmValueMapping::query()->where('kind', 'pathway_gateway')->where('crm_value', 'Taiwan Gateway')->value('local_code'))->toBe('TAIWAN_GATEWAY')
+        ->and(CrmValueMapping::query()->where('kind', 'uu_dai_gc')->where('crm_value', '50% học phí kỳ GC')->value('local_code'))->toBe('DISCOUNT50_1ST_SEMESTER_ONLY');
+});
+
+it('rejects a pathway_gateway mapping with a code that does not exist in voucher_definitions', function () {
+    $staff = User::factory()->create(['type' => UserType::STAFF]);
+    $campus = Campus::factory()->create();
+    crmMappingGrantPermission($staff, $campus, 'manage_crm_value_mapping');
+    session(['current_campus_id' => $campus->id]);
+
+    $response = $this->actingAs($staff)
+        ->withHeader('X-CSRF-TOKEN', CRM_MAPPING_CSRF)
+        ->post(route('student-applications.crm-mappings.store'), ['kind' => 'pathway_gateway', 'crm_value' => 'Taiwan Gateway', 'local_code' => 'NOPE']);
 
     $response->assertSessionHasErrors('local_code');
 });

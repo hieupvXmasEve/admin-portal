@@ -11,10 +11,16 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 /**
- * `local_code` is validated against the live catalog for `campus`/`major`/
- * `intake` (the only kinds a real code must exist for). `scholarship`,
- * `pathway_gateway`, `uu_dai_gc` have no local catalog (D8) — any non-empty
- * string is accepted, since they never block conversion.
+ * `local_code` is validated against a live catalog for every kind that has
+ * one: `campus`→`campuses`, `major`→`programs`, `intake`→`semesters`,
+ * `scholarship`→`scholarship_definitions`, and both `pathway_gateway` and
+ * `uu_dai_gc`→`voucher_definitions` (confirmed against live data: CRM's
+ * "Taiwan Gateway"/"Taiwan Pathway" and "50% học phí kỳ GC" values match
+ * `voucher_definitions` rows exactly — D8's "no local catalog" claim for
+ * these three kinds was wrong, corrected 2026-08-10). Catalog validation is
+ * orthogonal to whether a kind blocks conversion (it still doesn't, for
+ * these three) — it only prevents saving a code that cannot resolve to
+ * anything.
  */
 final class SaveCrmValueMappingRequest extends FormRequest
 {
@@ -66,6 +72,8 @@ final class SaveCrmValueMappingRequest extends FormRequest
             CrmValueMapping::KIND_MAJOR => ['table' => 'programs', 'column' => 'code'],
             CrmValueMapping::KIND_SPECIALIZATION => ['table' => 'specializations', 'column' => 'code'],
             CrmValueMapping::KIND_INTAKE => ['table' => 'semesters', 'column' => 'code'],
+            CrmValueMapping::KIND_SCHOLARSHIP => ['table' => 'scholarship_definitions', 'column' => 'code'],
+            CrmValueMapping::KIND_PATHWAY_GATEWAY, CrmValueMapping::KIND_UU_DAI_GC => ['table' => 'voucher_definitions', 'column' => 'code'],
             default => null,
         };
     }

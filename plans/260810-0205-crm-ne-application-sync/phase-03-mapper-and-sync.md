@@ -77,6 +77,24 @@ Files: `app/Http/Middleware/HandleInertiaRequests.php` (new `crm_sync_summary` f
 fast with `CrmAuthenticationException` if no token is stored. The summary-flash mechanics described above
 are unchanged.
 
+### Bug fix (2026-08-10, same day): false-positive "success" toasts
+
+Reported: clicking Login showed "Logged in to CRM." but the token never persisted (`logged_in: false` in
+the DB afterward). Root cause: Inertia's `onSuccess` callback fires for *any* successful HTTP visit
+(302→200), including `back()->with(['error' => ...])` — a caught `CrmSyncException` is still an HTTP
+success from Inertia's point of view; `onError` only fires for actual validation failures (422). Every
+action in `CrmMappings.vue` (`loginNow`, `syncNow`, `saveMapping`, `saveIntake`, `saveIntegration`) had
+`onSuccess` hardcode a positive toast message instead of reading the real flash — so a genuine server-side
+failure always displayed as success. Same root cause as the original "toast hiện nhưng không có data"
+report for `syncNow` (a caught exception has no `crm_sync_summary`, so it fell through to a hardcoded
+"Sync finished." success message).
+
+Fix: a shared `toastFromFlash()` helper reads `usePage().props.flash` (error > warning > success priority)
+inside every `onSuccess`, replacing the hardcoded messages. No backend change — this was purely a client
+assumption bug. No regression test added (no JS/Vue unit test harness exists for this page in the repo);
+verified by re-reading Inertia's documented `onSuccess`/`onError` semantics against the controller's actual
+response shapes for both the happy and caught-exception paths.
+
 ### Match key — a branch, not a fallback
 
 `UpsertCrmApplicationAction` currently does

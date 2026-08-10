@@ -122,3 +122,54 @@ Runs at two moments through one service: on mapping save, and at the start of ea
 - **Backfill overwriting staff edits** (high): fills only null columns; explicitly tested.
 - **Concurrent writers** (high): shared lock with the sync command.
 - **Unmapped-values query cost** (low): distinct over a small table; index only if measured.
+
+## Bug fix (2026-08-10, post-implementation): unmapped campus values were unreachable
+
+Reported: a real sync created 154 unmapped-campus applications, but the mapping screen showed "No unmapped
+CRM values." Root cause: `ListUnmappedCrmValuesQuery` returned `[]` for `kind=campus` whenever the caller
+passed a non-null `campusCode`, and `CrmMappingController::index()` passed `app('campus')?->code` — which
+`SetCampus` middleware binds for *every* request where `session('current_campus_id')` is set, i.e.
+virtually every normal staff session. The "campus-scoped actor sees only their campus" design (this
+document's original Discovery section and the Success Criteria above) never actually held in practice for
+`kind=campus`, since an unmapped campus value has no `campus_code` to scope by definition — the two
+success-criteria lines above about campus scoping are superseded.
+
+Since `manage_crm_value_mapping` is already org-wide-only (never grantable to a campus-scoped role —
+enforced in the seeder, asserted by `CrmMappingConfigTest`), campus-scoping the *query* was redundant
+defense-in-depth that actively broke the feature rather than adding real protection. Fix: dropped the
+`campusCode` parameter and all scoping from `ListUnmappedCrmValuesQuery::handle()` — the screen now always
+shows every unmapped value, gated solely by the permission (which is the actual, sufficient boundary).
+`CrmMappingController::index()` no longer resolves `app('campus')` for this query.
+
+## UX fix (2026-08-10, same day): free-text local_code was error-prone
+
+Reported: typing a local code by hand for every unmapped row was easy to get wrong. Root cause:
+`SaveCrmValueMappingRequest` already validates `local_code` against `campuses`/`programs`/`specializations`
+for their respective kinds (§Local code options above), but `CrmMappingController::index()` never passed
+those catalogs to the page, so `CrmMappings.vue` used a free-text `Input` for every kind uniformly. Fix:
+controller now passes `campuses` and `programs` (`code`, `name`); the Vue page renders a `Select` for
+`kind=campus`/`kind=major` rows and keeps `Input` only for `scholarship`/`pathway_gateway`/`uu_dai_gc`,
+which have no local catalog by design (D8) and stay free-text. `specialization` was left on `Input` too —
+no CRM field currently feeds that kind, so there is nothing live to verify a Select against yet (YAGNI).
+
+## Correction (2026-08-10, same day): D8's "no local catalog" was wrong for 3 of 3 remaining kinds
+
+User: "làm cả cho Scholarship và Pathway gateway, ưu đãi GC thì là voucher." Scout found real catalogs the
+original plan missed: `App\Models\ScholarshipDefinition` (`scholarship_definitions`, `code`+`name`) and
+`App\Models\VoucherDefinition` (`voucher_definitions`, `code`+`name`) — both pre-existing, unrelated to
+this feature (used by the Finance module for tuition discounts/vouchers). Confirmed against live dev data
+before trusting the claim: `voucher_definitions` contains `TAIWAN_GATEWAY`/`TAIWAN_PATHWAY` (exact CRM
+`pathway_gateway` values) and `DISCOUNT50_1ST_SEMESTER_ONLY` (matches CRM's "50% học phí kỳ GC",
+`uu_dai_gc`); `scholarship_definitions` contains `ASIA_PIONEER`, `ASIA_CHANGE_MAKER`, etc. (exact CRM
+`scholarship` values).
+
+D8 ("scholarship, pathway_gateway, uu_dai_gc have no local catalog") is corrected: all three now resolve
+against a real table — `scholarship`→`scholarship_definitions`, `pathway_gateway` **and** `uu_dai_gc`→
+`voucher_definitions` (both are voucher concepts, not two separate catalogs). What D8 got right and stays
+true: none of the three ever block conversion (`GetApplicationConversionReadinessQuery` only treats them as
+warnings) — catalog validation is about preventing a typo'd code, not about gating approval.
+
+Changed: `SaveCrmValueMappingRequest::catalogExistsRuleFor()` now validates these three kinds too;
+`CrmMappingController::index()` passes `scholarships`/`vouchers`; `CrmMappings.vue`'s `catalogFor()` maps
+`scholarship`→scholarships, `pathway_gateway`/`uu_dai_gc`→vouchers. `specialization` remains the only
+free-text-by-necessity kind (still no CRM field feeds it).

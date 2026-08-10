@@ -5,7 +5,11 @@ declare(strict_types=1);
 namespace App\Modules\Admissions\Http\Web;
 
 use App\Http\Controllers\Controller;
+use App\Models\Campus;
+use App\Models\Program;
+use App\Models\ScholarshipDefinition;
 use App\Models\Semester;
+use App\Models\VoucherDefinition;
 use App\Modules\Admissions\Exceptions\CrmSyncException;
 use App\Modules\Admissions\Http\Requests\Admissions\SaveCrmIntegrationSettingsRequest;
 use App\Modules\Admissions\Http\Requests\Admissions\SaveCrmValueMappingRequest;
@@ -24,13 +28,21 @@ final class CrmMappingController extends Controller
 {
     public function index(ListUnmappedCrmValuesQuery $unmapped, CrmMappingSettings $settings, CrmIntegrationSettings $integrationSettings): mixed
     {
-        $campus = app()->bound('campus') ? app('campus') : null;
-
         return Inertia::render('StudentApplications/CrmMappings', [
-            'unmapped' => $unmapped->handle($campus?->code),
+            'unmapped' => $unmapped->handle(),
             'intake' => ['crm_value' => CrmValueMapping::INTAKE_DEFAULT_KEY, 'local_code' => $settings->getIntakeCode()],
             'semesters' => Semester::query()->orderByDesc('id')->get(['code', 'name']),
             'integration' => $integrationSettings->forDisplay(),
+            // Catalog-backed kinds get a Select instead of a free-text Input on
+            // the mapping screen — SaveCrmValueMappingRequest already validates
+            // local_code against these tables, so typing a code by hand was
+            // error-prone for no reason. `pathway_gateway` and `uu_dai_gc` both
+            // resolve against `voucher_definitions` — confirmed against live
+            // data (see SaveCrmValueMappingRequest docblock).
+            'campuses' => Campus::query()->orderBy('name')->get(['code', 'name']),
+            'programs' => Program::query()->orderBy('name')->get(['code', 'name']),
+            'scholarships' => ScholarshipDefinition::query()->orderBy('name')->get(['code', 'name']),
+            'vouchers' => VoucherDefinition::query()->orderBy('name')->get(['code', 'name']),
         ]);
     }
 
