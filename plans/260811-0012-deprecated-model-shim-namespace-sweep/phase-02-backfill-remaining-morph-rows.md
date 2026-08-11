@@ -200,3 +200,62 @@ volume is unmeasured — step 1 fixes that before anything runs.
 | **User-visible:** saved/bookmarked Activity Logs filters break | `ActivityLogController.php:79-81` passes `subject_type` straight into an exact `where` with no allow-list, and `:105-111` builds the picker from `DISTINCT subject_type`; `resources/js/pages/Systems/ActivityLogs.vue:243-249` renders the raw FQCN. A bookmarked `?subject_type=App\Models\Room` returns zero rows — indistinguishable from "no room changes" in an audit UI. **This violates plan Goal 4 and must be declared in the PR, not glossed** |
 | A null after migration mistaken for a regression | Phase 1 established the pattern; step 6 traces each id |
 | Straggler FQCN in a column the name-filtered enumeration missed | Step 2 checks the two known cases by value and records the decision |
+
+## Execution Log — 2026-08-11
+
+**Step 1 re-measurement on dev `asia`** (matches plan Evidence Base, unchanged):
+
+| `activity_log.subject_type` | Rows |
+|---|---|
+| `App\Models\Room` | 87 |
+| `App\Models\RoomBooking` | 31 |
+| `App\Models\Club` | 19 |
+| `App\Models\Building` | 5 |
+| `activity_log` total | 184,157 |
+
+**Step 1 production measurement** (user-run, 2026-08-11):
+
+| `activity_log.subject_type` | Rows |
+|---|---|
+| `App\Models\Room` | 87 |
+| `App\Models\RoomBooking` | 31 |
+| `App\Models\Club` | 19 |
+| `App\Models\Building` | 5 |
+| `activity_log` total | 188,025 |
+
+Identical to dev for all four target models. Total row count (188k) is the same
+order of magnitude as dev (184k) — no chunking needed; four index-scoped
+`UPDATE`s over ≤87 rows each are not a deploy-window concern at this volume.
+
+**Deploy (step 4) and post-deploy verification (step 5/6 against production)
+still pending** — held for explicit user go-ahead, since triggering the actual
+deploy pipeline is out of scope for unattended execution. Everything else below
+is verified on dev `asia` only.
+
+**Step 2 residue check:** `telescope_entries.content` and `activity_log.properties`
+now return **0** rows naming any shimmed FQCN on dev (the telescope table has
+rotated since the validation session that found 236 rows there). Non-load-bearing
+either way — confirmed, not assumed.
+
+**Delivered:** `database/migrations/2026_08_11_085516_backfill_remaining_shimmed_morph_subject_types.php`
+— 4 `UPDATE`s (Room, RoomBooking, Club, Building), throwing `down()` per V3-e.
+No test file, no other file touched, per this phase's explicit scope.
+
+**Step 5 verification on dev `asia`** — exact `whereIn`, not `LIKE`:
+
+```
+resolved=121 null=21   (121 + 21 = 142 = pre-migration count)
+```
+
+**Step 6 — every null traced:**
+
+| Null subject | Cause |
+|---|---|
+| `Room#1,2,3,4,5,6,7,8,9,10` (1 row each), `#11` (×3), `#30` (×2), `#36` (×3) — 17 rows | Hard-deleted: `rooms` table has no row for any of these ids |
+| `Club#3` — 1 row | Hard-deleted: `clubs` table has no row for id 3 |
+| `Building#4` — 2 rows | Soft-deleted: `buildings.deleted_at = 2025-12-08 16:05:04`; `Building` uses `SoftDeletes`, so the default query (which `MorphTo` resolution uses) excludes it. Confirmed the row exists via `withoutGlobalScopes()`. Not a hard delete, but the same class of "no longer visible" pre-existing condition — resolves to null identically whether `subject_type` names the shimmed or canonical FQCN, since `class_alias` is one class |
+
+21 traced, 0 unexplained.
+
+**Remaining before this phase is done:** the standalone deploy (step 4) and
+post-deploy verification (step 5/6 repeated against production).
