@@ -282,6 +282,12 @@ export const mainNavGroups: NavGroup[] = [
                         requiredPermissions: ['view_student_action'],
                     },
                     {
+                        title: 'Defer Return Watchlist',
+                        href: studentRoutes.academicProgressionDeferReturns(),
+                        icon: Clock,
+                        requiredPermissions: ['view_student_action'],
+                    },
+                    {
                         title: 'Student Decisions',
                         href: studentRoutes.studentDecisionsIndex(),
                         icon: FileText,

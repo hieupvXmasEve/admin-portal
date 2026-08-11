@@ -442,6 +442,14 @@ Route::middleware(['auth', 'verified', 'campus.selected'])->group(function () {
             ->middleware('can:view_student_action')
             ->name('missing-decisions');
 
+        Route::get('/defer-returns', [AcademicProgressionAuditController::class, 'deferReturns'])
+            ->middleware('can:view_student_action')
+            ->name('defer-returns');
+
+        Route::get('/defer-returns/export', [AcademicProgressionAuditController::class, 'exportDeferReturns'])
+            ->middleware('can:view_student_action')
+            ->name('defer-returns.export');
+
         Route::get('/export', [AcademicProgressionAuditController::class, 'export'])
             ->middleware('can:view_student_action')
             ->name('export');

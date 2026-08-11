@@ -201,6 +201,22 @@ describe('academic progression audit', function (): void {
             );
     });
 
+    it('renders the defer-returns watchlist report', function (): void {
+        get(route('reports.academic-progression.defer-returns'))
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->component('Admin/Reports/AcademicProgressionAudit/DeferReturns')
+                ->where('filters.per_page', 25)
+                ->has('counts')
+            );
+    });
+
+    it('streams the defer-returns export as a spreadsheet', function (): void {
+        get(route('reports.academic-progression.defer-returns.export'))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    });
+
     it('names the CSV export after the selected semester code', function (): void {
         get(route('reports.academic-progression.export', ['semester_id' => $this->newer->id]))
             ->assertOk()

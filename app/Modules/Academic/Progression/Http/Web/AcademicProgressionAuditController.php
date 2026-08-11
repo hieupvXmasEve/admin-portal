@@ -8,13 +8,17 @@ use App\Enums\AcademicProgressionEventType;
 use App\Enums\ProgressionTriggerSource;
 use App\Http\Controllers\Controller;
 use App\Modules\Academic\Catalog\Queries\GetSemesterReferenceOptionsQuery;
+use App\Modules\Academic\Progression\Exports\DeferReturnWatchlistExport;
+use App\Modules\Academic\Progression\Queries\GetDeferReturnWatchlistQuery;
 use App\Modules\Academic\Progression\Queries\GetMissingDecisionReportQuery;
 use App\Modules\Academic\Progression\Queries\Placement\GetAcademicProgressionAuditQuery;
+use App\Services\ExcelExportService;
 use App\Shared\Contracts\Institution\CampusReferenceReader;
 use App\Shared\Contracts\Institution\DTO\CampusReference;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AcademicProgressionAuditController extends Controller
@@ -116,6 +120,51 @@ class AcademicProgressionAuditController extends Controller
                 'per_page' => $validated['per_page'] ?? 25,
             ],
         ]);
+    }
+
+    /**
+     * Show the defer-return watchlist report.
+     *
+     * Students still on hold (ACADEMIC_DEFER → deferred, WAITING_COURSE_OPENING
+     * → pending_course_opening), bucketed overdue/upcoming/waiting. A row
+     * self-clears once resume/dropout/transfer moves the student off that status.
+     */
+    public function deferReturns(Request $request, GetDeferReturnWatchlistQuery $query): Response
+    {
+        $validated = $request->validate([
+            'search' => ['nullable', 'string', 'max:255'],
+            'bucket' => ['nullable', 'string', 'in:overdue,upcoming,waiting'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+
+        $campusId = session('current_campus_id');
+
+        return Inertia::render('Admin/Reports/AcademicProgressionAudit/DeferReturns', [
+            'rows' => $query->handle($validated, $campusId),
+            'counts' => $query->counts($campusId),
+            'filters' => [
+                'search' => $validated['search'] ?? null,
+                'bucket' => $validated['bucket'] ?? null,
+                'per_page' => $validated['per_page'] ?? 25,
+            ],
+        ]);
+    }
+
+    /**
+     * Export the defer-return watchlist as Excel, honouring the active filters.
+     */
+    public function exportDeferReturns(Request $request, GetDeferReturnWatchlistQuery $query, ExcelExportService $excelService): BinaryFileResponse
+    {
+        $validated = $request->validate([
+            'search' => ['nullable', 'string', 'max:255'],
+            'bucket' => ['nullable', 'string', 'in:overdue,upcoming,waiting'],
+        ]);
+
+        $builder = $query->baseQuery($validated, session('current_campus_id'));
+
+        $export = new DeferReturnWatchlistExport($builder);
+
+        return $excelService->download($export, 'defer_return_watchlist_'.date('Y-m-d_H-i'));
     }
 
     /**
