@@ -6,17 +6,23 @@ namespace App\Modules\Finance\Actions;
 
 use App\Models\StudentScholarshipAward;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceSetting;
 use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Queries\GetActiveScholarshipAdjustmentQuery;
+use App\Modules\Finance\Queries\GetStudentBalanceQuery;
 use App\Modules\Finance\Queries\GetUnresolvedPriorAdjustmentQuery;
 use App\Modules\Finance\Services\InvoiceGenerationService;
+use App\Modules\Finance\Services\SettlementService;
 use App\Modules\Finance\Support\BillingAccountProvisioner;
 use App\Modules\Finance\Support\ScholarshipDiscountResolver;
 use App\Modules\Finance\Support\SettlementMutationGuard;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Debit materializer writer (ADR-0028 / wave 7).
@@ -24,6 +30,10 @@ use Illuminate\Support\Facades\DB;
  * Sole production owner of FinanceCharge::create. Called only from
  * RequestFinanceDebitAction (intake debit path). source_type/source_id are
  * retired on new writes — source identity lives on FinanceObligation.
+ *
+ * Also owns the opt-in `finance_settings.credit_offset_enabled` behavior:
+ * after commit, it may offset the charge just created with the student's own
+ * unapplied cash (see offsetWithUnappliedCredit()).
  */
 class CreateFinanceChargeAction
 {
@@ -36,6 +46,9 @@ class CreateFinanceChargeAction
         protected InvoiceGenerationService $invoiceService,
         private readonly BillingAccountProvisioner $billingAccountProvisioner,
         private readonly SettlementMutationGuard $settlementMutationGuard,
+        private readonly GetStudentBalanceQuery $studentBalance,
+        private readonly SettlementService $settlementService,
+        private readonly AllocatePaymentAction $allocatePayment,
     ) {}
 
     /**
@@ -78,8 +91,102 @@ class CreateFinanceChargeAction
                 $this->applyScholarship($charge, $invoice);
             }
 
+            $this->offsetWithUnappliedCredit($charge);
+
             return $charge->fresh(['invoiceLines.invoice']);
         });
+    }
+
+    /**
+     * When `finance_settings.credit_offset_enabled` is on and the student's
+     * total unapplied cash balance meets `credit_offset_min_balance`, offset
+     * the charge just created (only this charge — not other outstanding fees)
+     * with that cash (opt-in override of the default no-waterfall-spill rule).
+     *
+     * Deferred to after commit: it must never abort charge creation, and
+     * running it inside the write transaction would hold the billing-account
+     * lock while reaching for payment/line locks — the reverse of the lock
+     * order used by manual allocation and the DNG webhook bridge.
+     */
+    private function offsetWithUnappliedCredit(FinanceCharge $charge): void
+    {
+        $settings = FinanceSetting::current();
+        if (! $settings->credit_offset_enabled) {
+            return;
+        }
+
+        $minBalance = (float) $settings->credit_offset_min_balance;
+        $chargeId = (int) $charge->id;
+        $userId = $charge->created_by_user_id;
+
+        DB::afterCommit(function () use ($chargeId, $minBalance, $userId): void {
+            // The charge is already durably committed by this point — a
+            // failure here must never surface as a request-level error for
+            // an operation that already succeeded. Log and move on.
+            try {
+                $this->applyUnappliedCreditToCharge($chargeId, $minBalance, $userId);
+            } catch (\Throwable $e) {
+                Log::error('Finance credit offset failed after charge commit.', [
+                    'charge_id' => $chargeId,
+                    'exception' => $e,
+                ]);
+            }
+        });
+    }
+
+    private function applyUnappliedCreditToCharge(int $chargeId, float $minBalance, ?int $userId): void
+    {
+        $charge = FinanceCharge::find($chargeId);
+        if (! $charge instanceof FinanceCharge) {
+            return;
+        }
+
+        $balance = $this->studentBalance->handle((int) $charge->student_id);
+        if (! $balance['valid']) {
+            Log::warning('Finance credit offset skipped: invalid settlement position.', [
+                'student_id' => $charge->student_id,
+                'charge_id' => $chargeId,
+                'issues' => $balance['issues'],
+            ]);
+
+            return;
+        }
+
+        $unapplied = (float) ($balance['unapplied_credit'] ?? 0);
+        if ($unapplied <= 0 || $unapplied < $minBalance) {
+            return;
+        }
+
+        $line = InvoiceLine::where('charge_id', $chargeId)->where('status', 'active')->first();
+        if (! $line) {
+            return;
+        }
+
+        $payments = Payment::where('student_id', $charge->student_id)
+            ->where('status', Payment::STATUS_COMPLETED)
+            ->orderBy('paid_at')
+            ->get()
+            ->filter(fn (Payment $payment): bool => $payment->unapplied_amount > 0);
+
+        foreach ($payments as $payment) {
+            $outstanding = $this->settlementService->getLineOutstandingAmount($line->fresh());
+            if ($outstanding <= 0) {
+                break;
+            }
+
+            $allocate = min($payment->unapplied_amount, $outstanding);
+            if ($allocate <= 0) {
+                continue;
+            }
+
+            try {
+                $this->allocatePayment->run($payment, $charge, $allocate, $userId);
+            } catch (ValidationException) {
+                // Another allocator (manual/DNG) raced this line/payment first;
+                // its own row-lock re-check already re-validated — skip and move on.
+                continue;
+            }
+        }
     }
 
     /**

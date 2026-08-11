@@ -463,6 +463,15 @@ return [
             // DNG provider configuration is Finance-owned and scoped to the selected campus.
             'view_finance_dng_campus_mappings' => 'view_finance_dng_campus_mappings',
             'manage_finance_dng_campus_mappings' => 'manage_finance_dng_campus_mappings',
+            // Finance settings (credit offset toggle/threshold) — the SETTING is
+            // global (applies to every campus), but the permission check itself
+            // is campus-scoped like every other permission in this system
+            // (CampusPermissionReader). A role granting manage_finance_settings
+            // at ANY single campus can change behavior for ALL campuses. Only
+            // grant this to HQ/super_admin-level roles, never a campus-local
+            // finance admin role.
+            'view_finance_settings' => 'view_finance_settings',
+            'manage_finance_settings' => 'manage_finance_settings',
         ],
         'modules' => [
             'view_module' => 'view_module',

@@ -18,6 +18,7 @@ use App\Modules\Finance\Http\Web\Admin\FinanceCockpitController;
 use App\Modules\Finance\Http\Web\Admin\FinanceGlobalSearchController;
 use App\Modules\Finance\Http\Web\Admin\FinanceReportingController;
 use App\Modules\Finance\Http\Web\Admin\FinanceRevenueReportController;
+use App\Modules\Finance\Http\Web\Admin\FinanceSettingsController;
 use App\Modules\Finance\Http\Web\Admin\FinanceStudentOverviewController;
 use App\Modules\Finance\Http\Web\Admin\FinanceStudentPaymentController;
 use App\Modules\Finance\Http\Web\Admin\LifecycleDueExceptionController;
@@ -315,6 +316,15 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
                 ->middleware('can:resolve_finance_dng_receipt_exceptions')
                 ->name('receipt-exceptions.resolve');
         });
+    });
+
+    Route::prefix('settings')->name('settings.')->group(function () {
+        Route::get('/', [FinanceSettingsController::class, 'show'])
+            ->middleware('can:view_finance_settings')
+            ->name('show');
+        Route::put('/', [FinanceSettingsController::class, 'update'])
+            ->middleware('can:manage_finance_settings')
+            ->name('update');
     });
 
     Route::prefix('batch-studio')->name('batch-studio.')->group(function () {

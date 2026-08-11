@@ -545,6 +545,10 @@ export const financeRoutes = {
         overview: (studentId: number, focus?: string) => route(FINANCE_ROUTE_NAMES.STUDENT_OVERVIEW, focus ? { student: studentId, focus } : { student: studentId }),
     },
     search: () => route(FINANCE_ROUTE_NAMES.GLOBAL_SEARCH),
+    settings: {
+        show: () => route(FINANCE_ROUTE_NAMES.SETTINGS_SHOW),
+        update: () => route(FINANCE_ROUTE_NAMES.SETTINGS_UPDATE),
+    },
     semesterContext: {
         update: () => route(FINANCE_ROUTE_NAMES.SEMESTER_CONTEXT_UPDATE),
     },

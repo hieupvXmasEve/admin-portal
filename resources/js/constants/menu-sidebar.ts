@@ -397,6 +397,7 @@ export const mainNavGroups: NavGroup[] = [
                     { title: 'Lập yêu cầu thanh toán DNG', href: financeRoutes.batchStudio.dng(), icon: Send, requiredPermissions: ['view_finance_batch_studio', 'create_finance_payments'] },
                     { title: 'Settlement Worklist', href: financeRoutes.collect.settlement(), icon: Sparkles, requiredPermissions: ['allocate_finance_payment'] },
                     { title: 'Payments', href: financeRoutes.collect.payments(), icon: BarChart3, requiredPermissions: ['view_finance_payments'] },
+                    { title: 'Finance Settings', href: financeRoutes.settings.show(), icon: Settings2, requiredPermissions: ['view_finance_settings'] },
                 ],
             },
             {
