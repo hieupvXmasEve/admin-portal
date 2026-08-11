@@ -37,9 +37,15 @@ class ApplicationDocumentTypeSyncService
                     continue;
                 }
 
+                $attributes = $this->attributesFrom($entry);
+
+                if (in_array((string) $code, ApplicationDocumentType::RETIRED_CODES, true)) {
+                    $attributes['active'] = false;
+                }
+
                 ApplicationDocumentType::query()->updateOrCreate(
                     ['code' => (string) $code],
-                    $this->attributesFrom($entry),
+                    $attributes,
                 );
 
                 $processed++;

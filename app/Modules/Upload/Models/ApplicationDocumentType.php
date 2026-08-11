@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Upload\Models;
 
 use App\Models\StudentApplication;
+use App\Modules\Admissions\Support\Crm\CrmApplicationMapper;
 use App\Services\ApplicationDocumentTypeSyncService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -23,6 +24,16 @@ use Illuminate\Database\Eloquent\Model;
 class ApplicationDocumentType extends Model
 {
     use HasFactory;
+
+    /**
+     * Codes deactivated because they duplicate a base document concept —
+     * `page_index` variants that {@see CrmApplicationMapper}
+     * folds onto their base `file_type_code` and that CRM sync will never fill
+     * again. {@see ApplicationDocumentTypeSyncService::sync()} forces these
+     * inactive regardless of payload, so a catalog re-sync cannot reactivate
+     * them.
+     */
+    public const RETIRED_CODES = ['transcript_1', 'english_certificare', 'other_achievements_2'];
 
     protected $table = 'application_document_types';
 
