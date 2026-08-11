@@ -111,6 +111,87 @@ phase to be finished — the canonical class already exists. So cross-module edi
 are safe; only the *merge order* matters. Hence phase 3 depends on 2, and phase 5
 on 3. Phase 4 is genuinely disjoint and may run in parallel with 5.
 
+### Only 20 of 30 shims can be deleted — the shims are load-bearing
+
+<!-- Added: red-team session 1, Critical C1 -->
+
+`cross_context_concrete_imports` (`config/migration_debt.php:75-81`) is
+`baseline: 0, mode: exact` — zero tolerance, currently sitting exactly at 0 and
+owned by "Platform architecture maintainers". Its detector
+(`MigrationDebtInventory.php:349-388`) fires when a file namespaced
+`App\Modules\A\` names `App\Modules\B\` on a non-comment line;
+`MigrationDebtGuard.php:109` errors on any non-zero.
+
+`App\Models\X` is **namespace-neutral**, so a cross-module model read routed
+through a shim is invisible to that rule. Rewriting it to the canonical FQCN
+makes it visible and breaks the guard.
+
+**This is the real reason `260809-1557` left the shims behind.** 12 files depend
+on that property, keeping 10 shims alive:
+
+```
+Academic   -> Facilities    GetClassSessionFormOptionsQuery, LecturerTimetableService (Room)
+Academic   -> Facilities    CampusBuildingCountReader (Building)
+Academic   -> Engagement    GetCourseOfferingSurveyQuery (FormTarget)
+Admissions -> Upload        UpsertCrmApplicationAction, IngestionController,
+                            GetApplicantDocumentChecklistQuery, ListApplicationsQuery
+Engagement -> Upload        FormResponse, QueryReply (UploadRecord)
+Engagement -> Merchandise   EventParticipationOperations (GoldTransaction)
+Upload     -> Engagement    UploadRecord (FormResponse, QueryReply, QueryTicket)
+```
+
+| Module | Deletable | Blocked |
+|---|---|---|
+| Upload | **0 / 3** | `ApplicationDocument`, `ApplicationDocumentType`, `UploadRecord` |
+| Facilities | 2 / 4 | `Room`, `Building` |
+| Engagement | 12 / 16 | `FormResponse`, `FormTarget`, `QueryReply`, `QueryTicket` |
+| Merchandise | 6 / 7 | `GoldTransaction` |
+| **Total** | **20 / 30** | 10 |
+
+Consequences that reshaped this plan:
+
+- **Upload deletes nothing**, so the original "sweep Upload first, it is the
+  cleanest" phase was removed.
+- `Room` — the highest-caller shim (27) and highest morph-row holder (87) — is
+  blocked.
+- The natural phase boundary is deletable-vs-blocked, not per-module.
+- Removing the 10 survivors is a **module-boundary refactor** (route 12 reads
+  through `App\Shared\Contracts\*`), not a namespace sweep. Different owner,
+  different risk, different sign-off. Spun out to a follow-up plan in phase 5
+  rather than smuggled in as an import swap.
+
+**Decision (V3-c): sweep the unblocked 20; leave the 10 and their 12 callers
+untouched.** Files holding both a deletable and a blocked shim get a *partial*
+sweep and end up with mixed namespaces — intended, not half-finished work.
+
+### Nothing can write a shimmed FQCN anymore — so the migration goes first
+
+<!-- Added: red-team session 1; supersedes the same-PR ordering constraint -->
+
+An earlier revision claimed rows "keep accruing until the callers stop writing
+the old FQCN, since the logger records `get_class($model)`", and derived a
+same-PR ordering from it. **The causal claim is false.** Traced:
+`ActivityLogger.php:50` → `MorphTo.php:248` `getMorphClass()` →
+`HasRelationships.php:1006-1020` → returns `static::class`. `class_alias` does not
+create a second class, so `static::class` is always the canonical name no matter
+which alias the caller imported. `BusinessActionLogger.php:233` agrees.
+
+Confirmed by data — last old-FQCN write per model, all predating the 2026-08-09
+model move (`50ed50a4`): `Room` 2026-05-22, `RoomBooking` 2026-07-22, `Club`
+2026-04-17, `Building` 2026-01-22, `ClubMember` never.
+
+**The 142 rows are frozen residue, not an accruing set.** The same-PR constraint
+was unnecessary — and it was actively dangerous, because
+`scripts/deploy-ubuntu.sh` runs `migrate` (:120) long after the new code is live
+(`optimize:clear` :92, `git reset --hard` in `deploy.yml:70-77`), with no
+`artisan down`. Deleted shim files would have gone live minutes before the
+backfill, and a request touching one of the 142 rows would hit the stale
+optimized classmap (`autoload_classmap.php:613`) for a deleted file →
+`require(): Failed opening required`, an uncatchable E_COMPILE_ERROR.
+
+**Decision (V3-d): the backfill runs first, as its own deploy, with every shim in
+place** (phase 2). Deletion follows only after it is verified in production.
+
 ### Placement arch tests block shim deletion (correction)
 
 All six per-module placement arch tests assert the shim **still exists**:
@@ -189,12 +270,14 @@ accumulate continuously.
 
 ## Goals
 
+<!-- Updated: red-team session 1 - goals 1/2 reduced to 20 of 30 shims; goal 4 qualified with a known behavior change -->
+
 | # | Goal | Priority |
 |---|------|----------|
-| 1 | No production or test code imports `App\Models\<migrated model>` | P1 |
-| 2 | All 30 shim files deleted | P1 |
-| 3 | An arch test fails if a shim or a shim import reappears | P1 |
-| 4 | Zero behavior change — no logic or schema edits. Data edits limited to rewriting persisted morph strings | P1 |
+| 1 | No code references the **20 unblocked** shims' FQCNs | P1 |
+| 2 | **20 of 30** shim files deleted. The other 10 are load-bearing for a zero-tolerance boundary rule and are spun out to a follow-up plan — see "Only 20 of 30 shims can be deleted" | P1 |
+| 3 | An arch test fails if a shim or a shim import reappears — including a subclass-style reintroduction, and including after a model leaves the allow-list | P1 |
+| 4 | No logic or schema change. Data edits limited to rewriting persisted morph strings. **One known behavior change is accepted and must be declared:** saved/bookmarked Activity Logs `?subject_type=App\Models\X` links return zero rows after the backfill | P1 |
 | 5 | Previously-logged activity still resolves its subject after the sweep | P1 |
 
 ## Non-Goals
@@ -206,25 +289,45 @@ accumulate continuously.
 
 ## Architecture
 
-Mechanical for the code half, stateful for the five morph-bearing models. One
-module per phase so each PR is independently reviewable and revertable:
+<!-- Updated: red-team session 1 - resequenced; data first, guard second, sweep third -->
 
-1. Record the pre-sweep baseline for the suites the phase touches.
-2. Re-measure callers and morph rows with the real detector:
+Three separable concerns, not one repeated per-module procedure. Sequencing is
+load-bearing, so the phases are ordered by dependency rather than by module:
+
+**Stage 1 — data (phase 2).** One migration rewrites the remaining 142 morph
+rows, deployed alone with every shim in place. Safe in any order because nothing
+can write a shimmed FQCN anymore, and running it first removes the deploy-window
+fatal that the old same-PR ordering created.
+
+**Stage 2 — guard (phase 3).** Fix the four evasions in phase 1's
+`DeprecatedModelShimArchTest` *before* anything relies on it to prove a deletion
+is safe. As shipped it would have allowed deleting `app/Models/UploadRecord.php`
+while `app/Models/Answer.php` still imported it.
+
+**Stage 3 — code (phase 4).** Per PR, for the 20 unblocked shims:
+
+1. Record the pre-sweep baseline for the suites the PR touches.
+2. Re-measure callers with the real detector — **without** `grep -v app/Models/`,
+   which is what hid `Answer.php`:
    `grep -rlP '\bApp\\{1,2}Models\\{1,2}<Model>\b' app tests database routes config --include='*.php'`
-3. Rewrite `use` statements **and** inline/string FQCN references
-   (`'App\Models\X'` appears in morph maps, docblocks, arch-test literals, and
-   potentially factory resolution — **check `Relation::morphMap`, `config/*.php`,
-   `database/factories/`, and negative assertions in arch tests**, not just
-   `use` lines).
-4. Run the module's morph backfill migration, if it has rows — after step 3, same PR.
-5. Delete the shim file.
-6. **Delete the shim-must-exist block** from the module's placement arch test
-   (see the Evidence Base correction — this step is mandatory, not optional).
-7. Shrink `SHIMMED_MODELS` + `SHIMMED_MODEL_IMPORT_BASELINE` in
-   `DeprecatedModelShimArchTest`, and lower the `shared_model_imports` baseline
-   in `config/migration_debt.php` so the two guards do not drift.
-8. Run the module's suites and compare against the step-1 baseline.
+3. Rewrite `use` statements **and** inline/string FQCN references (docblocks and
+   arch-test negative assertions both count). On files that also hold a blocked
+   shim, rewrite only the deletable names.
+4. Delete the shim file.
+5. **Invert** the module's placement arch test per V3-a — `file_exists` →
+   `toBeFalse()`, keeping `not->toContain("class X extends")`. Do not delete the
+   block; that assertion is the duplicate-model guard and phase 1's test does not
+   replace it.
+6. Shrink `SHIMMED_MODELS` only. `ALL_MIGRATED_MODELS` stays at 30 so the importer
+   regex keeps watching a model after its shim is gone.
+7. Prove the deletion behaviorally: `class_exists('App\Models\<Name>')` is false
+   in-process. Grep alone cannot see a runtime-assembled FQCN.
+8. Run the PR's suites and compare against the step-1 baseline.
+
+**Never** edit `config/migration_debt.php` or `MigrationDebtContract` (V3-b).
+
+**Stage 4 — close (phase 5).** Annotate the 10 survivors with what blocks them,
+and spin the boundary refactor out to its own plan.
 
 The repo already has per-module placement arch tests
 (`UploadModelPlacementArchTest`, `FacilitiesModelPlacementArchTest`,
@@ -238,12 +341,9 @@ new mechanism. Phase 1 added the repo-wide guard on top.
 `class_alias` keeps *string* class references working, and `activity_log` held
 242 such rows across 5 models (142 remaining after phase 1 — see Evidence Base).
 
-**Required handling before any shim deletion.**
+### Morph strategy
 
-<!-- Updated: Validation Session 1 - strategy A chosen, deletion timing chosen -->
-
-**Decision (V1): strategy A — data migration.** Each module phase carries a
-migration rewriting its own models' rows:
+**Decision (V1-a, retained): strategy A — data migration.**
 
 ```sql
 UPDATE activity_log
@@ -251,99 +351,153 @@ UPDATE activity_log
  WHERE subject_type = 'App\Models\<X>';
 ```
 
-`down()` reverses it. Because rows keep accruing until the callers stop writing
-the old FQCN, the migration runs **after** the caller sweep in the same PR, and
-the row count is re-measured immediately before it.
+Rejected **B** (permanent `morphMap` alias): leaves the deprecated names in config
+forever — the debt moves rather than clears.
 
-Rejected: **B** (permanent `morphMap` alias) would leave the deprecated names in
-config forever — the debt moves rather than clears, which defeats the plan's
-only goal. **C** (both) is unnecessary: `jobs` is empty and `failed_jobs`
-contains no shimmed models, so there is no in-flight-payload window to protect.
+<!-- Updated: red-team session 1 - V1-b superseded; the jobs-table evidence was invalid -->
 
-**Decision (V1): delete each shim in the same PR as its module's caller sweep.**
-Verified safe — no queued job payload references a shimmed model. Keeps each PR
-self-contained and independently revertable.
+**V1-b (same-PR deletion) is superseded by V3-d.** Two independent reasons:
 
-Whichever model is swept, it must stop *writing* the old FQCN before its rows are
-migrated — that happens automatically once callers use the canonical namespace,
-since the logger records `get_class($model)`.
+1. The ordering it rested on is derived from a false causal claim — see "Nothing
+   can write a shimmed FQCN anymore" above.
+2. Its safety evidence was invalid. The "no in-flight queued payload" conclusion
+   came from inspecting the MySQL `jobs` / `failed_jobs` **tables**, but
+   `QUEUE_CONNECTION=redis` (`.env:65`) — `jobs` is empty because it is unused,
+   not because the queue is drained. The per-phase "re-check `jobs`" ritual would
+   have reported clean forever, in every environment. `CACHE_STORE` and
+   `SESSION_DRIVER` are also redis and were never inspected. (The conclusion
+   happens to survive, because `SerializesModels` stores a `ModelIdentifier`
+   naming the *declaring* class — but that was never established, so it was luck,
+   not analysis.)
 
-Re-verify before each deletion (the full enumeration is done, but data moves):
+**Decision (V3-d): backfill first, as its own deploy, shims untouched. Delete only
+after it is verified applied in production.** Where a queue check is still wanted,
+check the real backend (`LLEN queues:*` plus the `:delayed` / `:reserved` ZSETs),
+not the dead `jobs` table.
 
-- re-run the `activity_log.subject_type` count for the module's models
-- re-check `jobs` / `failed_jobs` payloads (empty / clean as of 2026-08-11)
-- `config/*.php`, factory resolution, and any quoted `'App\Models\X'` literal
+### Rollback
 
-The other 63 `%_type` / `%_class` columns were enumerated and are clear of
-shimmed models — that sweep does not need repeating per phase.
+`down()` must **not** mirror `up()`. Phase 1's implementation is
+`WHERE subject_type = NEW_FQCN`, which rewrites every canonically-named row —
+including rows the application wrote canonically on its own — not just the ones
+`up()` touched. Its `class_exists` guard made things worse in a different way:
+`migrate:rollback` reports success while reverting nothing, leaving an operator
+believing state was restored.
+
+**Decision (V3-e): phase 2's `down()` throws.** The recovery path is a code
+revert, not a data revert — old code resolves canonical FQCNs correctly while the
+shims exist.
+
+### Verification that actually verifies
+
+Three prescribed checks were structurally incapable of failing and are replaced:
+
+- **Never `LIKE` on an FQCN.** MySQL treats backslash as the `LIKE` escape
+  character, so `LIKE 'App\Modules\Facilities\Models\%'` matches **nothing** and
+  prints a clean-looking `resolved=0 null=0`. Proven: exact `whereIn` returns 100
+  where the `LIKE` form returns 0. Use `whereIn` with exact strings, and require a
+  `resolved + null == expected count` positive control.
+- **Never `./scripts/dev.sh mysql -e "..."`.** `scripts/dev.sh:54-57` does not
+  `shift` or forward arguments, so `-e` is silently dropped and the command exits
+  0 with no output — indistinguishable from "no rows". Use
+  `artisan tinker --execute=`.
+- **Never "re-run the enumeration and get zero hits".** `activity_log.subject_type`
+  legitimately holds ~178k `App\Models\%` rows for non-shimmed models, so zero
+  hits is unsatisfiable and would be waved through. Query the 30 exact FQCNs.
+
+The morph-map before/after diff an earlier revision prescribed is also dropped: it
+cannot fail. Both names are the same class object and the map's keys are
+`RoomBooking::BOOKED_BY_*` constant *values*, so the diff is clean regardless of
+whether the sweep is correct.
+
+### Enumeration scope, stated honestly
+
+The "all 64 `%_type`/`%_class` columns" claim was **name**-filtered, so it could
+not see a class string in a generically-named column. Two hold shimmed FQCNs and
+are accepted as residue rather than cleaned: `telescope_entries.content` (~236 dev
+rows) and `activity_log.properties` (JSON) — neither is a resolution key. Also
+verified clean but never previously mentioned:
+`lecturer_access_grants.token_subject_type` and
+`faculty_access_eligibility_outbox.token_subject_type`.
+
+Every number in this plan was measured on dev `asia`. **Production is unmeasured**
+— phase 2 step 1 gates on measuring it.
 
 ## Phases
 
-| # | Phase | Shims | Files | Morph rows | Status | Depends on |
-|---|-------|---|---|---|--------|-----------|
-| 1 | [Morph-migration pilot and guard test](./phase-01-start.md) | — | 3 new | 100 migrated | Done | — |
-| 2 | [Upload module sweep](./phase-02-upload-module-sweep.md) | 3 | 25 | 0 | Pending | 1 |
-| 3 | [Engagement module sweep](./phase-03-engagement-module-sweep.md) | 16 | 23 | 19 (`Club`) | Pending | 1, 2 |
-| 4 | [Facilities module sweep](./phase-04-facilities-module-sweep.md) | 4 | 31 | 123 | Pending | 1 |
-| 5 | [Merchandise sweep and final shim removal](./phase-05-merchandise-sweep-and-final-shim-removal.md) | 7 | 17 | 0 | Pending | 1, 3 |
+<!-- Updated: red-team session 1 - restructured from per-module to data/guard/code/close -->
 
-<!-- Updated: phase 2-5 scaffolding - all phases now scaffolded; dependency chain corrected for shared files -->
+| # | Phase | Delivers | Deletes | Status | Depends on |
+|---|-------|---|---|--------|-----------|
+| 1 | [Morph-migration pilot and guard test](./phase-01-start.md) | pilot migration + guard | 0 shims | Done | — |
+| 2 | [Backfill remaining morph rows](./phase-02-backfill-remaining-morph-rows.md) | 1 migration, own deploy | 0 shims | Pending | 1 |
+| 3 | [Harden the shim guard](./phase-03-harden-shim-guard.md) | 4 guard fixes | 0 shims | Pending | 1 |
+| 4 | [Sweep and delete the 20 unblocked shims](./phase-04-sweep-and-delete-unblocked-shims.md) | 3 PRs, 40 files | **20 shims** | Pending | 1, 2, 3 |
+| 5 | [Close out and spin out the 10 blocked shims](./phase-05-close-out-and-spin-out-blocked-shims.md) | annotations + follow-up plan | 0 shims | Pending | 1, 2, 3, 4 |
 
-Phase 1 landed the migration pilot and the guard test. The strategy question it
-originally carried is settled (V1-a) and its inventory is complete — see the
-Validation Log.
+**Strictly sequential: 1 → 2 → 3 → 4 → 5.** No parallelism.
 
-**Ordering rationale.** Phase 2 is deliberately next: Upload's three models have
-**zero** persisted morph rows, so it proves the mechanical sweep end to end
-without the stateful risk. Phase 3 then follows because it shares three test
-files with phase 2 (see Evidence Base) and must merge after it. Phase 5 shares
-one test file with phase 3 and follows it. **Phase 4 is genuinely disjoint** —
-it depends only on phase 1 and may run in parallel with phase 5, but it carries
-the largest caller set (31) and the largest morph blast radius (123 rows), so
-running it alone is advisable.
+Phases 2 and 3 are logically independent of each other, but every phase from 3
+onward edits `tests/Feature/Architecture/DeprecatedModelShimArchTest.php`, whose
+two `const` arrays are asserted for **exact** equality in both directions. Two
+branches editing them concurrently either conflict or auto-merge into a list that
+no longer matches the filesystem — failing with "New class_alias shims must not be
+added" while pointing at shims nobody added. An earlier revision's overlap
+analysis missed this because it only compared *shim-importing* files.
 
-Effective order: **1 → 2 → 3 → 5**, with **4** insertable anywhere after 1.
+Phase 4's three PRs (Merchandise → Engagement → Facilities) serialize for the same
+reason. Merchandise goes first: 6 shims, zero morph rows, and no blocked shim
+among the six.
+
+**The ordering is load-bearing, not stylistic.** Phase 2 must be deployed and
+verified in production before phase 4 deletes anything, or the deploy window
+described in Architecture produces an uncatchable fatal. Phase 3 must land before
+phase 4 because the guard is what proves a deletion is safe, and as shipped it
+could not see `app/Models/Answer.php`.
 
 ## Success Criteria
 
-- [ ] No `class_alias` shim remains in `app/Models/`
-- [ ] No code references `App\Models\<migrated model>` in `app`, `tests`,
-      `database`, `routes`, `config` — except the two intentional data-holders
-      documented in phase 3 (the ClubMember pilot migration and its test), if
-      those are kept
-- [ ] No `activity_log.subject_type` (or any other morph column) still holds a
-      deleted shim's FQCN — verified by re-running the full `information_schema`
-      enumeration and getting zero hits
-- [ ] `$activity->subject` resolves for previously-affected rows (spot-check
-      Room, RoomBooking, ClubMember), with every remaining null traced to a
-      hard-deleted subject row rather than the migration
-- [ ] `DeprecatedModelShimArchTest` fails if a `class_alias` shim is reintroduced
-      under `app/Models/`, and its `SHIMMED_MODELS` list is empty
-- [ ] All six per-module placement arch tests still green with their
-      shim-must-exist blocks removed
-- [ ] `FacilitiesDeliveryBoundaryArchTest`'s Room negative assertions retargeted
-      to the canonical FQCN and proven to still fail on a violation
-- [ ] `config/migration_debt.php` `shared_model_imports` baseline lowered to the
-      real post-sweep count
-- [ ] Full test suite green, with the same pass/fail baseline as before the sweep
-- [ ] No diff outside import lines, shim deletions, morph backfill migrations,
-      and the arch-test/baseline bookkeeping
+<!-- Updated: red-team session 1 - 30/30 reduced to 20/30; unverifiable criteria replaced -->
+
+- [ ] **20 of 30** shims deleted; exactly the 10 documented survivors remain in `app/Models/`
+- [ ] `class_exists('App\Models\<Name>')` is false, checked in-process, for all 20 deleted names
+- [ ] No code references the 20 deleted FQCNs anywhere in `app`, `tests`, `database`, `routes`, `config` — the `app/Models/` exclusion removed
+- [ ] The 10 blocked shims and their 12 cross-module callers byte-identical; each survivor annotated with what blocks it
+- [ ] All 6 morph columns return **0** for the 30 exact FQCNs via `whereIn` — not `LIKE`, not `dev.sh mysql -e`, not "zero hits" from a name-filtered enumeration
+- [ ] `$activity->subject` resolves for the 142 backfilled rows, with `resolved + null` equal to the pre-migration count and every null traced to a hard-deleted subject row
+- [ ] Production measured before the backfill deploy, and the backfill verified applied there before any deletion
+- [ ] Backfill `down()` throws rather than reversing; recovery documented as code revert
+- [ ] `DeprecatedModelShimArchTest` fails on: a new `class_alias` shim, one in a subdirectory, a subclass-style reintroduction, and an importer inside `app/Models/` — each proven red once, then reverted
+- [ ] `ALL_MIGRATED_MODELS` fixed at 30; no configuration of the guard is a tautology
+- [ ] All 6 placement arch tests green, **inverted** not deleted, each retaining `not->toContain("class X extends")`
+- [ ] `cross_context_concrete_imports` still `0`; `config/migration_debt.php` and `MigrationDebtContract` untouched by this plan
+- [ ] The 3 campus-scoped Merchandise tests pass individually, not just within the aggregate
+- [ ] Touched suites match their recorded pre-phase baselines
+- [ ] The accepted Activity Logs bookmark/filter breakage declared in the phase-2 PR
+- [ ] Follow-up boundary-refactor plan created for the 10 survivors
+- [ ] No diff outside import rewrites, the 20 deletions, one backfill migration, and arch-test bookkeeping
 
 ## Risks
 
+<!-- Updated: red-team session 1 - rewritten; 4 rows were mitigating risks with the mechanisms that caused them -->
+
 | Risk | Mitigation |
 |---|---|
-| **Confirmed:** `activity_log.subject_type` held 242 rows of shimmed FQCNs across 5 models (142 left after phase 1); deleting those shims breaks `$activity->subject` | Strategy A (data migration) proven by phase 1; phases 3 and 4 apply it before deleting their shims |
-| A *different* string class reference (docblock, arch-test literal, factory resolver, morph map) breaks silently | Each phase re-greps with the `\\{1,2}` detector that catches escaped literals, and the phase-1 guard fails on anything missed; deletion is the last step of each phase |
-| **Confirmed:** deleting a shim reddens its module's placement arch test, which asserts the shim exists | Each phase deletes that block in the same PR — mandatory step 6 in Architecture |
-| **Confirmed:** `FacilitiesDeliveryBoundaryArchTest` loses its Delivery-must-not-touch-Room boundary if its negative assertions are deleted rather than retargeted | Phase 4 step 8 retargets them and proves they still fail on a violation |
-| Morph rows keep accruing while the sweep is in progress | Re-run the measurement immediately before each deletion, not once at plan time |
-| In-flight queued jobs serialized with the old FQCN fail after deploy | Drain or check the queue before deploying a phase; `jobs` empty and `failed_jobs` clean as of 2026-08-11, re-check per phase |
-| Large mechanical diff hides a real edit | One module per PR; reviewer greps rather than reads and checks the diff contains only import lines, deletions, and the documented bookkeeping |
-| Cross-module edits (phase 2 touching Engagement files, phase 3 touching Upload, phase 5 touching Engagement) look out of scope | Documented per phase with the reason; leaving them would fail the phase-1 guard |
-| Parallel phases collide on the 4 shared test files | Dependency chain 1 → 2 → 3 → 5 encodes it; only phase 4 is safe to parallelize |
-| `config/migration_debt.php` `shared_model_imports` (baseline 289, mode `max`) drifts from reality as shims go | Each phase lowers it in the same PR — Architecture step 7 |
-| Baseline test failures get attributed to this sweep | Record the pre-sweep pass/fail baseline first — the repo has known pre-existing failures in Finance and Academic suites, plus 5 in `tests/Feature/Architecture` |
+| **Confirmed:** sweeping a cross-module read breaks the zero-tolerance `cross_context_concrete_imports` guard | 10 shims and their 12 callers are out of scope (V3-c); phase 4 re-runs `migration-debt:inventory` and requires `0` |
+| **Confirmed:** the deploy script puts deleted shims live minutes before `migrate` runs, producing an uncatchable E_COMPILE_ERROR via the stale optimized classmap | Backfill ships as its own deploy with all shims present (V3-d), verified in production before phase 4 deletes anything |
+| **Confirmed:** a caller inside `app/Models/` is invisible to the guard and to every phase grep (`app/Models/Answer.php` → `UploadRecord`) | Phase 3 replaces the directory-wide skip with a shim-file skip; baseline corrected to 93; phase 4 scans without the exclusion and checks `class_exists` in-process |
+| **Confirmed:** `migrate:rollback` reports success while reverting nothing, and phase 1's `down()` over-writes natively-canonical rows | Phase 2's `down()` throws (V3-e); recovery is code revert, documented |
+| **Confirmed:** deleting a shim reddens its module's placement arch test | Phase 4 **inverts** rather than deletes the block (V3-a), preserving the duplicate-model assertion the phase-1 guard does not replace |
+| **Confirmed:** the guard is evadable via subdirectory, subclass form, or a shrinking model list | Phase 3 fixes all three: recursive scan, behavioral `class_exists` assertion, and a fixed 30-name `ALL_MIGRATED_MODELS` for the importer regex |
+| **Confirmed:** three prescribed verification commands cannot fail or cannot run (`LIKE` on an FQCN, `dev.sh mysql -e`, "zero hits", morph-map diff) | All four replaced — see "Verification that actually verifies". Positive controls required, not absence of output |
+| **Confirmed:** every number came from dev `asia`; production never measured | Phase 2 step 1 gates the deploy on production counts and volume |
+| **Confirmed user-visible change:** bookmarked Activity Logs `?subject_type=App\Models\X` links return zero rows after the backfill | Declared in the phase-2 PR as an accepted behavior change rather than asserting Goal 4 verbatim. `ActivityLogController.php:79-81` passes the value into an exact `where` with no allow-list |
+| A runtime-assembled FQCN survives every grep | Phase 4 step 4 sweeps for the known idiom (`app/Modules/Academic/routes/web.php:66` uses it for a non-shimmed model), and step 7's `class_exists` check catches a resolvable name however it was written |
+| Concurrent phases collide on the guard's two `const` arrays | Strictly sequential 1 → 2 → 3 → 4 → 5, and phase 4's three PRs serialize too. No parallelism anywhere |
+| Mixed-namespace files read as half-finished and get "tidied" into a boundary violation | Documented as intended; the 12 blocked files are named and must stay byte-identical; the guard's importer baseline records which references are deliberate |
+| `shared_model_imports` is red (401 vs 289) and gets "fixed" by this plan | Out of scope and must not be edited (V3-b). The guard requires config baseline == the hardcoded ceiling, so editing config only adds a second error |
+| Campus-scope or policy regression masked by known failures | Phase 4 runs the 3 campus-scoped Merchandise tests individually. Red-team **falsified** the policy-bypass and campus-leak hypotheses: all shimmed-model authorization is instance-based and `log_name` derives from `class_basename()`, unchanged by the move |
+| Baseline test failures attributed to this plan | Record the pre-phase baseline first — known pre-existing failures in Finance and Academic, plus 5 in `tests/Feature/Architecture` (including `MigrationDebtInventoryTest` ×2, which is the 401/289 gate) |
 
 ## Validation Log
 
@@ -412,14 +566,15 @@ Scouted the exact per-module file sets before writing the four phase files.
 | The 2 Merchandise migrations reference shims in executable code | VERIFIED FALSE — docblock comments only, zero behavioral risk |
 | `AppServiceProvider` morph-map behavior changes when its `RoomBooking` import is rewritten | VERIFIED SAFE in principle — map keys are constant *values*, not FQCNs. Phase 4 still diffs the resolved map before/after to prove it |
 
-**Decisions taken during scaffolding:**
+**Decisions taken during scaffolding** — three of the four were overturned by
+red-team session 1. Historical record; **do not act on a superseded row**:
 
-| # | Decision |
-|---|---|
-| V2-a | **Delete** the shim-must-exist block from each placement arch test rather than inverting it — phase 1's guard already asserts the exact remaining-shim set repo-wide, so a per-module absence assertion is redundant |
-| V2-b | **Retarget** (do not delete) `FacilitiesDeliveryBoundaryArchTest`'s Room negative assertions, because their purpose is the Delivery boundary, not the shim |
-| V2-c | **Each phase lowers `config/migration_debt.php` `shared_model_imports`** in the same PR, so the two guard mechanisms cannot drift |
-| V2-d | Phase 3 owns `Club` only; **no second `ClubMember` backfill** |
+| # | Decision | Status |
+|---|---|---|
+| V2-a | **Delete** the shim-must-exist block from each placement arch test rather than inverting it — phase 1's guard already asserts the exact remaining-shim set repo-wide, so a per-module absence assertion is redundant | ~~SUPERSEDED by V3-a~~ — the block also holds `not->toContain("class X extends")`, the duplicate-model guard, which the phase-1 test does **not** replace. Invert, do not delete |
+| V2-b | **Retarget** (do not delete) `FacilitiesDeliveryBoundaryArchTest`'s Room negative assertions, because their purpose is the Delivery boundary, not the shim | ~~DEFERRED by V3-f~~ — reasoning still correct, but `Room` turned out to be blocked, so the assertions stay as-is until the follow-up plan sweeps it |
+| V2-c | **Each phase lowers `config/migration_debt.php` `shared_model_imports`** in the same PR, so the two guard mechanisms cannot drift | ~~SUPERSEDED by V3-b~~ — impossible (guard requires baseline == hardcoded ceiling) and wrong-direction (metric already red at 401 vs 289, mode `max`). Touch neither file |
+| V2-d | Phase 3 owns `Club` only; **no second `ClubMember` backfill** | Retained — folded into phase 2, which now backfills all 142 remaining rows in one migration |
 
 ### Whole-Plan Consistency Sweep (session 2)
 
@@ -442,20 +597,116 @@ Re-read `plan.md` and all five phase files.
 
 Unresolved contradictions: **none**.
 
+## Red Team Review
+
+### Session 1 — 2026-08-11
+
+**Findings:** 26 raised across 3 hostile reviewers, deduplicated to 16 distinct
+(24 accepted, 2 falsified). Every finding carried `file:line` evidence; none was
+rejected by the evidence filter. All 4 Criticals were independently re-verified by
+the orchestrator before acceptance.
+
+**Severity breakdown:** 4 Critical, 8 High, 4 Medium. Two adversarial hypotheses
+were **falsified** and are recorded so they are not re-litigated.
+
+Reviewers: Assumption Destroyer (Scope Auditor role) — BLOCKED; Failure Mode
+Analyst (Flow Tracer) — BLOCKED; Security Adversary (Fact Checker) —
+DONE_WITH_CONCERNS.
+
+| # | Finding | Severity | Disposition | Applied to |
+|---|---------|----------|-------------|-----------|
+| 1 | Sweeping cross-module reads breaks `cross_context_concrete_imports` (baseline 0, mode exact). 12 files, 10 shims blocked. The shims are load-bearing for that boundary | Critical | Accept | plan Evidence Base, phases 4 + 5 |
+| 2 | "Lower the `shared_model_imports` baseline" is impossible (guard requires baseline == hardcoded ceiling) and the metric is already red at 401 vs 289. Found independently by 2 reviewers | Critical | Accept — V2-c withdrawn → V3-b | plan Architecture, phase 4 |
+| 3 | `app/Models/Answer.php` imports `App\Models\UploadRecord`; invisible to the guard and every phase grep. Real count 93, not 92 | Critical | Accept | phase 3 (D1) |
+| 4 | Deploy script puts deleted shims live before `migrate`; stale optimized classmap → uncatchable E_COMPILE_ERROR | Critical | Accept — V1-b withdrawn → V3-d | plan Architecture, phase 2 |
+| 5 | `getMorphClass()` returns `static::class`, so no caller can write a shimmed FQCN since 2026-08-09. Rows are frozen, not accruing — the same-PR ordering rested on a false premise | High | Accept (this is what makes #4's fix possible) | plan Architecture, phase 2 |
+| 6 | V2-a deletes the duplicate-model assertion (`not->toContain("class X extends")`) that the phase-1 guard does not replace | High | Accept — V2-a withdrawn → V3-a (invert, don't delete) | plan Architecture, phases 3 + 4 |
+| 7 | Phase 1's `down()` over-writes natively-canonical rows; its `class_exists` guard makes `migrate:rollback` a success-reporting no-op | High | Accept → V3-e (`down()` throws) | plan Architecture, phase 2 |
+| 8 | Guard evadable three ways: non-recursive `glob`, `class_alias`-text-only (subclass form passes), and importer regex derived from a shrinking list | High | Accept | phase 3 (D2, D3) |
+| 9 | Phase 5's `SHIMMED_MODELS === []` early return makes the importer guard a permanent tautology, leaving Goal 3 unmet | High | Accept | phase 3 (D4), phase 5 |
+| 10 | "No in-flight queue payload" verified against MySQL `jobs` while `QUEUE_CONNECTION=redis` — the check reports clean forever. Cache and session are also redis, never inspected | High | Accept | plan Architecture (V1-b rationale corrected) |
+| 11 | Every number measured on dev `asia`; production never measured, yet the UPDATEs run there. `activity_log` is 184k rows on dev alone | High | Accept | phase 2 step 1 |
+| 12 | Phase 3 shipped a red test: deleting the `ClubMember` shim breaks `ClubMemberShimMorphBackfillMigrationTest`'s `down()` case, and the file was not in the modify list | High | Accept | phase 4 step 5 |
+| 13 | "Disjoint file sets, phase 4 parallelizable" false — every phase edits the guard's two exact-equality `const` arrays | High | Accept | plan Phases (strictly sequential) |
+| 14 | Phase 4's `LIKE 'App\Modules\...\%'` matches **zero** rows (MySQL backslash escaping) and prints `resolved=0 null=0`, reading as success. Verified: exact `whereIn` = 100, `LIKE` = 0 | High | Accept | plan Architecture, phase 2 step 5 |
+| 15 | `./scripts/dev.sh artisan mysql -e "..."` cannot run — no such artisan command, and `dev.sh:54-57` drops arguments, exiting 0 with no output | Medium | Accept | phase 5 step 3; repo bug spun out separately |
+| 16 | Morph-map before/after diff cannot fail — both names are the same class object and the map's keys are constant values | Medium | Accept (step deleted) | plan Architecture |
+| 17 | "Re-run the enumeration and get zero hits" is unsatisfiable: `activity_log.subject_type` legitimately holds ~178k `App\Models\%` rows for non-shimmed models | Medium | Accept | plan Success Criteria, phase 5 step 3 |
+| 18 | Enumeration was column-**name** filtered, so class strings in generic columns were never seen. `telescope_entries.content` holds 236 such rows; `activity_log.properties` unchecked. Candidate columns are 81, not 64 | Medium | Accept — recorded as accepted residue | plan Architecture, phases 2 + 5 |
+| 19 | Bookmarked Activity Logs `?subject_type=App\Models\X` returns zero rows post-backfill; `ActivityLogController.php:79-81` has no allow-list. Violates Goal 4 as written | Medium | Accept — declared, not hidden | plan Goal 4 + Risks, phase 2 step 7 |
+| 20 | Runtime-assembled FQCNs defeat the grep-based strategy; the idiom exists in-repo at `app/Modules/Academic/routes/web.php:66` | Medium | Accept | phase 4 steps 4 + 7 |
+| — | Authorization bypass via policy resolution in a half-swept state | — | **Falsified** | All shimmed-model authorization is instance-based (`get_class()` → canonical); no class-string `authorize`/`can` for any shimmed model. `Gate::getPolicyFor` hits the registered key |
+| — | Campus-scope / cross-tenant leak from rewriting morph types | — | **Falsified** | `AuditableModel.php:108-115` builds `log_name` from `class_basename($this)`, unchanged by the namespace move; `ActivityLogController` scopes on `log_name LIKE '%_campus_N'` |
+
+**Also verified clean** (do not re-investigate): no duplicate class basename in a
+third namespace for any shimmed model, so the morph rewrite is unambiguous;
+`personal_access_tokens.tokenable_type`, `lecturer_access_grants.token_subject_type`,
+and `faculty_access_eligibility_outbox.token_subject_type` hold no shimmed model;
+no broadcast channel, `Route::model`, `Route::bind`, `authorizeResource`, or `can:`
+middleware keyed to a shimmed FQCN; `config/`, `resources/`, `bootstrap/` clean;
+the 2 Merchandise migrations reference shims in docblocks only.
+
+**Decision deltas:**
+
+| # | Decision | Supersedes |
+|---|---|---|
+| V3-a | Placement arch tests: **invert** `file_exists` → `toBeFalse()`, keep `not->toContain("class X extends")`. Do not delete the block | V2-a |
+| V3-b | Never edit `config/migration_debt.php` or `MigrationDebtContract`. Record the delta only | V2-c |
+| V3-c | Sweep the unblocked 20; leave the 10 blocked shims and their 12 callers untouched. Spin the boundary refactor out | — |
+| V3-d | Backfill first, as its own deploy, shims in place. Delete only after production verification | V1-b |
+| V3-e | Backfill `down()` throws. Recovery is code revert, not data revert | — |
+| V3-f | V2-b (retarget `FacilitiesDeliveryBoundaryArchTest`) is **deferred**, not applied — `Room` is blocked, so those assertions stay as-is until the follow-up plan sweeps it | V2-b |
+
+### Whole-Plan Consistency Sweep (red-team session 1)
+
+Re-read `plan.md` and all five phase files after applying the accepted findings.
+
+- Phases restructured from per-module to data → guard → code → close. Files
+  renamed to match; the old "Upload module sweep" phase is gone because Upload
+  deletes zero shims.
+- Goals 1 and 2 reduced from 30/30 to 20/30. No surviving 30/30 claim; Success
+  Criteria and phase 5 both state 20/30.
+- Goal 4 qualified with the accepted Activity Logs behavior change rather than
+  left as an absolute.
+- Architecture procedure replaced: the same-PR ordering, the debt-baseline step,
+  the arch-test-block deletion, and the morph-map diff are all gone. Steps that
+  cannot fail or cannot run were removed, not reworded.
+- Evidence Base: added the load-bearing-shim analysis and the frozen-rows finding.
+  The 92 count is superseded by 93 in phase 3 (pending that phase's re-measure);
+  Evidence Base still states 92 as the pre-fix measurement and points at phase 3
+  for the correction.
+- Dependency chain is now strictly linear; the earlier parallelism allowance and
+  the 4-file overlap table's "any order" conclusion are removed.
+- V1-b, V2-a, V2-b, V2-c are marked superseded in place, each pointing at its
+  replacement. No phase file still instructs the withdrawn behavior.
+- Phase 1 is `done` and its execution log is historical; its "6 free deletions"
+  and "92 entries" statements are left as written with the corrections carried in
+  Evidence Base and phase 3, since editing a completed phase's log would rewrite
+  history.
+
+Unresolved contradictions: **none**.
+
 ## Open Questions
 
-1. **Do the two intentional data-holder files stay forever?**
-   `database/migrations/2026_08_11_021157_backfill_clubmember_shimmed_morph_subject_type.php`
-   and its test both hold `App\Models\ClubMember` as *data*, so
-   `SHIMMED_MODEL_IMPORT_BASELINE` cannot reach empty while they exist. Either
-   grandfather them with a comment or retire the pilot migration once every
-   environment has run it. Phase 5 must decide; no correct answer from the repo alone.
+1. **Do the 10 blocked shims get a boundary refactor, or a raised ceiling?**
+   Routing the 12 cross-module reads through `App\Shared\Contracts\*` is correct
+   and larger; adding an allow-list and raising
+   `cross_context_concrete_imports` is cheap but needs sign-off from the rule's
+   stated owner ("Platform architecture maintainers"). Phase 5 records the
+   question in the follow-up plan; it is not this plan's call.
 
-2. **Is phase 3 (16 shims, 23 files) one PR or three?** It splits cleanly along
-   the existing arch-test boundaries — Form / Club-Event / QueryTicket. One PR is
-   simpler to sequence; three are easier to review. Reviewer preference, not a
-   technical constraint.
+2. **Who owns `shared_model_imports` at 401 vs a 289 ceiling?** It is red today,
+   two of the five known `tests/Feature/Architecture` failures are this gate, and
+   no phase here may touch it. Is that accepted debt or unowned drift?
 
-The three original questions are resolved by V1-a/b/c above.
+3. **Is the Activity Logs filter breakage acceptable, or does
+   `ActivityLogController` need a compatibility mapping** from old FQCN to new for
+   bookmarked links? Product call. Phase 2 currently declares it as accepted.
+
+Questions 1-3 from validation session 1 are resolved by V1-a/b/c; V1-b is since
+superseded by V3-d. The two scaffolding-session questions are resolved: the
+data-holder-baseline question was answered by finding #8 (the regex is built from
+a fixed list, so the two files stay visible), and phase 3's PR-splitting question
+is moot now that Engagement is one PR inside phase 4.
 
 <!-- slug: deprecated-model-shim-namespace-sweep -->
