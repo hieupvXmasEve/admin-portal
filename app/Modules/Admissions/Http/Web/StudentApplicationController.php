@@ -41,18 +41,31 @@ final class StudentApplicationController extends Controller
 
     public function index(ListApplicationsRequest $request, ListApplicationsQuery $applications): mixed
     {
-        $filters = [
+        $filters = array_merge([
             'search' => $request->validated('search'),
             'status' => $request->validated('status'),
             'intake' => $request->validated('intake'),
             'per_page' => $request->validated('per_page', 15),
             'sort' => $request->validated('sort', 'created_at'),
             'direction' => $request->validated('direction', 'desc'),
-        ];
+        ], collect(ListApplicationsQuery::ADVANCED_FILTER_KEYS)->mapWithKeys(
+            fn (string $key) => [$key => $request->validated($key)],
+        )->all());
         $campus = app()->bound('campus') ? app('campus') : null;
         $lists = $applications->filters($campus?->code);
 
-        return Inertia::render('StudentApplications/Index', ['applications' => $applications->handle($filters, $campus?->code), 'filters' => $filters, 'currentCampus' => $campus === null ? null : ['code' => $campus->code, 'name' => $campus->name], 'documentTypes' => $lists['document_types'], 'intakes' => $lists['intakes'], 'statusOptions' => [['value' => StudentApplication::STATUS_PENDING, 'label' => 'Pending'], ['value' => StudentApplication::STATUS_ENROLLED, 'label' => 'Enrolled'], ['value' => StudentApplication::STATUS_REJECTED, 'label' => 'Rejected']]]);
+        return Inertia::render('StudentApplications/Index', [
+            'applications' => $applications->handle($filters, $campus?->code),
+            'filters' => $filters,
+            'currentCampus' => $campus === null ? null : ['code' => $campus->code, 'name' => $campus->name],
+            'documentTypes' => $lists['document_types'],
+            'intakes' => $lists['intakes'],
+            // Closure: skipped on the `only: ['applications', 'filters']` partial
+            // reload every keystroke triggers, so the DISTINCT scans behind it
+            // don't run on requests that never render the filter panel.
+            'filterOptions' => fn () => $applications->filterOptions($campus?->code),
+            'statusOptions' => [['value' => StudentApplication::STATUS_PENDING, 'label' => 'Pending'], ['value' => StudentApplication::STATUS_ENROLLED, 'label' => 'Enrolled'], ['value' => StudentApplication::STATUS_REJECTED, 'label' => 'Rejected']],
+        ]);
     }
 
     public function documents(StudentApplication $studentApplication, GetApplicantDocumentChecklistQuery $documentChecklist): mixed

@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn, valueUpdater } from '@/lib/utils';
-import type { ColumnDef, ExpandedState, SortingState, VisibilityState } from '@tanstack/vue-table';
+import type { Column, ColumnDef, ExpandedState, SortingState, VisibilityState } from '@tanstack/vue-table';
 import { FlexRender, getCoreRowModel, getExpandedRowModel, getSortedRowModel, useVueTable } from '@tanstack/vue-table';
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
@@ -18,6 +18,10 @@ interface DataTableProps<TData> {
     enableServerSorting?: boolean;
     initialSort?: string;
     initialDirection?: 'asc' | 'desc';
+    /** Controlled column visibility (e.g. persisted in localStorage). Defaults to an internal ref when omitted, so existing callers are unaffected. */
+    columnVisibility?: VisibilityState;
+    /** Opt-in: force the table to its natural width and scroll horizontally instead of compressing columns. `ui/table`'s `w-full` compresses by default. */
+    minWidth?: boolean;
 }
 
 const props = withDefaults(defineProps<DataTableProps<TData>>(), {
@@ -26,6 +30,8 @@ const props = withDefaults(defineProps<DataTableProps<TData>>(), {
     loading: false,
     enableRowSelection: false,
     enableServerSorting: true,
+    columnVisibility: undefined,
+    minWidth: false,
 });
 
 // Emits for selection and sorting events
@@ -34,11 +40,28 @@ const emit = defineEmits<{
     'select-all': [isSelected: boolean];
     'sort-change': [sort: string | null, direction: 'asc' | 'desc' | null];
     'row-click': [row: TData, event: MouseEvent];
+    'update:columnVisibility': [value: VisibilityState];
 }>();
+
+// prefer an explicit meta.label, then a plain-string header, else today's raw id —
+// strictly additive so the ~58 other DataTable consumers render unchanged.
+const columnLabel = (column: Column<TData, unknown>): string =>
+    column.columnDef.meta?.label ??
+    (typeof column.columnDef.header === 'string' && column.columnDef.header !== '' ? column.columnDef.header : column.id);
 
 // Table state
 const sorting = ref<SortingState>(props.initialSort ? [{ id: props.initialSort, desc: (props.initialDirection || 'asc') === 'desc' }] : []);
-const columnVisibility = ref<VisibilityState>({});
+const internalColumnVisibility = ref<VisibilityState>({});
+const columnVisibility = computed<VisibilityState>({
+    get: () => props.columnVisibility ?? internalColumnVisibility.value,
+    set: (value) => {
+        if (props.columnVisibility !== undefined) {
+            emit('update:columnVisibility', value);
+        } else {
+            internalColumnVisibility.value = value;
+        }
+    },
+});
 const rowSelection = ref({});
 const expanded = ref<ExpandedState>({});
 const columnPinning = ref({ right: ['actions'] });
@@ -163,13 +186,13 @@ defineExpose({
                         <DropdownMenuCheckboxItem
                             v-for="column in table.getAllColumns().filter((column) => column.getCanHide())"
                             :key="column.id"
-                            class="capitalize"
+                            :class="{ capitalize: !column.columnDef.meta?.label && !(typeof column.columnDef.header === 'string' && column.columnDef.header !== '') }"
                             :checked="column.getIsVisible()"
                             :model-value="column.getIsVisible()"
                             @update:model-value="(value) => column.toggleVisibility(!!value)"
                             @select.prevent
                         >
-                            {{ column.id }}
+                            {{ columnLabel(column) }}
                         </DropdownMenuCheckboxItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
@@ -185,7 +208,7 @@ defineExpose({
                     <span class="text-muted-foreground text-sm">Loading...</span>
                 </div>
             </div>
-            <Table>
+            <Table :class="minWidth ? 'min-w-max' : undefined">
                 <TableHeader>
                     <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
                         <TableHead

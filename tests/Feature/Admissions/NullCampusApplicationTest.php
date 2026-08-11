@@ -2,17 +2,20 @@
 
 declare(strict_types=1);
 
+use App\Models\ApplicationGuardian;
 use App\Models\Campus;
 use App\Models\CampusUserRole;
 use App\Models\Permission;
-use App\Models\Program;
 use App\Models\Role;
 use App\Models\RolePermission;
-use App\Models\Semester;
 use App\Models\StudentApplication;
 use App\Models\User;
+use App\Modules\Admissions\Models\ApplicationAcademicScore;
+use App\Modules\Admissions\Models\CrmValueMapping;
 use App\Modules\Admissions\Queries\ListApplicationsQuery;
+use App\Services\Admissions\IntendedProgramNormalizer;
 use App\Shared\Support\Enums\UserType;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
@@ -73,7 +76,7 @@ it('allows two applications to share the same email once the unique index is dro
     expect($second->exists)->toBeTrue();
 });
 
-it('excludes a null-campus application from a campus-scoped list and includes it in the all-campus list', function () {
+it('excludes a null-campus application from a campus-scoped list', function () {
     $campus = Campus::factory()->create();
     StudentApplication::factory()->pending()->forCampus($campus->code)->create(['student_code' => 'NC0000004']);
     $nullCampusApplication = StudentApplication::factory()->pending()->withoutCampus()->create(['student_code' => 'NC0000005']);
@@ -81,10 +84,24 @@ it('excludes a null-campus application from a campus-scoped list and includes it
     $filters = ['search' => null, 'status' => null, 'intake' => null, 'per_page' => 15, 'sort' => 'created_at', 'direction' => 'desc'];
 
     $scoped = app(ListApplicationsQuery::class)->handle($filters, $campus->code);
-    $allCampus = app(ListApplicationsQuery::class)->handle($filters, null);
 
-    expect(collect($scoped->items())->pluck('id'))->not->toContain($nullCampusApplication->id)
-        ->and(collect($allCampus->items())->pluck('id'))->toContain($nullCampusApplication->id);
+    expect(collect($scoped->items())->pluck('id'))->not->toContain($nullCampusApplication->id);
+});
+
+// A null $campusCode means the caller's campus binding could not be resolved
+// (e.g. a stale/deleted campus id in session) — see StudentApplicationController.
+// It must fail closed to zero rows, never "every campus", or a broken session
+// would leak the entire dataset across campuses (~20 CRM/PII columns wide).
+it('returns zero rows for a null campus code instead of every campus', function () {
+    $campus = Campus::factory()->create();
+    StudentApplication::factory()->pending()->forCampus($campus->code)->create(['student_code' => 'NC0000007']);
+    StudentApplication::factory()->pending()->withoutCampus()->create(['student_code' => 'NC0000008']);
+
+    $filters = ['search' => null, 'status' => null, 'intake' => null, 'per_page' => 15, 'sort' => 'created_at', 'direction' => 'desc'];
+
+    $result = app(ListApplicationsQuery::class)->handle($filters, null);
+
+    expect($result->items())->toBeEmpty();
 });
 
 it('lets a staff member edit and save a null-campus application', function () {
@@ -172,31 +189,31 @@ it('still denies approving a null-campus application even with permission at the
 it('rejects a duplicate application_academic_scores subject for the same application', function () {
     $application = StudentApplication::factory()->pending()->create(['student_code' => 'NC0000010']);
 
-    \App\Modules\Admissions\Models\ApplicationAcademicScore::query()->create([
+    ApplicationAcademicScore::query()->create([
         'student_application_id' => $application->id,
         'subject_code' => 'toan',
         'score' => 8.5,
         'source' => 'school_report',
     ]);
 
-    expect(fn () => \App\Modules\Admissions\Models\ApplicationAcademicScore::query()->create([
+    expect(fn () => ApplicationAcademicScore::query()->create([
         'student_application_id' => $application->id,
         'subject_code' => 'toan',
         'score' => 9.0,
         'source' => 'national_exam',
-    ]))->toThrow(Illuminate\Database\QueryException::class);
+    ]))->toThrow(QueryException::class);
 });
 
 it('allows two guardians with the same relationship label on one application (manual entry, e.g. step-parent)', function () {
     $application = StudentApplication::factory()->pending()->create(['student_code' => 'NC0000011']);
 
-    \App\Models\ApplicationGuardian::query()->create([
+    ApplicationGuardian::query()->create([
         'student_application_id' => $application->id,
         'full_name' => 'Father One',
         'relationship' => 'father',
     ]);
 
-    $second = \App\Models\ApplicationGuardian::query()->create([
+    $second = ApplicationGuardian::query()->create([
         'student_application_id' => $application->id,
         'full_name' => 'Father Two',
         'relationship' => 'father',
@@ -206,8 +223,8 @@ it('allows two guardians with the same relationship label on one application (ma
 });
 
 it('seeds major crm_value_mappings from IntendedProgramNormalizer::LABEL_TO_CODE', function () {
-    foreach (\App\Services\Admissions\IntendedProgramNormalizer::LABEL_TO_CODE as $label => $code) {
-        $mapping = \App\Modules\Admissions\Models\CrmValueMapping::query()
+    foreach (IntendedProgramNormalizer::LABEL_TO_CODE as $label => $code) {
+        $mapping = CrmValueMapping::query()
             ->where('kind', 'major')
             ->where('crm_value', $label)
             ->first();
