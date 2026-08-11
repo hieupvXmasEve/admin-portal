@@ -12,7 +12,7 @@ import { useDataTable } from '@/composables/useDataTable';
 import type { PaginatedResponse } from '@/types';
 import { formatCurrency, getChargeTypeLabel } from '@/types/finance';
 import { financeRoutes } from '@/utils/routes';
-import { Clock, Download, Wallet } from 'lucide-vue-next';
+import { Clock, Wallet } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
 type BalanceState = 'unpaid' | 'partially_paid' | 'paid' | 'overdue' | 'overpaid' | 'unapplied' | 'invalid';
@@ -144,11 +144,6 @@ const props = defineProps<{ collection_progress: CollectionProgressPayload }>();
 const reportView = props.collection_progress.meta.position_mode === 'as_of' ? 'historical-as-of' : 'collection-progress';
 const isHistorical = reportView === 'historical-as-of';
 const asOfTimestamp = props.collection_progress.meta.as_of_timestamp ?? '';
-const historicalExportUrl = financeRoutes.invoices.export({
-    semester_id: props.collection_progress.meta.semester_id ?? undefined,
-    as_of: asOfTimestamp,
-    as_of_timezone: props.collection_progress.meta.as_of_timezone,
-});
 
 const filterProps = props.collection_progress.filters ?? {};
 const stringFilter = (value: unknown, fallback = 'all'): string => (typeof value === 'string' && value !== '' ? value : fallback);
@@ -270,9 +265,6 @@ const lookupInvoiceUrl = (row: CollectionProgressRow): string | undefined => {
                             Số liệu được chốt tại {{ asOfTimestamp ? new Date(asOfTimestamp).toLocaleString() : 'mốc đã chọn' }} ({{ collection_progress.meta.as_of_timezone }}). Sự kiện phát sinh sau mốc này không viết lại snapshot.
                         </CardDescription>
                     </div>
-                    <a :href="historicalExportUrl" target="_blank" rel="noreferrer">
-                        <Button variant="outline" size="sm"><Download class="mr-2 size-4" /> Export snapshot</Button>
-                    </a>
                 </div>
                 <details v-if="collection_progress.meta.business_effective_timestamp_rules" class="text-muted-foreground text-xs">
                     <summary class="cursor-pointer font-medium">Business-effective timestamp rules</summary>
