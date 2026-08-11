@@ -53,8 +53,9 @@ for the whole life of the plan gets ignored or commented out.
 ## Related Code Files
 
 - Create: `tests/Feature/Architecture/DeprecatedModelShimArchTest.php`
-- Create: `database/migrations/<timestamp>_backfill_shimmed_morph_subject_types.php` (only if strategy A or C is chosen)
-- Modify: `app/Providers/AppServiceProvider.php` (only if strategy B or C is chosen)
+- Create: `database/migrations/<timestamp>_backfill_shimmed_morph_subject_types.php`
+  (strategy A is settled by V1-a; no `AppServiceProvider` morph-map alias is added —
+  that was rejected option B)
 
 ## Implementation Steps
 
@@ -67,8 +68,9 @@ for the whole life of the plan gets ignored or commented out.
    ```
 
 2. Write the strategy-A migration for **one** model only — `ClubMember` is the
-   best pilot: 100 morph rows and zero code callers, so it isolates the stateful
-   problem from the mechanical one.
+   best pilot: 100 morph rows and no *production* code callers, so it isolates the
+   stateful problem from the mechanical one. (Its three references are all test /
+   arch-test string literals — see the Evidence Base correction in `plan.md`.)
 
 3. Verify `$activity->subject` resolves for those rows before and after, with the
    shim still in place (the shim is not deleted in this phase).
@@ -88,13 +90,13 @@ misattributed to this plan.
 
 ## Success Criteria
 
-- [ ] Current morph-row counts re-measured and recorded
-- [ ] Strategy-A migration applied to `ClubMember`; its activity rows resolve
+- [x] Current morph-row counts re-measured and recorded
+- [x] Strategy-A migration applied to `ClubMember`; its activity rows resolve
       their subject after the change
-- [ ] Migration `down()` restores the old values
-- [ ] Arch test present, passing, with an explicit 30-entry allow-list
-- [ ] Zero shims deleted, zero callers swept in this phase
-- [ ] Full-suite baseline recorded
+- [x] Migration `down()` restores the old values
+- [x] Arch test present, passing, with an explicit 30-entry allow-list
+- [x] Zero shims deleted, zero callers swept in this phase
+- [x] Full-suite baseline recorded
 
 ## Risk Assessment
 
