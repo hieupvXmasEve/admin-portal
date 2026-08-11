@@ -28,6 +28,12 @@ interface UnmappedRow {
     affected_count: number;
 }
 
+interface MappedRow {
+    kind: string;
+    crm_value: string;
+    local_code: string;
+}
+
 interface Semester {
     code: string;
     name: string;
@@ -73,6 +79,7 @@ interface SyncSummary {
 
 interface Props {
     unmapped: UnmappedRow[];
+    mapped: MappedRow[];
     intake: { crm_value: string; local_code: string | null };
     semesters: Semester[];
     integration: IntegrationSettings;
@@ -129,6 +136,24 @@ const groups = computed(() => {
 // One draft local-code value per "kind:crm_value" row, bound to its Input/Select.
 const localCodeDrafts = reactive<Record<string, string>>({});
 const rowKey = (kind: string, crmValue: string): string => `${kind}:${crmValue}`;
+
+// Already-resolved mappings stay visible (not just "unmapped" ones) so staff
+// can reconfigure a saved code — e.g. campus_code — without it vanishing
+// from the screen the moment it's mapped. Seed drafts with the current value.
+for (const row of props.mapped) {
+    localCodeDrafts[rowKey(row.kind, row.crm_value)] = row.local_code;
+}
+
+const mappedGroups = computed(() => {
+    const byKind = new Map<string, MappedRow[]>();
+    for (const row of props.mapped) {
+        const list = byKind.get(row.kind) ?? [];
+        list.push(row);
+        byKind.set(row.kind, list);
+    }
+
+    return byKind;
+});
 
 // Catalog-backed kinds get a Select (SaveCrmValueMappingRequest already
 // validates local_code against these tables — typing was error-prone for no
@@ -467,6 +492,53 @@ function syncNow(): void {
                             <div class="min-w-0 flex-1">
                                 <div class="truncate font-medium">{{ row.crm_value }}</div>
                                 <Badge variant="outline" class="mt-1 text-xs">{{ row.affected_count }} application(s)</Badge>
+                            </div>
+                            <div class="space-y-1">
+                                <Select v-if="catalogFor(kind)" v-model="localCodeDrafts[rowKey(kind, row.crm_value)]">
+                                    <SelectTrigger class="w-56">
+                                        <SelectValue placeholder="Select…" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem v-for="option in catalogFor(kind) ?? []" :key="option.code" :value="option.code">
+                                            {{ option.name }} ({{ option.code }})
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <Input
+                                    v-else
+                                    v-model="localCodeDrafts[rowKey(kind, row.crm_value)]"
+                                    placeholder="Local code"
+                                    class="w-48"
+                                    @keyup.enter="saveMapping(kind, row.crm_value)"
+                                />
+                                <p v-if="previewFor(kind, localCodeDrafts[rowKey(kind, row.crm_value)])" class="text-muted-foreground text-xs">
+                                    {{ previewFor(kind, localCodeDrafts[rowKey(kind, row.crm_value)]) }}
+                                </p>
+                            </div>
+                            <Button size="sm" @click="saveMapping(kind, row.crm_value)">Save</Button>
+                        </div>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+
+        <!-- Step 5: already-resolved mappings, kept visible for reconfiguration. -->
+        <Card v-if="mapped.length > 0">
+            <CardHeader>
+                <CardTitle>5. Mapped values</CardTitle>
+                <CardDescription>Already resolved — change and save to reconfigure.</CardDescription>
+            </CardHeader>
+            <CardContent class="divide-y">
+                <div v-for="[kind, rows] in mappedGroups" :key="kind" class="py-4 first:pt-0 last:pb-0">
+                    <div class="mb-3 flex items-center gap-2">
+                        <component :is="kindMeta[kind]?.icon ?? Building2" class="text-muted-foreground h-4 w-4" />
+                        <h3 class="text-sm font-semibold">{{ kindMeta[kind]?.label ?? kind }}</h3>
+                        <Badge variant="secondary">{{ rows.length }}</Badge>
+                    </div>
+                    <div class="space-y-2">
+                        <div v-for="row in rows" :key="row.crm_value" class="flex flex-wrap items-center gap-3 rounded-md border px-3 py-2">
+                            <div class="min-w-0 flex-1">
+                                <div class="truncate font-medium">{{ row.crm_value }}</div>
                             </div>
                             <div class="space-y-1">
                                 <Select v-if="catalogFor(kind)" v-model="localCodeDrafts[rowKey(kind, row.crm_value)]">

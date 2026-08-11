@@ -15,6 +15,7 @@ use App\Modules\Admissions\Http\Requests\Admissions\SaveCrmIntegrationSettingsRe
 use App\Modules\Admissions\Http\Requests\Admissions\SaveCrmValueMappingRequest;
 use App\Modules\Admissions\Integrations\Crm\CrmClient;
 use App\Modules\Admissions\Models\CrmValueMapping;
+use App\Modules\Admissions\Queries\ListMappedCrmValuesQuery;
 use App\Modules\Admissions\Queries\ListUnmappedCrmValuesQuery;
 use App\Modules\Admissions\Services\CrmApplicationSyncService;
 use App\Modules\Admissions\Services\CrmMappingResolver;
@@ -26,10 +27,11 @@ use Inertia\Inertia;
 /** Admissions-owned staff screen for resolving raw CRM values to local codes (Phase 4) and the CRM connection config (dynamic follow-up). */
 final class CrmMappingController extends Controller
 {
-    public function index(ListUnmappedCrmValuesQuery $unmapped, CrmMappingSettings $settings, CrmIntegrationSettings $integrationSettings): mixed
+    public function index(ListUnmappedCrmValuesQuery $unmapped, ListMappedCrmValuesQuery $mapped, CrmMappingSettings $settings, CrmIntegrationSettings $integrationSettings): mixed
     {
         return Inertia::render('StudentApplications/CrmMappings', [
             'unmapped' => $unmapped->handle(),
+            'mapped' => $mapped->handle(),
             'intake' => ['crm_value' => CrmValueMapping::INTAKE_DEFAULT_KEY, 'local_code' => $settings->getIntakeCode()],
             'semesters' => Semester::query()->orderByDesc('id')->get(['code', 'name']),
             'integration' => $integrationSettings->forDisplay(),
