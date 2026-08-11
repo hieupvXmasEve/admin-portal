@@ -37,6 +37,8 @@ final class BatchChargePreviewExport implements FromArray, ShouldAutoSize, WithC
                     $index + 1,
                     (string) ($display['student_id'] ?? ''),
                     (string) ($display['label'] ?? ''),
+                    (string) ($display['program_name'] ?? ''),
+                    $display['term_number'] ?? null,
                     $this->feeCategoryLabel((string) ($display['fee_category'] ?? '')),
                     $this->diffLabel((string) ($display['diff'] ?? '')),
                     (float) ($display['gross'] ?? 0),
@@ -48,6 +50,8 @@ final class BatchChargePreviewExport implements FromArray, ShouldAutoSize, WithC
                     (float) ($display['voucher_amount'] ?? 0),
                     (float) ($display['discount'] ?? 0),
                     (float) ($display['net'] ?? 0),
+                    (float) ($display['unapplied_credit'] ?? 0),
+                    (float) ($display['credit_offset_projected'] ?? 0),
                     (string) ($display['reason'] ?? ''),
                 ];
             })
@@ -60,6 +64,8 @@ final class BatchChargePreviewExport implements FromArray, ShouldAutoSize, WithC
             'STT',
             'Mã sinh viên',
             'Họ và tên',
+            'Ngành',
+            'Kỳ HP',
             'Loại phí',
             'Phân loại',
             'Học phí gốc',
@@ -71,6 +77,8 @@ final class BatchChargePreviewExport implements FromArray, ShouldAutoSize, WithC
             'Số tiền voucher',
             'Tổng giảm trừ',
             'Học phí phải thu',
+            'Số dư khả dụng',
+            'Dự kiến trừ số dư',
             'Lý do',
         ];
     }
@@ -78,12 +86,14 @@ final class BatchChargePreviewExport implements FromArray, ShouldAutoSize, WithC
     public function columnFormats(): array
     {
         return [
-            'F' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
-            'I' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
-            'J' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
-            'L' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
-            'M' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
-            'N' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
+            'H' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1, // Học phí gốc
+            'K' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1, // Giá trị học bổng
+            'L' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1, // Số tiền học bổng
+            'N' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1, // Số tiền voucher
+            'O' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1, // Tổng giảm trừ
+            'P' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1, // Học phí phải thu
+            'Q' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1, // Số dư khả dụng
+            'R' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1, // Dự kiến trừ số dư
         ];
     }
 

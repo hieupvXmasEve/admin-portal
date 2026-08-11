@@ -129,6 +129,11 @@ class AssembleBatchChargePreviewQuery
                 'gross' => $hashPayload['gross'],
                 'discount' => $hashPayload['discount'],
                 'net' => $hashPayload['net'],
+                'program_name' => $row['program_name'] ?? null,
+                'specialization_name' => $row['specialization_name'] ?? null,
+                'term_number' => isset($row['term_number']) ? (int) $row['term_number'] : null,
+                'unapplied_credit' => isset($row['unapplied_credit']) ? (float) $row['unapplied_credit'] : null,
+                'credit_offset_projected' => isset($row['credit_offset_projected']) ? (float) $row['credit_offset_projected'] : null,
                 'scholarship_name' => $row['scholarship_name'] ?? null,
                 'scholarship_type' => $row['scholarship_type'] ?? null,
                 'scholarship_raw_value' => isset($row['scholarship_raw_value']) ? (float) $row['scholarship_raw_value'] : null,
@@ -172,6 +177,7 @@ class AssembleBatchChargePreviewQuery
             'ineligible_count' => $ineligible->count(),
             'warning_count' => $warnings->count(),
             'total_count' => $rows->count(),
+            'major_context' => $this->majorPreview->batchContext($semesterId),
         ]];
     }
 

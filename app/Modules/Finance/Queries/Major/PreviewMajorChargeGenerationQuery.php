@@ -5,14 +5,17 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Queries\Major;
 
 use App\Models\ScholarshipDefinition;
+use App\Models\Semester;
 use App\Models\StudentScholarshipAward;
 use App\Models\VoucherApplication;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceSetting;
 use App\Modules\Finance\Queries\GetActiveScholarshipAdjustmentQuery;
 use App\Modules\Finance\Queries\GetUnresolvedPriorAdjustmentQuery;
 use App\Modules\Finance\Services\DeferChargeResolver;
 use App\Modules\Finance\Support\ScholarshipDiscountResolver;
 use App\Modules\Finance\Support\StudentChargeTimingResolver;
+use App\Modules\Finance\Support\StudentFinanceSettlementPositionReader;
 use App\Modules\Finance\Support\VoucherDiscountAmountResolver;
 use App\Shared\Contracts\Academic\DTO\ProgramEnrollmentSummary;
 use App\Shared\Contracts\Academic\PendingScholarshipAdjustmentReader;
@@ -29,7 +32,28 @@ class PreviewMajorChargeGenerationQuery
         private readonly StudentChargeTimingResolver $timingResolver,
         private readonly VoucherDiscountAmountResolver $voucherDiscountAmountResolver,
         private readonly DeferChargeResolver $deferChargeResolver,
+        private readonly StudentFinanceSettlementPositionReader $settlementPositionReader,
     ) {}
+
+    /**
+     * Batch-wide context that doesn't vary per row — the semester being
+     * charged and the credit-offset config in effect for this generation run.
+     *
+     * @return array{charge_semester_id: int, charge_semester_code: string|null, charge_semester_name: string|null, credit_offset_enabled: bool, credit_offset_min_balance: float}
+     */
+    public function batchContext(int $semesterId): array
+    {
+        $semester = Semester::find($semesterId);
+        $settings = FinanceSetting::current();
+
+        return [
+            'charge_semester_id' => $semesterId,
+            'charge_semester_code' => $semester?->code,
+            'charge_semester_name' => $semester?->name,
+            'credit_offset_enabled' => $settings->credit_offset_enabled,
+            'credit_offset_min_balance' => (float) $settings->credit_offset_min_balance,
+        ];
+    }
 
     public function handle(int $semesterId, array $filters = [], ?int $campusId = null): array
     {
@@ -108,6 +132,9 @@ class PreviewMajorChargeGenerationQuery
             ->whereIn('student_id', array_keys($references))
             ->get()
             ->groupBy('student_id');
+        $unappliedCashByStudent = $this->settlementPositionReader
+            ->unappliedCashForStudents(array_values(array_keys($references)));
+        $creditOffsetSettings = FinanceSetting::current();
 
         return collect($references)
             ->filter(fn (StudentReference $reference): bool => ! in_array($reference->studentCode, $ignoredStudentIds, true))
@@ -119,6 +146,8 @@ class PreviewMajorChargeGenerationQuery
                 $vouchers->get($reference->id, collect()),
                 $semesterId,
                 $inFlightByStudent[$reference->id] ?? false,
+                (float) ($unappliedCashByStudent[$reference->id] ?? 0.0),
+                $creditOffsetSettings,
             ));
     }
 
@@ -129,6 +158,8 @@ class PreviewMajorChargeGenerationQuery
         Collection $voucherApplications,
         int $semesterId,
         bool $hasInFlightScholarshipDossier,
+        float $unappliedCash,
+        FinanceSetting $creditOffsetSettings,
     ): array {
         $base = $this->baseRow($student);
 
@@ -224,6 +255,24 @@ class PreviewMajorChargeGenerationQuery
 
         $scholarship = $this->resolveScholarship($award, (float) $amount, $student->id, $semesterId);
         $voucher = $this->resolveVoucher($student->id, $voucherApplications, $semesterId);
+        $netAmount = max(0.0, (float) $amount - $scholarship['amount'] - $voucher['amount']);
+
+        // Approximates CreateFinanceChargeAction::applyUnappliedCreditToCharge():
+        // capped at the charge's own outstanding (net_amount here, since
+        // scholarship/voucher land before the real offset would run) and
+        // only projected when the config gate + threshold are both met.
+        // Known divergence: the real offset sums each Payment's
+        // unapplied_amount (amount minus applications only), while this
+        // preview's $unappliedCash also subtracts PaymentSurplusDisposition
+        // rows (refund/forfeit) — a student with a disposed surplus can see
+        // a real deduction larger than what this preview projects.
+        $creditOffsetProjected = 0.0;
+        if ($creditOffsetSettings->credit_offset_enabled
+            && $unappliedCash > 0
+            && $unappliedCash >= (float) $creditOffsetSettings->credit_offset_min_balance
+        ) {
+            $creditOffsetProjected = min($unappliedCash, $netAmount);
+        }
 
         return array_merge($base, [
             'eligibility_status' => 'eligible',
@@ -239,7 +288,9 @@ class PreviewMajorChargeGenerationQuery
             'scholarship_adjusted_raw_value' => $scholarship['adjusted_raw_value'],
             'voucher_codes' => $voucher['codes'],
             'voucher_amount' => $voucher['amount'],
-            'net_amount' => max(0.0, (float) $amount - $scholarship['amount'] - $voucher['amount']),
+            'net_amount' => $netAmount,
+            'unapplied_credit' => $unappliedCash,
+            'credit_offset_projected' => $creditOffsetProjected,
         ]);
     }
 
@@ -358,6 +409,9 @@ class PreviewMajorChargeGenerationQuery
             'student_name' => $student->fullName,
             'student_code' => $student->studentCode,
             'student_email' => $student->email,
+            'program_name' => $student->programName,
+            'program_code' => $student->programCode,
+            'specialization_name' => $student->specializationName,
             'eligibility_status' => 'eligible',
             'eligibility_reason' => null,
             'term_number' => null,
@@ -371,6 +425,8 @@ class PreviewMajorChargeGenerationQuery
             'voucher_codes' => [],
             'voucher_amount' => 0.0,
             'net_amount' => null,
+            'unapplied_credit' => null,
+            'credit_offset_projected' => null,
         ];
     }
 

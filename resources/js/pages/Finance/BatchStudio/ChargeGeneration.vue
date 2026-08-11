@@ -271,6 +271,8 @@ function prepareNonAcademicScope(): boolean {
                     :counts="wizard.counts.value"
                     :block-count-controls="isEgc"
                     :block-counts="blockOverrides"
+                    :major-details="wizard.setup.fee_category === 'major'"
+                    :major-context="wizard.summary.value.major_context"
                     exportable
                     @toggle="wizard.toggle"
                     @export="exportPreview"

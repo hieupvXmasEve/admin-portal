@@ -1,5 +1,5 @@
 import { useApi, type ApiResponse } from '@/composables/useApiRequest';
-import type { BatchPreviewLineClient, BatchPreviewResponse, BatchResult } from '@/types/finance';
+import type { BatchPreviewLineClient, BatchPreviewResponse, BatchPreviewSummary, BatchResult } from '@/types/finance';
 import { useForm, usePage } from '@inertiajs/vue3';
 import { computed, reactive, ref } from 'vue';
 
@@ -16,7 +16,7 @@ export function useBatchStudio<TSetup extends Record<string, unknown>>(config: B
     const step = ref<1 | 2 | 3 | 4>(1);
     const setup = reactive({ ...config.defaultSetup });
     const lines = ref<BatchPreviewLineClient[]>([]);
-    const summary = ref<Record<string, number>>({});
+    const summary = ref<BatchPreviewSummary>({});
     const previewToken = ref<string | null>(null);
     const selected = ref<Set<string>>(new Set());
     const driftMessage = ref<string | null>(null);

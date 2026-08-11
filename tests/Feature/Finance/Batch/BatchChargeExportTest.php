@@ -75,10 +75,10 @@ it('downloads the batch charge preview as an Excel workbook', function () {
             $row = $export->array()[0];
 
             return $row[1] === 'SV001'
-                && $row[5] === 45_000_000.0
-                && $row[6] === 'Học bổng Tài năng'
-                && $row[9] === 9_000_000.0
-                && $row[13] === 36_000_000.0;
+                && $row[7] === 45_000_000.0
+                && $row[8] === 'Học bổng Tài năng'
+                && $row[11] === 9_000_000.0
+                && $row[15] === 36_000_000.0;
         },
     );
 });

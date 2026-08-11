@@ -187,14 +187,30 @@ final class StudentFinanceSettlementPositionReader
 
     private function unappliedCash(int $studentId): float
     {
+        return $this->unappliedCashForStudents([$studentId])[$studentId] ?? 0.0;
+    }
+
+    /**
+     * Bulk variant of unappliedCash() — one query pair for the whole set
+     * instead of one pair per student. Same computation, single source.
+     *
+     * @param  list<int>  $studentIds
+     * @return array<int, float>
+     */
+    public function unappliedCashForStudents(array $studentIds): array
+    {
+        if ($studentIds === []) {
+            return [];
+        }
+
         $payments = Payment::query()
-            ->where('student_id', $studentId)
+            ->whereIn('student_id', $studentIds)
             ->where('status', Payment::STATUS_COMPLETED)
             ->with('applications')
             ->get();
 
         if ($payments->isEmpty()) {
-            return 0.0;
+            return array_fill_keys($studentIds, 0.0);
         }
 
         $disposedByPayment = PaymentSurplusDisposition::query()
@@ -207,11 +223,16 @@ final class StudentFinanceSettlementPositionReader
             ->groupBy('payment_id')
             ->pluck('amount', 'payment_id');
 
-        return round((float) $payments->sum(function (Payment $payment) use ($disposedByPayment): float {
-            $applied = (float) $payment->applications->sum('amount');
-            $disposed = (float) ($disposedByPayment->get($payment->id) ?? 0);
+        $byStudent = array_fill_keys($studentIds, 0.0);
+        foreach ($payments->groupBy('student_id') as $studentId => $studentPayments) {
+            $byStudent[(int) $studentId] = round((float) $studentPayments->sum(function (Payment $payment) use ($disposedByPayment): float {
+                $applied = (float) $payment->applications->sum('amount');
+                $disposed = (float) ($disposedByPayment->get($payment->id) ?? 0);
 
-            return max(0, (float) $payment->amount - $applied - $disposed);
-        }), 2);
+                return max(0, (float) $payment->amount - $applied - $disposed);
+            }), 2);
+        }
+
+        return $byStudent;
     }
 }

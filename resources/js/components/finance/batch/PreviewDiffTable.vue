@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,11 +7,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import type { BatchDiffBucket, BatchPreviewLineClient } from '@/types/finance';
+import type { BatchDiffBucket, BatchPreviewLineClient, BatchPreviewMajorContext } from '@/types/finance';
 import { formatCurrency } from '@/types/finance';
 import { BATCH_BUCKET_META, batchReasonLabel } from '@/utils/batchStudioDisplay';
-import { Download, Search } from 'lucide-vue-next';
-import { computed, ref } from 'vue';
+import { ChevronDown, ChevronsUpDown, ChevronUp, Download, Search } from 'lucide-vue-next';
+import { computed, ref, watch } from 'vue';
 
 const props = defineProps<{
     lines: BatchPreviewLineClient[];
@@ -19,6 +20,8 @@ const props = defineProps<{
     exportable?: boolean;
     blockCountControls?: boolean;
     blockCounts?: Record<string, number>;
+    majorDetails?: boolean;
+    majorContext?: BatchPreviewMajorContext | null;
 }>();
 
 const emit = defineEmits<{
@@ -30,7 +33,38 @@ const emit = defineEmits<{
 const filter = ref<BatchDiffBucket | 'all'>('all');
 const search = ref('');
 
-const rows = computed(() =>
+type SortKey = 'label' | 'program_name' | 'term_number' | 'net' | 'unapplied_credit';
+const sortKey = ref<SortKey | null>(null);
+const sortDir = ref<'asc' | 'desc'>('asc');
+
+function toggleSort(key: SortKey): void {
+    if (sortKey.value === key) {
+        sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc';
+    } else {
+        sortKey.value = key;
+        sortDir.value = 'asc';
+    }
+}
+
+function sortValue(line: BatchPreviewLineClient, key: SortKey): string | number {
+    switch (key) {
+        case 'label':
+            return line.display.label.toLowerCase();
+        case 'program_name':
+            return (line.display.program_name ?? '').toLowerCase();
+        case 'term_number':
+            return line.display.term_number ?? -Infinity;
+        case 'net':
+            // Sort on the stable list amount, not the block-count-adjustable
+            // displayAmount() — otherwise editing a block-count dropdown
+            // re-sorts the table under the user's cursor mid-edit.
+            return Number(line.display.net ?? 0);
+        case 'unapplied_credit':
+            return line.display.unapplied_credit ?? -Infinity;
+    }
+}
+
+const filteredRows = computed(() =>
     props.lines.filter((l) => {
         const okBucket = filter.value === 'all' || l.display.diff === filter.value;
         const q = search.value.trim().toLowerCase();
@@ -39,7 +73,39 @@ const rows = computed(() =>
     }),
 );
 
+const rows = computed(() => {
+    if (!sortKey.value) return filteredRows.value;
+
+    const key = sortKey.value;
+    const dir = sortDir.value === 'asc' ? 1 : -1;
+
+    return [...filteredRows.value].sort((a, b) => {
+        const av = sortValue(a, key);
+        const bv = sortValue(b, key);
+        if (av < bv) return -1 * dir;
+        if (av > bv) return 1 * dir;
+        return 0;
+    });
+});
+
 const selectedInView = computed(() => rows.value.filter((l) => props.selected.has(l.key)).length);
+
+const pageSizeOptions = [10, 25, 50, 100];
+const pageSize = ref(25);
+const page = ref(1);
+
+const totalPages = computed(() => Math.max(1, Math.ceil(rows.value.length / pageSize.value)));
+const pagedRows = computed(() => {
+    const start = (page.value - 1) * pageSize.value;
+    return rows.value.slice(start, start + pageSize.value);
+});
+
+watch([filter, search, sortKey, sortDir, pageSize, () => props.lines], () => {
+    page.value = 1;
+});
+watch(totalPages, (next) => {
+    if (page.value > next) page.value = next;
+});
 
 function setFilter(value: BatchDiffBucket | 'all') {
     filter.value = value;
@@ -87,10 +153,40 @@ function adjustedLabel(line: BatchPreviewLineClient): string {
     if (raw === null || raw === undefined) return '';
     return type === 'percentage' ? `còn ${raw}%` : `còn ${formatCurrency(raw)}`;
 }
+
+function hasUnappliedCredit(line: BatchPreviewLineClient): boolean {
+    return Number(line.display.unapplied_credit ?? 0) > 0;
+}
+
+function hasProjectedOffset(line: BatchPreviewLineClient): boolean {
+    return Number(line.display.credit_offset_projected ?? 0) > 0;
+}
+
+function noOffsetReason(): string {
+    // Distinguishes "config is on but this row didn't clear the threshold"
+    // from the globally-disabled case (already stated once in the banner).
+    return props.majorContext?.credit_offset_enabled ? 'Dưới ngưỡng áp dụng' : 'Chưa áp dụng';
+}
+
+function sortIcon(key: SortKey) {
+    if (sortKey.value !== key) return ChevronsUpDown;
+    return sortDir.value === 'asc' ? ChevronUp : ChevronDown;
+}
 </script>
 
 <template>
     <div class="space-y-4">
+        <Alert v-if="majorDetails && majorContext">
+            <AlertTitle>Sinh phí HP cho kỳ {{ majorContext.charge_semester_name ?? majorContext.charge_semester_code ?? majorContext.charge_semester_id }}</AlertTitle>
+            <AlertDescription>
+                <template v-if="majorContext.credit_offset_enabled">
+                    Trừ số dư tự động: <strong>bật</strong> — sinh viên có số dư ≥ {{ formatCurrency(majorContext.credit_offset_min_balance) }} sẽ được trừ ngay sau khi tạo phí (xem cột "Số dư / Dự kiến trừ"). "Số tiền" bên dưới là giá trị phí gốc,
+                    <strong>chưa</strong> trừ số dư — số dư trừ sau khi phí đã tạo, và có thể lệch nếu số dư của sinh viên thay đổi trước khi xác nhận.
+                </template>
+                <template v-else> Trừ số dư tự động: <strong>tắt</strong> — số dư hiển thị chỉ để tham khảo, sẽ không tự trừ khi tạo phí. </template>
+            </AlertDescription>
+        </Alert>
+
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <button
                 v-for="(meta, key) in BATCH_BUCKET_META"
@@ -130,79 +226,118 @@ function adjustedLabel(line: BatchPreviewLineClient): string {
                     </Button>
                 </div>
 
-                <div class="overflow-hidden rounded-lg border">
-                    <div class="max-h-[min(28rem,60vh)] overflow-auto">
-                        <Table>
-                            <TableHeader class="bg-muted/40 sticky top-0 z-10">
-                                <TableRow>
-                                    <TableHead class="w-12 px-4" />
-                                    <TableHead class="min-w-[14rem] px-4">Sinh viên</TableHead>
-                                    <TableHead class="w-36 px-4">Phân loại</TableHead>
-                                    <TableHead v-if="blockCountControls" class="w-32 px-4">Số block</TableHead>
-                                    <TableHead class="w-36 px-4 text-right">Số tiền</TableHead>
-                                    <TableHead class="min-w-[12rem] px-4">Lý do</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                <TableRow v-for="l in rows" :key="l.key" class="hover:bg-muted/30" :class="selected.has(l.key) ? 'bg-primary/5' : ''">
-                                    <TableCell class="px-4 py-3 align-middle">
-                                        <Checkbox :model-value="selected.has(l.key)" :disabled="l.display.diff === 'skip'" @update:model-value="emit('toggle', l.key)" />
-                                    </TableCell>
-                                    <TableCell class="px-4 py-3 align-middle">
-                                        <div class="leading-snug font-medium">{{ l.display.label }}</div>
-                                        <div class="text-muted-foreground mt-0.5 font-mono text-xs">
-                                            {{ l.display.student_id || '—' }}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell class="px-4 py-3 align-middle">
-                                        <Badge variant="outline" :class="BATCH_BUCKET_META[l.display.diff].badgeClass">
-                                            {{ BATCH_BUCKET_META[l.display.diff].label }}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell v-if="blockCountControls" class="px-4 py-3 align-middle">
-                                        <Select v-if="maxBlockCount(l) > 0 && l.display.diff !== 'skip'" :model-value="String(selectedBlockCount(l))" @update:model-value="(value) => emit('update-block-count', l.key, Number(value))">
-                                            <SelectTrigger class="h-8 w-24">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem v-for="count in blockOptions(l)" :key="count" :value="String(count)">
-                                                    {{ count }}
-                                                </SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                        <span v-else class="text-muted-foreground text-sm">—</span>
-                                    </TableCell>
-                                    <TableCell class="px-4 py-3 text-right align-middle font-mono text-sm tabular-nums">
-                                        <template v-if="hasDiscountBreakdown(l)">
-                                            <div class="text-muted-foreground text-xs line-through">{{ formatCurrency(l.display.gross ?? 0) }}</div>
-                                            <div class="font-semibold">{{ formatCurrency(displayAmount(l)) }}</div>
-                                            <div class="text-muted-foreground mt-0.5 space-y-0.5 font-sans text-xs normal-case">
-                                                <div v-if="Number(l.display.scholarship_amount ?? 0) > 0">
-                                                    🎓 {{ l.display.scholarship_name }}<template v-if="scholarshipLabel(l)"> ({{ scholarshipLabel(l) }})</template>: -{{
-                                                        formatCurrency(l.display.scholarship_amount ?? 0)
-                                                    }}
-                                                </div>
-                                                <div v-if="hasReduction(l)" class="text-amber-600">
-                                                    📉 Bị giảm học bổng<template v-if="adjustedLabel(l)"> ({{ adjustedLabel(l) }})</template>: +{{
-                                                        formatCurrency(l.display.scholarship_reduction_amount ?? 0)
-                                                    }}
-                                                </div>
-                                                <div v-if="Number(l.display.voucher_amount ?? 0) > 0">
-                                                    🎟️ {{ (l.display.voucher_codes ?? []).join(', ') }}: -{{ formatCurrency(l.display.voucher_amount ?? 0) }}
-                                                </div>
+                <div class="rounded-lg border">
+                    <Table container-class="max-h-[min(42rem,75vh)] overflow-auto rounded-lg">
+                        <TableHeader class="bg-background sticky top-0 z-10">
+                            <TableRow>
+                                <TableHead class="w-12 px-4" />
+                                <TableHead class="min-w-[14rem] cursor-pointer px-4" @click="toggleSort('label')"> Sinh viên <component :is="sortIcon('label')" class="inline h-3 w-3" /> </TableHead>
+                                <TableHead v-if="majorDetails" class="min-w-[10rem] cursor-pointer px-4" @click="toggleSort('program_name')"> Ngành <component :is="sortIcon('program_name')" class="inline h-3 w-3" /> </TableHead>
+                                <TableHead v-if="majorDetails" class="w-20 cursor-pointer px-4" title="Số thứ tự kỳ đóng học phí trong lộ trình của sinh viên (không phải kỳ lịch)" @click="toggleSort('term_number')">
+                                    Kỳ HP <component :is="sortIcon('term_number')" class="inline h-3 w-3" />
+                                </TableHead>
+                                <TableHead class="w-36 px-4">Phân loại</TableHead>
+                                <TableHead v-if="blockCountControls" class="w-32 px-4">Số block</TableHead>
+                                <TableHead class="w-36 cursor-pointer px-4 text-right" @click="toggleSort('net')"> Số tiền <component :is="sortIcon('net')" class="inline h-3 w-3" /> </TableHead>
+                                <TableHead v-if="majorDetails" class="w-44 cursor-pointer px-4 text-right" @click="toggleSort('unapplied_credit')">
+                                    Số dư / Dự kiến trừ <component :is="sortIcon('unapplied_credit')" class="inline h-3 w-3" />
+                                </TableHead>
+                                <TableHead class="min-w-[12rem] px-4">Lý do</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            <TableRow v-for="l in pagedRows" :key="l.key" class="hover:bg-muted/30" :class="selected.has(l.key) ? 'bg-primary/5' : ''">
+                                <TableCell class="px-4 py-3 align-middle">
+                                    <Checkbox :model-value="selected.has(l.key)" :disabled="l.display.diff === 'skip'" @update:model-value="emit('toggle', l.key)" />
+                                </TableCell>
+                                <TableCell class="px-4 py-3 align-middle">
+                                    <div class="leading-snug font-medium">{{ l.display.label }}</div>
+                                    <div class="text-muted-foreground mt-0.5 font-mono text-xs">
+                                        {{ l.display.student_id || '—' }}
+                                    </div>
+                                </TableCell>
+                                <TableCell v-if="majorDetails" class="px-4 py-3 align-middle text-sm">
+                                    <div>{{ l.display.program_name || '—' }}</div>
+                                    <div v-if="l.display.specialization_name" class="text-muted-foreground text-xs">{{ l.display.specialization_name }}</div>
+                                </TableCell>
+                                <TableCell v-if="majorDetails" class="px-4 py-3 text-center align-middle text-sm tabular-nums">
+                                    {{ l.display.term_number ?? '—' }}
+                                </TableCell>
+                                <TableCell class="px-4 py-3 align-middle">
+                                    <Badge variant="outline" :class="BATCH_BUCKET_META[l.display.diff].badgeClass">
+                                        {{ BATCH_BUCKET_META[l.display.diff].label }}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell v-if="blockCountControls" class="px-4 py-3 align-middle">
+                                    <Select v-if="maxBlockCount(l) > 0 && l.display.diff !== 'skip'" :model-value="String(selectedBlockCount(l))" @update:model-value="(value) => emit('update-block-count', l.key, Number(value))">
+                                        <SelectTrigger class="h-8 w-24">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem v-for="count in blockOptions(l)" :key="count" :value="String(count)">
+                                                {{ count }}
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <span v-else class="text-muted-foreground text-sm">—</span>
+                                </TableCell>
+                                <TableCell class="px-4 py-3 text-right align-middle font-mono text-sm tabular-nums">
+                                    <template v-if="hasDiscountBreakdown(l)">
+                                        <div class="text-muted-foreground text-xs line-through">{{ formatCurrency(l.display.gross ?? 0) }}</div>
+                                        <div class="font-semibold">{{ formatCurrency(displayAmount(l)) }}</div>
+                                        <div class="text-muted-foreground mt-0.5 space-y-0.5 font-sans text-xs normal-case">
+                                            <div v-if="Number(l.display.scholarship_amount ?? 0) > 0">
+                                                🎓 {{ l.display.scholarship_name }}<template v-if="scholarshipLabel(l)"> ({{ scholarshipLabel(l) }})</template>: -{{ formatCurrency(l.display.scholarship_amount ?? 0) }}
                                             </div>
-                                        </template>
-                                        <template v-else>{{ formatCurrency(displayAmount(l)) }}</template>
-                                    </TableCell>
-                                    <TableCell class="text-muted-foreground px-4 py-3 align-middle text-sm leading-relaxed">
-                                        {{ batchReasonLabel(l.display.reason) }}
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow v-if="rows.length === 0">
-                                    <TableCell :colspan="blockCountControls ? 6 : 5" class="text-muted-foreground px-4 py-10 text-center"> Không có dòng nào khớp bộ lọc. </TableCell>
-                                </TableRow>
-                            </TableBody>
-                        </Table>
+                                            <div v-if="hasReduction(l)" class="text-amber-600">
+                                                📉 Bị giảm học bổng<template v-if="adjustedLabel(l)"> ({{ adjustedLabel(l) }})</template>: +{{ formatCurrency(l.display.scholarship_reduction_amount ?? 0) }}
+                                            </div>
+                                            <div v-if="Number(l.display.voucher_amount ?? 0) > 0">🎟️ {{ (l.display.voucher_codes ?? []).join(', ') }}: -{{ formatCurrency(l.display.voucher_amount ?? 0) }}</div>
+                                        </div>
+                                    </template>
+                                    <template v-else>{{ formatCurrency(displayAmount(l)) }}</template>
+                                </TableCell>
+                                <TableCell v-if="majorDetails" class="px-4 py-3 text-right align-middle font-mono text-sm tabular-nums">
+                                    <template v-if="hasUnappliedCredit(l)">
+                                        <div class="text-muted-foreground text-xs">Dư: {{ formatCurrency(l.display.unapplied_credit ?? 0) }}</div>
+                                        <div v-if="hasProjectedOffset(l)" class="font-medium text-amber-600">Dự kiến trừ: -{{ formatCurrency(l.display.credit_offset_projected ?? 0) }}</div>
+                                        <div v-else class="text-muted-foreground text-xs italic">{{ noOffsetReason() }}</div>
+                                    </template>
+                                    <span v-else class="text-muted-foreground">—</span>
+                                </TableCell>
+                                <TableCell class="text-muted-foreground px-4 py-3 align-middle text-sm leading-relaxed">
+                                    {{ batchReasonLabel(l.display.reason) }}
+                                </TableCell>
+                            </TableRow>
+                            <TableRow v-if="rows.length === 0">
+                                <TableCell :colspan="(blockCountControls ? 6 : 5) + (majorDetails ? 3 : 0)" class="text-muted-foreground px-4 py-10 text-center"> Không có dòng nào khớp bộ lọc. </TableCell>
+                            </TableRow>
+                        </TableBody>
+                    </Table>
+                </div>
+
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="flex items-center gap-2">
+                        <span class="text-muted-foreground text-sm">Hiển thị</span>
+                        <Select :model-value="String(pageSize)" @update:model-value="(value) => (pageSize = Number(value) || 25)">
+                            <SelectTrigger class="h-8 w-20">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem v-for="size in pageSizeOptions" :key="size" :value="String(size)">
+                                    {{ size }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <span class="text-muted-foreground text-sm">dòng / trang</span>
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                        <span class="text-muted-foreground text-sm"> Trang {{ page }} / {{ totalPages }} ({{ rows.length }} dòng) </span>
+                        <div class="flex gap-2">
+                            <Button variant="outline" size="sm" :disabled="page <= 1" @click="page--"> Trước </Button>
+                            <Button variant="outline" size="sm" :disabled="page >= totalPages" @click="page++"> Sau </Button>
+                        </div>
                     </div>
                 </div>
             </CardContent>

@@ -445,6 +445,11 @@ export interface BatchPreviewLineDisplay {
     gross?: number;
     discount?: number;
     net: number;
+    program_name?: string | null;
+    specialization_name?: string | null;
+    term_number?: number | null;
+    unapplied_credit?: number | null;
+    credit_offset_projected?: number | null;
     scholarship_name?: string | null;
     scholarship_type?: string | null;
     scholarship_raw_value?: number | null;
@@ -465,10 +470,32 @@ export interface BatchPreviewLineClient {
     display: BatchPreviewLineDisplay;
 }
 
+export interface BatchPreviewMajorContext {
+    charge_semester_id: number;
+    charge_semester_code: string | null;
+    charge_semester_name: string | null;
+    credit_offset_enabled: boolean;
+    credit_offset_min_balance: number;
+}
+
+export interface BatchPreviewSummary {
+    eligible_count?: number;
+    ineligible_count?: number;
+    warning_count?: number;
+    total_count?: number;
+    projected_block_count?: number;
+    projected_total_amount?: number;
+    new_charges_count?: number;
+    skip_count?: number;
+    total_amount?: number;
+    total_students?: number;
+    major_context?: BatchPreviewMajorContext;
+}
+
 export interface BatchPreviewResponse {
     preview_token: string;
     lines: BatchPreviewLineClient[];
-    summary: Record<string, number>;
+    summary: BatchPreviewSummary;
 }
 
 export type BatchJobKind = 'charge_generation' | 'dng_push' | 'reminder';
