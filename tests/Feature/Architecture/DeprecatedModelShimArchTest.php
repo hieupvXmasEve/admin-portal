@@ -1,0 +1,208 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Guard for plan 260811-0012 (deprecated model shim namespace sweep).
+ *
+ * `app/Models/*.php` shims are `class_alias()` one-liners kept for backward
+ * compatibility while callers migrate to their owning module's namespace
+ * (see 260809-1557). This test does two things:
+ *
+ * 1. Caps the shim count at the known allow-list — new shims must not
+ *    appear, and each phase of the sweep shrinks this list as it deletes
+ *    shims. An empty allow-list is the sweep's completion signal.
+ * 2. Caps the *importer* list at a recorded baseline — new files must not
+ *    start importing `App\Models\<shim>`. Existing importers are
+ *    grandfathered until their module's phase sweeps them; each phase
+ *    shrinks this list too. An empty importer list (alongside an empty
+ *    shim list) is the sweep's completion signal.
+ */
+
+// Shrink this list as each module phase deletes its shims (see plan.md).
+const SHIMMED_MODELS = [
+    'ApplicationDocument', 'ApplicationDocumentType', 'Building', 'Club',
+    'ClubMember', 'ClubMemberRoleHistory', 'Event', 'EventParticipant',
+    'Form', 'FormResponse', 'FormResultVisibility', 'FormSection',
+    'FormSurvey', 'FormTarget', 'FormVersion', 'GoldTransaction',
+    'Merchandise', 'MerchandiseImage', 'MerchandiseVariant', 'QueryAssignment',
+    'QueryReply', 'QueryTicket', 'QueryTopic', 'RedemptionOrder',
+    'RedemptionOrderItem', 'Room', 'RoomBooking', 'RoomBookingAction',
+    'StockMovement', 'UploadRecord',
+];
+
+// Baseline of files that already reference `App\Models\<shim>`, measured
+// 2026-08-11 (plan Evidence Base). Grandfathered until each module's phase
+// sweeps its callers — shrink this list then, never grow it. The
+// ClubMember backfill migration is included: it intentionally stores the
+// old FQCN as data, not as an import, and is deleted along with its
+// module's phase.
+const SHIMMED_MODEL_IMPORT_BASELINE = [
+    'app/Exports/StudentApplicationExport.php',
+    'app/Http/Controllers/Api/GoldTransactionController.php',
+    'app/Http/Controllers/Api/V1/Admissions/IngestionController.php',
+    'app/Http/Controllers/Web/StudentApplicationController.php',
+    'app/Http/Requests/GenerateClassSessionsRequest.php',
+    'app/Http/Requests/StoreRoomBookingRequest.php',
+    'app/Http/Requests/UpdateRoomBookingRequest.php',
+    'app/Modules/Academic/Delivery/Queries/GetClassSessionFormOptionsQuery.php',
+    'app/Modules/Academic/Delivery/Queries/GetCourseOfferingSurveyQuery.php',
+    'app/Modules/Academic/Delivery/Support/LecturerTimetableService.php',
+    'app/Modules/Academic/Support/CampusBuildingCountReader.php',
+    'app/Modules/Admissions/Actions/UpsertCrmApplicationAction.php',
+    'app/Modules/Admissions/Http/Api/IngestionController.php',
+    'app/Modules/Admissions/Queries/GetApplicantDocumentChecklistQuery.php',
+    'app/Modules/Admissions/Queries/ListApplicationsQuery.php',
+    'app/Modules/Engagement/Actions/EventParticipationOperations.php',
+    'app/Modules/Engagement/Models/FormResponse.php',
+    'app/Modules/Engagement/Models/QueryReply.php',
+    'app/Modules/Upload/Models/UploadRecord.php',
+    'app/Providers/AppServiceProvider.php',
+    'app/Services/AdminScheduleService.php',
+    'app/Services/Admissions/ApplicationBackfillService.php',
+    'app/Services/Admissions/ApplicationIngestionService.php',
+    'app/Services/ApplicationDocumentService.php',
+    'app/Services/ApplicationDocumentTypeSyncService.php',
+    'app/Services/DashboardStatsService.php',
+    'app/Services/GoldService.php',
+    'app/Services/NotificationService.php',
+    'app/Services/QRCodeService.php',
+    'app/Services/V1/Student/TimetableEventQuery.php',
+    'app/Services/V1/Student/TimetableService.php',
+    'database/factories/ClassSessionFactory.php',
+    'database/factories/ExamRoomSlotFactory.php',
+    'database/migrations/2026_08_01_144001_create_merchandise_table.php',
+    'database/migrations/2026_08_01_150001_create_redemption_orders_table.php',
+    'database/migrations/2026_08_11_021157_backfill_clubmember_shimmed_morph_subject_type.php',
+    'database/seeders/InitialSetup/EventSeeder.php',
+    'database/seeders/InitialSetup/InstitutionSetupSeeder.php',
+    'tests/Feature/Academic/ExamResit/AssignExamResitInvigilatorActionTest.php',
+    'tests/Feature/Architecture/EngagementQueryTicketModelPlacementArchTest.php',
+    'tests/Feature/Architecture/FacilitiesDeliveryBoundaryArchTest.php',
+    'tests/Feature/Academic/ExamResit/CancelExamResitAttemptActionTest.php',
+    'tests/Feature/Academic/ExamResit/CreateExamResitSessionActionTest.php',
+    'tests/Feature/Academic/ExamResit/CreateExamRoomSlotActionTest.php',
+    'tests/Feature/Academic/ExamResit/ExamScheduleControllerTest.php',
+    'tests/Feature/Academic/ExamResit/ListExamResitAttemptsQueryTest.php',
+    'tests/Feature/Academic/ExamResit/ListExamRoomSlotsQueryTest.php',
+    'tests/Feature/Academic/ExamResit/ScheduleExamResitAttemptActionTest.php',
+    'tests/Feature/Academic/RemediateEgcAttendanceFailuresCommandTest.php',
+    'tests/Feature/Academic/StudentLifecycleTimelineQueryTest.php',
+    'tests/Feature/Admissions/ApplicationBackfillTest.php',
+    'tests/Feature/Admissions/CrmApplicationSyncTest.php',
+    'tests/Feature/Admissions/IngestionApplicationsTest.php',
+    'tests/Feature/Api/V1/Lecturer/LecturerInvigilationTimetableTest.php',
+    'tests/Feature/Api/V1/Student/EngagementFormsApiTest.php',
+    'tests/Feature/Api/V1/Student/QueryTicketApiTest.php',
+    'tests/Feature/Api/V1/Student/StudentExamResitTimetableTest.php',
+    'tests/Feature/Api/V1/Student/TimetableControllerTest.php',
+    'tests/Feature/CourseOffering/CourseOfferingRosterRouteCutoverTest.php',
+    'tests/Feature/CourseOffering/CourseRosterDeliveryActionTest.php',
+    'tests/Feature/Engagement/ClubMemberShimMorphBackfillMigrationTest.php',
+    'tests/Feature/Engagement/CourseOfferingSurveyRouteTest.php',
+    'tests/Feature/Engagement/ProvisionCourseSurveyActionTest.php',
+    'tests/Feature/Facilities/RoomAvailabilityExamBlockTest.php',
+    'tests/Feature/Facilities/RoomBookingExamConflictTest.php',
+    'tests/Feature/Facilities/RoomBookingSeriesTest.php',
+    'tests/Feature/Facilities/SpaceReservationContractTest.php',
+    'tests/Feature/Finance/Operations/exam_resit_due_helpers.php',
+    'tests/Feature/Form/AdminQueryInboxTest.php',
+    'tests/Feature/Form/FormManagementWorkflowTest.php',
+    'tests/Feature/Form/QueryTicketWorkflowTest.php',
+    'tests/Feature/Form/SurveyAggregateConfigTest.php',
+    'tests/Feature/Form/SurveyResultDownloadTest.php',
+    'tests/Feature/Gold/GoldServiceTest.php',
+    'tests/Feature/Gold/GoldTransactionOwnershipTest.php',
+    'tests/Feature/Gold/ReclaimGoldRewardTest.php',
+    'tests/Feature/Lecture/LecturerGpaReportTest.php',
+    'tests/Feature/Merchandise/MerchandiseAdminPageTest.php',
+    'tests/Feature/Merchandise/MerchandiseCrudTest.php',
+    'tests/Feature/Merchandise/MerchandiseVariantCrossCampusPolicyTest.php',
+    'tests/Feature/Merchandise/Redemption/RedemptionAccessControlTest.php',
+    'tests/Feature/Merchandise/Redemption/RedemptionCheckoutTest.php',
+    'tests/Feature/Merchandise/Redemption/RedemptionRefundAndStateMachineTest.php',
+    'tests/Feature/Merchandise/Reports/MerchandiseReportCampusScopeTest.php',
+    'tests/Feature/Merchandise/Reports/MerchandiseReportDataTest.php',
+    'tests/Feature/Merchandise/StockServiceTest.php',
+    'tests/Feature/Platform/SystemConfigurationMigrationTest.php',
+    'tests/Feature/StudentApplication/DocumentsTest.php',
+    'tests/Feature/StudentApplication/ExportTest.php',
+    'tests/Feature/StudentApplication/IndexCampusScopeTest.php',
+    'tests/Feature/Upload/UploadPlatformTest.php',
+    'tests/Unit/Notification/EventNotificationServiceTest.php',
+];
+
+it('has no class_alias shim under app/Models beyond the known allow-list', function (): void {
+    $workspace = dirname(__DIR__, 3);
+    $modelsDir = $workspace.'/app/Models';
+
+    $shimmedFiles = [];
+    foreach (glob($modelsDir.'/*.php') ?: [] as $path) {
+        $contents = file_get_contents($path) ?: '';
+        if (str_contains($contents, 'class_alias(')) {
+            $shimmedFiles[] = basename($path, '.php');
+        }
+    }
+
+    sort($shimmedFiles);
+    $expected = SHIMMED_MODELS;
+    sort($expected);
+
+    expect($shimmedFiles)->toBe($expected, 'New class_alias shims must not be added to app/Models. Update the SHIMMED_MODELS allow-list in this test only when deleting a shim, never when adding one.');
+});
+
+it('has no new caller importing App\Models\<shim> beyond the recorded baseline', function (): void {
+    $workspace = dirname(__DIR__, 3);
+    $scanDirs = ['app', 'tests', 'database', 'routes', 'config'];
+
+    // Matches both the raw single-backslash FQCN form (use-statements,
+    // unescaped references) and the double-backslash form written inside
+    // double-quoted PHP string literals (e.g. morph-type config values) —
+    // \\{1,2} matches one or two literal backslash characters in the
+    // scanned source text.
+    $modelAlternation = implode('|', array_map(fn (string $m) => preg_quote($m, '/'), SHIMMED_MODELS));
+    $pattern = '/\bApp\\\\{1,2}Models\\\\{1,2}('.$modelAlternation.')\b/';
+
+    $found = [];
+
+    foreach ($scanDirs as $dir) {
+        $fullDir = $workspace.'/'.$dir;
+        if (! is_dir($fullDir)) {
+            continue;
+        }
+
+        $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($fullDir, FilesystemIterator::SKIP_DOTS));
+
+        foreach ($iterator as $file) {
+            if (! $file->isFile() || $file->getExtension() !== 'php') {
+                continue;
+            }
+
+            $relativePath = ltrim(substr($file->getPathname(), strlen($workspace)), '/');
+
+            // The shim files themselves legitimately reference App\Models\<Model>.
+            if (str_starts_with($relativePath, 'app/Models/')) {
+                continue;
+            }
+
+            $contents = file_get_contents($file->getPathname()) ?: '';
+
+            if (preg_match($pattern, $contents) === 1) {
+                $found[] = $relativePath;
+            }
+        }
+    }
+
+    sort($found);
+    $baseline = SHIMMED_MODEL_IMPORT_BASELINE;
+    sort($baseline);
+
+    $newOffenders = array_values(array_diff($found, $baseline));
+    expect($newOffenders)->toBe([], "New callers must use the canonical App\\Modules\\<Owner>\\Models namespace instead of the deprecated App\\Models shim:\n".implode("\n", $newOffenders));
+
+    // Exact match (not just "no growth") so a completed module sweep must
+    // shrink SHIMMED_MODEL_IMPORT_BASELINE — an empty list becomes the
+    // sweep's completion signal, as the file docblock promises.
+    $staleEntries = array_values(array_diff($baseline, $found));
+    expect($staleEntries)->toBe([], "SHIMMED_MODEL_IMPORT_BASELINE has stale entries whose imports were already swept — shrink the list to match:\n".implode("\n", $staleEntries));
+});
