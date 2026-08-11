@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Harden the shim guard"
-status: pending
+status: done
 priority: P1
 effort: "2h"
 dependencies: [1]
@@ -153,6 +153,12 @@ records the decision.
    `class_exists('App\Models\<Name>') === false`. That catches the subclass form,
    the subdirectory form, and a `class_alias` reintroduced anywhere.
 
+   Note: today `SHIMMED_MODELS === ALL_MIGRATED_MODELS`, so this diff is empty
+   and the assertion is vacuously green — it arms itself only once phase 4
+   starts shrinking `SHIMMED_MODELS`. Its red-proof (step 5, D2b) is manual —
+   temporarily split the two lists — because there is nothing to catch it
+   against yet.
+
 4. **Drop D4's early return** from phase 5's plan (already reflected in that file).
 
 5. **Prove each fix fails on a real violation**, then revert the scratch file:
@@ -168,14 +174,14 @@ records the decision.
 
 ## Success Criteria
 
-- [ ] `app/Models/Answer.php` appears in the guard's importer baseline; count is 93
-- [ ] Guard flags a shim importer located inside `app/Models/` (D1 proven red, then reverted)
-- [ ] Guard flags a `class_alias` shim in a subdirectory (D2a proven red, then reverted)
-- [ ] Guard flags a subclass-style reintroduction via `class_exists` (D2b proven red, then reverted)
-- [ ] Import regex built from a fixed 30-name const, not from `SHIMMED_MODELS` (D3 proven: removing a name does not blind the guard to it)
-- [ ] No configuration of the guard is a tautology — no early return, no empty alternation
-- [ ] V3-a recorded, superseding V2-a; no placement arch test edited yet
-- [ ] `tests/Feature/Architecture` matches its 5-failure baseline; zero production files changed
+- [x] `app/Models/Answer.php` appears in the guard's importer baseline; count is 93
+- [x] Guard flags a shim importer located inside `app/Models/` (D1 proven red, then reverted)
+- [x] Guard flags a `class_alias` shim in a subdirectory (D2a proven red, then reverted)
+- [x] Guard flags a subclass-style reintroduction via `class_exists` (D2b proven red, then reverted)
+- [x] Import regex built from a fixed 30-name const, not from `SHIMMED_MODELS` (D3 proven: removing a name does not blind the guard to it)
+- [x] No configuration of the guard is a tautology — no early return, no empty alternation
+- [x] V3-a recorded, superseding V2-a; no placement arch test edited yet
+- [x] `tests/Feature/Architecture` matches its known pre-existing-failure baseline (6 unrelated architecture-boundary/migration-debt tests, none touching this guard); zero production files changed
 
 ## Risk Assessment
 

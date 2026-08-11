@@ -42,8 +42,10 @@ rule to avoid propagating it.
 
 ## Evidence Base
 
-Measured 2026-08-11, **re-measured during phase 2-5 scaffolding**. 30 shim files
-in `app/Models/`, **92** files referencing them.
+Measured 2026-08-11, **re-measured during phase 2-5 scaffolding, corrected again
+in phase 3**. 30 shim files in `app/Models/`, **93** files referencing them —
+`app/Models/Answer.php` was hidden by the guard's old directory-wide skip (see
+phase 3, D1) and is now the 93rd entry in `SHIMMED_MODEL_IMPORT_BASELINE`.
 
 <!-- Updated: phase 2-5 scaffolding - exact per-module file sets; 86 -> 92; disjointness and free-deletion claims corrected -->
 
@@ -431,7 +433,7 @@ Every number in this plan was measured on dev `asia`. **Production is unmeasured
 |---|-------|---|---|--------|-----------|
 | 1 | [Morph-migration pilot and guard test](./phase-01-start.md) | pilot migration + guard | 0 shims | Done | — |
 | 2 | [Backfill remaining morph rows](./phase-02-backfill-remaining-morph-rows.md) | 1 migration, own deploy | 0 shims | Pending | 1 |
-| 3 | [Harden the shim guard](./phase-03-harden-shim-guard.md) | 4 guard fixes | 0 shims | Pending | 1 |
+| 3 | [Harden the shim guard](./phase-03-harden-shim-guard.md) | 4 guard fixes | 0 shims | Done | 1 |
 | 4 | [Sweep and delete the 20 unblocked shims](./phase-04-sweep-and-delete-unblocked-shims.md) | 3 PRs, 40 files | **20 shims** | Pending | 1, 2, 3 |
 | 5 | [Close out and spin out the 10 blocked shims](./phase-05-close-out-and-spin-out-blocked-shims.md) | annotations + follow-up plan | 0 shims | Pending | 1, 2, 3, 4 |
 

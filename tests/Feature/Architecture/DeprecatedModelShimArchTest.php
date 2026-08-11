@@ -19,8 +19,10 @@ declare(strict_types=1);
  *    shim list) is the sweep's completion signal.
  */
 
-// Shrink this list as each module phase deletes its shims (see plan.md).
-const SHIMMED_MODELS = [
+// All 30 models moved by 260809-1557. Fixed, never shrinks — the import guard
+// must keep watching a model after its shim is deleted, or a missed caller
+// becomes invisible exactly when the shim stops covering for it (phase 3, D3).
+const ALL_MIGRATED_MODELS = [
     'ApplicationDocument', 'ApplicationDocumentType', 'Building', 'Club',
     'ClubMember', 'ClubMemberRoleHistory', 'Event', 'EventParticipant',
     'Form', 'FormResponse', 'FormResultVisibility', 'FormSection',
@@ -31,6 +33,11 @@ const SHIMMED_MODELS = [
     'StockMovement', 'UploadRecord',
 ];
 
+// Shrink this list as each module phase deletes its shims (see plan.md). Only
+// used as the still-shimmed allow-list; the import regex is built from
+// ALL_MIGRATED_MODELS instead so it never blinds itself (phase 3, D3).
+const SHIMMED_MODELS = ALL_MIGRATED_MODELS;
+
 // Baseline of files that already reference `App\Models\<shim>`, measured
 // 2026-08-11 (plan Evidence Base). Grandfathered until each module's phase
 // sweeps its callers — shrink this list then, never grow it. The
@@ -39,6 +46,7 @@ const SHIMMED_MODELS = [
 // module's phase.
 const SHIMMED_MODEL_IMPORT_BASELINE = [
     'app/Exports/StudentApplicationExport.php',
+    'app/Models/Answer.php',
     'app/Http/Controllers/Api/GoldTransactionController.php',
     'app/Http/Controllers/Api/V1/Admissions/IngestionController.php',
     'app/Http/Controllers/Web/StudentApplicationController.php',
@@ -136,11 +144,18 @@ it('has no class_alias shim under app/Models beyond the known allow-list', funct
     $workspace = dirname(__DIR__, 3);
     $modelsDir = $workspace.'/app/Models';
 
+    // Recursive: a shim reintroduced in a subdirectory (e.g. app/Models/Engagement/Club.php)
+    // is a real shim and must not evade this scan (phase 3, D2).
     $shimmedFiles = [];
-    foreach (glob($modelsDir.'/*.php') ?: [] as $path) {
-        $contents = file_get_contents($path) ?: '';
+    $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($modelsDir, FilesystemIterator::SKIP_DOTS));
+    foreach ($iterator as $file) {
+        if (! $file->isFile() || $file->getExtension() !== 'php') {
+            continue;
+        }
+
+        $contents = file_get_contents($file->getPathname()) ?: '';
         if (str_contains($contents, 'class_alias(')) {
-            $shimmedFiles[] = basename($path, '.php');
+            $shimmedFiles[] = basename($file->getPathname(), '.php');
         }
     }
 
@@ -149,6 +164,21 @@ it('has no class_alias shim under app/Models beyond the known allow-list', funct
     sort($expected);
 
     expect($shimmedFiles)->toBe($expected, 'New class_alias shims must not be added to app/Models. Update the SHIMMED_MODELS allow-list in this test only when deleting a shim, never when adding one.');
+});
+
+it('has no App\Models\<shim> reintroduced by any means once its shim is deleted', function (): void {
+    // A subclass (`class Club extends \App\Modules\Engagement\Models\Club {}`)
+    // creates a genuinely distinct class with no `class_alias(` text anywhere,
+    // so it passes the scan above but still resurrects the persisted-FQCN
+    // problem the sweep exists to close (phase 3, D2b). Behavioral, not textual.
+    $sweptModels = array_values(array_diff(ALL_MIGRATED_MODELS, SHIMMED_MODELS));
+
+    $stillResolvable = array_values(array_filter(
+        $sweptModels,
+        fn (string $model): bool => class_exists('App\\Models\\'.$model)
+    ));
+
+    expect($stillResolvable)->toBe([], "App\\Models\\<Name> must not resolve for a swept model, by class_alias, subclass, or otherwise:\n".implode("\n", $stillResolvable));
 });
 
 it('has no new caller importing App\Models\<shim> beyond the recorded baseline', function (): void {
@@ -160,7 +190,7 @@ it('has no new caller importing App\Models\<shim> beyond the recorded baseline',
     // double-quoted PHP string literals (e.g. morph-type config values) —
     // \\{1,2} matches one or two literal backslash characters in the
     // scanned source text.
-    $modelAlternation = implode('|', array_map(fn (string $m) => preg_quote($m, '/'), SHIMMED_MODELS));
+    $modelAlternation = implode('|', array_map(fn (string $m) => preg_quote($m, '/'), ALL_MIGRATED_MODELS));
     $pattern = '/\bApp\\\\{1,2}Models\\\\{1,2}('.$modelAlternation.')\b/';
 
     $found = [];
@@ -180,12 +210,15 @@ it('has no new caller importing App\Models\<shim> beyond the recorded baseline',
 
             $relativePath = ltrim(substr($file->getPathname(), strlen($workspace)), '/');
 
-            // The shim files themselves legitimately reference App\Models\<Model>.
-            if (str_starts_with($relativePath, 'app/Models/')) {
+            $contents = file_get_contents($file->getPathname()) ?: '';
+
+            // Only the shim files themselves legitimately reference App Models <Model>
+            // via class_alias(). Skipping the whole app/Models/ directory hid a real
+            // caller (app/Models/Answer.php importing the UploadRecord shim) —
+            // skip by content, not by directory (phase 3, D1).
+            if (str_starts_with($relativePath, 'app/Models/') && str_contains($contents, 'class_alias(')) {
                 continue;
             }
-
-            $contents = file_get_contents($file->getPathname()) ?: '';
 
             if (preg_match($pattern, $contents) === 1) {
                 $found[] = $relativePath;

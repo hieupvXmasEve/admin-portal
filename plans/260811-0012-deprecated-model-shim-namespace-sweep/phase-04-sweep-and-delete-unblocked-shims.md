@@ -206,6 +206,12 @@ apply until `Room` is actually swept in a future boundary-refactor plan.
    ./scripts/dev.sh artisan tinker --execute="foreach ([<this PR's models>] as \$m) { echo \$m.' => '.(class_exists('App\\\\Models\\\\'.\$m) ? 'STILL RESOLVES (BAD)' : 'gone') .PHP_EOL; }"
    ```
 
+   Run `./scripts/dev.sh composer dump-autoload` before this check. Composer's
+   classmap still points at a deleted shim file until the map is regenerated,
+   so `class_exists` can read false for the wrong reason (stale reference
+   dropped by autoload failure, not by an absent name) — flagged by phase 3's
+   review (M2).
+
 8. **Shrink `SHIMMED_MODELS`** only. Leave `ALL_MIGRATED_MODELS`,
    `config/migration_debt.php`, and `MigrationDebtContract` alone.
 
