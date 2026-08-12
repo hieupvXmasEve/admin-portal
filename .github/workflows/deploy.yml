@@ -67,7 +67,20 @@ jobs:
               exit 11
             fi
 
-            git fetch origin "${DEPLOY_BRANCH}" --prune
+            # github.com:22 intermittently times out from these servers.
+            # Retry, then fall back to GitHub's SSH endpoint on port 443.
+            fetch_branch() {
+              git fetch origin "${DEPLOY_BRANCH}" --prune && return 0
+              echo "git fetch over port 22 failed; retrying via ssh.github.com:443" >&2
+              for attempt in 1 2 3; do
+                GIT_SSH_COMMAND='ssh -o HostName=ssh.github.com -o Port=443' \
+                  git fetch origin "${DEPLOY_BRANCH}" --prune && return 0
+                sleep 10
+              done
+              echo "git fetch failed after fallback retries" >&2
+              return 1
+            }
+            fetch_branch
             git checkout -B "${DEPLOY_BRANCH}" "origin/${DEPLOY_BRANCH}"
 
             if [ -n "${DEPLOY_SHA}" ]; then
@@ -130,7 +143,20 @@ jobs:
               exit 11
             fi
 
-            git fetch origin "${DEPLOY_BRANCH}" --prune
+            # github.com:22 intermittently times out from these servers.
+            # Retry, then fall back to GitHub's SSH endpoint on port 443.
+            fetch_branch() {
+              git fetch origin "${DEPLOY_BRANCH}" --prune && return 0
+              echo "git fetch over port 22 failed; retrying via ssh.github.com:443" >&2
+              for attempt in 1 2 3; do
+                GIT_SSH_COMMAND='ssh -o HostName=ssh.github.com -o Port=443' \
+                  git fetch origin "${DEPLOY_BRANCH}" --prune && return 0
+                sleep 10
+              done
+              echo "git fetch failed after fallback retries" >&2
+              return 1
+            }
+            fetch_branch
             git checkout -B "${DEPLOY_BRANCH}" "origin/${DEPLOY_BRANCH}"
 
             if [ -n "${DEPLOY_SHA}" ]; then
@@ -201,7 +227,20 @@ jobs:
               exit 11
             fi
 
-            git fetch origin "${DEPLOY_BRANCH}" --prune
+            # github.com:22 intermittently times out from these servers.
+            # Retry, then fall back to GitHub's SSH endpoint on port 443.
+            fetch_branch() {
+              git fetch origin "${DEPLOY_BRANCH}" --prune && return 0
+              echo "git fetch over port 22 failed; retrying via ssh.github.com:443" >&2
+              for attempt in 1 2 3; do
+                GIT_SSH_COMMAND='ssh -o HostName=ssh.github.com -o Port=443' \
+                  git fetch origin "${DEPLOY_BRANCH}" --prune && return 0
+                sleep 10
+              done
+              echo "git fetch failed after fallback retries" >&2
+              return 1
+            }
+            fetch_branch
             git checkout -B "${DEPLOY_BRANCH}" "origin/${DEPLOY_BRANCH}"
 
             if [ -n "${DEPLOY_SHA}" ]; then
