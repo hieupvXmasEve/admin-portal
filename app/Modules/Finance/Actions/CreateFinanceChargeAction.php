@@ -9,6 +9,7 @@ use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceSetting;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
+use App\Modules\Finance\Models\ScholarshipSemesterAdjustment;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Queries\GetActiveScholarshipAdjustmentQuery;
 use App\Modules\Finance\Queries\GetStudentBalanceQuery;
@@ -235,6 +236,9 @@ class CreateFinanceChargeAction
             $scholarshipDef,
             $resolver->invoiceTuitionBase($invoice),
             $adjustment,
+            // A restoration only ever changes what a LATER (carry-forward)
+            // semester discounts from — never this adjustment's own target.
+            $isCarryForward ? $adjustment->effectiveAdjustedAmount() : null,
         );
 
         // With an adjustment, zero is a real ledger operation (full suspension
@@ -256,6 +260,23 @@ class CreateFinanceChargeAction
             (int) $award->id,
             $tuitionCharge->created_by_user_id,
         );
+
+        // The charge that just landed IS the invoice the adjustment was
+        // waiting on (apply()-time timing guard returned NO_INVOICE, per its
+        // own comment: "generation paths resolve through the adjustment when
+        // the invoice is created" — this is that resolution). Never for a
+        // carry-forward adjustment: that one is already `applied` from its
+        // OWN target semester: flipping it again here would be wrong. Reuses
+        // applyToLedger's own timing-guard re-check rather than flipping the
+        // status directly, so paid-installment / review-required edge cases
+        // still route correctly instead of being silently skipped.
+        if (
+            $adjustment !== null
+            && ! $isCarryForward
+            && $adjustment->status === ScholarshipSemesterAdjustment::STATUS_PENDING_APPLY
+        ) {
+            app(ApplyScholarshipSemesterAdjustmentAction::class)->applyToLedger($adjustment);
+        }
     }
 
     /**

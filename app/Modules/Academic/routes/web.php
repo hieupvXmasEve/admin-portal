@@ -49,6 +49,7 @@ use App\Modules\Academic\Progression\Http\Web\AcademicProgressionAuditController
 use App\Modules\Academic\Progression\Http\Web\GpaHistoryController;
 use App\Modules\Academic\Progression\Http\Web\PerformanceDashboardController;
 use App\Modules\Academic\Progression\Http\Web\ScholarshipAdjustmentDossierController;
+use App\Modules\Academic\Progression\Http\Web\ScholarshipRestorationWatchlistController;
 use App\Modules\Academic\Progression\Http\Web\SemesterEnrollmentController;
 use App\Modules\Academic\Progression\Http\Web\StudentAcademicSummaryController;
 use App\Modules\Academic\Progression\Http\Web\StudentActionAuditController;
@@ -451,6 +452,20 @@ Route::middleware(['auth', 'verified', 'campus.selected'])->group(function () {
             ->name('defer-returns.export');
 
         Route::get('/export', [AcademicProgressionAuditController::class, 'export'])
+            ->middleware('can:view_student_action')
+            ->name('export');
+    });
+
+    // Scholarship Restoration Watchlist (Phase 4). Read-only report; the
+    // propose/approve/reject decision actions themselves POST to the Finance
+    // module's own routes (finance.scholarship-restorations.*) — this screen
+    // never writes.
+    Route::prefix('reports/scholarship-restorations')->name('reports.scholarship-restorations.')->group(function () {
+        Route::get('/', [ScholarshipRestorationWatchlistController::class, 'index'])
+            ->middleware('can:view_student_action')
+            ->name('index');
+
+        Route::get('/export', [ScholarshipRestorationWatchlistController::class, 'export'])
             ->middleware('can:view_student_action')
             ->name('export');
     });

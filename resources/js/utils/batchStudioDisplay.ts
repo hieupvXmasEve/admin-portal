@@ -3,6 +3,7 @@ import type { BatchDiffBucket } from '@/types/finance';
 const REASON_LABELS: Record<string, string> = {
     already_charged: 'Kỳ này đã có charge active cùng loại - không tạo lại',
     scholarship_review_pending: 'Đang chờ xét duyệt điều chỉnh học bổng - chưa tạo học phí',
+    scholarship_restoration_pending: 'Đang chờ duyệt đề xuất khôi phục học bổng - chưa tạo học phí',
     tuition_not_due_this_semester: 'Chưa tới kỳ phát sinh HP (trước intake_major)',
     zero_amount_term: 'Kỳ này không phát sinh HP (amount = 0)',
     missing_curriculum_version: 'Thiếu curriculum_version',

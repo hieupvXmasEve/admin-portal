@@ -18,9 +18,13 @@ class CreateRestorationProposalAction
 {
     public function __construct(private readonly CampusPermissionReader $permissions) {}
 
-    public function run(int $adjustmentId, string $reason, int $proposerUserId): ScholarshipRestorationProposal
+    /**
+     * $restoredAmount null = propose a full restore. Set = propose a partial
+     * restore at that level (same unit convention as adjusted_amount).
+     */
+    public function run(int $adjustmentId, string $reason, int $proposerUserId, ?float $restoredAmount = null): ScholarshipRestorationProposal
     {
-        return DB::transaction(function () use ($adjustmentId, $reason, $proposerUserId): ScholarshipRestorationProposal {
+        return DB::transaction(function () use ($adjustmentId, $reason, $proposerUserId, $restoredAmount): ScholarshipRestorationProposal {
             $adjustment = ScholarshipSemesterAdjustment::query()->lockForUpdate()->find($adjustmentId);
 
             if ($adjustment === null) {
@@ -36,16 +40,40 @@ class CreateRestorationProposalAction
                 throw new \DomainException('proposer_not_authorized');
             }
 
-            // Idempotency: refuse a second active proposal for the same
-            // adjustment (pending_approval or already approved).
-            $hasActiveProposal = ScholarshipRestorationProposal::query()
+            // Duplicate guard (narrowed for repeat-after-partial): block while
+            // a pending_approval proposal exists, or once an approved FULL
+            // restore exists (nothing left to raise). An approved PARTIAL
+            // restore allows a new proposal — floor validated below.
+            $existingProposals = ScholarshipRestorationProposal::query()
                 ->where('scholarship_semester_adjustment_id', $adjustmentId)
                 ->whereIn('status', ScholarshipRestorationProposal::ACTIVE_STATUSES)
                 ->lockForUpdate()
-                ->exists();
+                ->get();
 
-            if ($hasActiveProposal) {
+            $approvedProposals = $existingProposals->filter(fn (ScholarshipRestorationProposal $proposal) => $proposal->status === ScholarshipRestorationProposal::STATUS_APPROVED);
+
+            $hasPending = $existingProposals->contains(fn (ScholarshipRestorationProposal $proposal) => $proposal->status === ScholarshipRestorationProposal::STATUS_PENDING_APPROVAL);
+            $hasApprovedFullRestore = $approvedProposals->contains(fn (ScholarshipRestorationProposal $proposal) => $proposal->restored_amount === null);
+
+            if ($hasPending || $hasApprovedFullRestore) {
                 throw new \DomainException('duplicate_active_proposal');
+            }
+
+            // Same tie-break the resolver's effectiveAdjustedAmount() uses —
+            // the floor validated here and the amount actually charged later
+            // must never disagree.
+            $latestApproved = ScholarshipSemesterAdjustment::pickLatestApproved($approvedProposals);
+
+            $floor = $latestApproved !== null && $latestApproved->restored_amount !== null
+                ? (float) $latestApproved->restored_amount
+                : (float) $adjustment->adjusted_amount;
+
+            if ($restoredAmount !== null) {
+                $originalAmount = (float) $adjustment->original_amount;
+
+                if ($restoredAmount <= $floor || $restoredAmount >= $originalAmount) {
+                    throw new \DomainException('restored_amount_out_of_bounds');
+                }
             }
 
             return ScholarshipRestorationProposal::query()->create([
@@ -55,6 +83,7 @@ class CreateRestorationProposalAction
                 'evaluated_semester_id' => $adjustment->target_semester_id,
                 'status' => ScholarshipRestorationProposal::STATUS_PENDING_APPROVAL,
                 'reason' => $reason,
+                'restored_amount' => $restoredAmount,
                 'proposed_by_user_id' => $proposerUserId,
             ]);
         });

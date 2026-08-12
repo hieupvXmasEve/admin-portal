@@ -52,6 +52,13 @@ class ScholarshipDiscountResolver
      * (the award may have mutated since approval — snapshots win), clamped to
      * [0, baseAmount] and never above the unadjusted resolution.
      *
+     * $effectiveAmountOverride: pass ScholarshipSemesterAdjustment::
+     * effectiveAdjustedAmount() here ONLY for a carry-forward charge (a LATER
+     * semester than the adjustment's own target) so a partial restoration can
+     * raise what that later semester discounts from. Leave null for the
+     * adjustment's own target-semester charge — a restoration never changes
+     * what the already-penalized semester itself owed.
+     *
      * May legitimately return 0.0 (full suspension). Callers MUST NOT treat 0
      * as "no scholarship" — an existing ledger discount has to be zeroed.
      */
@@ -59,6 +66,7 @@ class ScholarshipDiscountResolver
         ScholarshipDefinition $definition,
         float $baseAmount,
         ?ScholarshipSemesterAdjustment $adjustment,
+        ?float $effectiveAmountOverride = null,
     ): float {
         if ($adjustment === null) {
             return $this->resolve($definition, $baseAmount);
@@ -68,7 +76,7 @@ class ScholarshipDiscountResolver
             return 0.0;
         }
 
-        $adjustedValue = (float) $adjustment->adjusted_amount;
+        $adjustedValue = $effectiveAmountOverride ?? (float) $adjustment->adjusted_amount;
 
         $discount = $adjustment->original_type === ScholarshipSemesterAdjustment::TYPE_PERCENTAGE
             ? ($baseAmount * $adjustedValue) / 100

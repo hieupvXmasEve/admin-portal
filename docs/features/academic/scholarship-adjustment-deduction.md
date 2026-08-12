@@ -271,3 +271,42 @@ Bổ sung ràng buộc "generate XOR reduce": batch-studio (`GenerateMajorCharge
 Preview sinh phí HP (`/finance/batch-studio/charges`) tính đúng số tiền sau giảm trừ nhưng không hiển thị vì sao — chỉ ra một con số net, không có dòng học bổng/giảm trừ. Cột "Số tiền" nay hiển thị: gross gạch ngang, net in đậm, và breakdown bên dưới — dòng học bổng cố định (tên + % gốc từ `ScholarshipDefinition`, số tiền chưa điều chỉnh) và, nếu có quyết định giảm trừ đang hiệu lực (`ScholarshipSemesterAdjustment` status `pending_apply`/`applied` đúng học kỳ đích), thêm dòng riêng "bị giảm học bổng" (mức đã điều chỉnh + số tiền bị cắt bớt). Số tiền thực trừ vào `net_amount` không đổi — chỉ tách cách hiển thị để staff phân biệt "học bổng được cấp" và "bị giảm do quyết định" thay vì một số duy nhất không giải thích được.
 
 `PreviewMajorChargeGenerationQuery::resolveScholarship()` trả thêm `unadjusted_amount`, `reduction_amount`, `adjusted_raw_value`; field cũ `raw_value`/`type` giữ nguyên giá trị gốc (không còn bị quyết định điều chỉnh ghi đè). Đường truyền: `AssembleBatchChargePreviewQuery::mapChargeRow()` → `BatchPreviewLineDisplay` (`resources/js/types/finance.ts`) → `PreviewDiffTable.vue`.
+
+## Follow-up: khôi phục một phần + màn hình watchlist + chặn sinh học phí (2026-08-12)
+
+Xem plan [260812-2252-scholarship-restoration-watchlist](../../../plans/260812-2252-scholarship-restoration-watchlist/plan.md).
+
+### Khôi phục một phần (partial restoration)
+
+`ScholarshipRestorationProposal` có thêm cột `restored_amount` (decimal, nullable, cùng đơn vị `adjusted_amount` — giá trị **còn lại**, không phải phần bị trừ). `NULL` = khôi phục toàn bộ (hành vi cũ, tương thích ngược). Đề xuất mới phải nằm giữa "mức sàn" (mức `restored_amount` đã duyệt gần nhất, hoặc `adjusted_amount` nếu chưa có) và `original_amount` — validate cả ở FormRequest (client hint) lẫn `CreateRestorationProposalAction` (nguồn xác thực duy nhất).
+
+Có thể đề xuất lại nhiều lần: sau khi một đề xuất **khôi phục một phần** được duyệt, staff được đề xuất tiếp ở mức cao hơn (mức sàn nâng lên theo lần duyệt gần nhất). Guard "một đề xuất đang hoạt động" thu hẹp lại: chỉ chặn khi có đề xuất `pending_approval`, hoặc đã có một lần duyệt **toàn bộ** (`restored_amount IS NULL`) — không còn gì để nâng tiếp.
+
+**Cảnh báo quan trọng cho người đọc code sau này**: `ScholarshipDiscountResolver::resolveAdjusted()` luôn đọc `adjustment->adjusted_amount` trực tiếp — một khôi phục một phần **không bao giờ** được phép đổi số tiền của chính học kỳ đã bị điều chỉnh (target semester), chỉ đổi số tiền các học kỳ SAU nó (carry-forward). Ba nơi gọi carry-forward (`CreateFinanceChargeAction`, `GenerateBatchChargesAction`, `PreviewMajorChargeGenerationQuery`) tự tính `effectiveAdjustedAmount()` và truyền vào tham số `$effectiveAmountOverride` — không có tham số này thì `resolveAdjusted()` không bao giờ tự ý dùng mức khôi phục.
+
+### Lệnh console `finance:evaluate-scholarship-restorations` đã bị gỡ bỏ
+
+Quyết định sản phẩm: khôi phục học bổng chỉ tạo được qua giao diện staff, không còn tự động qua CLI. `ScholarshipRestorationVerdictQuery` (đánh giá "sạch hay còn trượt") vẫn giữ nguyên, chỉ đổi người gọi.
+
+### Màn hình Watchlist khôi phục học bổng
+
+Route `reports/scholarship-restorations` (Academic Progression, quyền `view_student_action`) liệt kê **mọi** sinh viên đang bị "carry" một điều chỉnh (chưa đề xuất / đang chờ / đã từ chối / đã khôi phục một phần — khôi phục toàn bộ thì không còn carry nữa nên không xuất hiện), kèm bằng chứng học thuật: verdict, GPA, điểm danh, môn đang học.
+
+**Verdict tiến triển (progressive verdict)**: không cố định ở học kỳ đích — hệ thống quét lùi từ học kỳ mới nhất về học kỳ đích, lấy **học kỳ đã chốt điểm mới nhất** để đánh giá, bỏ qua các học kỳ chưa chốt (đang học dở). Nhãn "đánh giá tại kỳ X" hiển thị rõ học kỳ nào được dùng, tránh staff hiểu nhầm verdict luôn là của học kỳ đích.
+
+Quyết định (đề xuất/duyệt/từ chối) POST thẳng sang route của Finance (`finance.scholarship-restorations.*`) — ranh giới module chỉ áp dụng cho import PHP, không áp dụng cho URL gọi từ frontend.
+
+### Chặn sinh học phí khi đang chờ duyệt khôi phục
+
+Mở rộng bất biến "generate XOR reduce" đã có (follow-up 2026-08-07): ngoài hồ sơ điều chỉnh đang xử lý (`PendingScholarshipAdjustmentReader`), nay còn chặn khi điều chỉnh đang carry-forward có đề xuất khôi phục ở trạng thái `pending_approval` — tránh sinh học phí ở mức cũ rồi vài phút sau bị duyệt khôi phục, phải sửa tay. Reader mới `App\Modules\Finance\Support\PendingScholarshipRestorationReader` (Finance-nội bộ, không cần Shared contract vì cả điều chỉnh lẫn đề xuất khôi phục đều do Finance sở hữu). Bake sẵn tiền điều kiện của `GetUnresolvedPriorAdjustmentQuery` ("chỉ gọi sau khi không có điều chỉnh đang active cho học kỳ hiện tại"): sinh viên có điều chỉnh riêng cho **chính học kỳ đang sinh phí** thì loại khỏi danh sách bị chặn — điều chỉnh cũ đang chờ khôi phục không liên quan tới học kỳ đó.
+
+Gate được gắn ở **ba** nơi, khớp đúng bộ ba đã có sẵn cho hồ sơ điều chỉnh in-flight (follow-up 2026-08-07):
+- `PreviewMajorChargeGenerationQuery` — preview, `eligibility_reason = 'scholarship_restoration_pending'` (chuỗi tự do, không phải enum, cùng quy ước với `scholarship_review_pending`); nhãn tiếng Việt tương ứng trong `resources/js/utils/batchStudioDisplay.ts`.
+- `GenerateMajorChargesAction` — **đường sống thật** khi staff bấm "Tạo học phí" ở batch-studio (`BatchStudioController::commitCharges`). Đây là nơi quan trọng nhất: preview không tự nó chặn tiền, chỉ hiển thị dòng `ineligible` — commit vẫn sẽ tạo phí nếu ở đây không có gate riêng.
+- `GenerateBatchChargesAction` — công cụ sửa lỗi billing (`FixBillingExceptionAction`), không phải đường sống, nhưng cùng bất biến nên gate như nhau, kể cả `skipped_count`.
+
+### Đã biết, chưa làm
+
+- Liên kết "Giảm tiếp" trên watchlist chỉ đưa staff đến trang danh sách hồ sơ giảm trừ (`scholarship-adjustments.index`), **chưa** điền sẵn form tạo hồ sơ cho đúng sinh viên — trang danh sách hiện chưa có cơ chế prefill qua query string.
+- Lý do từ chối (`reject`) bắt buộc nhập nhưng chỉ ghi vào log ứng dụng, chưa có cột lưu trên `scholarship_restoration_proposals` (bảng chỉ có `reason` của phía đề xuất).
+- `deferred_scholarship_restoration_pending` (stats key ở cả ba nơi sinh phí) hiện chưa có nơi nào đọc để báo cho sinh viên biết học phí đang bị hoãn (khác `deferred_scholarship_review`, vốn có `ScholarshipReviewDeferralNotifier` bắn realtime/email) — cần quyết định sản phẩm trước khi làm.

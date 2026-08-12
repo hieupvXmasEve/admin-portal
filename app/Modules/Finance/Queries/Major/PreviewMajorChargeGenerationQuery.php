@@ -13,6 +13,7 @@ use App\Modules\Finance\Models\FinanceSetting;
 use App\Modules\Finance\Queries\GetActiveScholarshipAdjustmentQuery;
 use App\Modules\Finance\Queries\GetUnresolvedPriorAdjustmentQuery;
 use App\Modules\Finance\Services\DeferChargeResolver;
+use App\Modules\Finance\Support\PendingScholarshipRestorationReader;
 use App\Modules\Finance\Support\ScholarshipDiscountResolver;
 use App\Modules\Finance\Support\StudentChargeTimingResolver;
 use App\Modules\Finance\Support\StudentFinanceSettlementPositionReader;
@@ -122,6 +123,8 @@ class PreviewMajorChargeGenerationQuery
         $enrollments = app(ProgramEnrollmentReader::class)->forStudentIds(array_keys($references));
         $inFlightByStudent = app(PendingScholarshipAdjustmentReader::class)
             ->inFlightByStudent(array_keys($references), $semesterId);
+        $pendingRestorationByStudent = app(PendingScholarshipRestorationReader::class)
+            ->pendingByStudent(array_keys($references), $semesterId);
         $awards = StudentScholarshipAward::query()
             ->with('scholarshipDefinition')
             ->whereIn('student_id', array_keys($references))
@@ -146,6 +149,7 @@ class PreviewMajorChargeGenerationQuery
                 $vouchers->get($reference->id, collect()),
                 $semesterId,
                 $inFlightByStudent[$reference->id] ?? false,
+                $pendingRestorationByStudent[$reference->id] ?? false,
                 (float) ($unappliedCashByStudent[$reference->id] ?? 0.0),
                 $creditOffsetSettings,
             ));
@@ -158,6 +162,7 @@ class PreviewMajorChargeGenerationQuery
         Collection $voucherApplications,
         int $semesterId,
         bool $hasInFlightScholarshipDossier,
+        bool $hasPendingRestoration,
         float $unappliedCash,
         FinanceSetting $creditOffsetSettings,
     ): array {
@@ -215,6 +220,16 @@ class PreviewMajorChargeGenerationQuery
             return array_merge($base, [
                 'eligibility_status' => 'ineligible',
                 'eligibility_reason' => 'scholarship_review_pending',
+            ]);
+        }
+
+        // Carried adjustment has a pending_approval restoration proposal for
+        // this semester — same timing invariant as the dossier check above,
+        // mirrored for the restoration decision (Phase 5).
+        if ($hasPendingRestoration) {
+            return array_merge($base, [
+                'eligibility_status' => 'ineligible',
+                'eligibility_reason' => 'scholarship_restoration_pending',
             ]);
         }
 
@@ -365,13 +380,22 @@ class PreviewMajorChargeGenerationQuery
 
         // Restoration gate (Phase 5) parity: no adjustment for THIS semester,
         // but an earlier `applied` adjustment carries forward unresolved.
+        $isCarryForward = false;
         if ($adjustment === null) {
             $adjustment = app(GetUnresolvedPriorAdjustmentQuery::class)
                 ->handle($studentId, $semesterId);
+            $isCarryForward = $adjustment !== null;
         }
 
-        // FIN-04/07: shared resolver owns the capped scholarship math.
-        $discount = $resolver->resolveAdjusted($definition, $baseAmount, $adjustment);
+        // FIN-04/07: shared resolver owns the capped scholarship math. A
+        // restoration only ever changes what a LATER (carry-forward)
+        // semester discounts from — never this adjustment's own target.
+        $discount = $resolver->resolveAdjusted(
+            $definition,
+            $baseAmount,
+            $adjustment,
+            $isCarryForward ? $adjustment->effectiveAdjustedAmount() : null,
+        );
 
         if ($discount <= 0 && $adjustment === null) {
             return $empty;

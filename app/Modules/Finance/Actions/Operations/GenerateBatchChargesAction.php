@@ -20,6 +20,7 @@ use App\Modules\Finance\Services\InvoiceGenerationService;
 use App\Modules\Finance\Support\BillingAccountProvisioner;
 use App\Modules\Finance\Support\BillingScopeHelper;
 use App\Modules\Finance\Support\EgcLevelFeeResolver;
+use App\Modules\Finance\Support\PendingScholarshipRestorationReader;
 use App\Modules\Finance\Support\ScholarshipAdjustmentTimingGuard;
 use App\Modules\Finance\Support\ScholarshipDiscountResolver;
 use App\Modules\Finance\Support\SettlementMutationGuard;
@@ -86,6 +87,13 @@ class GenerateBatchChargesAction
         $inFlightByStudent = app(PendingScholarshipAdjustmentReader::class)
             ->inFlightByStudent($students->pluck('id')->all(), $semesterId);
 
+        // Set-based, once per run: a student carrying an adjustment forward
+        // with a pending_approval restoration proposal must not get a new
+        // tuition_term charge either — same timing invariant as the dossier
+        // check above, mirrored for the restoration decision (Phase 5).
+        $pendingRestorationByStudent = app(PendingScholarshipRestorationReader::class)
+            ->pendingByStudent($students->pluck('id')->all(), $semesterId);
+
         $stats = [
             'total_students' => $students->count(),
             'created_count' => 0,
@@ -95,6 +103,7 @@ class GenerateBatchChargesAction
             'failed_count' => 0,
             'errors' => [],
             'deferred_scholarship_review' => [],
+            'deferred_scholarship_restoration_pending' => [],
         ];
 
         DB::beginTransaction();
@@ -104,9 +113,10 @@ class GenerateBatchChargesAction
                     $canGenerateEgc = in_array(FinanceCharge::TYPE_EGC_LEVEL_FEE, $chargeTypes, true)
                         && $studentChargeTimingResolver->shouldGenerateEgcForSemester($student, $semesterId);
                     $blockTuitionForScholarshipReview = $inFlightByStudent[$student->id] ?? false;
+                    $blockTuitionForRestorationPending = $pendingRestorationByStudent[$student->id] ?? false;
                     $tuitionOtherwiseDue = in_array(FinanceCharge::TYPE_TUITION_TERM, $chargeTypes, true)
                         && $studentChargeTimingResolver->shouldGenerateTuitionForSemester($student, $semesterId);
-                    $canGenerateTuition = $tuitionOtherwiseDue && ! $blockTuitionForScholarshipReview;
+                    $canGenerateTuition = $tuitionOtherwiseDue && ! $blockTuitionForScholarshipReview && ! $blockTuitionForRestorationPending;
                     // Only a student whose tuition was actually due gets counted/
                     // notified as deferred — otherwise a not-due student would be
                     // wrongly told their (never-going-to-exist) tuition is on hold.
@@ -114,6 +124,9 @@ class GenerateBatchChargesAction
                     // EGC+tuition run still reports the tuition-side deferral.
                     if ($tuitionOtherwiseDue && $blockTuitionForScholarshipReview) {
                         $stats['deferred_scholarship_review'][] = $student->id;
+                    }
+                    if ($tuitionOtherwiseDue && $blockTuitionForRestorationPending) {
+                        $stats['deferred_scholarship_restoration_pending'][] = $student->id;
                     }
                     // FIN-REV-020-02 (M2): a fully deferred semester enrollment is
                     // non-billable (PRESERVE and FORFEIT alike), so no charge is
@@ -191,7 +204,7 @@ class GenerateBatchChargesAction
 
                     // Decision: If no reusable invoice exists and no new charges are expected -> skip.
                     if (! $reusableInvoice && ! $shouldGenInvoice) {
-                        if ($blockTuitionForScholarshipReview) {
+                        if ($blockTuitionForScholarshipReview || $blockTuitionForRestorationPending) {
                             $stats['skipped_count']++;
                         }
 
@@ -378,7 +391,7 @@ class GenerateBatchChargesAction
                             });
                         }
 
-                        if ($blockTuitionForScholarshipReview) {
+                        if ($blockTuitionForScholarshipReview || $blockTuitionForRestorationPending) {
                             $stats['skipped_count']++;
                         }
 
@@ -534,6 +547,9 @@ class GenerateBatchChargesAction
             $scholarshipDef,
             $invoiceBase > 0 ? $invoiceBase : $baseAmount,
             $adjustment,
+            // A restoration only ever changes what a LATER (carry-forward)
+            // semester discounts from — never this adjustment's own target.
+            $isCarryForward ? $adjustment->effectiveAdjustedAmount() : null,
         );
 
         if ($existingAmount !== null && abs((float) $existingAmount - $discount) < 0.01) {

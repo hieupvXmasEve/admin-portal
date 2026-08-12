@@ -45,12 +45,14 @@ class ScholarshipRestorationProposal extends Model
         'evaluated_semester_id',
         'status',
         'reason',
+        'restored_amount',
         'proposed_by_user_id',
         'approved_by_user_id',
         'approved_at',
     ];
 
     protected $casts = [
+        'restored_amount' => 'decimal:2',
         'approved_at' => 'datetime',
     ];
 

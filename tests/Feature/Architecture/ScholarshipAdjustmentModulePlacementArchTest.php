@@ -120,7 +120,10 @@ it('keeps the P5 restoration proposal in Finance and the verdict/dossier-close i
 
     expect(file_exists($workspace.'/app/Modules/Finance/Models/ScholarshipRestorationProposal.php'))->toBeTrue()
         ->and(file_exists($workspace.'/app/Modules/Academic/Progression/Queries/ScholarshipRestorationVerdictQuery.php'))->toBeTrue()
-        ->and(file_exists($workspace.'/app/Modules/Academic/Progression/Actions/ScholarshipAdjustment/CloseDossierAction.php'))->toBeTrue();
+        ->and(file_exists($workspace.'/app/Modules/Academic/Progression/Actions/ScholarshipAdjustment/CloseDossierAction.php'))->toBeTrue()
+        // Restoration is UI-action-only (validation decision 2026-08-12) — the
+        // console command must not come back.
+        ->and(file_exists($workspace.'/app/Console/Commands/EvaluateScholarshipRestorations.php'))->toBeFalse();
 
     $strayModels = glob($workspace.'/app/Modules/Academic/Models/ScholarshipRestoration*.php') ?: [];
     $strayQueries = glob($workspace.'/app/Modules/Finance/Queries/ScholarshipRestorationVerdict*.php') ?: [];
@@ -133,7 +136,6 @@ it('keeps the P5 restoration proposal in Finance and the verdict/dossier-close i
     $financeRestorationFiles = array_merge(
         glob($workspace.'/app/Modules/Finance/Actions/*RestorationProposal*.php') ?: [],
         glob($workspace.'/app/Modules/Finance/Queries/*UnresolvedPriorAdjustment*.php') ?: [],
-        glob($workspace.'/app/Console/Commands/EvaluateScholarshipRestorations.php') ?: [],
     );
 
     expect($financeRestorationFiles)->not->toBeEmpty();

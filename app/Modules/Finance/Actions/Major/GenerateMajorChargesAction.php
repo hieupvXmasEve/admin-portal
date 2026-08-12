@@ -10,6 +10,7 @@ use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Services\InvoiceGenerationService;
+use App\Modules\Finance\Support\PendingScholarshipRestorationReader;
 use App\Modules\Finance\Support\StudentChargeTimingResolver;
 use App\Modules\Finance\Support\VoucherDiscountAmountResolver;
 use App\Shared\Contracts\Academic\PendingScholarshipAdjustmentReader;
@@ -23,7 +24,7 @@ class GenerateMajorChargesAction
 {
     /**
      * @param  array{semester_id: int, due_date: string, student_ids: array<int, int>}  $data
-     * @return array{created: int, skipped: int, failed: int, errors: array<int, string>, deferred_scholarship_review: array<int, int>}
+     * @return array{created: int, skipped: int, failed: int, errors: array<int, string>, deferred_scholarship_review: array<int, int>, deferred_scholarship_restoration_pending: array<int, int>}
      */
     public static function run(array $data): array
     {
@@ -46,6 +47,7 @@ class GenerateMajorChargesAction
             'failed' => 0,
             'errors' => [],
             'deferred_scholarship_review' => [],
+            'deferred_scholarship_restoration_pending' => [],
         ];
 
         if ($studentIds->isEmpty()) {
@@ -60,6 +62,14 @@ class GenerateMajorChargesAction
         // charge (timing invariant — see plan skip-tuition-generation-pending-scholarship-review).
         $inFlightByStudent = app(PendingScholarshipAdjustmentReader::class)
             ->inFlightByStudent($studentIds->all(), $semesterId);
+
+        // Same timing invariant, mirrored for a carried-forward adjustment with
+        // a pending_approval restoration proposal (Phase 5, scholarship-restoration-watchlist).
+        // THIS is the live batch-studio commit path (BatchStudioController::
+        // commitCharges -> GenerateMajorChargesAction) — the sibling
+        // GenerateBatchChargesAction is a billing-exception repair tool only.
+        $pendingRestorationByStudent = app(PendingScholarshipRestorationReader::class)
+            ->pendingByStudent($studentIds->all(), $semesterId);
 
         DB::beginTransaction();
         try {
@@ -97,6 +107,13 @@ class GenerateMajorChargesAction
                     if ($inFlightByStudent[$studentId] ?? false) {
                         $stats['skipped']++;
                         $stats['deferred_scholarship_review'][] = (int) $studentId;
+
+                        continue;
+                    }
+
+                    if ($pendingRestorationByStudent[$studentId] ?? false) {
+                        $stats['skipped']++;
+                        $stats['deferred_scholarship_restoration_pending'][] = (int) $studentId;
 
                         continue;
                     }

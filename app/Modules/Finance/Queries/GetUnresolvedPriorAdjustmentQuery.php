@@ -11,8 +11,14 @@ use App\Modules\Finance\Models\ScholarshipSemesterAdjustment;
 /**
  * The generation-time restoration gate (Phase 5). Finds the latest `applied`
  * adjustment for a student whose target semester is strictly before the
- * given semester and has NO approved restoration proposal — the case where
- * the original award must NOT be silently restored.
+ * given semester and has NO approved FULL-restore proposal — the case where
+ * the original award must NOT be silently restored. A partial restoration
+ * keeps the row carried — the caller MUST resolve the effective (possibly
+ * restored) amount via ScholarshipSemesterAdjustment::effectiveAdjustedAmount()
+ * and pass it as ScholarshipDiscountResolver::resolveAdjusted()'s
+ * $effectiveAmountOverride; the returned model's own adjusted_amount
+ * attribute is left untouched (it still reflects this adjustment's own
+ * target-semester rate, used elsewhere for display).
  *
  * Callers use this ONLY after GetActiveScholarshipAdjustmentQuery for the
  * current semester returns null: a new adjustment for the current semester
@@ -37,7 +43,11 @@ class GetUnresolvedPriorAdjustmentQuery
                 ->whereNotNull('start_date')
                 ->where('start_date', '<', $currentSemester->start_date))
             ->whereDoesntHave('restorationProposals', fn ($query) => $query
-                ->where('status', ScholarshipRestorationProposal::STATUS_APPROVED))
+                ->where('status', ScholarshipRestorationProposal::STATUS_APPROVED)
+                ->whereNull('restored_amount'))
+            // Avoid N+1 in the batch consumer: effectiveAdjustedAmount() reads
+            // this relation directly instead of issuing a per-row query.
+            ->with('approvedRestorationProposals')
             // Most recent prior by SEMESTER (start_date), not insert order — an
             // out-of-order backfill must not carry the wrong semester's rate.
             ->join('semesters as prior_target', 'prior_target.id', '=', 'scholarship_semester_adjustments.target_semester_id')

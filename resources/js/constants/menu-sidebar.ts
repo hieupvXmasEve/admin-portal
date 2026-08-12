@@ -288,6 +288,12 @@ export const mainNavGroups: NavGroup[] = [
                         requiredPermissions: ['view_student_action'],
                     },
                     {
+                        title: 'Scholarship Restoration Watchlist',
+                        href: studentRoutes.scholarshipRestorationWatchlist(),
+                        icon: Clock,
+                        requiredPermissions: ['view_student_action'],
+                    },
+                    {
                         title: 'Student Decisions',
                         href: studentRoutes.studentDecisionsIndex(),
                         icon: FileText,

@@ -26,6 +26,7 @@ use App\Modules\Finance\Http\Web\Admin\LifecycleDueExceptionHistoryController;
 use App\Modules\Finance\Http\Web\Admin\MajorChargeGenerationController;
 use App\Modules\Finance\Http\Web\Admin\PaymentController;
 use App\Modules\Finance\Http\Web\Admin\PricingOperationsController;
+use App\Modules\Finance\Http\Web\Admin\ScholarshipRestorationController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(function () {
@@ -344,5 +345,19 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
             ->middleware('can:view_finance_batch_studio')->name('reminders');
         Route::post('/reminders', [BatchStudioController::class, 'commitReminders'])
             ->middleware('can:view_finance_operations_due_calendar')->name('reminders.commit');
+    });
+
+    // Scholarship restoration decision loop (Phase 2). Propose is gated by the
+    // same permission CreateRestorationProposalAction re-checks at the
+    // adjustment's campus (restore_scholarship); approve/reject by the one
+    // ApproveRestorationProposalAction/RejectRestorationProposalAction
+    // re-check (approve_scholarship_adjustment) — no new permission.
+    Route::prefix('scholarship-restorations')->name('scholarship-restorations.')->group(function () {
+        Route::post('adjustments/{adjustment}', [ScholarshipRestorationController::class, 'propose'])
+            ->middleware('can:restore_scholarship')->name('propose');
+        Route::post('{proposal}/approve', [ScholarshipRestorationController::class, 'approve'])
+            ->middleware('can:approve_scholarship_adjustment')->name('approve');
+        Route::post('{proposal}/reject', [ScholarshipRestorationController::class, 'reject'])
+            ->middleware('can:approve_scholarship_adjustment')->name('reject');
     });
 });

@@ -12,6 +12,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 
 /**
  * Per-semester scholarship adjustment approved by the Academic maker-checker
@@ -129,5 +130,84 @@ class ScholarshipSemesterAdjustment extends Model
     public function restorationProposals(): HasMany
     {
         return $this->hasMany(ScholarshipRestorationProposal::class, 'scholarship_semester_adjustment_id');
+    }
+
+    /**
+     * Scoped down to APPROVED only — used wherever a caller only ever cares
+     * about approved history, so eager-loading it can never be mistaken for
+     * the general restorationProposals() relation (pending/rejected rows
+     * would silently vanish if a consumer touched the wrong one).
+     */
+    public function approvedRestorationProposals(): HasMany
+    {
+        return $this->restorationProposals()->where('status', ScholarshipRestorationProposal::STATUS_APPROVED);
+    }
+
+    /**
+     * The most recently approved restoration proposal, or null if none.
+     * "Most recent" = latest approved_at, tie-broken by id (approved_at is
+     * only second-granularity, so two approvals in the same second must not
+     * resolve to whichever happened to insert first).
+     *
+     * Uses the loaded approvedRestorationProposals relation when present
+     * (GetUnresolvedPriorAdjustmentQuery eager-loads it to avoid N+1 in the
+     * batch/major-preview consumers); falls back to a query otherwise.
+     */
+    public function latestApprovedRestoration(): ?ScholarshipRestorationProposal
+    {
+        if (! $this->exists) {
+            return null;
+        }
+
+        $proposals = $this->relationLoaded('approvedRestorationProposals')
+            ? $this->approvedRestorationProposals
+            : $this->approvedRestorationProposals()->get();
+
+        return self::pickLatestApproved($proposals);
+    }
+
+    /**
+     * Shared tie-break so the floor CreateRestorationProposalAction validates
+     * against and the amount the resolver actually charges can never disagree.
+     *
+     * @param  Collection<int, ScholarshipRestorationProposal>  $proposals  Must already be APPROVED-only.
+     */
+    public static function pickLatestApproved(Collection $proposals): ?ScholarshipRestorationProposal
+    {
+        return $proposals
+            ->sort(fn (ScholarshipRestorationProposal $a, ScholarshipRestorationProposal $b) => [$a->approved_at?->getTimestamp() ?? 0, $a->id]
+                <=> [$b->approved_at?->getTimestamp() ?? 0, $b->id])
+            ->last();
+    }
+
+    /**
+     * The amount a CARRY-FORWARD charge (a LATER semester than this
+     * adjustment's own target) must discount from, honoring a partial
+     * restoration. Same unit convention as adjusted_amount (value of
+     * original_type — "remaining value", not a deduction):
+     *
+     * - No approved proposal at all           → adjusted_amount (today's rate).
+     * - Latest approved, restored_amount NULL → full restore (caller should
+     *   already have excluded this row via GetUnresolvedPriorAdjustmentQuery;
+     *   defensive fallback to adjusted_amount if reached directly).
+     * - Latest approved, restored_amount set  → that partial amount.
+     *
+     * MUST NOT be used for this adjustment's own target-semester charge — a
+     * restoration only ever changes what LATER semesters carry forward, never
+     * the already-billed penalized semester itself (that stays at
+     * adjusted_amount forever, by design — see ScholarshipDiscountResolver,
+     * which reads adjusted_amount directly and never calls this method).
+     */
+    public function effectiveAdjustedAmount(): float
+    {
+        $latestApproved = $this->latestApprovedRestoration();
+
+        if ($latestApproved === null) {
+            return (float) $this->adjusted_amount;
+        }
+
+        return $latestApproved->restored_amount !== null
+            ? (float) $latestApproved->restored_amount
+            : (float) $this->adjusted_amount;
     }
 }
