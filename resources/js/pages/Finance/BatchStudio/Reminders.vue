@@ -160,6 +160,8 @@ function onNext() {
                         :selected="wizard.selected.value"
                         :counts="wizard.counts.value"
                         @toggle="wizard.toggle"
+                        @select-all="(keys) => wizard.setSelection(keys, true)"
+                        @deselect-all="(keys) => wizard.setSelection(keys, false)"
                     />
                 </div>
 

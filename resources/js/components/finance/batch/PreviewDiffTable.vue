@@ -26,6 +26,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
     (e: 'toggle', key: string): void;
+    (e: 'select-all', keys: string[]): void;
+    (e: 'deselect-all', keys: string[]): void;
     (e: 'export'): void;
     (e: 'update-block-count', key: string, count: number): void;
 }>();
@@ -89,6 +91,27 @@ const rows = computed(() => {
 });
 
 const selectedInView = computed(() => rows.value.filter((l) => props.selected.has(l.key)).length);
+
+// Rows with an enabled checkbox in the current filter/search view — "skip"
+// rows have a disabled checkbox (see the Checkbox binding below) and must
+// never be force-selected by "Chọn tất cả".
+const selectableRowKeys = computed(() => rows.value.filter((l) => l.display.diff !== 'skip').map((l) => l.key));
+
+const allSelectedInView = computed(() => selectableRowKeys.value.length > 0 && selectableRowKeys.value.every((key) => props.selected.has(key)));
+
+// true/false/'indeterminate' drives the reka-ui Checkbox tri-state directly.
+const headerCheckboxState = computed<boolean | 'indeterminate'>(() => {
+    if (selectedInView.value === 0) return false;
+    return allSelectedInView.value ? true : 'indeterminate';
+});
+
+function onHeaderCheckboxChange(value: boolean | 'indeterminate'): void {
+    if (value === true) {
+        emit('select-all', selectableRowKeys.value);
+    } else {
+        emit('deselect-all', selectableRowKeys.value);
+    }
+}
 
 const pageSizeOptions = [10, 25, 50, 100];
 const pageSize = ref(25);
@@ -220,17 +243,21 @@ function sortIcon(key: SortKey) {
                         <Search class="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
                         <Input v-model="search" placeholder="Tìm theo tên hoặc mã SV…" class="pl-8" />
                     </div>
-                    <Button v-if="exportable" variant="outline" size="sm" class="shrink-0" @click="emit('export')">
-                        <Download class="mr-2 h-4 w-4" />
-                        Xuất Excel
-                    </Button>
+                    <div class="flex shrink-0 items-center gap-2">
+                        <Button v-if="exportable" variant="outline" size="sm" @click="emit('export')">
+                            <Download class="mr-2 h-4 w-4" />
+                            Xuất Excel
+                        </Button>
+                    </div>
                 </div>
 
                 <div class="rounded-lg border">
                     <Table container-class="max-h-[min(42rem,75vh)] overflow-auto rounded-lg">
                         <TableHeader class="bg-background sticky top-0 z-10">
                             <TableRow>
-                                <TableHead class="w-12 px-4" />
+                                <TableHead class="w-12 px-4">
+                                    <Checkbox :model-value="headerCheckboxState" :disabled="selectableRowKeys.length === 0" title="Chọn / bỏ chọn tất cả trong bộ lọc" @update:model-value="onHeaderCheckboxChange" />
+                                </TableHead>
                                 <TableHead class="min-w-[14rem] cursor-pointer px-4" @click="toggleSort('label')"> Sinh viên <component :is="sortIcon('label')" class="inline h-3 w-3" /> </TableHead>
                                 <TableHead v-if="majorDetails" class="min-w-[10rem] cursor-pointer px-4" @click="toggleSort('program_name')"> Ngành <component :is="sortIcon('program_name')" class="inline h-3 w-3" /> </TableHead>
                                 <TableHead v-if="majorDetails" class="w-20 cursor-pointer px-4" title="Số thứ tự kỳ đóng học phí trong lộ trình của sinh viên (không phải kỳ lịch)" @click="toggleSort('term_number')">

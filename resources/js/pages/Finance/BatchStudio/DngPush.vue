@@ -276,7 +276,15 @@ function retryFailedSubset() {
                     </CardContent>
                 </Card>
 
-                <PreviewDiffTable v-else-if="step === 2" :lines="wizard.lines.value" :selected="wizard.selected.value" :counts="wizard.counts.value" @toggle="wizard.toggle" />
+                <PreviewDiffTable
+                    v-else-if="step === 2"
+                    :lines="wizard.lines.value"
+                    :selected="wizard.selected.value"
+                    :counts="wizard.counts.value"
+                    @toggle="wizard.toggle"
+                    @select-all="(keys) => wizard.setSelection(keys, true)"
+                    @deselect-all="(keys) => wizard.setSelection(keys, false)"
+                />
 
                 <div v-else-if="step === 3" class="mx-auto max-w-2xl space-y-4">
                     <Card>

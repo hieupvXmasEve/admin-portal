@@ -56,6 +56,18 @@ export function useBatchStudio<TSetup extends Record<string, unknown>>(config: B
         selected.value = next;
     }
 
+    function setSelection(keys: string[], value: boolean): void {
+        const next = new Set(selected.value);
+        for (const key of keys) {
+            if (value) {
+                next.add(key);
+            } else {
+                next.delete(key);
+            }
+        }
+        selected.value = next;
+    }
+
     function excludeWarnings(): void {
         selected.value = new Set(
             [...selected.value].filter((k) => lines.value.find((l) => l.key === k)?.display.diff !== 'warning'),
@@ -121,6 +133,7 @@ export function useBatchStudio<TSetup extends Record<string, unknown>>(config: B
         previewing,
         runPreview,
         toggle,
+        setSelection,
         excludeWarnings,
         commit,
     };

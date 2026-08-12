@@ -275,6 +275,8 @@ function prepareNonAcademicScope(): boolean {
                     :major-context="wizard.summary.value.major_context"
                     exportable
                     @toggle="wizard.toggle"
+                    @select-all="(keys) => wizard.setSelection(keys, true)"
+                    @deselect-all="(keys) => wizard.setSelection(keys, false)"
                     @export="exportPreview"
                     @update-block-count="setBlockOverride"
                 />
