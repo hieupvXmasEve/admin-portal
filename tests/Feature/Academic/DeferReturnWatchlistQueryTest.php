@@ -35,25 +35,27 @@ function watchlistStudent(Campus $campus, Program $program, string $code, string
         ]);
 }
 
-function watchlistDefer(Student $student, User $user, Semester $fromSemester, Semester $returnSemester): StudentActionLog
+function watchlistDefer(Student $student, User $user, Semester $fromSemester, Semester $returnSemester, ?string $previousStatus = null): StudentActionLog
 {
     return StudentActionLog::query()->create([
         'student_id' => $student->id,
         'action_type' => StudentActionType::ACADEMIC_DEFER->value,
         'from_semester_id' => $fromSemester->id,
         'return_semester_id' => $returnSemester->id,
+        'previous_status' => $previousStatus,
         'reason' => 'Watchlist fixture',
         'changed_by_user_id' => $user->id,
     ]);
 }
 
-function watchlistWaiting(Student $student, User $user, Semester $fromSemester): StudentActionLog
+function watchlistWaiting(Student $student, User $user, Semester $fromSemester, ?string $previousStatus = null): StudentActionLog
 {
     return StudentActionLog::query()->create([
         'student_id' => $student->id,
         'action_type' => StudentActionType::WAITING_COURSE_OPENING->value,
         'from_semester_id' => $fromSemester->id,
         'egc_defer_from_block_number' => 1,
+        'previous_status' => $previousStatus,
         'reason' => 'Watchlist fixture',
         'changed_by_user_id' => $user->id,
     ]);
@@ -178,4 +180,45 @@ it('returns bucket counts unaffected by the bucket filter and by pagination', fu
 
     expect($counts)->toBe(['overdue' => 1, 'upcoming' => 1, 'waiting' => 1])
         ->and($filtered->total())->toBe(1);
+});
+
+it('formats anchor dates as d/m/Y, the repo-wide date convention', function () {
+    $student = watchlistStudent($this->campus, $this->program, 'SE800017', 'deferred');
+    $from = Semester::factory()->create(['start_date' => now()->subMonths(6), 'end_date' => now()->subMonths(3)]);
+    $return = Semester::factory()->create(['start_date' => '2026-03-15', 'end_date' => '2026-07-20']);
+    watchlistDefer($student, $this->user, $from, $return);
+
+    $row = (new GetDeferReturnWatchlistQuery)->handle([], $this->campus->id)->items()[0];
+
+    expect($row['anchor_start_date'])->toBe('15/03/2026')
+        ->and($row['anchor_end_date'])->toBe('20/07/2026');
+});
+
+it('exposes the status the student held right before the defer/waiting action', function () {
+    $student = watchlistStudent($this->campus, $this->program, 'SE800013', 'deferred');
+    $from = Semester::factory()->create(['start_date' => now()->subMonths(6), 'end_date' => now()->subMonths(3)]);
+    $return = Semester::factory()->create(['start_date' => now()->subWeek(), 'end_date' => now()->addMonths(2)]);
+    watchlistDefer($student, $this->user, $from, $return, 'intake_course');
+
+    $result = (new GetDeferReturnWatchlistQuery)->handle([], $this->campus->id);
+
+    expect($result->items()[0]['previous_status'])->toBe('intake_course');
+});
+
+it('filters by the return semester on the defer leg and excludes waiting rows anchored elsewhere', function () {
+    $from = Semester::factory()->create(['start_date' => now()->subMonths(6), 'end_date' => now()->subMonths(3)]);
+    $targetReturn = Semester::factory()->create(['start_date' => now()->addMonths(2), 'end_date' => now()->addMonths(5)]);
+    $otherReturn = Semester::factory()->create(['start_date' => now()->addMonths(4), 'end_date' => now()->addMonths(7)]);
+
+    $matching = watchlistStudent($this->campus, $this->program, 'SE800014', 'deferred');
+    $other = watchlistStudent($this->campus, $this->program, 'SE800015', 'deferred');
+    $waiting = watchlistStudent($this->campus, $this->program, 'SE800016', 'pending_course_opening');
+    watchlistDefer($matching, $this->user, $from, $targetReturn);
+    watchlistDefer($other, $this->user, $from, $otherReturn);
+    watchlistWaiting($waiting, $this->user, $from);
+
+    $result = (new GetDeferReturnWatchlistQuery)->handle(['semester_id' => $targetReturn->id], $this->campus->id);
+
+    expect($result->total())->toBe(1)
+        ->and($result->items()[0]['student_code'])->toBe('SE800014');
 });

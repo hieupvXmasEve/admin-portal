@@ -134,6 +134,7 @@ class AcademicProgressionAuditController extends Controller
         $validated = $request->validate([
             'search' => ['nullable', 'string', 'max:255'],
             'bucket' => ['nullable', 'string', 'in:overdue,upcoming,waiting'],
+            'semester_id' => ['nullable', 'integer', 'exists:semesters,id'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
@@ -145,7 +146,11 @@ class AcademicProgressionAuditController extends Controller
             'filters' => [
                 'search' => $validated['search'] ?? null,
                 'bucket' => $validated['bucket'] ?? null,
+                'semester_id' => $validated['semester_id'] ?? null,
                 'per_page' => $validated['per_page'] ?? 25,
+            ],
+            'options' => [
+                'semesters' => $this->semesters->auditOptions(),
             ],
         ]);
     }
@@ -158,6 +163,7 @@ class AcademicProgressionAuditController extends Controller
         $validated = $request->validate([
             'search' => ['nullable', 'string', 'max:255'],
             'bucket' => ['nullable', 'string', 'in:overdue,upcoming,waiting'],
+            'semester_id' => ['nullable', 'integer', 'exists:semesters,id'],
         ]);
 
         $builder = $query->baseQuery($validated, session('current_campus_id'));

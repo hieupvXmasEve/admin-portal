@@ -5,9 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { useTableFilters } from '@/composables/useFilters';
 import type { PaginatedResponse } from '@/types';
+import { getStudentStatusBadgeClass, getStudentStatusLabel } from '@/types/student';
 import { studentRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
 import { CalendarClock, CheckCircle2, Download, RefreshCw, Search } from 'lucide-vue-next';
@@ -15,6 +17,7 @@ import { computed } from 'vue';
 
 type Bucket = 'overdue' | 'upcoming' | 'waiting';
 type Severity = 'in_semester' | 'semester_ended' | null;
+type BadgeColor = 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning' | 'info' | 'purple' | 'indigo';
 
 interface Campus {
     id: number;
@@ -37,6 +40,7 @@ interface DeferReturnRow {
     student_code: string;
     student_name: string;
     student_status: string;
+    previous_status: string | null;
     campus: Campus | null;
     anchor_semester: AnchorSemester | null;
     anchor_start_date: string | null;
@@ -53,13 +57,23 @@ interface DeferReturnCounts {
 interface DeferReturnFilters {
     search: string | null;
     bucket: Bucket | '' | null;
+    semester_id: number | null;
     per_page: number;
+}
+
+interface SemesterOption {
+    id: number;
+    code: string | null;
+    name: string | null;
 }
 
 interface Props {
     rows: PaginatedResponse<DeferReturnRow>;
     counts: DeferReturnCounts;
     filters: DeferReturnFilters;
+    options: {
+        semesters: SemesterOption[];
+    };
 }
 
 const props = defineProps<Props>();
@@ -69,6 +83,8 @@ const { filters, clearFilters, handlePaginationNavigate, handlePageSizeChange, u
     props.filters,
     ['rows', 'counts', 'filters'],
 );
+
+const setSemester = (value: string) => updateField('semester_id', value === 'all' ? null : Number(value));
 
 const tabs: Array<{ value: Bucket | ''; label: string }> = [
     { value: '', label: 'All' },
@@ -87,12 +103,15 @@ const exportUrl = computed(() => {
     const params = new URLSearchParams();
     if (filters.value.search) params.set('search', filters.value.search);
     if (filters.value.bucket) params.set('bucket', filters.value.bucket);
+    if (filters.value.semester_id) params.set('semester_id', String(filters.value.semester_id));
 
     const query = params.toString();
     return `${studentRoutes.academicProgressionDeferReturnsExport()}${query ? `?${query}` : ''}`;
 });
 
-const formatDate = (value: string | null): string => (value ? value.slice(0, 10) : '—');
+// Dates arrive pre-formatted d/m/Y from the backend (repo-wide date
+// convention) — display as-is, no reformatting on the frontend.
+const formatDate = (value: string | null): string => value ?? '—';
 
 const daysLabel = (row: DeferReturnRow): string => {
     if (row.days_elapsed === null) return '—';
@@ -103,9 +122,16 @@ const daysLabel = (row: DeferReturnRow): string => {
     return `quá hạn ${row.days_elapsed} ngày`;
 };
 
-const severityBadgeVariant = (severity: Severity): 'destructive' | 'outline' => (severity === 'semester_ended' ? 'destructive' : 'outline');
+const daysBadgeVariant = (row: DeferReturnRow): BadgeColor => {
+    if (row.bucket === 'overdue') return row.severity === 'semester_ended' ? 'destructive' : 'warning';
+    if (row.bucket === 'upcoming') return 'info';
+
+    return 'purple';
+};
 
 const bucketLabel = (bucket: Bucket): string => (bucket === 'overdue' ? 'Overdue' : bucket === 'upcoming' ? 'Upcoming' : 'Waiting');
+
+const bucketBadgeVariant = (bucket: Bucket): BadgeColor => (bucket === 'overdue' ? 'destructive' : bucket === 'upcoming' ? 'info' : 'warning');
 </script>
 
 <template>
@@ -177,7 +203,7 @@ const bucketLabel = (bucket: Bucket): string => (bucket === 'overdue' ? 'Overdue
                         </Button>
                     </div>
 
-                    <div class="flex items-end gap-4">
+                    <div class="flex flex-wrap items-end gap-4">
                         <div class="w-full space-y-2 sm:w-64">
                             <Label>Search Student</Label>
                             <div class="relative">
@@ -189,6 +215,21 @@ const bucketLabel = (bucket: Bucket): string => (bucket === 'overdue' ? 'Overdue
                                     class="pl-8"
                                 />
                             </div>
+                        </div>
+
+                        <div class="w-full space-y-2 sm:w-56">
+                            <Label>Return Semester</Label>
+                            <Select :model-value="filters.semester_id ? String(filters.semester_id) : 'all'" @update:model-value="(v) => setSemester(String(v))">
+                                <SelectTrigger>
+                                    <SelectValue placeholder="All semesters" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All semesters</SelectItem>
+                                    <SelectItem v-for="sem in options.semesters" :key="sem.id" :value="String(sem.id)">
+                                        {{ sem.code ?? sem.name }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
 
                         <Button variant="outline" @click="clearFilters">
@@ -226,6 +267,7 @@ const bucketLabel = (bucket: Bucket): string => (bucket === 'overdue' ? 'Overdue
                                 <th class="px-4 py-3 text-left font-medium">Return / anchor semester</th>
                                 <th class="px-4 py-3 text-left font-medium">Date</th>
                                 <th class="px-4 py-3 text-left font-medium">Days</th>
+                                <th class="px-4 py-3 text-left font-medium">Status before</th>
                                 <th class="px-4 py-3 text-left font-medium">Status</th>
                                 <th class="px-4 py-3 text-left font-medium">Action</th>
                             </tr>
@@ -240,16 +282,23 @@ const bucketLabel = (bucket: Bucket): string => (bucket === 'overdue' ? 'Overdue
                                 </td>
                                 <td class="px-4 py-3">{{ row.campus?.name ?? '—' }}</td>
                                 <td class="px-4 py-3">
-                                    <Badge variant="outline">{{ bucketLabel(row.bucket) }}</Badge>
+                                    <Badge :variant="bucketBadgeVariant(row.bucket)">{{ bucketLabel(row.bucket) }}</Badge>
                                 </td>
                                 <td class="px-4 py-3">{{ row.anchor_semester?.code ?? '—' }}</td>
                                 <td class="px-4 py-3">{{ formatDate(row.anchor_start_date) }}</td>
                                 <td class="px-4 py-3">
-                                    <Badge v-if="row.bucket === 'overdue'" :variant="severityBadgeVariant(row.severity)">{{ daysLabel(row) }}</Badge>
-                                    <span v-else>{{ daysLabel(row) }}</span>
+                                    <Badge :variant="daysBadgeVariant(row)">{{ daysLabel(row) }}</Badge>
                                 </td>
                                 <td class="px-4 py-3">
-                                    <Badge variant="secondary">{{ row.student_status }}</Badge>
+                                    <span v-if="row.previous_status" :class="`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStudentStatusBadgeClass(row.previous_status)}`">
+                                        {{ getStudentStatusLabel(row.previous_status) }}
+                                    </span>
+                                    <span v-else>—</span>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <span :class="`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStudentStatusBadgeClass(row.student_status)}`">
+                                        {{ getStudentStatusLabel(row.student_status) }}
+                                    </span>
                                 </td>
                                 <td class="px-4 py-3">
                                     <Button size="sm" variant="outline" @click="goToStudentLifecycle(row.student_pk)"> View lifecycle </Button>

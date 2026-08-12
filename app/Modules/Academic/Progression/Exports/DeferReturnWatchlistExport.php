@@ -32,6 +32,7 @@ class DeferReturnWatchlistExport implements FromQuery, WithHeadings, WithMapping
             'Anchor Semester',
             'Anchor Start Date',
             'Days Elapsed',
+            'Status Before Action',
             'Student Status',
         ];
     }
@@ -51,6 +52,7 @@ class DeferReturnWatchlistExport implements FromQuery, WithHeadings, WithMapping
             $row->anchor_semester_code ?? '',
             $row->anchor_start_date ?? '',
             $row->days_elapsed ?? '',
+            $row->previous_status ?? '',
             $row->student_status,
         ];
     }

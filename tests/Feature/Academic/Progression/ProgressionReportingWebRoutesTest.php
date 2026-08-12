@@ -207,6 +207,7 @@ describe('academic progression audit', function (): void {
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->component('Admin/Reports/AcademicProgressionAudit/DeferReturns')
                 ->where('filters.per_page', 25)
+                ->where('options.semesters.0.code', '2026SP')
                 ->has('counts')
             );
     });

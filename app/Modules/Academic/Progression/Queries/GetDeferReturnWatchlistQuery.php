@@ -25,7 +25,7 @@ class GetDeferReturnWatchlistQuery
     private const BUCKETS = ['overdue', 'upcoming', 'waiting'];
 
     /**
-     * @param  array{search?: string|null, bucket?: string|null, per_page?: int|null}  $filters
+     * @param  array{search?: string|null, bucket?: string|null, semester_id?: int|null, per_page?: int|null}  $filters
      */
     public function handle(array $filters = [], ?int $campusId = null): LengthAwarePaginator
     {
@@ -68,18 +68,24 @@ class GetDeferReturnWatchlistQuery
      *
      * Exposed for tests, the export, and reuse; callers normally use handle().
      *
-     * @param  array{search?: string|null, bucket?: string|null}  $filters
+     * @param  array{search?: string|null, bucket?: string|null, semester_id?: int|null}  $filters
      */
     public function baseQuery(array $filters = [], ?int $campusId = null): Builder
     {
         $search = $filters['search'] ?? null;
         $bucket = $filters['bucket'] ?? null;
+        $semesterId = $filters['semester_id'] ?? null;
 
         return DB::query()
             ->fromSub($this->unionSub(), 'rows')
             ->leftJoin('campuses as c', 'c.id', '=', 'rows.campus_id')
             ->when($campusId, fn (Builder $query, $id) => $query->where('rows.campus_id', $id))
             ->when($bucket, fn (Builder $query, $value) => $query->where('rows.bucket', $value))
+            // anchor_semester_id is the return semester on the defer leg and the
+            // from_semester (on-hold anchor) on the waiting leg — see unionSub().
+            // Waiting rows never match a specific return semester by design, so
+            // this filter naturally excludes them once a semester is chosen.
+            ->when($semesterId, fn (Builder $query, $id) => $query->where('rows.anchor_semester_id', $id))
             ->when($search, function (Builder $query, $term): void {
                 $query->where(function (Builder $inner) use ($term): void {
                     $inner->where('rows.student_name', 'like', "%{$term}%")
@@ -95,6 +101,7 @@ class GetDeferReturnWatchlistQuery
                 'rows.student_code',
                 'rows.student_name',
                 'rows.student_status',
+                'rows.previous_status',
                 'rows.campus_id',
                 'c.name as campus_name',
                 'c.code as campus_code',
@@ -137,12 +144,16 @@ class GetDeferReturnWatchlistQuery
                 's.student_id as student_code',
                 's.full_name as student_name',
                 's.status as student_status',
+                'sal.previous_status as previous_status',
                 's.campus_id as campus_id',
                 'sem.id as anchor_semester_id',
                 'sem.code as anchor_semester_code',
                 'sem.name as anchor_semester_name',
-                'sem.start_date as anchor_start_date',
-                'sem.end_date as anchor_end_date',
+                // Repo date convention is d/m/Y (see StudentActionLog::getFormattedSignedAtAttribute
+                // et al.) — formatted here so the frontend and the export both just
+                // display the string, no reformatting on either side.
+                DB::raw("date_format(sem.start_date, '%d/%m/%Y') as anchor_start_date"),
+                DB::raw("date_format(sem.end_date, '%d/%m/%Y') as anchor_end_date"),
                 DB::raw('datediff(curdate(), sem.start_date) as days_elapsed'),
             ]);
 
@@ -161,12 +172,16 @@ class GetDeferReturnWatchlistQuery
                 's.student_id as student_code',
                 's.full_name as student_name',
                 's.status as student_status',
+                'sal.previous_status as previous_status',
                 's.campus_id as campus_id',
                 'sem.id as anchor_semester_id',
                 'sem.code as anchor_semester_code',
                 'sem.name as anchor_semester_name',
-                'sem.start_date as anchor_start_date',
-                'sem.end_date as anchor_end_date',
+                // Repo date convention is d/m/Y (see StudentActionLog::getFormattedSignedAtAttribute
+                // et al.) — formatted here so the frontend and the export both just
+                // display the string, no reformatting on either side.
+                DB::raw("date_format(sem.start_date, '%d/%m/%Y') as anchor_start_date"),
+                DB::raw("date_format(sem.end_date, '%d/%m/%Y') as anchor_end_date"),
                 DB::raw('datediff(curdate(), sem.start_date) as days_elapsed'),
             ]);
 
@@ -183,12 +198,16 @@ class GetDeferReturnWatchlistQuery
      *     student_code: string,
      *     student_name: string,
      *     student_status: string,
+     *     previous_status: string|null,
      *     campus: array{id: int, name: string|null, code: string|null}|null,
      *     anchor_semester: array{id: int, code: string|null, name: string|null}|null,
      *     anchor_start_date: string|null,
      *     anchor_end_date: string|null,
      *     days_elapsed: int|null
      * }
+     *
+     * anchor_start_date / anchor_end_date arrive already formatted d/m/Y
+     * (see unionSub()) — pass through as-is, no reformatting here or on the frontend.
      */
     private function mapRow(object $row): array
     {
@@ -203,6 +222,10 @@ class GetDeferReturnWatchlistQuery
             // so this report displays names the same way every other surface does.
             'student_name' => mb_strtoupper((string) $row->student_name, 'UTF-8'),
             'student_status' => (string) $row->student_status,
+            // Status the student held right before this defer/waiting action
+            // was recorded (student_action_logs.previous_status, set at
+            // action-record time by RecordStudentActionAction).
+            'previous_status' => $row->previous_status === null ? null : (string) $row->previous_status,
             'campus' => $row->campus_id === null ? null : [
                 'id' => (int) $row->campus_id,
                 'name' => $row->campus_name,
