@@ -28,6 +28,7 @@ class CourseOfferingCatalogFormController extends Controller
         if ($form['active_semester'] === null) {
             return Inertia::render('CourseOfferings/Create', [
                 'active_semester' => null,
+                'semesters' => $form['semesters'],
                 'units' => [],
                 'lectures' => [],
                 'syllabus_templates' => [],

@@ -17,7 +17,7 @@ class GetCourseOfferingCatalogFormQuery
     ) {}
 
     /**
-     * @return array{active_semester: array{id: int, name: string, code: string, start_date: mixed, end_date: mixed}|null, units: list<array{unit_id: int, code: string, name: string, credit_points: string, level: int|null, unit_type: string|null}>, lectures: Collection<int, Lecture>, syllabus_templates: list<array<string, mixed>>, semester: array{id: int, name: string, code: string, start_date: mixed, end_date: mixed}|null, unit: array{id: int, code: string, name: string, credit_points: string}|null, syllabus_template: array{id: int, title: string|null, version: string|null, description: string|null}|null}
+     * @return array{active_semester: array{id: int, name: string, code: string, start_date: mixed, end_date: mixed}|null, semesters: list<array{id: int, name: string, code: string, start_date: mixed, end_date: mixed, is_current: bool}>, units: list<array{unit_id: int, code: string, name: string, credit_points: string, level: int|null, unit_type: string|null}>, lectures: Collection<int, Lecture>, syllabus_templates: list<array<string, mixed>>, semester: array{id: int, name: string, code: string, start_date: mixed, end_date: mixed}|null, unit: array{id: int, code: string, name: string, credit_points: string}|null, syllabus_template: array{id: int, title: string|null, version: string|null, description: string|null}|null}
      */
     public function handle(?int $academicPeriodId = null, ?int $unitId = null, ?int $syllabusTemplateId = null): array
     {
@@ -37,6 +37,17 @@ class GetCourseOfferingCatalogFormQuery
                 'start_date' => $activePeriod->start_date,
                 'end_date' => $activePeriod->end_date,
             ],
+            'semesters' => array_map(
+                static fn ($period): array => [
+                    'id' => $period->id,
+                    'name' => $period->name,
+                    'code' => $period->code,
+                    'start_date' => $period->start_date,
+                    'end_date' => $period->end_date,
+                    'is_current' => $period->is_current,
+                ],
+                $this->catalog->offeringPeriods(),
+            ),
             'units' => array_map(
                 static fn ($unit): array => $unit->toArray(),
                 $this->catalog->offeringUnits(),

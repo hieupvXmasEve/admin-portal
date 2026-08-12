@@ -7,7 +7,8 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/comp
 import { Input } from '@/components/ui/input';
 import { NumberInput } from '@/components/ui/number-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
+// Not in use, temporarily commented out with the Additional Information section
+// import { Textarea } from '@/components/ui/textarea';
 import type { CourseOfferingFormData, Lecture } from '@/types/models';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { toTypedSchema } from '@vee-validate/zod';
@@ -25,6 +26,14 @@ interface Props {
         start_date: string;
         end_date: string;
     } | null;
+    semesters: Array<{
+        id: number;
+        name: string;
+        code: string;
+        start_date: string;
+        end_date: string;
+        is_current: boolean;
+    }>;
     units: Array<{
         unit_id: number;
         code: string;
@@ -60,6 +69,12 @@ interface Props {
 
 const props = defineProps<Props>();
 const submitError = ref<string | null>(null);
+
+// Selected semester, defaults to the active one
+const selectedSemesterId = ref<string>(props.active_semester ? props.active_semester.id.toString() : '');
+const selectedSemester = computed(() => props.semesters.find((semester) => semester.id.toString() === selectedSemesterId.value) ?? null);
+const isNonActiveSemester = computed(() => selectedSemesterId.value !== '' && selectedSemesterId.value !== props.active_semester?.id.toString());
+
 // Define validation schema that exactly matches backend CourseOffering validation rules
 const formSchema = toTypedSchema(
     z.object({
@@ -144,7 +159,7 @@ const onSubmit = handleSubmit((values) => {
 
     // Transform form data to match backend expectations
     const formData = {
-        semester_id: props.active_semester?.id,
+        semester_id: selectedSemesterId.value ? Number(selectedSemesterId.value) : undefined,
         unit_id: values.unit_id,
         syllabus_template_id: !values.syllabus_template_id || values.syllabus_template_id === 'none' || values.syllabus_template_id === '' ? null : values.syllabus_template_id,
         lecture_id: !values.lecture_id || values.lecture_id === '' ? null : values.lecture_id,
@@ -248,11 +263,22 @@ const goBack = () => window.history.back();
         </div>
     </div>
 
-    <!-- Active Semester Info -->
-    <div v-if="props.active_semester" class="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
-        <div class="flex items-start">
+    <!-- Semester Selection -->
+    <div
+        v-if="props.active_semester"
+        class="mb-6 rounded-lg border p-4 transition-colors"
+        :class="isNonActiveSemester ? 'border-amber-200 bg-amber-50' : 'border-blue-200 bg-blue-50'"
+    >
+        <div class="flex items-start gap-4">
             <div class="flex-shrink-0">
-                <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <svg v-if="isNonActiveSemester" class="h-5 w-5 text-amber-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path
+                        fill-rule="evenodd"
+                        d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 8a1 1 0 100-2 1 1 0 000 2z"
+                        clip-rule="evenodd"
+                    />
+                </svg>
+                <svg v-else class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                     <path
                         fill-rule="evenodd"
                         d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z"
@@ -260,19 +286,29 @@ const goBack = () => window.history.back();
                     />
                 </svg>
             </div>
-            <div class="ml-3 flex-1">
-                <h3 class="text-sm font-medium text-blue-800">Active Semester</h3>
-                <div class="mt-1 text-sm text-blue-700">
-                    <p>
-                        <strong>{{ props.active_semester.name }}</strong> ({{ props.active_semester.code }})
-                    </p>
-                    <p class="mt-1 text-xs">
-                        {{ new Date(props.active_semester.start_date).toLocaleDateString() }} -
-                        {{ new Date(props.active_semester.end_date).toLocaleDateString() }}
-                    </p>
+            <div class="min-w-0 flex-1">
+                <h3 class="text-sm font-medium" :class="isNonActiveSemester ? 'text-amber-800' : 'text-blue-800'">
+                    {{ isNonActiveSemester ? 'Non-Active Semester Selected' : 'Active Semester' }}
+                </h3>
+                <div class="mt-2 max-w-xs">
+                    <Select v-model="selectedSemesterId">
+                        <SelectTrigger :class="isNonActiveSemester ? 'border-amber-300 bg-white' : 'border-blue-300 bg-white'">
+                            <SelectValue placeholder="Select semester" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem v-for="semester in props.semesters" :key="semester.id" :value="semester.id.toString()">
+                                {{ semester.name }} ({{ semester.code }}){{ semester.is_current ? ' — Active' : '' }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
                 </div>
+                <p v-if="selectedSemester" class="mt-2 text-xs" :class="isNonActiveSemester ? 'text-amber-700' : 'text-blue-700'">
+                    {{ new Date(selectedSemester.start_date).toLocaleDateString() }} -
+                    {{ new Date(selectedSemester.end_date).toLocaleDateString() }}
+                </p>
+                <p v-if="isNonActiveSemester" class="mt-1 text-xs font-medium text-amber-700">This is not the currently active semester. Double-check before creating the offering.</p>
             </div>
-            <div class="text-right text-xs text-blue-600">
+            <div class="text-right text-xs" :class="isNonActiveSemester ? 'text-amber-600' : 'text-blue-600'">
                 <p>
                     <strong>{{ props.units.length }}</strong> units available
                 </p>
@@ -521,6 +557,7 @@ const goBack = () => window.history.back();
                         </FormField>
                     </div>
 
+                    <!-- Not in use, temporarily commented out
                     <FormField v-slot="{ componentField }" name="location">
                         <FormItem>
                             <FormLabel>Location</FormLabel>
@@ -530,6 +567,7 @@ const goBack = () => window.history.back();
                             <FormMessage />
                         </FormItem>
                     </FormField>
+                    -->
 
                     <FormField v-slot="{ componentField }" name="enrollment_status">
                         <FormItem>
@@ -552,7 +590,7 @@ const goBack = () => window.history.back();
                 </CardContent>
             </Card>
 
-            <!-- Registration Dates -->
+            <!-- Registration Dates: not in use, temporarily commented out
             <Card>
                 <CardHeader>
                     <CardTitle>Registration Dates</CardTitle>
@@ -581,8 +619,9 @@ const goBack = () => window.history.back();
                     </div>
                 </CardContent>
             </Card>
+            -->
 
-            <!-- Additional Information -->
+            <!-- Additional Information: not in use, temporarily commented out
             <Card>
                 <CardHeader>
                     <CardTitle>Additional Information</CardTitle>
@@ -609,6 +648,7 @@ const goBack = () => window.history.back();
                     </FormField>
                 </CardContent>
             </Card>
+            -->
         </div>
 
         <!-- Error Display -->
