@@ -141,6 +141,28 @@ it('creates an auto-approved exam resit source and materializes its finance obli
         ->and(InvoiceLine::query()->where('charge_id', $charge->id)->count())->toBe(1);
 });
 
+it('rejects registering a second exam-resit attempt while one is already in flight for the record', function () {
+    $record = examResitRecordFor(AcademicRecord::FAILURE_GRADE_FAILED);
+
+    app(CreateExamResitAttemptAction::class)->run([
+        'student_id' => $this->student->id,
+        'academic_record_id' => $record->id,
+        'operation_semester_id' => $this->semester->id,
+        'charge_semester_id' => $this->semester->id,
+        'campus_id' => $this->campus->id,
+    ]);
+
+    expect(fn () => app(CreateExamResitAttemptAction::class)->run([
+        'student_id' => $this->student->id,
+        'academic_record_id' => $record->id,
+        'operation_semester_id' => $this->semester->id,
+        'charge_semester_id' => $this->semester->id,
+        'campus_id' => $this->campus->id,
+    ]))->toThrow(ValidationException::class);
+
+    expect(ExamResitAttempt::where('academic_record_id', $record->id)->count())->toBe(1);
+});
+
 it('rolls back the exam resit source and propagates unrelated finance intake failures untranslated', function () {
     app()->instance(FinanceIntakeContract::class, new class implements FinanceIntakeContract
     {

@@ -609,6 +609,10 @@ Route::middleware(['auth', 'verified', 'campus.selected'])->group(function () {
             ->middleware('can:create_exam_resit')
             ->name('store');
 
+        Route::post('/bulk', [ExamResitAttemptController::class, 'storeBulk'])
+            ->middleware('can:create_exam_resit')
+            ->name('store-bulk');
+
         Route::get('/{examResit}/schedule', [ExamResitAttemptController::class, 'scheduleForm'])
             ->middleware('can:schedule_exam_resit')
             ->name('schedule.create');

@@ -7,7 +7,9 @@ namespace App\Modules\Academic\Delivery\Http\Web;
 use App\Http\Controllers\Controller;
 use App\Models\ExamResitAttempt;
 use App\Models\ExamResitSession;
+use App\Models\Semester;
 use App\Modules\Academic\Catalog\Queries\GetSemesterReferenceOptionsQuery;
+use App\Modules\Academic\Delivery\Actions\BulkCreateExamResitAttemptsAction;
 use App\Modules\Academic\Delivery\Actions\CancelExamResitAttemptAction;
 use App\Modules\Academic\Delivery\Actions\CompleteExamResitAttemptAction;
 use App\Modules\Academic\Delivery\Actions\CreateExamResitAttemptAction;
@@ -16,6 +18,7 @@ use App\Modules\Academic\Delivery\Http\Requests\ExamResit\CancelExamResitRequest
 use App\Modules\Academic\Delivery\Http\Requests\ExamResit\CompleteExamResitRequest;
 use App\Modules\Academic\Delivery\Http\Requests\ExamResit\ListExamResitRequest;
 use App\Modules\Academic\Delivery\Http\Requests\ExamResit\ScheduleExamResitRequest;
+use App\Modules\Academic\Delivery\Http\Requests\ExamResit\StoreExamResitBulkRequest;
 use App\Modules\Academic\Delivery\Http\Requests\ExamResit\StoreExamResitRequest;
 use App\Modules\Academic\Delivery\Queries\ListExamResitAttemptsQuery;
 use App\Modules\Academic\Delivery\Queries\ListExamResitEligibleStudentsQuery;
@@ -84,6 +87,7 @@ class ExamResitAttemptController extends Controller
             'total_eligible' => $eligibleStudents->count(),
             'filters' => $request->only(['search', 'semester_id', 'campus_id', 'unit_id']),
             'semesters' => $this->semesters->options(),
+            'current_semester_id' => Semester::getActiveSemester()?->id,
             'campuses' => array_map(
                 static fn (CampusReference $campus): array => $campus->toArray(),
                 $this->campuses->all(),
@@ -102,6 +106,61 @@ class ExamResitAttemptController extends Controller
         Inertia::flash('success', 'Đăng ký thi lại thành công.');
 
         return redirect()->route('academic.exam-resit.index');
+    }
+
+    /**
+     * Register exam-resit attempts for multiple records in one submit. Each
+     * record runs the same eligibility + catalog-pricing gate as {@see store};
+     * one ineligible record does not block the rest of the batch.
+     */
+    public function storeBulk(StoreExamResitBulkRequest $request, BulkCreateExamResitAttemptsAction $action): RedirectResponse
+    {
+        $validated = $request->validated();
+
+        $result = $action->handle(
+            items: $validated['items'],
+            operationSemesterId: (int) $validated['operation_semester_id'],
+            chargeSemesterId: (int) $validated['charge_semester_id'],
+            notes: $validated['notes'] ?? null,
+        );
+
+        Inertia::flash($this->bulkResultFlashKey($result), $this->bulkResultMessage($result));
+
+        return back();
+    }
+
+    /**
+     * @param  array{succeeded: list<array<string, mixed>>, failed: list<array<string, mixed>>}  $result
+     */
+    private function bulkResultFlashKey(array $result): string
+    {
+        if ($result['failed'] === []) {
+            return 'success';
+        }
+
+        return $result['succeeded'] === [] ? 'error' : 'warning';
+    }
+
+    /**
+     * @param  array{succeeded: list<array<string, mixed>>, failed: list<array{student_name:?string, reason:string}>}  $result
+     */
+    private function bulkResultMessage(array $result): string
+    {
+        $succeededCount = count($result['succeeded']);
+        $failedCount = count($result['failed']);
+
+        if ($failedCount === 0) {
+            return "Đã đăng ký thi lại thành công cho {$succeededCount} sinh viên.";
+        }
+
+        $reasons = collect($result['failed'])
+            ->take(5)
+            ->map(fn (array $failure): string => ($failure['student_name'] ?? 'Sinh viên').': '.$failure['reason'])
+            ->implode('; ');
+
+        $message = "Đăng ký thành công {$succeededCount}, thất bại {$failedCount}. Lý do: {$reasons}";
+
+        return $failedCount > 5 ? $message.'; ...' : $message;
     }
 
     /**

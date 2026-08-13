@@ -249,6 +249,19 @@ it('renders the create page with eligible students', function () {
             ->has('semesters'));
 });
 
+it('surfaces the active semester as current_semester_id on the create page', function () {
+    $this->semester->update(['is_active' => true]);
+    Semester::factory()->create(['is_active' => false]);
+
+    actingAs($this->user)
+        ->withSession(['current_campus_id' => $this->campus->id])
+        ->get(route('academic.exam-resit.create'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Academic/ExamResit/Create')
+            ->where('current_semester_id', $this->semester->id));
+});
+
 it('stores an exam-resit attempt from a grade-failed record', function () {
     $record = gradeFailedRecordForController();
 
@@ -265,6 +278,109 @@ it('stores an exam-resit attempt from a grade-failed record', function () {
         ->assertRedirect(route('academic.exam-resit.index'));
 
     expect(ExamResitAttempt::where('academic_record_id', $record->id)->where('status', ExamResitAttempt::STATUS_APPROVED)->exists())->toBeTrue();
+});
+
+it('bulk-stores exam-resit attempts for multiple eligible records in one submit', function () {
+    $studentOne = $this->student;
+    $recordOne = gradeFailedRecordForController();
+
+    $studentTwo = Student::factory()->forCampus($this->campus)->create([
+        'status' => 'intake_course', 'intake' => 1, 'intake_mode' => 'sequential', 'intake_semester_id' => $this->semester->id,
+    ]);
+    test()->student = $studentTwo;
+    $recordTwo = gradeFailedRecordForController();
+
+    actingAs($this->user)
+        ->withSession(['current_campus_id' => $this->campus->id, '_token' => 'test-token'])
+        ->post(route('academic.exam-resit.store-bulk'), [
+            '_token' => 'test-token',
+            'items' => [
+                ['student_id' => $studentOne->id, 'academic_record_id' => $recordOne->id, 'campus_id' => $this->campus->id],
+                ['student_id' => $studentTwo->id, 'academic_record_id' => $recordTwo->id, 'campus_id' => $this->campus->id],
+            ],
+            'operation_semester_id' => $this->semester->id,
+            'charge_semester_id' => $this->semester->id,
+        ])
+        ->assertRedirect();
+
+    expect(ExamResitAttempt::where('academic_record_id', $recordOne->id)->where('status', ExamResitAttempt::STATUS_APPROVED)->exists())->toBeTrue()
+        ->and(ExamResitAttempt::where('academic_record_id', $recordTwo->id)->where('status', ExamResitAttempt::STATUS_APPROVED)->exists())->toBeTrue();
+});
+
+it('collects per-item failures in a bulk submit without blocking the rest of the batch', function () {
+    $eligibleRecord = gradeFailedRecordForController();
+
+    $passedUnit = Unit::factory()->create();
+    $passedOffering = CourseOffering::factory()->create([
+        'semester_id' => $this->semester->id,
+        'unit_id' => $passedUnit->id,
+        'campus_id' => $this->campus->id,
+    ]);
+    $alreadyPassedRecord = AcademicRecord::factory()->create([
+        'student_id' => $this->student->id,
+        'campus_id' => $this->campus->id,
+        'semester_id' => $this->semester->id,
+        'unit_id' => $passedUnit->id,
+        'course_offering_id' => $passedOffering->id,
+        'completion_status' => 'completed',
+        'grade_status' => 'final',
+        'is_passed' => true,
+        'failure_reason' => null,
+    ]);
+
+    actingAs($this->user)
+        ->withSession(['current_campus_id' => $this->campus->id, '_token' => 'test-token'])
+        ->post(route('academic.exam-resit.store-bulk'), [
+            '_token' => 'test-token',
+            'items' => [
+                ['student_id' => $this->student->id, 'academic_record_id' => $eligibleRecord->id, 'campus_id' => $this->campus->id],
+                ['student_id' => $this->student->id, 'academic_record_id' => $alreadyPassedRecord->id, 'campus_id' => $this->campus->id],
+            ],
+            'operation_semester_id' => $this->semester->id,
+            'charge_semester_id' => $this->semester->id,
+        ])
+        ->assertRedirect();
+
+    $flash = session('inertia.flash_data', []);
+
+    expect($flash)->toHaveKey('warning')
+        ->and($flash['warning'])->toContain('thành công 1')
+        ->and($flash['warning'])->toContain('thất bại 1');
+
+    expect(ExamResitAttempt::where('academic_record_id', $eligibleRecord->id)->where('status', ExamResitAttempt::STATUS_APPROVED)->exists())->toBeTrue()
+        ->and(ExamResitAttempt::where('academic_record_id', $alreadyPassedRecord->id)->exists())->toBeFalse();
+});
+
+it('blocks a duplicate item in the same bulk submit from double-registering the same record', function () {
+    $record = gradeFailedRecordForController();
+
+    actingAs($this->user)
+        ->withSession(['current_campus_id' => $this->campus->id, '_token' => 'test-token'])
+        ->post(route('academic.exam-resit.store-bulk'), [
+            '_token' => 'test-token',
+            'items' => [
+                ['student_id' => $this->student->id, 'academic_record_id' => $record->id, 'campus_id' => $this->campus->id],
+                ['student_id' => $this->student->id, 'academic_record_id' => $record->id, 'campus_id' => $this->campus->id],
+            ],
+            'operation_semester_id' => $this->semester->id,
+            'charge_semester_id' => $this->semester->id,
+        ])
+        ->assertRedirect();
+
+    expect(ExamResitAttempt::where('academic_record_id', $record->id)->count())->toBe(1)
+        ->and(FinanceCharge::where('charge_type', FinanceCharge::TYPE_EXAM_RESIT_FEE)->count())->toBe(1);
+});
+
+it('rejects an empty bulk submit', function () {
+    actingAs($this->user)
+        ->withSession(['current_campus_id' => $this->campus->id, '_token' => 'test-token'])
+        ->post(route('academic.exam-resit.store-bulk'), [
+            '_token' => 'test-token',
+            'items' => [],
+            'operation_semester_id' => $this->semester->id,
+            'charge_semester_id' => $this->semester->id,
+        ])
+        ->assertSessionHasErrors('items');
 });
 
 it('rejects cancel without a reason', function () {

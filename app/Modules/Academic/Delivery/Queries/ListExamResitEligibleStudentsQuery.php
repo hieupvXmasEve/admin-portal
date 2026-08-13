@@ -25,17 +25,6 @@ use Illuminate\Support\Collection;
 class ListExamResitEligibleStudentsQuery
 {
     /**
-     * Statuses that mean an exam-resit source is already in flight or consumed for
-     * a record, so it must not be offered again.
-     */
-    private const BLOCKING_ATTEMPT_STATUSES = [
-        ExamResitAttempt::STATUS_REQUESTED,
-        ExamResitAttempt::STATUS_APPROVED,
-        ExamResitAttempt::STATUS_SCHEDULED,
-        ExamResitAttempt::STATUS_COMPLETED,
-    ];
-
-    /**
      * @param  array{campus_id?:int|null,semester_id?:int|null,search?:string|null,unit_id?:int|null}  $filters
      * @return Collection<int,array{student:Student,failed_record:AcademicRecord,unit:mixed}>
      */
@@ -68,7 +57,7 @@ class ListExamResitEligibleStudentsQuery
 
             $blockedRecordIds = ExamResitAttempt::query()
                 ->where('student_id', $student->id)
-                ->whereIn('status', self::BLOCKING_ATTEMPT_STATUSES)
+                ->whereIn('status', ExamResitAttempt::IN_FLIGHT_OR_CONSUMED_STATUSES)
                 ->pluck('academic_record_id');
 
             $records = AcademicRecord::query()

@@ -56,6 +56,20 @@ class ExamResitAttempt extends AuditableModel
         self::STATUS_SCHEDULED,
     ];
 
+    /**
+     * Statuses that mean an exam-resit source is already in flight or
+     * consumed for a record — registering another one for the same record
+     * must be blocked while any of these exist. Shared between the
+     * eligibility list (display filter) and the create action (write guard);
+     * the write guard is the one that actually prevents double-registration.
+     */
+    public const IN_FLIGHT_OR_CONSUMED_STATUSES = [
+        self::STATUS_REQUESTED,
+        self::STATUS_APPROVED,
+        self::STATUS_SCHEDULED,
+        self::STATUS_COMPLETED,
+    ];
+
     protected $fillable = [
         'student_id',
         'academic_record_id',

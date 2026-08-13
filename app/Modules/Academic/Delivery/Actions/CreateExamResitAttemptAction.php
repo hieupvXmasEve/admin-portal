@@ -167,6 +167,17 @@ class CreateExamResitAttemptAction
                 'failure_reason' => ['Dữ liệu chuyên cần chưa ghi nhận đủ, chưa thể chốt điều kiện thi lại.'],
             ]);
         }
+
+        $hasInFlightAttempt = ExamResitAttempt::query()
+            ->where('academic_record_id', $record->id)
+            ->whereIn('status', ExamResitAttempt::IN_FLIGHT_OR_CONSUMED_STATUSES)
+            ->exists();
+
+        if ($hasInFlightAttempt) {
+            throw ValidationException::withMessages([
+                'academic_record_id' => ['Bản ghi này đã có đăng ký thi lại đang xử lý hoặc đã hoàn tất.'],
+            ]);
+        }
     }
 
     private function resolveSyllabus(AcademicRecord $record): SyllabusTemplate
