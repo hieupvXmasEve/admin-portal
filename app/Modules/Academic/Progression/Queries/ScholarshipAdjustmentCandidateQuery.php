@@ -6,7 +6,6 @@ namespace App\Modules\Academic\Progression\Queries;
 
 use App\Models\AcademicRecord;
 use App\Models\AssessmentComponentDetailScore;
-use App\Models\CourseRegistration;
 use App\Models\Semester;
 use App\Models\StudentScholarshipAward;
 use App\Shared\Contracts\Finance\TuitionChargeExistenceReader;
@@ -88,23 +87,15 @@ class ScholarshipAdjustmentCandidateQuery
             ->pluck('student_id')
             ->unique();
 
-        // Continuation: an active/completed registration in the target semester.
-        $continuingStudentIds = CourseRegistration::query()
-            ->whereIn('student_id', $activeAwardStudentIds)
-            ->where('semester_id', $targetSemesterId)
-            ->whereIn('registration_status', ['pending', 'registered', 'confirmed', 'completed'])
-            ->pluck('student_id')
-            ->unique();
-
         $eligibleFailures = $failedRecords->filter(
-            fn (AcademicRecord $record) => $continuingStudentIds->contains($record->student_id)
+            fn (AcademicRecord $record) => $activeAwardStudentIds->contains($record->student_id)
         );
 
         // Timing invariant: once tuition_term is generated for the target
         // semester, the reduction window is closed (see plan
         // skip-tuition-generation-pending-scholarship-review).
         $alreadyCharged = app(TuitionChargeExistenceReader::class)
-            ->tuitionTermChargedByStudent($continuingStudentIds->all(), $targetSemesterId);
+            ->tuitionTermChargedByStudent($activeAwardStudentIds->all(), $targetSemesterId);
 
         $excludedAlreadyCharged = $eligibleFailures
             ->pluck('student_id')

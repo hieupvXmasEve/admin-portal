@@ -272,6 +272,17 @@ it('is idempotent: a second identification run does not duplicate the dossier', 
         ->and(ScholarshipAdjustmentDossier::query()->where('student_id', $fixture['student']->id)->count())->toBe(1);
 });
 
+it('surfaces a candidate with no course_registrations in the target semester at all', function () {
+    $ctx = candidateBaseContext();
+    $fixture = candidateEligibleStudent($ctx);
+    CourseRegistration::query()->where('student_id', $fixture['student']->id)->delete();
+
+    $result = app(ScholarshipAdjustmentCandidateQuery::class)
+        ->handle($ctx['campus']->id, $ctx['source']->id, $ctx['target']->id);
+
+    expect($result['candidates']->pluck('student_id'))->toContain($fixture['student']->id);
+});
+
 it('excludes a candidate who already has an active tuition_term charge for the target semester', function () {
     $ctx = candidateBaseContext();
     $fixture = candidateEligibleStudent($ctx);
