@@ -10,6 +10,7 @@ use App\Models\Program;
 use App\Models\Role;
 use App\Models\RolePermission;
 use App\Models\Semester;
+use App\Models\Specialization;
 use App\Models\StudentApplication;
 use App\Models\User;
 use App\Modules\Admissions\Queries\GetApplicationConversionReadinessQuery;
@@ -81,8 +82,8 @@ it('reports a distinct reason when resolved but the curriculum is ambiguous', fu
     $campus = Campus::factory()->create(['code' => 'HCM']);
     $program = Program::factory()->create(['code' => 'IT']);
     $semester = Semester::factory()->create(['code' => 'FA25']);
-    $specA = \App\Models\Specialization::factory()->create(['program_id' => $program->id]);
-    $specB = \App\Models\Specialization::factory()->create(['program_id' => $program->id]);
+    $specA = Specialization::factory()->create(['program_id' => $program->id]);
+    $specB = Specialization::factory()->create(['program_id' => $program->id]);
     CurriculumVersion::factory()->forProgram($program)->create(['semester_id' => $semester->id, 'specialization_id' => $specA->id, 'version_code' => 'IT2025.A']);
     CurriculumVersion::factory()->forProgram($program)->create(['semester_id' => $semester->id, 'specialization_id' => $specB->id, 'version_code' => 'IT2025.B']);
 
@@ -162,6 +163,35 @@ it('full flow: sync an unmapped record, approve is blocked, reject stays availab
     expect($application->fresh()->status)->toBe(StudentApplication::STATUS_ENROLLED)
         ->and($application->fresh()->student)->not->toBeNull()
         ->and($application->fresh()->student->campus_id)->toBe($mapping['campus']->id);
+});
+
+it('approve flashes only an error, never success, when the curriculum version is missing (no double toast)', function () {
+    $campus = Campus::factory()->create(['code' => 'HCM']);
+    $staff = User::factory()->create(['type' => UserType::STAFF]);
+    readinessGrantPermission($staff, $campus, 'approve_student_application');
+    Program::factory()->create(['code' => 'IT']);
+    Semester::factory()->create(['code' => 'FA25']);
+    // Deliberately no CurriculumVersion for IT/FA25 — triggers the
+    // 'no_curriculum' readiness failure the controller catches as
+    // ApplicationLifecycleException.
+
+    $application = StudentApplication::factory()->pending()->create([
+        'campus_code' => 'HCM', 'intended_program' => 'IT', 'intake' => 'FA25', 'student_code' => 'RDY0000002',
+    ]);
+
+    session(['current_campus_id' => $campus->id]);
+    $response = $this->actingAs($staff)
+        ->withHeader('X-CSRF-TOKEN', READINESS_CSRF)
+        ->post(route('student-applications.approve', $application), ['admission_date' => now()->toDateString()]);
+
+    // The redirect always carries 200/302 on this domain-failure path (only
+    // the flash distinguishes it), so a stray onSuccess-toast in the frontend
+    // would fire alongside this error toast — see Show.vue's approve()/
+    // submitRevoke() comments. Session must carry error only, never success.
+    $response->assertRedirect();
+    $response->assertSessionHas('error', 'No curriculum version exists for this program and intake. Set one up before approving.');
+    $response->assertSessionMissing('success');
+    expect($application->fresh()->status)->toBe(StudentApplication::STATUS_PENDING);
 });
 
 it('existing manual applications with campus/program/intake already set are unaffected', function () {

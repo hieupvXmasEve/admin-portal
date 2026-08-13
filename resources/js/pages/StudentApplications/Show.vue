@@ -166,7 +166,11 @@ const approve = () => {
         {},
         {
             preserveScroll: true,
-            onSuccess: () => toast.success('Application approved. The student has been enrolled.'),
+            // No onSuccess toast here: the controller redirects back with 200
+            // on both real success and a caught domain failure (e.g. missing
+            // curriculum version), so Inertia's onSuccess fires either way.
+            // The server-flashed message (success or error) is the only
+            // trustworthy signal — useFlashToast (AppLayout) renders it.
             onError: () => toast.error('Failed to approve application.'),
             onFinish: () => {
                 isSubmitting.value = false;
@@ -204,8 +208,10 @@ const submitRevoke = () => {
         {},
         {
             preserveScroll: true,
+            // No onSuccess toast here — same reason as approve() above: the
+            // server-flashed message is the only trustworthy success/error
+            // signal, rendered globally by useFlashToast.
             onSuccess: () => {
-                toast.success('Approval revoked. The application is pending again.');
                 showRevokeDialog.value = false;
             },
             onError: () => toast.error('Failed to revoke application.'),
