@@ -224,7 +224,7 @@ class ClassSessionService
                     'session_date' => $currentDate->toDateString(),
                     'start_time' => $fullStartTime,
                     'end_time' => $currentDate->copy()->setTimeFromTimeString($endTime),
-                    'duration_minutes' => $sessionDuration * 60,
+                    'duration_minutes' => $this->calculateDurationMinutes($startTime, $endTime),
                     'session_type' => 'lecture',
                     'delivery_mode' => $courseOffering->delivery_mode,
                     'status' => 'scheduled',

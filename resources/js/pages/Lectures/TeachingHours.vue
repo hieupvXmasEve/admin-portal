@@ -144,7 +144,11 @@ const columns: ColumnDef<LecturerTeachingHours>[] = [
             h(
                 Link,
                 {
-                    href: route('lectures.teaching-hours.details', row.original.lecture_id),
+                    href: route('lectures.teaching-hours.details', {
+                        lecture: row.original.lecture_id,
+                        date_from: filters.date_from || undefined,
+                        date_to: filters.date_to || undefined,
+                    }),
                     class: 'font-medium text-primary hover:underline',
                 },
                 () => row.original.lecture_name,
