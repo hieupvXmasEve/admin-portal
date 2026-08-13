@@ -309,7 +309,7 @@ const loadCourseOfferings = async () => {
             throw error.value;
         }
 
-        availableCourseOfferings.value = Array.isArray(data.value) ? data.value : [];
+        availableCourseOfferings.value = Array.isArray(data.value?.data) ? data.value.data : [];
     } catch (error) {
         toast.error('Failed to load course offerings');
         console.error(error);
