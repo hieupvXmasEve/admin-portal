@@ -85,10 +85,15 @@ final class GetStudentHubScoresQuery
      */
     private function courses(Collection $assessmentCourses, Collection $outcomesByOffering): Collection
     {
-        return $assessmentCourses->map(function (StudentHubAssessmentCourseEvidence $course) use ($outcomesByOffering): array {
+        $assessmentCoursesByOffering = $assessmentCourses->keyBy('courseOfferingId');
+        $offeringIds = $assessmentCoursesByOffering->keys()->merge($outcomesByOffering->keys())->unique();
+
+        return $offeringIds->map(function (int $courseOfferingId) use ($assessmentCoursesByOffering, $outcomesByOffering): array {
+            /** @var StudentHubAssessmentCourseEvidence|null $course */
+            $course = $assessmentCoursesByOffering->get($courseOfferingId);
             /** @var StudentHubCourseOutcomeEvidence|null $outcome */
-            $outcome = $outcomesByOffering->get($course->courseOfferingId);
-            $scores = collect($course->scores)->map(static fn ($score): array => [
+            $outcome = $outcomesByOffering->get($courseOfferingId);
+            $scores = $course === null ? [] : collect($course->scores)->map(static fn ($score): array => [
                 'id' => $score->id,
                 'assessment_name' => $score->assessmentName,
                 'assessment_type' => $score->assessmentType,
@@ -103,13 +108,13 @@ final class GetStudentHubScoresQuery
                 'is_late' => $score->isLate,
                 'status' => $score->status,
             ])->all();
-            $scheme = $this->scheme($course->gradingScheme);
+            $scheme = $course === null ? null : $this->scheme($course->gradingScheme);
 
             return [
-                'course_offering_id' => $course->courseOfferingId,
-                'course_name' => $course->courseName,
-                'course_code' => $course->courseCode,
-                'semester' => $course->semesterName,
+                'course_offering_id' => $courseOfferingId,
+                'course_name' => $course?->courseName ?? $outcome?->unitName ?? 'N/A',
+                'course_code' => $course?->courseCode ?? $outcome?->unitCode ?? 'N/A',
+                'semester' => $course?->semesterName ?? $outcome?->semesterName ?? 'N/A',
                 'scores' => $scores,
                 'all_scores_count' => count($scores),
                 'has_more_scores' => count($scores) > 100,
