@@ -119,7 +119,13 @@ final class StudentApplicationController extends Controller
 
     public function edit(StudentApplication $studentApplication): mixed
     {
-        return Inertia::render('StudentApplications/Edit', ['application' => $studentApplication, ...$this->programMappingReader->formOptions()]);
+        $studentApplication->load(['guardians' => fn ($query) => $query->orderByDesc('is_primary')->orderBy('id')]);
+
+        return Inertia::render('StudentApplications/Edit', [
+            'application' => $studentApplication,
+            'guardianRelationships' => ApplicationGuardian::relationships(),
+            ...$this->programMappingReader->formOptions(),
+        ]);
     }
 
     public function update(UpdateApplicationRequest $request, StudentApplication $studentApplication): RedirectResponse

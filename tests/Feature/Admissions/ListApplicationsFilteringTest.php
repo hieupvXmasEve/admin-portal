@@ -284,3 +284,41 @@ it('row payload contains every ship-list field and none of the excluded ones', f
         expect($row)->not->toHaveKey($field);
     }
 });
+
+it('row payload carries the primary guardian, ignoring non-primary guardians', function () {
+    $campus = Campus::factory()->create();
+    $application = StudentApplication::factory()->pending()->create(['campus_code' => $campus->code]);
+    \App\Models\ApplicationGuardian::factory()->create([
+        'student_application_id' => $application->id,
+        'full_name' => 'Trần Thị Mai',
+        'relationship' => 'mother',
+        'phone' => '0911222333',
+        'is_primary' => false,
+    ]);
+    \App\Models\ApplicationGuardian::factory()->create([
+        'student_application_id' => $application->id,
+        'full_name' => 'Phạm Đăng Khánh',
+        'relationship' => 'father',
+        'phone' => '0933667888',
+        'is_primary' => true,
+    ]);
+
+    $result = app(ListApplicationsQuery::class)->handle(baseListFilters(), $campus->code);
+    $row = $result->items()[0];
+
+    expect($row['primary_guardian_name'])->toBe('Phạm Đăng Khánh')
+        ->and($row['primary_guardian_relationship'])->toBe('father')
+        ->and($row['primary_guardian_phone'])->toBe('0933667888');
+});
+
+it('row payload has null guardian fields when the application has no guardians', function () {
+    $campus = Campus::factory()->create();
+    StudentApplication::factory()->pending()->create(['campus_code' => $campus->code]);
+
+    $result = app(ListApplicationsQuery::class)->handle(baseListFilters(), $campus->code);
+    $row = $result->items()[0];
+
+    expect($row['primary_guardian_name'])->toBeNull()
+        ->and($row['primary_guardian_relationship'])->toBeNull()
+        ->and($row['primary_guardian_phone'])->toBeNull();
+});

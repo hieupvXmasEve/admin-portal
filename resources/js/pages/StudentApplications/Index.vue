@@ -57,6 +57,9 @@ interface ApplicationRow {
     created_at: string;
     student?: LinkedStudent | null;
     conversion_readiness: ConversionReadiness | null;
+    primary_guardian_name: string | null;
+    primary_guardian_relationship: string | null;
+    primary_guardian_phone: string | null;
     // Ship-list CRM + pre-existing fields (Evidence Base), hidden by default (D8).
     gender: string | null;
     ethnicity: string | null;
@@ -238,6 +241,7 @@ const columns = computed<ColumnDef<ApplicationRow>[]>(() => [
     { accessorKey: 'intake', header: 'Intake', enableSorting: true },
     { accessorKey: 'status', header: 'Status', enableSorting: true },
     { accessorKey: 'created_at', header: 'Created', enableSorting: true },
+    { id: 'primary_guardian', header: 'Primary Guardian', enableSorting: false },
     // Identity
     { accessorKey: 'gender', header: 'Gender', enableSorting: true },
     { accessorKey: 'ethnicity', header: 'Ethnicity', enableSorting: false },
@@ -278,12 +282,13 @@ const columns = computed<ColumnDef<ApplicationRow>[]>(() => [
     { id: 'actions', header: '', enableSorting: false, enableHiding: false },
 ]);
 
-// Everything new starts hidden (D8): default visible set equals today's 8 +
-// document columns + actions, so existing users see no change until they opt in.
-const NEW_COLUMN_IDS = [...SIMPLE_TEXT_FIELDS, 'overall', 'gpa', 'crm_paid_amount', 'last_synced_at'] as const;
-const defaultColumnVisibility: VisibilityState = Object.fromEntries(NEW_COLUMN_IDS.map((id) => [id, false]));
+// All fields visible by default (supersedes D8): the column-toggle stays
+// available for staff who want to narrow the view, but nothing is hidden on
+// first load. Storage key bumped to v2 so the old D8 hidden-by-default state
+// stored in existing browsers doesn't silently reapply.
+const defaultColumnVisibility: VisibilityState = {};
 const knownColumnIds = computed(() => columns.value.map((column) => column.id ?? ('accessorKey' in column ? String(column.accessorKey) : undefined)).filter((id): id is string => !!id));
-const { columnVisibility } = useTableColumnVisibility('student-applications:columns:v1', defaultColumnVisibility, knownColumnIds.value);
+const { columnVisibility } = useTableColumnVisibility('student-applications:columns:v2', defaultColumnVisibility, knownColumnIds.value);
 
 const statusBadgeClass = (status: ApplicationRow['status']): string => {
     switch (status) {
@@ -590,6 +595,18 @@ const submitReject = () => {
 
             <template #cell-created_at="{ row }">
                 <span class="text-muted-foreground whitespace-nowrap">{{ formatDate(row.original.created_at) }}</span>
+            </template>
+
+            <template #cell-primary_guardian="{ row }">
+                <template v-if="row.original.primary_guardian_name">
+                    <p class="font-medium">{{ row.original.primary_guardian_name }}</p>
+                    <p class="text-muted-foreground text-xs">
+                        <span v-if="row.original.primary_guardian_relationship" class="capitalize">{{ row.original.primary_guardian_relationship }}</span>
+                        <span v-if="row.original.primary_guardian_relationship && row.original.primary_guardian_phone"> · </span>
+                        <span v-if="row.original.primary_guardian_phone">{{ row.original.primary_guardian_phone }}</span>
+                    </p>
+                </template>
+                <span v-else class="text-muted-foreground">—</span>
             </template>
 
             <!-- CRM ship-list columns, hidden by default (D8). Plain text fields share one formatter. -->

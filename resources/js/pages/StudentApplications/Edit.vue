@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GuardianManager from '@/components/student-applications/GuardianManager.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -7,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import type { Guardian } from '@/types/application-guardian';
 import { Head, router } from '@inertiajs/vue3';
 import { toTypedSchema } from '@vee-validate/zod';
 import { ArrowLeft } from 'lucide-vue-next';
@@ -52,10 +54,12 @@ interface StudentApplication {
     is_international_applicant: boolean;
     exception_units: string | null;
     status: 'pending' | 'enrolled' | 'rejected';
+    guardians?: Guardian[];
 }
 
 interface Props {
     application: StudentApplication;
+    guardianRelationships: string[];
     campuses: CodeOption[];
     programs: CodeOption[];
     semesters: CodeOption[];
@@ -366,6 +370,9 @@ const handleCancel = () => {
                     </FormField>
                 </CardContent>
             </Card>
+
+            <!-- Guardians -->
+            <GuardianManager :application-id="application.id" :guardians="application.guardians ?? []" :guardian-relationships="guardianRelationships" :editable="application.status === 'pending'" />
 
             <!-- Academic Information -->
             <Card>

@@ -40,7 +40,11 @@ final class ListApplicationsQuery
      */
     public function handle(array $filters, ?string $campusCode): LengthAwarePaginator
     {
-        $query = StudentApplication::query()->with(['student:id,student_id,full_name', 'documents' => fn ($query) => $query->orderBy('page_index')->orderBy('id')]);
+        $query = StudentApplication::query()->with([
+            'student:id,student_id,full_name',
+            'documents' => fn ($query) => $query->orderBy('page_index')->orderBy('id'),
+            'guardians' => fn ($query) => $query->where('is_primary', true),
+        ]);
 
         // Fail closed: a null campus code means the session's campus binding
         // could not be resolved (e.g. a stale/deleted campus id), not "show
@@ -56,6 +60,7 @@ final class ListApplicationsQuery
         return $query->orderBy($filters['sort'], $filters['direction'])->paginate($filters['per_page'])->withQueryString()->through(
             fn (StudentApplication $application): array => [
                 'id' => $application->id, 'full_name' => $application->full_name, 'student_code' => $application->student_code, 'email' => $application->email, 'national_id' => $application->national_id, 'phone' => $application->phone, 'intended_program' => $application->intended_program, 'intake' => $application->intake, 'status' => $application->status, 'created_at' => $application->created_at, 'student' => $application->student,
+                'primary_guardian_name' => $application->guardians->first()?->full_name, 'primary_guardian_relationship' => $application->guardians->first()?->relationship, 'primary_guardian_phone' => $application->guardians->first()?->phone,
                 // Ship-list CRM + pre-existing fields (Evidence Base): hidden-by-default
                 // columns surfaced starting phase 3. The 6 zero/near-zero CRM fields
                 // (new_province, new_street, new_ward, intended_specialization, sut_id,
