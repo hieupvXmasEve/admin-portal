@@ -14,12 +14,13 @@ class CheckGpaFinalizationEligibilityAction
      */
     public function execute(string|int $semesterId, int|string|null $campusId = null): array
     {
-        // Total students who have valid GPA-contributing records in this semester AND have status = 'intake_course'
+        // Total students who have valid GPA-contributing records in this semester.
+        // Eligibility does not depend on current status — a student who completed
+        // the semester and later deferred/withdrew must still be finalizable.
         $baseQuery = AcademicRecord::where('semester_id', $semesterId)
             ->where('excluded_from_gpa', false)
             ->where('credit_points', '>', 0)
             ->whereHas('student', function ($query) use ($campusId) {
-                $query->where('status', 'intake_course');
                 if ($campusId) {
                     $query->where('campus_id', $campusId);
                 }
@@ -34,7 +35,7 @@ class CheckGpaFinalizationEligibilityAction
                 'total_students' => 0,
                 'eligible_count' => 0,
                 'ineligible_count' => 0,
-                'message' => 'No intake_course academic records found for this semester' . ($campusId ? ' in this campus.' : '.'),
+                'message' => 'No academic records found for this semester' . ($campusId ? ' in this campus.' : '.'),
             ];
         }
 

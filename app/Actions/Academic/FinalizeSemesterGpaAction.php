@@ -33,7 +33,11 @@ class FinalizeSemesterGpaAction
     {
         Semester::findOrFail($semesterId);
 
-        $studentsQuery = Student::where('status', 'intake_course');
+        // Eligibility is decided by having a final, credit-bearing record for the
+        // semester (below), not by the student's current status — a student who
+        // completed the semester as intake_course and later deferred/withdrew
+        // must still be finalizable for that past semester.
+        $studentsQuery = Student::query();
         if ($campusId) {
             $studentsQuery->where('campus_id', $campusId);
         }

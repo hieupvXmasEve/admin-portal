@@ -249,20 +249,20 @@ it('skips students whose only records are zero-credit units', function () {
         ->and(GpaCalculation::where('student_id', $student->id)->exists())->toBeFalse();
 });
 
-it('only finalizes students with status intake_course', function () {
+it('finalizes students regardless of their current status, based only on the semester record', function () {
     $intake = ($this->makeStudent)();
-    $other = Student::factory()->forCampus($this->campus)->create([
-        'status' => 'active',
+    $deferred = Student::factory()->forCampus($this->campus)->create([
+        'status' => 'deferred',
         'intake' => 1,
         'intake_mode' => 'sequential',
         'intake_semester_id' => $this->sem1->id,
     ]);
 
     ($this->makeRecord)($intake, $this->sem1, ['credit_points' => 3.0, 'final_percentage' => 80.0]);
-    ($this->makeRecord)($other, $this->sem1, ['credit_points' => 3.0, 'final_percentage' => 80.0]);
+    ($this->makeRecord)($deferred, $this->sem1, ['credit_points' => 3.0, 'final_percentage' => 80.0]);
 
     $this->action->execute($this->sem1->id, $this->admin->id, $this->campus->id);
 
     expect(GpaCalculation::where('student_id', $intake->id)->exists())->toBeTrue()
-        ->and(GpaCalculation::where('student_id', $other->id)->exists())->toBeFalse();
+        ->and(GpaCalculation::where('student_id', $deferred->id)->exists())->toBeTrue();
 });

@@ -105,6 +105,9 @@ const handleFinalize = () => {
             showFinalizeDialog.value = false;
             toast.success('GPA finalized successfully!');
         },
+        onError: (errors) => {
+            toast.error(errors.finalize ?? 'Failed to finalize GPA.');
+        },
     });
 };
 </script>
