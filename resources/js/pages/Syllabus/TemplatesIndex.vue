@@ -7,7 +7,6 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useDataTable } from '@/composables/useDataTable';
 import type { PaginatedResponse } from '@/types';
-import { formatCurrency } from '@/types/finance';
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { Edit, Eye, Plus, X } from 'lucide-vue-next';
@@ -30,7 +29,6 @@ interface TemplateRow {
     delivery_mode: string | null;
     min_attendance_threshold: string | number;
     min_grade_threshold: string | number;
-    exam_resit_fee: string | number | null;
     created_at: string;
     unit?: Unit;
 }
@@ -133,18 +131,6 @@ const columns = computed<ColumnDef<TemplateRow>[]>(() => [
         header: 'Min Grade',
         cell: ({ row }) => Number(row.original.min_grade_threshold),
         enableSorting: false,
-    },
-    {
-        accessorKey: 'exam_resit_fee',
-        header: 'Phí thi lại',
-        cell: ({ row }) => {
-            const fee = row.original.exam_resit_fee;
-            if (fee === null || fee === undefined || Number(fee) <= 0) {
-                return '—';
-            }
-            return formatCurrency(Number(fee));
-        },
-        enableSorting: true,
     },
     {
         accessorKey: 'created_at',

@@ -50,7 +50,6 @@ beforeEach(function () {
         'is_default' => true,
         'is_active' => true,
         'created_by' => $this->user->id,
-        'exam_resit_fee' => 750000,
         'exam_resit_max_attempts' => 1,
         'exam_resit_late_payment_grace_days' => 14,
         'exam_resit_allow_unpaid_sitting' => false,
@@ -122,7 +121,6 @@ it('creates an auto-approved exam resit source and materializes its finance obli
     expect($attempt->hq_fee_status)->toBe(ExamResitAttempt::HQ_FEE_CHARGE_CREATED);
     expect((float) $attempt->fee_amount)->toBe(750000.0);
     expect($attempt->policy_snapshot['max_attempts'])->toBe(1);
-    expect($attempt->policy_snapshot['exam_resit_fee'])->toBe(750000);
     expect($attempt->policy_snapshot['late_payment_grace_days'])->toBe(14);
     expect($attempt->policy_snapshot['allow_unpaid_sitting'])->toBeFalse();
 
@@ -143,7 +141,7 @@ it('creates an auto-approved exam resit source and materializes its finance obli
         ->and(InvoiceLine::query()->where('charge_id', $charge->id)->count())->toBe(1);
 });
 
-it('rolls back the exam resit source when finance intake fails', function () {
+it('rolls back the exam resit source and propagates unrelated finance intake failures untranslated', function () {
     app()->instance(FinanceIntakeContract::class, new class implements FinanceIntakeContract
     {
         public function request(FinanceIntakeData $intake): FinanceIntakeResult
@@ -176,6 +174,33 @@ it('rolls back the exam resit source when finance intake fails', function () {
         'charge_semester_id' => $this->semester->id,
         'campus_id' => $this->campus->id,
     ]))->toThrow(RuntimeException::class, 'finance intake unavailable');
+
+    expect(ExamResitAttempt::query()->count())->toBe(0)
+        ->and(FinanceObligation::query()->count())->toBe(0)
+        ->and(FinanceCharge::query()->count())->toBe(0);
+});
+
+it('throws a validation error when no catalog pricing rule exists for the unit', function () {
+    DB::table('finance_pricing_catalog_items')
+        ->where('obligation_type', FinanceCharge::TYPE_EXAM_RESIT_FEE)
+        ->delete();
+
+    $record = examResitRecordFor(AcademicRecord::FAILURE_GRADE_FAILED);
+
+    try {
+        app(CreateExamResitAttemptAction::class)->run([
+            'student_id' => $this->student->id,
+            'academic_record_id' => $record->id,
+            'operation_semester_id' => $this->semester->id,
+            'charge_semester_id' => $this->semester->id,
+            'campus_id' => $this->campus->id,
+        ]);
+
+        $this->fail('Expected ValidationException was not thrown.');
+    } catch (ValidationException $exception) {
+        expect($exception->errors()['policy'][0])
+            ->toBe('Chưa cấu hình giá thi lại cho môn này. Vui lòng cấu hình tại Pricing Operations.');
+    }
 
     expect(ExamResitAttempt::query()->count())->toBe(0)
         ->and(FinanceObligation::query()->count())->toBe(0)

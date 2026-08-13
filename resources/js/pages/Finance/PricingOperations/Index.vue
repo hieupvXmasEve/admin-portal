@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import DataPagination from '@/components/DataPagination.vue';
+import PricingUnitCombobox from '@/components/finance/PricingUnitCombobox.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -17,7 +18,7 @@ import { formatCurrency } from '@/types/finance';
 import { financeRoutes } from '@/utils/routes';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { AlertTriangle, Plus } from 'lucide-vue-next';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 interface ObligationTypeOption {
     value: string;
@@ -92,6 +93,27 @@ const createForm = useForm({
     effective_until: '',
 });
 
+// Only these two obligation types resolve via PricingStrategy::CatalogFixed
+// scoped by unit today — the Unit picker is the default entry for them; the
+// raw JSON box stays reachable behind "advanced" since facts_match still
+// supports non-unit_id keys (e.g. campus_id) for these same two types.
+const UNIT_SCOPED_OBLIGATION_TYPES = ['retake_fee', 'exam_resit_fee'];
+const isUnitScopedType = computed(() => UNIT_SCOPED_OBLIGATION_TYPES.includes(createForm.obligation_type));
+const showUnitPicker = computed(() => isUnitScopedType.value && !useAdvancedFactsMatch.value);
+const selectedUnitId = ref<number | null>(null);
+const useAdvancedFactsMatch = ref(false);
+
+function handleUnitSelect(unitId: number | null): void {
+    selectedUnitId.value = unitId;
+    createForm.facts_match_json = unitId ? JSON.stringify({ unit_id: unitId }) : '';
+}
+
+watch(isUnitScopedType, () => {
+    selectedUnitId.value = null;
+    useAdvancedFactsMatch.value = false;
+    createForm.facts_match_json = '';
+});
+
 function submitCreate(): void {
     createForm.post(financeRoutes.pricingOperations.store(), {
         preserveScroll: true,
@@ -100,6 +122,7 @@ function submitCreate(): void {
             createForm.currency = 'VND';
             createForm.is_active = true;
             createForm.obligation_type = catalogTypes.value[0]?.value ?? '';
+            selectedUnitId.value = null;
             showCreateForm.value = false;
         },
     });
@@ -213,8 +236,20 @@ function formatFacts(facts: Record<string, unknown> | null): string {
                         <p v-if="createForm.errors.description" class="text-destructive text-xs">{{ createForm.errors.description }}</p>
                     </div>
 
-                    <div class="space-y-2 md:col-span-2">
-                        <Label for="facts_match_json">facts_match (raw JSON object)</Label>
+                    <div v-if="showUnitPicker" class="space-y-2 md:col-span-2">
+                        <div class="flex items-center justify-between">
+                            <Label>Áp dụng cho môn học cụ thể (để trống = mọi môn)</Label>
+                            <Button type="button" variant="link" size="sm" class="h-auto p-0 text-xs" @click="useAdvancedFactsMatch = true">Nhập facts_match thủ công (JSON)</Button>
+                        </div>
+                        <PricingUnitCombobox :model-value="selectedUnitId" @update:model-value="handleUnitSelect" />
+                        <p v-if="createForm.errors.facts_match_json" class="text-destructive text-xs">{{ createForm.errors.facts_match_json }}</p>
+                    </div>
+                    <div v-else class="space-y-2 md:col-span-2">
+                        <div v-if="isUnitScopedType" class="flex items-center justify-between">
+                            <Label for="facts_match_json">facts_match (raw JSON object)</Label>
+                            <Button type="button" variant="link" size="sm" class="h-auto p-0 text-xs" @click="useAdvancedFactsMatch = false">Quay lại chọn môn học</Button>
+                        </div>
+                        <Label v-else for="facts_match_json">facts_match (raw JSON object)</Label>
                         <Textarea
                             id="facts_match_json"
                             v-model="createForm.facts_match_json"

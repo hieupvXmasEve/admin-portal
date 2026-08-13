@@ -193,6 +193,9 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
         Route::get('/', [PricingOperationsController::class, 'index'])
             ->middleware('can:view_finance_pricing_operations')
             ->name('index');
+        Route::get('/units/search', [PricingOperationsController::class, 'searchUnits'])
+            ->middleware('can:view_finance_pricing_operations')
+            ->name('units.search');
         Route::post('/', [PricingOperationsController::class, 'store'])
             ->middleware('can:manage_finance_pricing_operations')
             ->name('store');

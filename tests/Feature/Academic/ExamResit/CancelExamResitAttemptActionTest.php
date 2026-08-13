@@ -203,7 +203,6 @@ it('cancels a target-path charge-created attempt through the finance cancellatio
         'is_default' => true,
         'is_active' => true,
         'created_by' => $this->user->id,
-        'exam_resit_fee' => 750_000,
         'exam_resit_max_attempts' => 1,
         'exam_resit_late_payment_grace_days' => 14,
         'exam_resit_allow_unpaid_sitting' => false,

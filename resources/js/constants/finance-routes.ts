@@ -10,6 +10,7 @@ export const FINANCE_ROUTE_NAMES = {
     PRICING_OPERATIONS_STORE: 'finance.pricing-operations.store',
     PRICING_OPERATIONS_ACTIVATE: 'finance.pricing-operations.activate',
     PRICING_OPERATIONS_DEACTIVATE: 'finance.pricing-operations.deactivate',
+    PRICING_OPERATIONS_UNITS_SEARCH: 'finance.pricing-operations.units.search',
 
     // Today
     OPERATIONS_DASHBOARD: 'finance.operations.dashboard',

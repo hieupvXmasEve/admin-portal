@@ -45,7 +45,6 @@ class SyllabusTemplateFactory extends Factory
             'min_attendance_threshold' => 80.00,
             'min_grade_threshold' => 60.00,
             'exam_resit_max_attempts' => 1,
-            'exam_resit_fee' => 750000,
             'exam_resit_registration_window_days' => null,
             'exam_resit_late_payment_grace_days' => 14,
             'exam_resit_allow_unpaid_sitting' => false,

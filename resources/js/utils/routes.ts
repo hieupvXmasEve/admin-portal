@@ -485,6 +485,7 @@ export const financeRoutes = {
         store: () => route(FINANCE_ROUTE_NAMES.PRICING_OPERATIONS_STORE),
         activate: (pricingRuleId: number) => route(FINANCE_ROUTE_NAMES.PRICING_OPERATIONS_ACTIVATE, { pricingRule: pricingRuleId }),
         deactivate: (pricingRuleId: number) => route(FINANCE_ROUTE_NAMES.PRICING_OPERATIONS_DEACTIVATE, { pricingRule: pricingRuleId }),
+        unitsSearch: () => route(FINANCE_ROUTE_NAMES.PRICING_OPERATIONS_UNITS_SEARCH),
     },
     today: {
         dashboard: () => route(FINANCE_ROUTE_NAMES.OPERATIONS_DASHBOARD),

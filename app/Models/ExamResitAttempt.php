@@ -219,7 +219,7 @@ class ExamResitAttempt extends AuditableModel
         ]);
     }
 
-    public function markFinanceObligationCreated(int $userId): void
+    public function markFinanceObligationCreated(int $userId, float $feeAmount): void
     {
         if ($this->hq_fee_status !== self::HQ_FEE_PENDING) {
             throw new \RuntimeException("Cannot create finance obligation from hq_fee_status: {$this->hq_fee_status}");
@@ -229,6 +229,7 @@ class ExamResitAttempt extends AuditableModel
             'hq_fee_status' => self::HQ_FEE_CHARGE_CREATED,
             'charge_created_by_user_id' => $userId,
             'charge_created_at' => now(),
+            'fee_amount' => $feeAmount,
         ]);
     }
 

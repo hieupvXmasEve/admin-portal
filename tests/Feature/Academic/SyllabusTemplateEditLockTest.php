@@ -53,7 +53,6 @@ function makeEditableTemplate(object $context): SyllabusTemplate
         'version' => '1.0',
         'min_attendance_threshold' => 80,
         'min_grade_threshold' => 40,
-        'exam_resit_fee' => 750000,
         'is_active' => true,
     ]);
 }
@@ -84,8 +83,7 @@ it('allows editing when no assigned offering has completed sessions', function (
             ->component('Syllabus/TemplatesShow')
             ->where('can_edit', true)
             ->where('template.min_attendance_threshold', fn ($value) => (float) $value === 80.0)
-            ->where('template.min_grade_threshold', fn ($value) => (float) $value === 40.0)
-            ->where('template.exam_resit_fee', fn ($value) => (float) $value === 750000.0));
+            ->where('template.min_grade_threshold', fn ($value) => (float) $value === 40.0));
 
     actingAs($this->user)
         ->withSession(['current_campus_id' => $this->campus->id])

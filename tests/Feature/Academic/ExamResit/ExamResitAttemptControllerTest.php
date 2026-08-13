@@ -72,7 +72,6 @@ function gradeFailedRecordForController(): AcademicRecord
         'is_default' => true,
         'is_active' => true,
         'created_by' => test()->user->id,
-        'exam_resit_fee' => 750000,
         'exam_resit_max_attempts' => 1,
         'exam_resit_late_payment_grace_days' => 14,
         'exam_resit_allow_unpaid_sitting' => false,

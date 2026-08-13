@@ -4,7 +4,6 @@ import Badge from '@/components/ui/badge/Badge.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { formatCurrency } from '@/types/finance';
 import type { GradingScheme } from '@/types/grading-scheme';
 import { Head, router } from '@inertiajs/vue3';
 import { AlertTriangle, ArrowLeft, BookOpen, Calendar, CheckCircle2, Clock, Edit, Globe, Lock, MapPin, User, Users, XCircle } from 'lucide-vue-next';
@@ -62,7 +61,6 @@ interface SyllabusTemplate {
     total_sessions: number;
     min_attendance_threshold: number | string;
     min_grade_threshold: number | string;
-    exam_resit_fee: number | string | null;
     learning_outcomes?: string[];
     grading_criteria?: Array<{ name: string; weight: number }>;
     required_materials?: string[];
@@ -145,14 +143,6 @@ const formatDate = (dateString: string) => {
 };
 
 const formatThreshold = (value: number | string) => Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 });
-
-const formatExamResitFee = (fee: number | string | null) => {
-    const amount = Number(fee ?? 0);
-    if (!amount || amount <= 0) {
-        return '—';
-    }
-    return formatCurrency(amount);
-};
 
 const totalAssessmentWeight = props.template.assessment_components?.reduce((sum, component) => sum + Number(component.weight), 0) || 0;
 </script>
@@ -292,10 +282,6 @@ const totalAssessmentWeight = props.template.assessment_components?.reduce((sum,
                     <div class="space-y-2">
                         <div class="text-muted-foreground text-sm font-medium">Min Pass Grade (out of 100)</div>
                         <p class="font-medium">{{ formatThreshold(template.min_grade_threshold) }}</p>
-                    </div>
-                    <div class="space-y-2">
-                        <div class="text-muted-foreground text-sm font-medium">Phí thi lại (VND)</div>
-                        <p class="font-medium">{{ formatExamResitFee(template.exam_resit_fee) }}</p>
                     </div>
                 </div>
 

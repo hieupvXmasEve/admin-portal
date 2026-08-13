@@ -13,6 +13,7 @@ use App\Shared\Contracts\Finance\Enums\FinancialEffect;
 use App\Shared\Contracts\Finance\FinanceIntakeContract;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 
 class CreateExamResitAttemptAction
 {
@@ -38,7 +39,6 @@ class CreateExamResitAttemptAction
 
             $syllabus = $this->resolveSyllabus($record);
             $policySnapshot = $this->buildPolicySnapshot($syllabus);
-            $this->assertPolicyAllowsExamResit($policySnapshot);
             $this->assertAttemptsRemaining($record, (int) $policySnapshot['max_attempts']);
 
             $requestSequence = ExamResitAttempt::query()
@@ -67,10 +67,8 @@ class CreateExamResitAttemptAction
                 'attempt_number' => null,
                 'approved_at' => now(),
                 'hq_fee_status' => ExamResitAttempt::HQ_FEE_PENDING,
-                'fee_amount' => $policySnapshot['exam_resit_fee'],
                 'policy_snapshot' => $policySnapshot,
                 'max_attempts_snapshot' => $policySnapshot['max_attempts'],
-                'exam_resit_fee_snapshot' => $policySnapshot['exam_resit_fee'],
                 'late_payment_grace_days_snapshot' => $policySnapshot['late_payment_grace_days'],
                 'allow_unpaid_sitting_snapshot' => $policySnapshot['allow_unpaid_sitting'],
                 'notes' => $data['notes'] ?? null,
@@ -78,32 +76,42 @@ class CreateExamResitAttemptAction
 
             $unit = $record->unit;
 
-            app(FinanceIntakeContract::class)->request(new FinanceIntakeData(
-                source_system: AcademicFinanceObligationSource::SOURCE_SYSTEM,
-                source_kind: AcademicFinanceObligationSource::EXAM_RESIT_ATTEMPT,
-                source_ref: AcademicFinanceObligationSource::examResitAttemptRef($attempt),
-                financial_effect: FinancialEffect::Debit,
-                obligation_type: AcademicFinanceObligationSource::EXAM_RESIT_FEE,
-                facts: [
-                    'student_id' => $attempt->student_id,
-                    'semester_id' => $attempt->charge_semester_id,
-                    'campus_id' => $attempt->campus_id,
-                    'unit_id' => $attempt->unit_id,
-                    'academic_record_id' => $attempt->academic_record_id,
-                    'original_course_offering_id' => $attempt->original_course_offering_id,
-                    'original_semester_id' => $attempt->original_semester_id,
-                    'operation_semester_id' => $attempt->operation_semester_id,
-                    'charge_semester_id' => $attempt->charge_semester_id,
-                    'request_sequence' => $attempt->request_sequence,
-                    'syllabus_template_id' => $attempt->syllabus_template_id,
-                    'max_attempts_snapshot' => $attempt->max_attempts_snapshot,
-                    'late_payment_grace_days_snapshot' => $attempt->late_payment_grace_days_snapshot,
-                    'allow_unpaid_sitting_snapshot' => $attempt->allow_unpaid_sitting_snapshot,
-                    'description' => "Phí thi lại: {$unit?->code} - {$unit?->name}",
-                ],
-            ));
+            try {
+                $intakeResult = app(FinanceIntakeContract::class)->request(new FinanceIntakeData(
+                    source_system: AcademicFinanceObligationSource::SOURCE_SYSTEM,
+                    source_kind: AcademicFinanceObligationSource::EXAM_RESIT_ATTEMPT,
+                    source_ref: AcademicFinanceObligationSource::examResitAttemptRef($attempt),
+                    financial_effect: FinancialEffect::Debit,
+                    obligation_type: AcademicFinanceObligationSource::EXAM_RESIT_FEE,
+                    facts: [
+                        'student_id' => $attempt->student_id,
+                        'semester_id' => $attempt->charge_semester_id,
+                        'campus_id' => $attempt->campus_id,
+                        'unit_id' => $attempt->unit_id,
+                        'academic_record_id' => $attempt->academic_record_id,
+                        'original_course_offering_id' => $attempt->original_course_offering_id,
+                        'original_semester_id' => $attempt->original_semester_id,
+                        'operation_semester_id' => $attempt->operation_semester_id,
+                        'charge_semester_id' => $attempt->charge_semester_id,
+                        'request_sequence' => $attempt->request_sequence,
+                        'syllabus_template_id' => $attempt->syllabus_template_id,
+                        'max_attempts_snapshot' => $attempt->max_attempts_snapshot,
+                        'late_payment_grace_days_snapshot' => $attempt->late_payment_grace_days_snapshot,
+                        'allow_unpaid_sitting_snapshot' => $attempt->allow_unpaid_sitting_snapshot,
+                        'description' => "Phí thi lại: {$unit?->code} - {$unit?->name}",
+                    ],
+                ));
+            } catch (RuntimeException $e) {
+                if (! str_contains($e->getMessage(), 'No active Finance pricing catalog item')) {
+                    throw $e;
+                }
 
-            $attempt->markFinanceObligationCreated($userId);
+                throw ValidationException::withMessages([
+                    'policy' => ['Chưa cấu hình giá thi lại cho môn này. Vui lòng cấu hình tại Pricing Operations.'],
+                ]);
+            }
+
+            $attempt->markFinanceObligationCreated($userId, $intakeResult->amount);
 
             return $attempt->fresh();
         });
@@ -184,29 +192,16 @@ class CreateExamResitAttemptAction
     }
 
     /**
-     * @return array{max_attempts:int,exam_resit_fee:float,registration_window_days:?int,late_payment_grace_days:int,allow_unpaid_sitting:bool}
+     * @return array{max_attempts:int,registration_window_days:?int,late_payment_grace_days:int,allow_unpaid_sitting:bool}
      */
     private function buildPolicySnapshot(SyllabusTemplate $syllabus): array
     {
         return [
             'max_attempts' => max(1, (int) ($syllabus->exam_resit_max_attempts ?? 1)),
-            'exam_resit_fee' => (float) ($syllabus->exam_resit_fee ?? 0),
             'registration_window_days' => $syllabus->exam_resit_registration_window_days,
             'late_payment_grace_days' => (int) ($syllabus->exam_resit_late_payment_grace_days ?? 14),
             'allow_unpaid_sitting' => (bool) ($syllabus->exam_resit_allow_unpaid_sitting ?? false),
         ];
-    }
-
-    /**
-     * @param  array{exam_resit_fee:float}  $policySnapshot
-     */
-    private function assertPolicyAllowsExamResit(array $policySnapshot): void
-    {
-        if ($policySnapshot['exam_resit_fee'] <= 0) {
-            throw ValidationException::withMessages([
-                'policy' => ['Syllabus chưa cấu hình exam_resit_fee hợp lệ.'],
-            ]);
-        }
     }
 
     private function assertAttemptsRemaining(AcademicRecord $record, int $maxAttempts): void

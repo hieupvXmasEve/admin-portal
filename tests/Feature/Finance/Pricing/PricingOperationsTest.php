@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\Campus;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Models\Unit;
 use App\Models\User;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
@@ -283,4 +284,82 @@ it('accepts raw facts_match JSON on create', function (): void {
     $item = FinancePricingCatalogItem::query()->where('rule_version', 'retake_fee:facts-v1')->firstOrFail();
 
     expect($item->facts_match)->toBe(['campus_code' => 'HN']);
+});
+
+it('creates a unit-scoped exam_resit_fee rule that resolves over the catch-all', function (): void {
+    ($this->grantPricing)([
+        'view_finance_pricing_operations',
+        'manage_finance_pricing_operations',
+    ]);
+
+    $unit = Unit::factory()->create();
+
+    FinancePricingCatalogItem::query()->create([
+        'obligation_type' => FinanceCharge::TYPE_EXAM_RESIT_FEE,
+        'amount' => 750_000,
+        'currency' => 'VND',
+        'rule_version' => 'exam_resit_fee:catch-all',
+        'description' => 'Catch-all',
+        'facts_match' => null,
+        'is_active' => true,
+        'effective_from' => now()->subDay(),
+    ]);
+
+    actingAs($this->user)
+        ->post(route('finance.pricing-operations.store'), [
+            '_token' => 'pricing-ops-csrf',
+            'obligation_type' => FinanceCharge::TYPE_EXAM_RESIT_FEE,
+            'amount' => 900_000,
+            'currency' => 'VND',
+            'rule_version' => 'exam_resit_fee:unit-'.$unit->id,
+            'facts_match_json' => json_encode(['unit_id' => $unit->id]),
+            'is_active' => true,
+            'effective_from' => now()->subDay()->toDateString(),
+        ])
+        ->assertRedirect();
+
+    $item = FinancePricingCatalogItem::query()->where('rule_version', 'exam_resit_fee:unit-'.$unit->id)->firstOrFail();
+    expect($item->facts_match)->toBe(['unit_id' => $unit->id]);
+
+    $student = Student::factory()->forCampus($this->campus)->create([
+        'status' => 'intake_course',
+        'intake' => 2024,
+        'intake_semester_id' => $this->semester->id,
+    ]);
+
+    $result = app(FinanceIntakeContract::class)->request(new FinanceIntakeData(
+        source_system: 'academic',
+        source_kind: 'exam_resit_attempt',
+        source_ref: 'RESIT-UNIT-SCOPED-001',
+        financial_effect: FinancialEffect::Debit,
+        obligation_type: FinanceCharge::TYPE_EXAM_RESIT_FEE,
+        facts: [
+            'student_id' => $student->id,
+            'semester_id' => $this->semester->id,
+            'unit_id' => $unit->id,
+            'description' => 'Resit priced via unit-scoped rule',
+        ],
+    ));
+
+    expect((float) $result->amount)->toBe(900_000.0)
+        ->and($result->pricing_rule_version)->toBe('exam_resit_fee:unit-'.$unit->id);
+});
+
+it('lets Finance pricing-operations staff search units without the Academic view_unit permission', function (): void {
+    ($this->grantPricing)(['view_finance_pricing_operations']);
+
+    $unit = Unit::factory()->create(['code' => 'CS101', 'name' => 'Intro to CS']);
+
+    actingAs($this->user)
+        ->getJson(route('finance.pricing-operations.units.search', ['q' => 'CS101']))
+        ->assertOk()
+        ->assertJsonFragment(['id' => $unit->id]);
+});
+
+it('forbids unit search without view_finance_pricing_operations', function (): void {
+    ($this->grantPricing)(['view_finance_charges']);
+
+    actingAs($this->user)
+        ->getJson(route('finance.pricing-operations.units.search', ['q' => 'CS101']))
+        ->assertForbidden();
 });
