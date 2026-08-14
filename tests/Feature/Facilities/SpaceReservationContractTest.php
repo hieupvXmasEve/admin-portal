@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Campus;
-use App\Models\Room;
+use App\Modules\Facilities\Models\Room;
 use App\Models\User;
 use App\Modules\Facilities\Models\RoomBooking;
 use App\Shared\Contracts\Facilities\DTO\SpaceReservationRequest;

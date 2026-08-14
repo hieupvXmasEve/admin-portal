@@ -8,7 +8,7 @@ use App\Models\CourseOffering;
 use App\Models\ExamRoomSlot;
 use App\Models\ExamRoomSlotInvigilator;
 use App\Models\Lecture;
-use App\Models\Room;
+use App\Modules\Facilities\Models\Room;
 use App\Models\User;
 use App\Modules\Academic\Delivery\Actions\AssignExamResitInvigilatorAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;

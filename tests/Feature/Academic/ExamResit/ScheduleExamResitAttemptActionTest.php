@@ -9,7 +9,7 @@ use App\Models\CourseRegistration;
 use App\Models\ExamResitAttempt;
 use App\Models\ExamResitSession;
 use App\Models\ExamRoomSlot;
-use App\Models\Room;
+use App\Modules\Facilities\Models\Room;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;

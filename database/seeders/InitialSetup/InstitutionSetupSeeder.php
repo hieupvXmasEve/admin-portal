@@ -6,7 +6,7 @@ namespace Database\Seeders\InitialSetup;
 
 use App\Models\Building;
 use App\Models\Campus;
-use App\Models\Room;
+use App\Modules\Facilities\Models\Room;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 

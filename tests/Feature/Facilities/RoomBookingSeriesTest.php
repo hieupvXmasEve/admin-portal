@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Models\Building;
 use App\Models\Campus;
 use App\Models\ClassSession;
-use App\Models\Room;
+use App\Modules\Facilities\Models\Room;
 use App\Models\User;
 use App\Modules\Facilities\Actions\CreateRoomBookingSeriesAction;
 use App\Modules\Facilities\Exceptions\RoomBookingSeriesConflictException;

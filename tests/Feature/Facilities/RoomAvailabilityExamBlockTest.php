@@ -6,7 +6,7 @@ use App\Models\Building;
 use App\Models\Campus;
 use App\Models\ExamResitSession;
 use App\Models\ExamRoomSlot;
-use App\Models\Room;
+use App\Modules\Facilities\Models\Room;
 use App\Models\Unit;
 use App\Models\User;
 use App\Modules\Facilities\Models\RoomBooking;

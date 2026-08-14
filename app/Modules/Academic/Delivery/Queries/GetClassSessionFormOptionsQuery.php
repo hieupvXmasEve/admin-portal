@@ -6,7 +6,7 @@ namespace App\Modules\Academic\Delivery\Queries;
 
 use App\Models\ClassSession;
 use App\Models\CourseOffering;
-use App\Models\Room;
+use App\Modules\Facilities\Models\Room;
 use App\Modules\Academic\Delivery\Support\ClassSessionService;
 use App\Shared\Contracts\Identity\ActiveLecturerReader;
 

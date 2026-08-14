@@ -7,7 +7,7 @@ namespace Database\Factories;
 use App\Models\ClassSession;
 use App\Models\CourseOffering;
 use App\Models\Lecture;
-use App\Models\Room;
+use App\Modules\Facilities\Models\Room;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

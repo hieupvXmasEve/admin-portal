@@ -9,7 +9,7 @@ use App\Models\CurriculumVersion;
 use App\Models\Lecture;
 use App\Models\Program;
 use App\Models\ProgramChangeRequest;
-use App\Models\Room;
+use App\Modules\Facilities\Models\Room;
 use App\Models\Semester;
 use App\Models\Specialization;
 use App\Models\Student;

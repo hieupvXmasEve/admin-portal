@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Models\Campus;
 use App\Models\ExamResitSession;
 use App\Models\ExamRoomSlot;
-use App\Models\Room;
+use App\Modules\Facilities\Models\Room;
 use App\Models\Semester;
 use App\Models\Unit;
 use App\Models\User;

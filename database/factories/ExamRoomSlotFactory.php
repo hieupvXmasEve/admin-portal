@@ -6,7 +6,7 @@ namespace Database\Factories;
 
 use App\Models\Campus;
 use App\Models\ExamRoomSlot;
-use App\Models\Room;
+use App\Modules\Facilities\Models\Room;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

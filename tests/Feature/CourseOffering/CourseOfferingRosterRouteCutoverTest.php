@@ -8,7 +8,7 @@ use App\Models\Campus;
 use App\Models\ClassSession;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
-use App\Models\Room;
+use App\Modules\Facilities\Models\Room;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;

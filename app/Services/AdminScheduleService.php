@@ -6,7 +6,7 @@ namespace App\Services;
 
 use App\Models\ClassSession;
 use App\Models\Lecture;
-use App\Models\Room;
+use App\Modules\Facilities\Models\Room;
 use App\Models\Semester;
 use App\Models\Unit;
 use Carbon\Carbon;

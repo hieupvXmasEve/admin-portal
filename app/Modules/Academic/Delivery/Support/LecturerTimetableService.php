@@ -6,7 +6,7 @@ namespace App\Modules\Academic\Delivery\Support;
 
 use App\Models\ClassSession;
 use App\Models\CourseOffering;
-use App\Models\Room;
+use App\Modules\Facilities\Models\Room;
 use App\Shared\Contracts\Identity\LecturerTeachingActor as Lecture;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;

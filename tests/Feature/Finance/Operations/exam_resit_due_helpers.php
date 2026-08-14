@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Models\ExamResitAttempt;
 use App\Models\ExamResitSession;
 use App\Models\ExamRoomSlot;
-use App\Models\Room;
+use App\Modules\Facilities\Models\Room;
 use App\Models\Student;
 use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Actions\CreateExamResitChargeSimpleAction;
