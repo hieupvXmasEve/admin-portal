@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Models\CurriculumVersion;
 use App\Models\EgcBlock;
-use App\Models\EgcRetakeDiscountLink;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
@@ -12,6 +11,7 @@ use App\Modules\Finance\Actions\Egc\ApplyEgcMajorEntryCreditAction;
 use App\Modules\Finance\Actions\Egc\ApplyEgcRetakeDiscountAction;
 use App\Modules\Finance\Models\CreditApplication;
 use App\Modules\Finance\Models\DiscountAllocation;
+use App\Modules\Finance\Models\EgcRetakeDiscountLink;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceCreditEntitlement;
 use App\Modules\Finance\Models\FinanceDiscountEntitlement;
