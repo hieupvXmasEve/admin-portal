@@ -7,28 +7,31 @@ namespace App\Modules\Academic\Delivery\Queries;
 use App\Models\AcademicRecord;
 use App\Models\ExamResitAttempt;
 use App\Models\Student;
-use App\Modules\Academic\Delivery\Actions\CreateExamResitAttemptAction;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 /**
- * Eligible students/records for exam-resit (thi lại) registration (ACAD-RET-001 slice 7).
- *
- * Any finalized failed academic record qualifies, regardless of `failure_reason`
- * (grade/attendance/both/manual) — staff reviews the failure reason shown on the
- * create page and decides who to register. Only true duplicates are excluded: a
- * unit already passed via another record, or a record with an in-flight/consumed
- * exam-resit attempt (see {@see ListExamResitBlockedStudentsQuery} for that set).
- * No curriculum-membership join is needed: a finalized failed academic record
- * already proves the student took the unit.
- *
- * Mirrors the gate in {@see CreateExamResitAttemptAction}.
+ * Duplicate/blocked records for the exam-resit (thi lại) create page — the
+ * complement of {@see ListExamResitEligibleStudentsQuery}. A finalized failed
+ * record is blocked only when it is a true duplicate, never on grade/attendance
+ * grounds: the unit was already passed via another record, or the record already
+ * has an in-flight/consumed exam-resit attempt. Shown to staff for transparency,
+ * not selectable for registration.
  */
-class ListExamResitEligibleStudentsQuery
+class ListExamResitBlockedStudentsQuery
 {
+    public const REASON_UNIT_ALREADY_PASSED = 'unit_already_passed';
+
+    public const REASON_RESIT_ALREADY_IN_FLIGHT = 'resit_already_in_flight';
+
+    private const REASON_LABELS = [
+        self::REASON_UNIT_ALREADY_PASSED => 'Đã pass môn này ở bản ghi khác',
+        self::REASON_RESIT_ALREADY_IN_FLIGHT => 'Đã có đăng ký thi lại đang xử lý/hoàn tất cho bản ghi này',
+    ];
+
     /**
      * @param  array{campus_id?:int|null,semester_id?:int|null,search?:string|null,unit_id?:int|null}  $filters
-     * @return Collection<int,array{student:Student,failed_record:AcademicRecord,unit:mixed}>
+     * @return Collection<int,array{student:Student,failed_record:AcademicRecord,unit:mixed,reason_code:string,reason_label:string}>
      */
     public function handle(array $filters): Collection
     {
@@ -46,7 +49,7 @@ class ListExamResitEligibleStudentsQuery
                         ->orWhere('student_id', 'like', "%{$search}%");
                 });
             })
-            ->whereHas('academicRecords', fn (Builder $q) => $this->scopeEligibleRecords($q, $unitId, $semesterId))
+            ->whereHas('academicRecords', fn (Builder $q) => $this->scopeFailedRecords($q, $unitId, $semesterId))
             ->with(['campus', 'program'])
             ->get();
 
@@ -65,17 +68,22 @@ class ListExamResitEligibleStudentsQuery
 
             $records = AcademicRecord::query()
                 ->where('student_id', $student->id)
-                ->where(fn (Builder $q) => $this->scopeEligibleRecords($q, $unitId, $semesterId))
-                ->whereNotIn('unit_id', $passedUnitIds)
-                ->whereNotIn('id', $blockedRecordIds)
+                ->where(fn (Builder $q) => $this->scopeFailedRecords($q, $unitId, $semesterId))
+                ->where(fn (Builder $q) => $q->whereIn('unit_id', $passedUnitIds)->orWhereIn('id', $blockedRecordIds))
                 ->with('unit')
                 ->get();
 
             foreach ($records as $record) {
+                $reasonCode = $passedUnitIds->contains($record->unit_id)
+                    ? self::REASON_UNIT_ALREADY_PASSED
+                    : self::REASON_RESIT_ALREADY_IN_FLIGHT;
+
                 $results->push([
                     'student' => $student,
                     'failed_record' => $record,
                     'unit' => $record->unit,
+                    'reason_code' => $reasonCode,
+                    'reason_label' => self::REASON_LABELS[$reasonCode],
                 ]);
             }
         }
@@ -86,7 +94,7 @@ class ListExamResitEligibleStudentsQuery
     /**
      * @param  Builder<AcademicRecord>  $query
      */
-    private function scopeEligibleRecords(Builder $query, ?int $unitId, ?int $semesterId): void
+    private function scopeFailedRecords(Builder $query, ?int $unitId, ?int $semesterId): void
     {
         $query->where('is_passed', false)
             ->where('completion_status', '!=', 'in_progress')

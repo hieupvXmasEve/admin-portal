@@ -74,7 +74,7 @@ beforeEach(function () {
     ]);
 });
 
-function examResitRecordFor(string $failureReason): AcademicRecord
+function examResitRecordFor(?string $failureReason): AcademicRecord
 {
     return AcademicRecord::factory()->create([
         'student_id' => test()->student->id,
@@ -229,26 +229,47 @@ it('throws a validation error when no catalog pricing rule exists for the unit',
         ->and(FinanceCharge::query()->count())->toBe(0);
 });
 
-it('rejects attendance failures from exam resit', function () {
+it('allows registering an attendance-failed record for exam resit (staff decision, no longer routed away)', function () {
     $record = examResitRecordFor(AcademicRecord::FAILURE_ATTENDANCE_FAILED);
 
-    app(CreateExamResitAttemptAction::class)->run([
+    $attempt = app(CreateExamResitAttemptAction::class)->run([
         'student_id' => $this->student->id,
         'academic_record_id' => $record->id,
         'operation_semester_id' => $this->semester->id,
         'charge_semester_id' => $this->semester->id,
         'campus_id' => $this->campus->id,
     ]);
-})->throws(ValidationException::class);
 
-it('rejects combined grade and attendance failures from exam resit', function () {
+    expect($attempt)->toBeInstanceOf(ExamResitAttempt::class)
+        ->and($attempt->academic_record_id)->toBe($record->id);
+});
+
+it('allows registering a combined grade-and-attendance-failed record for exam resit', function () {
     $record = examResitRecordFor(AcademicRecord::FAILURE_BOTH_FAILED);
 
-    app(CreateExamResitAttemptAction::class)->run([
+    $attempt = app(CreateExamResitAttemptAction::class)->run([
         'student_id' => $this->student->id,
         'academic_record_id' => $record->id,
         'operation_semester_id' => $this->semester->id,
         'charge_semester_id' => $this->semester->id,
         'campus_id' => $this->campus->id,
     ]);
-})->throws(ValidationException::class);
+
+    expect($attempt)->toBeInstanceOf(ExamResitAttempt::class)
+        ->and($attempt->academic_record_id)->toBe($record->id);
+});
+
+it('allows registering a legacy record with no failure_reason (never backfilled), matching the eligible list', function () {
+    $record = examResitRecordFor(null);
+
+    $attempt = app(CreateExamResitAttemptAction::class)->run([
+        'student_id' => $this->student->id,
+        'academic_record_id' => $record->id,
+        'operation_semester_id' => $this->semester->id,
+        'charge_semester_id' => $this->semester->id,
+        'campus_id' => $this->campus->id,
+    ]);
+
+    expect($attempt)->toBeInstanceOf(ExamResitAttempt::class)
+        ->and($attempt->academic_record_id)->toBe($record->id);
+});

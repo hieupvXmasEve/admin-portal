@@ -21,7 +21,11 @@ use Illuminate\Validation\ValidationException;
  *   record; it is still recorded and consumes an attempt.
  * - On an applied (strictly higher) resit, the result is score-authoritative: it
  *   clears any prior manual override (`override_pass`), and a still-failing result
- *   is normalized to `grade_failed` (attendance was already fine to be eligible).
+ *   is normalized to `grade_failed`. Grade-only: attendance is not re-checked here.
+ *   Confirmed product decision — once exam resit is allowed for a record (any
+ *   original failure_reason, see {@see \App\Modules\Academic\Delivery\Queries\ListExamResitEligibleStudentsQuery}),
+ *   the resit score alone decides pass/fail; the original attendance shortfall is
+ *   informational only and does not block passing.
  * - Attempt counting: `attempt_number` is consumed ONLY at completion (the student
  *   actually sat the resit and a result was recorded), separate from the
  *   request/source sequence assigned at creation time.

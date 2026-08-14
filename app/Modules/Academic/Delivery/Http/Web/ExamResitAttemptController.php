@@ -21,6 +21,7 @@ use App\Modules\Academic\Delivery\Http\Requests\ExamResit\ScheduleExamResitReque
 use App\Modules\Academic\Delivery\Http\Requests\ExamResit\StoreExamResitBulkRequest;
 use App\Modules\Academic\Delivery\Http\Requests\ExamResit\StoreExamResitRequest;
 use App\Modules\Academic\Delivery\Queries\ListExamResitAttemptsQuery;
+use App\Modules\Academic\Delivery\Queries\ListExamResitBlockedStudentsQuery;
 use App\Modules\Academic\Delivery\Queries\ListExamResitEligibleStudentsQuery;
 use App\Shared\Contracts\Institution\CampusReferenceReader;
 use App\Shared\Contracts\Institution\DTO\CampusReference;
@@ -33,6 +34,7 @@ class ExamResitAttemptController extends Controller
     public function __construct(
         private readonly ListExamResitAttemptsQuery $attemptsQuery,
         private readonly ListExamResitEligibleStudentsQuery $eligibilityQuery,
+        private readonly ListExamResitBlockedStudentsQuery $blockedQuery,
         private readonly GetSemesterReferenceOptionsQuery $semesters,
         private readonly CampusReferenceReader $campuses,
     ) {}
@@ -74,20 +76,27 @@ class ExamResitAttemptController extends Controller
     public function create(ListExamResitRequest $request): Response
     {
         $validated = $request->validated();
+        $activeSemesterId = Semester::getActiveSemester()?->id;
+        $semesterId = isset($validated['semester_id']) ? (int) $validated['semester_id'] : $activeSemesterId;
 
-        $eligibleStudents = $this->eligibilityQuery->handle([
+        $queryFilters = [
             'campus_id' => $validated['campus_id'] ?? session('current_campus_id'),
-            'semester_id' => $validated['semester_id'] ?? null,
+            'semester_id' => $semesterId,
             'search' => $validated['search'] ?? null,
             'unit_id' => $validated['unit_id'] ?? null,
-        ]);
+        ];
+
+        $eligibleStudents = $this->eligibilityQuery->handle($queryFilters);
+        $blockedStudents = $this->blockedQuery->handle($queryFilters);
 
         return Inertia::render('Academic/ExamResit/Create', [
             'eligible_students' => $eligibleStudents->values(),
             'total_eligible' => $eligibleStudents->count(),
-            'filters' => $request->only(['search', 'semester_id', 'campus_id', 'unit_id']),
+            'blocked_students' => $blockedStudents->values(),
+            'total_blocked' => $blockedStudents->count(),
+            'filters' => array_merge($request->only(['search', 'campus_id', 'unit_id']), ['semester_id' => $semesterId]),
             'semesters' => $this->semesters->options(),
-            'current_semester_id' => Semester::getActiveSemester()?->id,
+            'current_semester_id' => $activeSemesterId,
             'campuses' => array_map(
                 static fn (CampusReference $campus): array => $campus->toArray(),
                 $this->campuses->all(),

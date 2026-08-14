@@ -140,9 +140,12 @@ class ListRetakeCourseEligibleStudentsQuery
 
     /**
      * Constrain an AcademicRecord query to failures that belong to the course-retake
-     * lane. Grade-only failures (`grade_failed`) route to exam resit and are excluded;
-     * attendance/both/manual failures and legacy un-backfilled records (null) remain
-     * eligible. Mirrors, in reverse, the exam-resit gate in CreateExamResitAttemptAction.
+     * lane. Grade-only failures (`grade_failed`) are excluded — everything else
+     * (attendance/both/manual failures, legacy un-backfilled `null` records) remains
+     * eligible. Exam resit no longer excludes these on `failure_reason`
+     * (see {@see \App\Modules\Academic\Delivery\Queries\ListExamResitEligibleStudentsQuery}),
+     * so a non-grade-only failure can now be eligible in both lanes at once — no
+     * cross-lane guard exists to prevent registering the same record in both.
      *
      * @param  Builder<AcademicRecord>  $query
      */

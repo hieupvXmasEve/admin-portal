@@ -146,28 +146,6 @@ class CreateExamResitAttemptAction
             ]);
         }
 
-        if ($record->failure_reason === null) {
-            throw ValidationException::withMessages([
-                'failure_reason' => ['Thi lại cần failure_reason rõ ràng từ Academic finalization.'],
-            ]);
-        }
-
-        if (in_array($record->failure_reason, [
-            AcademicRecord::FAILURE_ATTENDANCE_FAILED,
-            AcademicRecord::FAILURE_BOTH_FAILED,
-        ], true)) {
-            throw ValidationException::withMessages([
-                'failure_reason' => ['Sinh viên fail do chuyên cần phải đi luồng học lại, không đủ điều kiện thi lại.'],
-            ]);
-        }
-
-        $snapshot = $record->failure_reason_snapshot ?? [];
-        if (($snapshot['attendance_evidence_state'] ?? null) === 'not_recorded' || (int) $record->total_not_recorded > 0) {
-            throw ValidationException::withMessages([
-                'failure_reason' => ['Dữ liệu chuyên cần chưa ghi nhận đủ, chưa thể chốt điều kiện thi lại.'],
-            ]);
-        }
-
         $hasInFlightAttempt = ExamResitAttempt::query()
             ->where('academic_record_id', $record->id)
             ->whereIn('status', ExamResitAttempt::IN_FLIGHT_OR_CONSUMED_STATUSES)

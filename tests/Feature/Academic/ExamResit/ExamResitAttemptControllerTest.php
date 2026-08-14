@@ -246,7 +246,40 @@ it('renders the create page with eligible students', function () {
         ->assertInertia(fn ($page) => $page
             ->component('Academic/ExamResit/Create')
             ->has('eligible_students')
+            ->has('blocked_students')
             ->has('semesters'));
+});
+
+it('surfaces a duplicate (already-passed-unit) record in blocked_students, not eligible_students', function () {
+    $blockedRecord = gradeFailedRecordForController();
+    $laterOffering = CourseOffering::factory()->create([
+        'semester_id' => $this->semester->id,
+        'unit_id' => $blockedRecord->unit_id,
+        'campus_id' => $this->campus->id,
+    ]);
+    AcademicRecord::factory()->create([
+        'student_id' => $this->student->id,
+        'campus_id' => $this->campus->id,
+        'semester_id' => $this->semester->id,
+        'unit_id' => $blockedRecord->unit_id,
+        'course_offering_id' => $laterOffering->id,
+        'completion_status' => 'completed',
+        'grade_status' => 'final',
+        'is_passed' => true,
+        'failure_reason' => null,
+    ]);
+
+    actingAs($this->user)
+        ->withSession(['current_campus_id' => $this->campus->id])
+        ->get(route('academic.exam-resit.create'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Academic/ExamResit/Create')
+            ->where('eligible_students', fn ($students) => count($students) === 0)
+            ->where('blocked_students', fn ($students) => count($students) === 1
+                && $students[0]['reason_code'] === 'unit_already_passed'
+                && $students[0]['failed_record']['id'] === $blockedRecord->id)
+            ->where('total_blocked', 1));
 });
 
 it('surfaces the active semester as current_semester_id on the create page', function () {
@@ -260,6 +293,80 @@ it('surfaces the active semester as current_semester_id on the create page', fun
         ->assertInertia(fn ($page) => $page
             ->component('Academic/ExamResit/Create')
             ->where('current_semester_id', $this->semester->id));
+});
+
+it('defaults the eligible list to the active semester, excluding a fail record from another semester', function () {
+    $this->semester->update(['is_active' => true]);
+    $otherSemester = Semester::factory()->create(['is_active' => false]);
+
+    $recordInActiveSemester = gradeFailedRecordForController();
+
+    $otherOffering = CourseOffering::factory()->create([
+        'semester_id' => $otherSemester->id,
+        'unit_id' => Unit::factory()->create()->id,
+        'campus_id' => $this->campus->id,
+    ]);
+    AcademicRecord::factory()->create([
+        'student_id' => $this->student->id,
+        'campus_id' => $this->campus->id,
+        'semester_id' => $otherSemester->id,
+        'unit_id' => $otherOffering->unit_id,
+        'course_offering_id' => $otherOffering->id,
+        'completion_status' => 'failed',
+        'grade_status' => 'final',
+        'is_passed' => false,
+        'override_pass' => false,
+        'failure_reason' => AcademicRecord::FAILURE_GRADE_FAILED,
+        'total_not_recorded' => 0,
+    ]);
+
+    actingAs($this->user)
+        ->withSession(['current_campus_id' => $this->campus->id])
+        ->get(route('academic.exam-resit.create'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Academic/ExamResit/Create')
+            ->where('filters.semester_id', $this->semester->id)
+            ->where('eligible_students', fn ($students) => count($students) === 1
+                && $students[0]['failed_record']['id'] === $recordInActiveSemester->id)
+            ->where('total_eligible', 1));
+});
+
+it('scopes the eligible list to an explicitly requested semester_id, overriding the active-semester default', function () {
+    $this->semester->update(['is_active' => true]);
+    $otherSemester = Semester::factory()->create(['is_active' => false]);
+
+    gradeFailedRecordForController();
+
+    $otherOffering = CourseOffering::factory()->create([
+        'semester_id' => $otherSemester->id,
+        'unit_id' => Unit::factory()->create()->id,
+        'campus_id' => $this->campus->id,
+    ]);
+    $recordInOtherSemester = AcademicRecord::factory()->create([
+        'student_id' => $this->student->id,
+        'campus_id' => $this->campus->id,
+        'semester_id' => $otherSemester->id,
+        'unit_id' => $otherOffering->unit_id,
+        'course_offering_id' => $otherOffering->id,
+        'completion_status' => 'failed',
+        'grade_status' => 'final',
+        'is_passed' => false,
+        'override_pass' => false,
+        'failure_reason' => AcademicRecord::FAILURE_GRADE_FAILED,
+        'total_not_recorded' => 0,
+    ]);
+
+    actingAs($this->user)
+        ->withSession(['current_campus_id' => $this->campus->id])
+        ->get(route('academic.exam-resit.create', ['semester_id' => $otherSemester->id]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Academic/ExamResit/Create')
+            ->where('filters.semester_id', $otherSemester->id)
+            ->where('eligible_students', fn ($students) => count($students) === 1
+                && $students[0]['failed_record']['id'] === $recordInOtherSemester->id)
+            ->where('total_eligible', 1));
 });
 
 it('stores an exam-resit attempt from a grade-failed record', function () {

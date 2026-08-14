@@ -12,18 +12,23 @@ use App\Shared\Support\Academic\CourseGradeScale;
  * correct remediation lane (ACAD-RET-001).
  *
  * Policy (locked decisions):
- * - Grade failure  → `grade_failed`     → eligible for exam resit (`thi lại`).
- * - Attendance failure (or both) → `attendance_failed` / `both_failed`
- *                   → must go through course retake (`học lại`).
+ * - Grade failure  → `grade_failed`.
+ * - Attendance failure (or both) → `attendance_failed` / `both_failed`.
+ *   NOTE: `failure_reason` no longer determines exam-resit vs course-retake
+ *   routing by itself — exam resit ({@see \App\Modules\Academic\Delivery\Queries\ListExamResitEligibleStudentsQuery})
+ *   accepts every reason, and course retake ({@see \App\Modules\Academic\Delivery\Queries\ListRetakeCourseEligibleStudentsQuery})
+ *   still excludes only `grade_failed`. Non-grade-only failures are eligible in
+ *   both lanes; staff decide. This classifier only labels the reason, it does
+ *   not gate anything.
  * - Attendance %   = (present + late) / (present + late + absent) × 100.
  *                   Excused and not-recorded sessions are EXCLUDED from the
  *                   denominator (story policy), so they never penalise a student.
  * - Attendance is evaluated only when there is recorded evidence. A course with
  *   no recorded sessions is "not applicable" — grade alone decides (this keeps
  *   the historical grade-only behavior for records without attendance data).
- * - Not-recorded sessions are surfaced as `attendance_evidence_state` so the
- *   downstream resit-eligibility gate can block until evidence is complete; they
- *   do not, by themselves, fail the student here.
+ * - Not-recorded sessions are surfaced as `attendance_evidence_state`; the
+ *   exam-resit list/action no longer block on this, so a not-recorded record
+ *   can be registered — the raw value is still shown to staff on the create page.
  * - `override_pass` always wins: the staff-forced result stands, and an overridden
  *   failure is labelled `manual_failed`.
  *

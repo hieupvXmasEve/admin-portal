@@ -70,12 +70,26 @@ it('lists an intake_course student with a grade-failed final record', function (
         ->and($results->first()['unit']->id)->toBe($record->unit_id);
 });
 
-it('excludes an attendance-failed record (course-retake lane)', function () {
-    failedGradeRecord($this->student, $this->campus, $this->semester, [
+it('includes an attendance-failed record (staff decides eligibility, not the query)', function () {
+    $record = failedGradeRecord($this->student, $this->campus, $this->semester, [
         'failure_reason' => AcademicRecord::FAILURE_ATTENDANCE_FAILED,
     ]);
 
-    expect(eligibleExamResit())->toHaveCount(0);
+    $results = eligibleExamResit();
+
+    expect($results)->toHaveCount(1)
+        ->and($results->first()['failed_record']->id)->toBe($record->id);
+});
+
+it('includes a both-failed record', function () {
+    $record = failedGradeRecord($this->student, $this->campus, $this->semester, [
+        'failure_reason' => AcademicRecord::FAILURE_BOTH_FAILED,
+    ]);
+
+    $results = eligibleExamResit();
+
+    expect($results)->toHaveCount(1)
+        ->and($results->first()['failed_record']->id)->toBe($record->id);
 });
 
 it('excludes a record that already has an in-flight exam-resit attempt', function () {
@@ -113,10 +127,54 @@ it('excludes a record whose unit the student already passed', function () {
     expect(eligibleExamResit())->toHaveCount(0);
 });
 
-it('excludes a record with not-recorded attendance evidence', function () {
-    failedGradeRecord($this->student, $this->campus, $this->semester, [
+it('includes a record with not-recorded attendance evidence', function () {
+    $record = failedGradeRecord($this->student, $this->campus, $this->semester, [
         'total_not_recorded' => 2,
     ]);
 
-    expect(eligibleExamResit())->toHaveCount(0);
+    $results = eligibleExamResit();
+
+    expect($results)->toHaveCount(1)
+        ->and($results->first()['failed_record']->id)->toBe($record->id);
+});
+
+it('includes a manual_failed record', function () {
+    $record = failedGradeRecord($this->student, $this->campus, $this->semester, [
+        'failure_reason' => AcademicRecord::FAILURE_MANUAL_FAILED,
+    ]);
+
+    $results = eligibleExamResit();
+
+    expect($results)->toHaveCount(1)
+        ->and($results->first()['failed_record']->id)->toBe($record->id);
+});
+
+it('includes a legacy finalized failed record with no failure_reason (never backfilled) — must match the submit gate', function () {
+    $record = failedGradeRecord($this->student, $this->campus, $this->semester, [
+        'failure_reason' => null,
+    ]);
+
+    $results = eligibleExamResit();
+
+    expect($results)->toHaveCount(1)
+        ->and($results->first()['failed_record']->id)->toBe($record->id);
+});
+
+it('scopes to the given semester_id, excluding a fail record from a different semester', function () {
+    $otherSemester = Semester::factory()->create();
+    $record = failedGradeRecord($this->student, $this->campus, $this->semester);
+    failedGradeRecord($this->student, $this->campus, $otherSemester);
+
+    $results = eligibleExamResit(['semester_id' => $this->semester->id]);
+
+    expect($results)->toHaveCount(1)
+        ->and($results->first()['failed_record']->id)->toBe($record->id);
+});
+
+it('returns fail records from every semester when semester_id is not given', function () {
+    $otherSemester = Semester::factory()->create();
+    failedGradeRecord($this->student, $this->campus, $this->semester);
+    failedGradeRecord($this->student, $this->campus, $otherSemester);
+
+    expect(eligibleExamResit())->toHaveCount(2);
 });
