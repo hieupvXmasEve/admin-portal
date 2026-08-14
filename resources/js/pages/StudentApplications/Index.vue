@@ -60,6 +60,10 @@ interface ApplicationRow {
     primary_guardian_name: string | null;
     primary_guardian_relationship: string | null;
     primary_guardian_phone: string | null;
+    father_guardian_name: string | null;
+    father_guardian_phone: string | null;
+    mother_guardian_name: string | null;
+    mother_guardian_phone: string | null;
     // Ship-list CRM + pre-existing fields (Evidence Base), hidden by default (D8).
     gender: string | null;
     ethnicity: string | null;
@@ -83,6 +87,21 @@ interface ApplicationRow {
     uu_dai_gc: string | null;
     crm_paid_amount: string | number | null;
     last_synced_at: string | null;
+    // Full CRM parity, added 2026-08-14 (previously excluded — near-zero fill
+    // or never surfaced at all).
+    new_province: string | null;
+    new_street: string | null;
+    new_ward: string | null;
+    birth_day: number | null;
+    birth_month: number | null;
+    birth_year: number | null;
+    exam_date: string | null;
+    listening: string | number | null;
+    reading: string | number | null;
+    writing: string | number | null;
+    speaking: string | number | null;
+    registration_form: boolean | null;
+    academic_scores: Record<string, string | number>;
 }
 
 /** Ship-list fields with no special formatting: render the raw value or "—". */
@@ -105,7 +124,33 @@ const SIMPLE_TEXT_FIELDS = [
     'scholarship',
     'pathway_gateway',
     'uu_dai_gc',
+    'new_province',
+    'new_street',
+    'new_ward',
 ] as const satisfies readonly (keyof ApplicationRow)[];
+
+// 13 school-report subjects + 4 national-exam subjects (the latter have 0
+// rows to date — a dead CRM contract — but the column stays so a future
+// report shows up without another code change).
+const ACADEMIC_SUBJECTS = [
+    { code: 'toan', label: 'Toán' },
+    { code: 'ly', label: 'Lý' },
+    { code: 'hoa', label: 'Hóa' },
+    { code: 'sinh', label: 'Sinh' },
+    { code: 'tin_hoc', label: 'Tin học' },
+    { code: 'van', label: 'Văn' },
+    { code: 'lich_su', label: 'Lịch sử' },
+    { code: 'dia_ly', label: 'Địa lý' },
+    { code: 'tieng_anh', label: 'Tiếng Anh' },
+    { code: 'giao_duc_cong_dan', label: 'GDCD' },
+    { code: 'giao_duc_quoc_phong', label: 'GDQP' },
+    { code: 'cong_nghe', label: 'Công nghệ' },
+    { code: 'kt_pl', label: 'KT-PL' },
+    { code: 'thithpt_toan', label: 'THPT Toán' },
+    { code: 'thithpt_van', label: 'THPT Văn' },
+    { code: 'thithpt_option1', label: 'THPT Môn tự chọn 1' },
+    { code: 'thithpt_option2', label: 'THPT Môn tự chọn 2' },
+] as const;
 
 interface DocumentType {
     code: string;
@@ -242,10 +287,14 @@ const columns = computed<ColumnDef<ApplicationRow>[]>(() => [
     { accessorKey: 'status', header: 'Status', enableSorting: true },
     { accessorKey: 'created_at', header: 'Created', enableSorting: true },
     { id: 'primary_guardian', header: 'Primary Guardian', enableSorting: false },
+    { id: 'father_guardian', header: 'Father', enableSorting: false },
+    { id: 'mother_guardian', header: 'Mother', enableSorting: false },
     // Identity
     { accessorKey: 'gender', header: 'Gender', enableSorting: true },
     { accessorKey: 'ethnicity', header: 'Ethnicity', enableSorting: false },
     { accessorKey: 'religion', header: 'Religion', enableSorting: false },
+    { id: 'date_of_birth', header: 'Date of Birth', enableSorting: false },
+    { accessorKey: 'registration_form', header: 'Registration Form', enableSorting: false },
     // Admission
     { accessorKey: 'crm_campus', header: 'CRM Campus', enableSorting: true },
     { accessorKey: 'crm_major', header: 'CRM Major', enableSorting: true },
@@ -256,8 +305,19 @@ const columns = computed<ColumnDef<ApplicationRow>[]>(() => [
     { accessorKey: 'gpa_type', header: 'GPA Type', enableSorting: false },
     { accessorKey: 'school', header: 'School', enableSorting: true },
     { accessorKey: 'gpa', header: 'GPA', enableSorting: true },
+    ...ACADEMIC_SUBJECTS.map(
+        (subject): ColumnDef<ApplicationRow> => ({
+            id: `score_${subject.code}`,
+            header: subject.label,
+            meta: { label: subject.label },
+            enableSorting: false,
+        }),
+    ),
     // Location
     { accessorKey: 'province', header: 'Province', enableSorting: true },
+    { accessorKey: 'new_province', header: 'New Province', enableSorting: false },
+    { accessorKey: 'new_street', header: 'New Street', enableSorting: false },
+    { accessorKey: 'new_ward', header: 'New Ward', enableSorting: false },
     { accessorKey: 'birth_place', header: 'Birth Place', enableSorting: false },
     { accessorKey: 'permanent_address', header: 'Permanent Address', enableSorting: false },
     { accessorKey: 'address', header: 'Address', enableSorting: false },
@@ -265,6 +325,11 @@ const columns = computed<ColumnDef<ApplicationRow>[]>(() => [
     { accessorKey: 'id_card_place_of_issue', header: 'ID Issue Place', enableSorting: false },
     // English
     { accessorKey: 'english_test_type', header: 'English Test', enableSorting: false },
+    { accessorKey: 'exam_date', header: 'Exam Date', enableSorting: false },
+    { accessorKey: 'listening', header: 'Listening', enableSorting: false },
+    { accessorKey: 'reading', header: 'Reading', enableSorting: false },
+    { accessorKey: 'writing', header: 'Writing', enableSorting: false },
+    { accessorKey: 'speaking', header: 'Speaking', enableSorting: false },
     { accessorKey: 'overall', header: 'Overall Score', enableSorting: true },
     // Sync
     { accessorKey: 'last_synced_at', header: 'Last Synced', enableSorting: true },
@@ -313,6 +378,17 @@ const formatScore = (value: string | number | null): string => {
 const formatVnd = (value: string | number | null): string => (value === null ? '—' : new Intl.NumberFormat('vi-VN').format(Number(value)) + '₫');
 
 const fieldValue = (row: ApplicationRow, field: (typeof SIMPLE_TEXT_FIELDS)[number]): string => row[field] || '—';
+
+// Plain numeric score, no zero-hiding (D12 only covers gpa/overall).
+const formatPlainScore = (value: string | number | null): string => (value === null ? '—' : Number(value).toFixed(2));
+
+const formatDateOfBirth = (row: ApplicationRow): string =>
+    row.birth_day && row.birth_month && row.birth_year ? `${String(row.birth_day).padStart(2, '0')}/${String(row.birth_month).padStart(2, '0')}/${row.birth_year}` : '—';
+
+const academicScore = (row: ApplicationRow, subjectCode: string): string => {
+    const score = row.academic_scores[subjectCode];
+    return score === undefined ? '—' : Number(score).toFixed(2);
+};
 
 // Documents of a given catalog type for a row (empty when none submitted).
 const docsForType = (row: ApplicationRow, code: string): DocRef[] => row.documents_by_type?.[code] ?? [];
@@ -609,8 +685,38 @@ const submitReject = () => {
                 <span v-else class="text-muted-foreground">—</span>
             </template>
 
+            <template #cell-father_guardian="{ row }">
+                <template v-if="row.original.father_guardian_name">
+                    <p class="font-medium">{{ row.original.father_guardian_name }}</p>
+                    <p v-if="row.original.father_guardian_phone" class="text-muted-foreground text-xs">{{ row.original.father_guardian_phone }}</p>
+                </template>
+                <span v-else class="text-muted-foreground">—</span>
+            </template>
+
+            <template #cell-mother_guardian="{ row }">
+                <template v-if="row.original.mother_guardian_name">
+                    <p class="font-medium">{{ row.original.mother_guardian_name }}</p>
+                    <p v-if="row.original.mother_guardian_phone" class="text-muted-foreground text-xs">{{ row.original.mother_guardian_phone }}</p>
+                </template>
+                <span v-else class="text-muted-foreground">—</span>
+            </template>
+
             <!-- CRM ship-list columns, hidden by default (D8). Plain text fields share one formatter. -->
             <template v-for="field in SIMPLE_TEXT_FIELDS" :key="field" #[`cell-${field}`]="{ row }">{{ fieldValue(row.original, field) }}</template>
+
+            <template #cell-date_of_birth="{ row }">{{ formatDateOfBirth(row.original) }}</template>
+            <template #cell-registration_form="{ row }">
+                <span v-if="row.original.registration_form === null" class="text-muted-foreground">—</span>
+                <span v-else>{{ row.original.registration_form ? 'Yes' : 'No' }}</span>
+            </template>
+
+            <template v-for="subject in ACADEMIC_SUBJECTS" :key="subject.code" #[`cell-score_${subject.code}`]="{ row }">{{ academicScore(row.original, subject.code) }}</template>
+
+            <template #cell-exam_date="{ row }">{{ row.original.exam_date ? formatDate(row.original.exam_date) : '—' }}</template>
+            <template #cell-listening="{ row }">{{ formatPlainScore(row.original.listening) }}</template>
+            <template #cell-reading="{ row }">{{ formatPlainScore(row.original.reading) }}</template>
+            <template #cell-writing="{ row }">{{ formatPlainScore(row.original.writing) }}</template>
+            <template #cell-speaking="{ row }">{{ formatPlainScore(row.original.speaking) }}</template>
 
             <template #cell-gpa="{ row }">{{ formatScore(row.original.gpa) }}</template>
             <template #cell-overall="{ row }">{{ formatScore(row.original.overall) }}</template>

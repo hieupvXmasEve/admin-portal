@@ -90,10 +90,12 @@ class StudentApplication extends AuditableModel
         'pathway_gateway',
         'uu_dai_gc',
         'crm_paid_amount',
+        'registration_form',
         'last_synced_at',
     ];
 
     protected $casts = [
+        'registration_form' => 'boolean',
         'birth_day' => 'integer',
         'birth_month' => 'integer',
         'birth_year' => 'integer',

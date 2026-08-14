@@ -66,7 +66,7 @@ function fullCrmRecord(array $overrides = []): array
         'ielts_certificate' => 'https://drive.example/ielts',
         'scholarship_cert_view_url' => 'https://drive.example/sch',
         'file_id_card_photo' => 'https://drive.example/ignored',
-        'registration_form' => 'https://drive.example/ignored2',
+        'registration_form' => 1,
         'toan' => '8.0', 'ly' => '7.5', 'hoa' => '7.0', 'sinh' => '8.0', 'tin_hoc' => '9.0',
         'van' => '7.0', 'lich_su' => '8.0', 'dia_ly' => '8.5', 'tieng_anh' => '9.0',
         'giao_duc_cong_dan' => '9.5', 'giao_duc_quoc_phong' => '9.0', 'cong_nghe' => '8.0', 'kt_pl' => '8.5',
@@ -89,6 +89,7 @@ it('maps a full record with every field populated', function () {
         ->and($payload)->not->toHaveKey('crm_admission_id')
         ->and($payload['gpa'])->toBe(8.5)
         ->and($payload['crm_paid_amount'])->toBe(1000000.0)
+        ->and($payload['registration_form'])->toBeTrue()
         ->and($payload['english_test']['listening'])->toBe(7.5)
         ->and($payload['guardians'])->toHaveCount(2)
         ->and($payload['documents'])->toHaveCount(12)
@@ -169,10 +170,16 @@ it('rejects a plain http: document URL (https only)', function () {
     expect(collect($payload['documents'])->firstWhere('file_type_code', 'diploma'))->toBeNull();
 });
 
-it('ignores file_id_card_photo and registration_form entirely', function () {
+it('ignores file_id_card_photo as a document (no catalog code for it)', function () {
     $payload = mapper()->map(fullCrmRecord());
 
     $codes = collect($payload['documents'])->pluck('file_type_code');
     expect($codes)->not->toContain('id_card_photo')
         ->and($codes)->not->toContain('registration_form');
+});
+
+it('maps registration_form to a boolean, not a document', function () {
+    expect(mapper()->map(fullCrmRecord(['registration_form' => 1]))['registration_form'])->toBeTrue()
+        ->and(mapper()->map(fullCrmRecord(['registration_form' => 0]))['registration_form'])->toBeFalse()
+        ->and(mapper()->map(fullCrmRecord(['registration_form' => null]))['registration_form'])->toBeNull();
 });

@@ -43,7 +43,8 @@ final class ListApplicationsQuery
         $query = StudentApplication::query()->with([
             'student:id,student_id,full_name',
             'documents' => fn ($query) => $query->orderBy('page_index')->orderBy('id'),
-            'guardians' => fn ($query) => $query->where('is_primary', true),
+            'guardians',
+            'academicScores',
         ]);
 
         // Fail closed: a null campus code means the session's campus binding
@@ -60,13 +61,25 @@ final class ListApplicationsQuery
         return $query->orderBy($filters['sort'], $filters['direction'])->paginate($filters['per_page'])->withQueryString()->through(
             fn (StudentApplication $application): array => [
                 'id' => $application->id, 'full_name' => $application->full_name, 'student_code' => $application->student_code, 'email' => $application->email, 'national_id' => $application->national_id, 'phone' => $application->phone, 'intended_program' => $application->intended_program, 'intake' => $application->intake, 'status' => $application->status, 'created_at' => $application->created_at, 'student' => $application->student,
-                'primary_guardian_name' => $application->guardians->first()?->full_name, 'primary_guardian_relationship' => $application->guardians->first()?->relationship, 'primary_guardian_phone' => $application->guardians->first()?->phone,
-                // Ship-list CRM + pre-existing fields (Evidence Base): hidden-by-default
-                // columns surfaced starting phase 3. The 6 zero/near-zero CRM fields
-                // (new_province, new_street, new_ward, intended_specialization, sut_id,
-                // study_link_status) are deliberately excluded.
-                'gender' => $application->gender, 'ethnicity' => $application->ethnicity, 'address' => $application->address, 'english_test_type' => $application->english_test_type, 'overall' => $application->overall,
-                'crm_campus' => $application->crm_campus, 'crm_major' => $application->crm_major, 'province' => $application->province, 'permanent_address' => $application->permanent_address, 'birth_place' => $application->birth_place, 'nationality' => $application->nationality, 'religion' => $application->religion, 'id_card_place_of_issue' => $application->id_card_place_of_issue, 'school' => $application->school, 'graduation_year' => $application->graduation_year, 'gpa' => $application->gpa, 'gpa_type' => $application->gpa_type, 'scholarship' => $application->scholarship, 'pathway_gateway' => $application->pathway_gateway, 'uu_dai_gc' => $application->uu_dai_gc, 'crm_paid_amount' => $application->crm_paid_amount, 'last_synced_at' => $application->last_synced_at,
+                'primary_guardian_name' => $application->guardians->firstWhere('is_primary', true)?->full_name, 'primary_guardian_relationship' => $application->guardians->firstWhere('is_primary', true)?->relationship, 'primary_guardian_phone' => $application->guardians->firstWhere('is_primary', true)?->phone,
+                // Both parents, not just whichever is primary — a staff member
+                // scanning the list wants father AND mother contacts, not one.
+                'father_guardian_name' => $application->guardians->firstWhere('relationship', 'father')?->full_name, 'father_guardian_phone' => $application->guardians->firstWhere('relationship', 'father')?->phone,
+                'mother_guardian_name' => $application->guardians->firstWhere('relationship', 'mother')?->full_name, 'mother_guardian_phone' => $application->guardians->firstWhere('relationship', 'mother')?->phone,
+                // Full CRM parity, per user request 2026-08-14: every scalar CRM
+                // field synced onto student_applications is now surfaced. Only
+                // intended_specialization, sut_id, and study_link_status stay
+                // excluded (0/395 fill, no CRM contract writes them).
+                'gender' => $application->gender, 'ethnicity' => $application->ethnicity, 'address' => $application->address,
+                'birth_day' => $application->birth_day, 'birth_month' => $application->birth_month, 'birth_year' => $application->birth_year,
+                'english_test_type' => $application->english_test_type, 'exam_date' => $application->exam_date, 'overall' => $application->overall,
+                'listening' => $application->listening, 'reading' => $application->reading, 'writing' => $application->writing, 'speaking' => $application->speaking,
+                'crm_campus' => $application->crm_campus, 'crm_major' => $application->crm_major, 'province' => $application->province,
+                'new_province' => $application->new_province, 'new_street' => $application->new_street, 'new_ward' => $application->new_ward,
+                'permanent_address' => $application->permanent_address, 'birth_place' => $application->birth_place, 'nationality' => $application->nationality, 'religion' => $application->religion, 'id_card_place_of_issue' => $application->id_card_place_of_issue, 'school' => $application->school, 'graduation_year' => $application->graduation_year, 'gpa' => $application->gpa, 'gpa_type' => $application->gpa_type, 'scholarship' => $application->scholarship, 'pathway_gateway' => $application->pathway_gateway, 'uu_dai_gc' => $application->uu_dai_gc, 'crm_paid_amount' => $application->crm_paid_amount, 'registration_form' => $application->registration_form, 'last_synced_at' => $application->last_synced_at,
+                // Keyed by subject_code (school-report + national-exam); absence
+                // of a key means "not reported" (see ApplicationAcademicScore).
+                'academic_scores' => $application->academicScores->pluck('score', 'subject_code'),
                 'documents_by_type' => $application->documents->groupBy('file_type_code')->map(fn ($documents) => $documents->map(fn ($document): array => ['id' => $document->id, 'link' => $document->link, 'original_name' => $document->original_name, 'page_index' => $document->page_index])->values()),
                 // Only a pending application can ever be approved, so readiness
                 // is only meaningful — and only computed — for those rows.

@@ -110,7 +110,7 @@ final class UpsertCrmApplicationAction
             'english_qualifications', 'study_link_status',
             'crm_campus', 'crm_major', 'province', 'new_province', 'new_street', 'new_ward', 'permanent_address',
             'birth_place', 'nationality', 'religion', 'id_card_place_of_issue', 'school', 'graduation_year',
-            'gpa', 'gpa_type', 'scholarship', 'pathway_gateway', 'uu_dai_gc', 'crm_paid_amount',
+            'gpa', 'gpa_type', 'scholarship', 'pathway_gateway', 'uu_dai_gc', 'crm_paid_amount', 'registration_form',
         ]);
         $test = $data['english_test'] ?? [];
 

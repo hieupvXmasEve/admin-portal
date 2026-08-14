@@ -3,11 +3,13 @@
 declare(strict_types=1);
 
 use App\Exports\StudentApplicationExport;
+use App\Models\ApplicationGuardian;
 use App\Models\Campus;
 use App\Models\StudentApplication;
 use App\Modules\Admissions\Actions\ExportApplicationsAction;
 use App\Modules\Admissions\Http\Requests\Admissions\ExportApplicationsRequest;
 use App\Modules\Admissions\Http\Requests\Admissions\ListApplicationsRequest;
+use App\Modules\Admissions\Models\ApplicationAcademicScore;
 use App\Modules\Admissions\Queries\ListApplicationsQuery;
 use App\Modules\Admissions\Support\StudentApplicationSortColumns;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -274,28 +276,69 @@ it('row payload contains every ship-list field and none of the excluded ones', f
         'pathway_gateway', 'nationality', 'crm_paid_amount', 'id_card_place_of_issue', 'scholarship',
         'religion', 'permanent_address', 'graduation_year', 'birth_place', 'uu_dai_gc',
         'gender', 'ethnicity', 'address', 'english_test_type', 'overall',
+        // Full CRM parity, added 2026-08-14: previously deliberately excluded
+        // for near-zero fill, now shown per explicit user request.
+        'new_province', 'new_street', 'new_ward',
+        'birth_day', 'birth_month', 'birth_year', 'exam_date',
+        'listening', 'reading', 'writing', 'speaking',
+        'registration_form', 'academic_scores',
+        'father_guardian_name', 'father_guardian_phone', 'mother_guardian_name', 'mother_guardian_phone',
     ];
     foreach ($shipList as $field) {
         expect($row)->toHaveKey($field);
     }
 
-    $excluded = ['new_province', 'new_street', 'new_ward', 'intended_specialization', 'sut_id', 'study_link_status'];
+    $excluded = ['intended_specialization', 'sut_id', 'study_link_status'];
     foreach ($excluded as $field) {
         expect($row)->not->toHaveKey($field);
     }
 });
 
+it('row payload carries father and mother guardians separately, not just the primary', function () {
+    $campus = Campus::factory()->create();
+    $application = StudentApplication::factory()->pending()->create(['campus_code' => $campus->code]);
+    ApplicationGuardian::factory()->forApplication($application)->create([
+        'relationship' => 'mother', 'full_name' => 'Mother Name', 'phone' => '0900000001', 'is_primary' => true,
+    ]);
+    ApplicationGuardian::factory()->forApplication($application)->create([
+        'relationship' => 'father', 'full_name' => 'Father Name', 'phone' => '0900000002', 'is_primary' => false,
+    ]);
+
+    $result = app(ListApplicationsQuery::class)->handle(baseListFilters(), $campus->code);
+    $row = $result->items()[0];
+
+    expect($row['primary_guardian_name'])->toBe('Mother Name')
+        ->and($row['mother_guardian_name'])->toBe('Mother Name')
+        ->and($row['mother_guardian_phone'])->toBe('0900000001')
+        ->and($row['father_guardian_name'])->toBe('Father Name')
+        ->and($row['father_guardian_phone'])->toBe('0900000002');
+});
+
+it('row payload carries academic scores keyed by subject_code, absent when not reported', function () {
+    $campus = Campus::factory()->create();
+    $application = StudentApplication::factory()->pending()->create(['campus_code' => $campus->code]);
+    ApplicationAcademicScore::factory()->forApplication($application)->create(['subject_code' => 'toan', 'score' => 8.5]);
+    ApplicationAcademicScore::factory()->forApplication($application)->create(['subject_code' => 'van', 'score' => 7.0]);
+
+    $result = app(ListApplicationsQuery::class)->handle(baseListFilters(), $campus->code);
+    $row = $result->items()[0];
+
+    expect((float) $row['academic_scores']['toan'])->toBe(8.5)
+        ->and((float) $row['academic_scores']['van'])->toBe(7.0)
+        ->and($row['academic_scores'])->not->toHaveKey('ly');
+});
+
 it('row payload carries the primary guardian, ignoring non-primary guardians', function () {
     $campus = Campus::factory()->create();
     $application = StudentApplication::factory()->pending()->create(['campus_code' => $campus->code]);
-    \App\Models\ApplicationGuardian::factory()->create([
+    ApplicationGuardian::factory()->create([
         'student_application_id' => $application->id,
         'full_name' => 'Trần Thị Mai',
         'relationship' => 'mother',
         'phone' => '0911222333',
         'is_primary' => false,
     ]);
-    \App\Models\ApplicationGuardian::factory()->create([
+    ApplicationGuardian::factory()->create([
         'student_application_id' => $application->id,
         'full_name' => 'Phạm Đăng Khánh',
         'relationship' => 'father',

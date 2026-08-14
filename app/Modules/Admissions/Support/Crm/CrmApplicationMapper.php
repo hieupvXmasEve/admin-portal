@@ -101,6 +101,7 @@ final class CrmApplicationMapper
             'pathway_gateway' => $this->string($raw['pathway_gateway'] ?? null),
             'uu_dai_gc' => $this->string($raw['uu_dai_gc'] ?? null),
             'crm_paid_amount' => $this->float($raw['paid_amount'] ?? null),
+            'registration_form' => $this->bool($raw['registration_form'] ?? null),
             'english_test' => [
                 'test_type' => $this->string($raw['english_certificate_type'] ?? null),
                 'exam_date' => $this->string($raw['certificate_exam_date'] ?? null),
@@ -244,6 +245,23 @@ final class CrmApplicationMapper
         $trimmed = trim($value);
 
         return $trimmed === '' ? null : $trimmed;
+    }
+
+    private function bool(mixed $value): ?bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_int($value) || is_float($value)) {
+            return (bool) $value;
+        }
+
+        if (is_string($value) && $value !== '') {
+            return (bool) (int) $value;
+        }
+
+        return null;
     }
 
     private function float(mixed $value): ?float

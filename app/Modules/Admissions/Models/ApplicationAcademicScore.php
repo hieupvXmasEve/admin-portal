@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Admissions\Models;
 
 use App\Models\StudentApplication;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -15,6 +16,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class ApplicationAcademicScore extends Model
 {
+    use HasFactory;
+
     public const SOURCE_SCHOOL_REPORT = 'school_report';
 
     public const SOURCE_NATIONAL_EXAM = 'national_exam';
