@@ -78,6 +78,23 @@ it('reports missing intake when the target-intake setting has not been configure
     expect(collect($readiness['missing'])->firstWhere('field', 'intake'))->not->toBeNull();
 });
 
+it('reports no_curriculum with program_id/semester_id so the UI can deep-link to Curriculum Versions', function () {
+    $campus = Campus::factory()->create(['code' => 'HCM']);
+    $program = Program::factory()->create(['code' => 'IT']);
+    $semester = Semester::factory()->create(['code' => 'FA25']);
+    // No CurriculumVersion for this (program, semester) pair.
+    $application = StudentApplication::factory()->pending()->create(['campus_code' => 'HCM', 'intended_program' => 'IT', 'intake' => 'FA25']);
+
+    $readiness = app(GetApplicationConversionReadinessQuery::class)->handle($application);
+
+    expect($readiness['ready'])->toBeFalse();
+    $curriculumMissing = collect($readiness['missing'])->firstWhere('field', 'curriculum_version');
+    expect($curriculumMissing)->not->toBeNull()
+        ->and($curriculumMissing['reason'])->toBe('no_curriculum')
+        ->and($curriculumMissing['program_id'])->toBe($program->id)
+        ->and($curriculumMissing['semester_id'])->toBe($semester->id);
+});
+
 it('reports a distinct reason when resolved but the curriculum is ambiguous', function () {
     $campus = Campus::factory()->create(['code' => 'HCM']);
     $program = Program::factory()->create(['code' => 'IT']);
@@ -93,7 +110,9 @@ it('reports a distinct reason when resolved but the curriculum is ambiguous', fu
 
     expect($readiness['ready'])->toBeFalse();
     $curriculumMissing = collect($readiness['missing'])->firstWhere('field', 'curriculum_version');
-    expect($curriculumMissing['reason'])->toBe('ambiguous_curriculum');
+    expect($curriculumMissing['reason'])->toBe('ambiguous_curriculum')
+        ->and($curriculumMissing['program_id'])->toBe($program->id)
+        ->and($curriculumMissing['semester_id'])->toBe($semester->id);
 });
 
 it('reports missing email when blank', function () {

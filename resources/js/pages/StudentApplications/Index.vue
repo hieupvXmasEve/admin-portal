@@ -39,9 +39,23 @@ interface DocRef {
 
 interface ConversionReadiness {
     ready: boolean;
-    missing: { field: string; crm_value: string | null; kind: string | null; reason: string }[];
+    missing: { field: string; crm_value: string | null; kind: string | null; reason: string; program_id?: number; semester_id?: number }[];
     warnings: { field: string; crm_value: string; kind: string }[];
 }
+
+const CURRICULUM_REASONS = ['no_curriculum', 'ambiguous_curriculum'];
+
+// A curriculum-version block never mixes with unmapped/unset CRM fields (the
+// backend only runs that check once campus/program/intake all resolve), so
+// checking the first entry is enough. The CRM mapping screen has zero
+// curriculum-version concept — sending staff there for this reason is a dead end.
+const readinessLink = (readiness: ConversionReadiness): string => {
+    const first = readiness.missing[0];
+    if (first && CURRICULUM_REASONS.includes(first.reason) && first.program_id) {
+        return route('curriculum_versions.index', { program_id: first.program_id });
+    }
+    return route('student-applications.crm-mappings.index');
+};
 
 interface ApplicationRow {
     id: number;
@@ -660,11 +674,11 @@ const submitReject = () => {
                     </span>
                     <a
                         v-if="row.original.conversion_readiness && !row.original.conversion_readiness.ready"
-                        :href="route('student-applications.crm-mappings.index')"
+                        :href="readinessLink(row.original.conversion_readiness)"
                         class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 hover:bg-amber-200"
                         :title="row.original.conversion_readiness.missing.map((m) => m.crm_value ?? m.field).join(', ')"
                     >
-                        Chưa map
+                        {{ CURRICULUM_REASONS.includes(row.original.conversion_readiness.missing[0]?.reason) ? 'Thiếu curriculum' : 'Chưa map' }}
                     </a>
                 </div>
             </template>

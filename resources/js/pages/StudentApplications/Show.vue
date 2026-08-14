@@ -91,9 +91,18 @@ interface DocumentChecklist {
 
 interface ConversionReadiness {
     ready: boolean;
-    missing: { field: string; crm_value: string | null; kind: string | null; reason: string }[];
+    missing: { field: string; crm_value: string | null; kind: string | null; reason: string; program_id?: number; semester_id?: number }[];
     warnings: { field: string; crm_value: string; kind: string }[];
 }
+
+const CURRICULUM_REASONS = ['no_curriculum', 'ambiguous_curriculum'];
+
+// The CRM mapping screen has no curriculum-version concept — a "no curriculum
+// version" block can only be resolved on the Curriculum Versions screen.
+const missingItemLink = (item: ConversionReadiness['missing'][number]): string =>
+    CURRICULUM_REASONS.includes(item.reason) && item.program_id
+        ? route('curriculum_versions.index', { program_id: item.program_id })
+        : route('student-applications.crm-mappings.index');
 
 interface Props {
     application: StudentApplication;
@@ -393,16 +402,16 @@ const submitRevoke = () => {
                 <Card v-if="conversionReadiness && !conversionReadiness.ready" class="border-amber-300">
                     <CardHeader>
                         <CardTitle class="text-amber-800">Chưa map — not conversion-ready</CardTitle>
-                        <CardDescription>
-                            Resolve these before this application can be approved.
-                            <a :href="route('student-applications.crm-mappings.index')" class="text-amber-700 underline">Open the mapping screen</a>
-                        </CardDescription>
+                        <CardDescription>Resolve these before this application can be approved.</CardDescription>
                     </CardHeader>
                     <CardContent class="space-y-2 text-sm">
                         <div v-for="(item, index) in conversionReadiness.missing" :key="index" class="rounded-md bg-amber-50 px-3 py-2">
                             <p class="font-medium text-amber-900 capitalize">{{ item.field.replace(/_/g, ' ') }}</p>
                             <p v-if="item.crm_value" class="text-amber-700">CRM value: "{{ item.crm_value }}"</p>
                             <p class="text-xs text-amber-600">{{ item.reason.replace(/_/g, ' ') }}</p>
+                            <a :href="missingItemLink(item)" class="text-xs text-amber-700 underline">
+                                {{ CURRICULUM_REASONS.includes(item.reason) ? 'Open Curriculum Versions' : 'Open the mapping screen' }}
+                            </a>
                         </div>
                     </CardContent>
                 </Card>

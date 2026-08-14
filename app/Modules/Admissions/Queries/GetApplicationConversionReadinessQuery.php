@@ -39,7 +39,7 @@ final class GetApplicationConversionReadinessQuery
     /**
      * @return array{
      *     ready: bool,
-     *     missing: list<array{field: string, crm_value: string|null, kind: string|null, reason: string}>,
+     *     missing: list<array{field: string, crm_value: string|null, kind: string|null, reason: string, program_id?: int, semester_id?: int}>,
      *     warnings: list<array{field: string, crm_value: string, kind: string}>,
      * }
      */
@@ -84,10 +84,14 @@ final class GetApplicationConversionReadinessQuery
         if ($missing === []) {
             $matchCount = (int) ($resolved['curriculum_match_count'] ?? 0);
 
+            // program_id/semester_id let the UI deep-link straight to the
+            // Curriculum Versions screen pre-filtered to the blocked program —
+            // staff otherwise land on the CRM mapping screen, which has no
+            // curriculum-version concept at all and cannot fix this.
             if ($matchCount === 0) {
-                $missing[] = ['field' => 'curriculum_version', 'crm_value' => null, 'kind' => null, 'reason' => 'no_curriculum'];
+                $missing[] = ['field' => 'curriculum_version', 'crm_value' => null, 'kind' => null, 'reason' => 'no_curriculum', 'program_id' => $resolved['program_id'], 'semester_id' => $resolved['intake_semester_id']];
             } elseif ($matchCount > 1) {
-                $missing[] = ['field' => 'curriculum_version', 'crm_value' => null, 'kind' => null, 'reason' => 'ambiguous_curriculum'];
+                $missing[] = ['field' => 'curriculum_version', 'crm_value' => null, 'kind' => null, 'reason' => 'ambiguous_curriculum', 'program_id' => $resolved['program_id'], 'semester_id' => $resolved['intake_semester_id']];
             }
         }
 
