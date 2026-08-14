@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * Merchandise catalog entry. `status` is a backend allow-list (see
- * App\Models\Merchandise::STATUSES) rather than a DB enum so new statuses
+ * App\Modules\Merchandise\Models\Merchandise::STATUSES) rather than a DB enum so new statuses
  * grow without a migration. `gold_price` is the CURRENT price only —
  * redemption order lines (Phase 3) snapshot the price paid separately so a
  * later price change never rewrites history.

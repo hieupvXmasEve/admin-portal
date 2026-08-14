@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Database\Seeders\InitialSetup;
 
 use App\Models\Campus;
-use App\Models\Event;
-use App\Models\EventParticipant;
 use App\Models\Lecture;
 use App\Models\Student;
 use App\Models\User;
+use App\Modules\Engagement\Models\Event;
+use App\Modules\Engagement\Models\EventParticipant;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 

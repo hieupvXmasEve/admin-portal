@@ -6,9 +6,9 @@ use App\Models\Campus;
 use App\Models\ClassSession;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
-use App\Models\Event;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Modules\Engagement\Models\Event;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 

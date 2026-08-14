@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Backfill remaining morph rows"
-status: pending
+status: done
 priority: P1
 effort: "1-2h + one deploy cycle"
 dependencies: [1]
@@ -181,14 +181,14 @@ volume is unmeasured — step 1 fixes that before anything runs.
 
 ## Success Criteria
 
-- [ ] Production row counts measured and recorded in this file before deploy
-- [ ] `activity_log.subject_type` holds zero rows for all 30 shimmed FQCNs, verified with exact `IN (...)` matching, not `LIKE`
-- [ ] `resolved + null` equals the pre-migration count (positive control, not just "no nulls")
-- [ ] Every null traced to a hard-deleted subject row
-- [ ] `down()` throws with a message pointing at code revert as the recovery path
-- [ ] Migration deployed and verified applied in every environment
-- [ ] Zero files changed outside the one migration
-- [ ] `telescope_entries.content` / `activity_log.properties` residue confirmed non-load-bearing and recorded
+- [x] Production row counts measured and recorded in this file before deploy
+- [x] `activity_log.subject_type` holds zero rows for all 30 shimmed FQCNs, verified with exact `IN (...)` matching, not `LIKE`
+- [x] `resolved + null` equals the pre-migration count (positive control, not just "no nulls")
+- [x] Every null traced to a hard-deleted subject row
+- [x] `down()` throws with a message pointing at code revert as the recovery path
+- [x] Migration deployed and verified applied in every environment
+- [x] Zero files changed outside the one migration
+- [x] `telescope_entries.content` / `activity_log.properties` residue confirmed non-load-bearing and recorded
 
 ## Risk Assessment
 
@@ -257,5 +257,20 @@ resolved=121 null=21   (121 + 21 = 142 = pre-migration count)
 
 21 traced, 0 unexplained.
 
-**Remaining before this phase is done:** the standalone deploy (step 4) and
-post-deploy verification (step 5/6 repeated against production).
+**Step 4 — production deploy confirmed:** `migrate:status` on prod shows
+`2026_08_11_085516_backfill_remaining_shimmed_morph_subject_types ... Ran`
+(batch 77).
+
+**Step 5/6 — production verification** (2026-08-11, user-run via prod tinker):
+
+```
+resolved=121 null=21   (121 + 21 = 142 = pre-migration count)
+```
+
+21 null ids identical set to dev: `Room#1..10` (×1 each), `#11` (×3), `#30`
+(×2), `#36` (×3) = 18; `Club#3` = 1; `Building#4` = 2. Same causes already
+traced in step 6 above (hard-deleted Room/Club rows, soft-deleted Building)
+— prod data matches dev exactly, no new nulls, no unexplained rows.
+
+**Phase 2 complete.** Migration deployed and verified in production per V3-d.
+Phase 4 is now unblocked.

@@ -33,20 +33,35 @@ it('keeps the 7 Forms models inside the Engagement module', function (): void {
     }
 });
 
-it('has no real (non-shim) Forms sub-batch model class under app/Models', function (): void {
+it('has deleted the app/Models shim for the 5 swept Forms models', function (): void {
     $workspace = dirname(__DIR__, 3);
 
-    $models = [
+    $sweptModels = [
         'Form',
-        'FormResponse',
         'FormResultVisibility',
         'FormSection',
         'FormSurvey',
-        'FormTarget',
         'FormVersion',
     ];
 
-    foreach ($models as $model) {
+    foreach ($sweptModels as $model) {
+        $legacyPath = $workspace."/app/Models/{$model}.php";
+        expect(file_exists($legacyPath))->toBeFalse("Expected shim to be deleted at app/Models/{$model}.php.");
+        expect(class_exists("App\\Models\\{$model}"))->toBeFalse("App\\Models\\{$model} must not resolve by class_alias, subclass, or otherwise.");
+    }
+});
+
+it('has no real (non-shim) FormResponse/FormTarget model class under app/Models', function (): void {
+    $workspace = dirname(__DIR__, 3);
+
+    // FormResponse and FormTarget stay blocked: an Upload <-> Engagement and
+    // an Academic -> Engagement cross-module read still resolve them through
+    // this shim, and rewriting either caller to the canonical namespace
+    // would trip the zero-tolerance cross_context_concrete_imports boundary
+    // rule.
+    $blockedModels = ['FormResponse', 'FormTarget'];
+
+    foreach ($blockedModels as $model) {
         $legacyPath = $workspace."/app/Models/{$model}.php";
         expect(file_exists($legacyPath))->toBeTrue("Expected shim to remain at app/Models/{$model}.php.");
 

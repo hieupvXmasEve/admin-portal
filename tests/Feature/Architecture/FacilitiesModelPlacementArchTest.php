@@ -24,12 +24,28 @@ it('keeps Building, Room, RoomBooking, RoomBookingAction inside Facilities modul
     }
 });
 
-it('has no real (non-shim) Building, Room, RoomBooking, RoomBookingAction class under app/Models', function (): void {
+it('has deleted the app/Models shim for RoomBooking and RoomBookingAction', function (): void {
     $workspace = dirname(__DIR__, 3);
 
-    $models = ['Building', 'Room', 'RoomBooking', 'RoomBookingAction'];
+    $sweptModels = ['RoomBooking', 'RoomBookingAction'];
 
-    foreach ($models as $model) {
+    foreach ($sweptModels as $model) {
+        $legacyPath = $workspace."/app/Models/{$model}.php";
+        expect(file_exists($legacyPath))->toBeFalse("Expected shim to be deleted at app/Models/{$model}.php.");
+        expect(class_exists("App\\Models\\{$model}"))->toBeFalse("App\\Models\\{$model} must not resolve by class_alias, subclass, or otherwise.");
+    }
+});
+
+it('has no real (non-shim) Building/Room model class under app/Models', function (): void {
+    $workspace = dirname(__DIR__, 3);
+
+    // Room and Building stay blocked: an Academic -> Facilities cross-module
+    // read still resolves them through this shim, and rewriting either
+    // caller to the canonical namespace would trip the zero-tolerance
+    // cross_context_concrete_imports boundary rule.
+    $blockedModels = ['Building', 'Room'];
+
+    foreach ($blockedModels as $model) {
         $legacyPath = $workspace."/app/Models/{$model}.php";
         expect(file_exists($legacyPath))->toBeTrue("Expected shim to remain at app/Models/{$model}.php.");
 

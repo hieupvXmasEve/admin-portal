@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Models\Event;
 use App\Modules\Engagement\Actions\EventNotificationPublisher;
+use App\Modules\Engagement\Models\Event;
 use App\Shared\Contracts\Academic\StudentLifecycleStatusReader;
 use App\Shared\Contracts\DomainEvents\DomainEvent;
 use App\Shared\Contracts\DomainEvents\DomainEventPublisher;

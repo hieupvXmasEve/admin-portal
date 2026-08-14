@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Services\V1\Student;
 
 use App\Models\ClassSession;
-use App\Models\Event;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Modules\Engagement\Models\Event;
 use App\Repositories\V1\Student\ClassSessionRepository;
 use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use Carbon\Carbon;

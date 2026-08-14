@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 use App\Models\Campus;
 use App\Models\CourseOffering;
-use App\Models\Form;
-use App\Models\FormVersion;
 use App\Models\Semester;
 use App\Models\User;
 use App\Modules\Engagement\Actions\ProvisionCourseSurveyAction;
+use App\Modules\Engagement\Models\Form;
+use App\Modules\Engagement\Models\FormVersion;
 use App\Shared\Contracts\Academic\DTO\CourseOfferingSurveyContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;

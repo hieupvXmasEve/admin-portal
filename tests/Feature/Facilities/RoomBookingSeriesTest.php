@@ -6,11 +6,11 @@ use App\Models\Building;
 use App\Models\Campus;
 use App\Models\ClassSession;
 use App\Models\Room;
-use App\Models\RoomBooking;
-use App\Models\RoomBookingAction;
 use App\Models\User;
 use App\Modules\Facilities\Actions\CreateRoomBookingSeriesAction;
 use App\Modules\Facilities\Exceptions\RoomBookingSeriesConflictException;
+use App\Modules\Facilities\Models\RoomBooking;
+use App\Modules\Facilities\Models\RoomBookingAction;
 use App\Modules\Facilities\Queries\GetRoomBookingCloneDraftQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 

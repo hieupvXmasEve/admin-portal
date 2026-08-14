@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 use App\Models\Campus;
 use App\Models\GoldTransaction;
-use App\Models\Merchandise;
-use App\Models\MerchandiseVariant;
 use App\Models\ParentProfile;
-use App\Models\RedemptionOrder;
 use App\Models\Role;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
+use App\Modules\Merchandise\Models\Merchandise;
+use App\Modules\Merchandise\Models\MerchandiseVariant;
+use App\Modules\Merchandise\Models\RedemptionOrder;
 use App\Modules\Merchandise\Support\RedemptionService;
 use App\Services\GoldService;
 use App\Shared\Contracts\Identity\CampusPermissionReader;

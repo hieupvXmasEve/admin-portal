@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-use App\Models\Event;
-use App\Models\EventParticipant;
 use App\Models\GoldTransaction;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Modules\Engagement\Actions\EventParticipationOperations;
+use App\Modules\Engagement\Models\Event;
+use App\Modules\Engagement\Models\EventParticipant;
 use App\Services\GoldService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;

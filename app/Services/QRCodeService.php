@@ -2,11 +2,11 @@
 
 namespace App\Services;
 
-use App\Models\Event;
-use Illuminate\Support\Str;
+use App\Modules\Engagement\Models\Event;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use tbQuar\Facades\Quar;
 
 class QRCodeService

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\V1\Student;
 
-use App\Models\Event;
 use App\Models\Student;
+use App\Modules\Engagement\Models\Event;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;

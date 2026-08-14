@@ -36,14 +36,33 @@ const ALL_MIGRATED_MODELS = [
 // Shrink this list as each module phase deletes its shims (see plan.md). Only
 // used as the still-shimmed allow-list; the import regex is built from
 // ALL_MIGRATED_MODELS instead so it never blinds itself (phase 3, D3).
-const SHIMMED_MODELS = ALL_MIGRATED_MODELS;
+//
+// 20 of the 30 migrated models have had their app/Models shim swept and
+// deleted already: Merchandise, MerchandiseImage, MerchandiseVariant,
+// RedemptionOrder, RedemptionOrderItem, StockMovement, Club, ClubMember,
+// ClubMemberRoleHistory, Event, EventParticipant, Form,
+// FormResultVisibility, FormSection, FormSurvey, FormVersion,
+// QueryAssignment, QueryTopic, RoomBooking, RoomBookingAction.
+// The remaining 10 (ApplicationDocument, ApplicationDocumentType, Building,
+// FormResponse, FormTarget, GoldTransaction, QueryReply, QueryTicket, Room,
+// UploadRecord) stay shimmed: a still-live cross-module read resolves each
+// through its shim, and rewriting that caller to the canonical namespace
+// would trip the zero-tolerance cross_context_concrete_imports boundary
+// rule — see plan.md "Only 20 of 30 shims can be deleted". Written as a
+// literal (not array_diff) because top-level `const` requires a
+// compile-time constant expression.
+const SHIMMED_MODELS = [
+    'ApplicationDocument', 'ApplicationDocumentType', 'Building',
+    'FormResponse', 'FormTarget', 'GoldTransaction',
+    'QueryReply', 'QueryTicket', 'Room', 'UploadRecord',
+];
 
 // Baseline of files that already reference `App\Models\<shim>`, measured
 // 2026-08-11 (plan Evidence Base). Grandfathered until each module's phase
-// sweeps its callers — shrink this list then, never grow it. The
-// ClubMember backfill migration is included: it intentionally stores the
-// old FQCN as data, not as an import, and is deleted along with its
-// module's phase.
+// sweeps its callers — shrink this list then, never grow it. The two morph
+// backfill migrations are permanent exceptions, not temporary grandfathering:
+// they intentionally store the old FQCN as data (a WHERE clause value), not
+// as an import, and historical migrations are never rewritten or deleted.
 const SHIMMED_MODEL_IMPORT_BASELINE = [
     'app/Exports/StudentApplicationExport.php',
     'app/Models/Answer.php',
@@ -51,8 +70,6 @@ const SHIMMED_MODEL_IMPORT_BASELINE = [
     'app/Http/Controllers/Api/V1/Admissions/IngestionController.php',
     'app/Http/Controllers/Web/StudentApplicationController.php',
     'app/Http/Requests/GenerateClassSessionsRequest.php',
-    'app/Http/Requests/StoreRoomBookingRequest.php',
-    'app/Http/Requests/UpdateRoomBookingRequest.php',
     'app/Modules/Academic/Delivery/Queries/GetClassSessionFormOptionsQuery.php',
     'app/Modules/Academic/Delivery/Queries/GetCourseOfferingSurveyQuery.php',
     'app/Modules/Academic/Delivery/Support/LecturerTimetableService.php',
@@ -65,7 +82,6 @@ const SHIMMED_MODEL_IMPORT_BASELINE = [
     'app/Modules/Engagement/Models/FormResponse.php',
     'app/Modules/Engagement/Models/QueryReply.php',
     'app/Modules/Upload/Models/UploadRecord.php',
-    'app/Providers/AppServiceProvider.php',
     'app/Services/AdminScheduleService.php',
     'app/Services/Admissions/ApplicationBackfillService.php',
     'app/Services/Admissions/ApplicationIngestionService.php',
@@ -73,16 +89,10 @@ const SHIMMED_MODEL_IMPORT_BASELINE = [
     'app/Services/ApplicationDocumentTypeSyncService.php',
     'app/Services/DashboardStatsService.php',
     'app/Services/GoldService.php',
-    'app/Services/NotificationService.php',
-    'app/Services/QRCodeService.php',
-    'app/Services/V1/Student/TimetableEventQuery.php',
-    'app/Services/V1/Student/TimetableService.php',
     'database/factories/ClassSessionFactory.php',
     'database/factories/ExamRoomSlotFactory.php',
-    'database/migrations/2026_08_01_144001_create_merchandise_table.php',
-    'database/migrations/2026_08_01_150001_create_redemption_orders_table.php',
     'database/migrations/2026_08_11_021157_backfill_clubmember_shimmed_morph_subject_type.php',
-    'database/seeders/InitialSetup/EventSeeder.php',
+    'database/migrations/2026_08_11_085516_backfill_remaining_shimmed_morph_subject_types.php',
     'database/seeders/InitialSetup/InstitutionSetupSeeder.php',
     'tests/Feature/Academic/ExamResit/AssignExamResitInvigilatorActionTest.php',
     'tests/Feature/Architecture/EngagementQueryTicketModelPlacementArchTest.php',
@@ -103,12 +113,9 @@ const SHIMMED_MODEL_IMPORT_BASELINE = [
     'tests/Feature/Api/V1/Student/EngagementFormsApiTest.php',
     'tests/Feature/Api/V1/Student/QueryTicketApiTest.php',
     'tests/Feature/Api/V1/Student/StudentExamResitTimetableTest.php',
-    'tests/Feature/Api/V1/Student/TimetableControllerTest.php',
     'tests/Feature/CourseOffering/CourseOfferingRosterRouteCutoverTest.php',
     'tests/Feature/CourseOffering/CourseRosterDeliveryActionTest.php',
     'tests/Feature/Engagement/ClubMemberShimMorphBackfillMigrationTest.php',
-    'tests/Feature/Engagement/CourseOfferingSurveyRouteTest.php',
-    'tests/Feature/Engagement/ProvisionCourseSurveyActionTest.php',
     'tests/Feature/Facilities/RoomAvailabilityExamBlockTest.php',
     'tests/Feature/Facilities/RoomBookingExamConflictTest.php',
     'tests/Feature/Facilities/RoomBookingSeriesTest.php',
@@ -123,21 +130,15 @@ const SHIMMED_MODEL_IMPORT_BASELINE = [
     'tests/Feature/Gold/GoldTransactionOwnershipTest.php',
     'tests/Feature/Gold/ReclaimGoldRewardTest.php',
     'tests/Feature/Lecture/LecturerGpaReportTest.php',
-    'tests/Feature/Merchandise/MerchandiseAdminPageTest.php',
-    'tests/Feature/Merchandise/MerchandiseCrudTest.php',
-    'tests/Feature/Merchandise/MerchandiseVariantCrossCampusPolicyTest.php',
     'tests/Feature/Merchandise/Redemption/RedemptionAccessControlTest.php',
     'tests/Feature/Merchandise/Redemption/RedemptionCheckoutTest.php',
     'tests/Feature/Merchandise/Redemption/RedemptionRefundAndStateMachineTest.php',
-    'tests/Feature/Merchandise/Reports/MerchandiseReportCampusScopeTest.php',
     'tests/Feature/Merchandise/Reports/MerchandiseReportDataTest.php',
-    'tests/Feature/Merchandise/StockServiceTest.php',
     'tests/Feature/Platform/SystemConfigurationMigrationTest.php',
     'tests/Feature/StudentApplication/DocumentsTest.php',
     'tests/Feature/StudentApplication/ExportTest.php',
     'tests/Feature/StudentApplication/IndexCampusScopeTest.php',
     'tests/Feature/Upload/UploadPlatformTest.php',
-    'tests/Unit/Notification/EventNotificationServiceTest.php',
 ];
 
 it('has no class_alias shim under app/Models beyond the known allow-list', function (): void {

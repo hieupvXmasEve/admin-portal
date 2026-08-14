@@ -69,7 +69,11 @@ it('rewrites legacy App\Models\ClubMember activity_log rows to the canonical nam
         ->and($activity->subject->id)->toBe($member->id);
 });
 
-it('reverses the backfill on down()', function (): void {
+it('down() is a no-op once the ClubMember shim is deleted', function (): void {
+    // down() guards on class_exists('App\Models\ClubMember'), which is false
+    // now that the shim file is gone, so it must leave canonical rows
+    // untouched rather than writing back a class name that no longer
+    // resolves.
     $club = Club::factory()->create();
     $member = createClubMemberForTest($club);
 
@@ -88,7 +92,7 @@ it('reverses the backfill on down()', function (): void {
     $migration->down();
 
     expect(DB::table('activity_log')->where('id', $activityId)->value('subject_type'))
-        ->toBe('App\Models\ClubMember');
+        ->toBe('App\Modules\Engagement\Models\ClubMember');
 });
 
 it('leaves other subject_type values untouched', function (): void {

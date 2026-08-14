@@ -7,9 +7,9 @@ use App\Models\Campus;
 use App\Models\ExamResitSession;
 use App\Models\ExamRoomSlot;
 use App\Models\Room;
-use App\Models\RoomBooking;
 use App\Models\Unit;
 use App\Models\User;
+use App\Modules\Facilities\Models\RoomBooking;
 use App\Modules\Facilities\Queries\GetRoomAvailabilityBoardQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 

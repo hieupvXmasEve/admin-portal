@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 use App\Models\Campus;
 use App\Models\Room;
-use App\Models\RoomBooking;
 use App\Models\User;
+use App\Modules\Facilities\Models\RoomBooking;
 use App\Shared\Contracts\Facilities\DTO\SpaceReservationRequest;
 use App\Shared\Contracts\Facilities\SpaceAvailabilityReader;
 use App\Shared\Contracts\Facilities\SpaceReservationContract;

@@ -3,9 +3,9 @@
 declare(strict_types=1);
 
 use App\Models\Campus;
-use App\Models\Merchandise;
 use App\Models\Role;
 use App\Models\User;
+use App\Modules\Merchandise\Models\Merchandise;
 use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Database\Seeders\InitialSetup\RoleAndPermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;

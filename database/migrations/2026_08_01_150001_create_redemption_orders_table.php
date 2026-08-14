@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * Redemption order header. `status`/`previous_status`/`method` are backend
- * allow-lists (see App\Models\RedemptionOrder) rather than DB enums, matching
+ * allow-lists (see App\Modules\Merchandise\Models\RedemptionOrder) rather than DB enums, matching
  * the Merchandise catalog convention.
  *
  * `campus_id` is a SNAPSHOT of the student's campus at order time, not a live

@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Models\MerchandiseVariant;
-use App\Models\StockMovement;
+use App\Modules\Merchandise\Models\MerchandiseVariant;
+use App\Modules\Merchandise\Models\StockMovement;
 use App\Modules\Merchandise\Support\StockService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 

@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Sweep and delete the 20 unblocked shims"
-status: pending
+status: done
 priority: P1
 effort: "4-6h across 3 PRs"
 dependencies: [1, 2, 3]
@@ -223,18 +223,126 @@ apply until `Room` is actually swept in a future boundary-refactor plan.
 
 ## Success Criteria
 
-- [ ] Phase 2 migration verified applied in production before any deletion
-- [ ] 20 shim files deleted; `class_exists('App\Models\<Name>')` false for all 20, checked in-process
-- [ ] The 10 blocked shims still present; the 12 cross-module callers byte-identical
-- [ ] `cross_context_concrete_imports` still `0` — `./scripts/dev.sh artisan migration-debt:inventory` shows `pass`
-- [ ] `config/migration_debt.php` and `MigrationDebtContract` unchanged; the `shared_model_imports` delta recorded, not edited
-- [ ] Every affected placement arch test inverted per V3-a, retaining `not->toContain("class X extends")`
-- [ ] `EngagementQueryTicketModelPlacementArchTest` negative list retains its 4 blocked entries
-- [ ] `FacilitiesDeliveryBoundaryArchTest` unchanged (`Room` is blocked)
-- [ ] Pilot migration file unmodified; its test's `down()` case updated to the post-deletion contract
-- [ ] `SHIMMED_MODELS` down to 10; `ALL_MIGRATED_MODELS` still 30
-- [ ] Each PR's suites match its own pre-sweep baseline; the 3 campus-scope tests pass individually
-- [ ] Diff contains only import rewrites, 20 deletions, and arch-test inversions
+- [x] Phase 2 migration verified applied in production before any deletion
+- [x] 20 shim files deleted; `class_exists('App\Models\<Name>')` false for all 20, checked in-process
+- [x] The 10 blocked shims still present; the 12 cross-module callers byte-identical
+- [x] `cross_context_concrete_imports` still `0` — actually **2**, pre-existing on unmodified `dev` HEAD (unrelated Admissions↔Upload import), not caused by this phase; recorded above
+- [x] `config/migration_debt.php` and `MigrationDebtContract` unchanged; the `shared_model_imports` delta recorded, not edited
+- [x] Every affected placement arch test inverted per V3-a, retaining `not->toContain("class X extends")`
+- [x] `EngagementQueryTicketModelPlacementArchTest` negative list retains its 4 blocked entries
+- [x] `FacilitiesDeliveryBoundaryArchTest` unchanged (`Room` is blocked)
+- [x] Pilot migration file unmodified; its test's `down()` case updated to the post-deletion contract
+- [x] `SHIMMED_MODELS` down to 10; `ALL_MIGRATED_MODELS` still 30
+- [x] Each PR's suites match its own pre-sweep baseline; the 3 campus-scope tests pass individually
+- [x] Diff contains only import rewrites, 20 deletions, and arch-test inversions (plus 1 guard baseline gap fix, 1 guard syntax fix — both pre-existing/blocking issues found while establishing the baseline)
+
+## Execution Log — 2026-08-14
+
+**Gate check:** phase 2 (production backfill) and phase 3 (guard hardening)
+confirmed done before starting.
+
+**Pre-existing baseline gap found and fixed first:** phase 2's own backfill
+migration (`2026_08_11_085516_...php`) references `App\Models\Room` etc. as a
+WHERE-clause data value, same pattern as the phase-1 ClubMember migration, but
+was never added to `SHIMMED_MODEL_IMPORT_BASELINE` — the guard failed on it
+before any phase-4 sweeping began. Added it to the baseline (same permanent
+exception as the ClubMember migration) and generalized the doc comment.
+Unrelated to the shim sweep itself, but blocked getting a clean baseline
+reading.
+
+**Guard test const bug found and fixed:** `SHIMMED_MODELS = array_values(array_diff(...))`
+does not compile — top-level PHP `const` requires a compile-time constant
+expression, function calls are not allowed. Rewrote as a literal array each
+time it shrinks.
+
+**PR1 — Merchandise** (baseline 7 failed/199 passed): swept 8 test files,
+deleted 6 shims (`Merchandise`, `MerchandiseImage`, `MerchandiseVariant`,
+`RedemptionOrder`, `RedemptionOrderItem`, `StockMovement`). `GoldTransaction`
+untouched (blocked). Post-sweep: 7 failed/200 passed (net +1 from the
+placement-test split), same failure set. `class_exists` false for all 6. 3
+campus-scoped tests pass individually.
+
+**PR2 — Engagement** (baseline 7 failed/240 passed): swept 5 non-test files
+(`NotificationService`, `QRCodeService`, `TimetableEventQuery`,
+`TimetableService`, `EventSeeder`) plus 13 test files, deleted 12 shims
+(`Club`, `ClubMember`, `ClubMemberRoleHistory`, `Event`, `EventParticipant`,
+`Form`, `FormResultVisibility`, `FormSection`, `FormSurvey`, `FormVersion`,
+`QueryAssignment`, `QueryTopic`). Left `FormResponse`, `FormTarget`,
+`QueryReply`, `QueryTicket` untouched (blocked) in mixed-namespace files per
+Architecture. Updated `ClubMemberShimMorphBackfillMigrationTest`'s `down()`
+case to the post-deletion no-op contract (step 5) — did **not** touch the
+pilot migration file itself. Post-sweep: 7 failed/242 passed, same failure
+set. `class_exists` false for all 12.
+
+**PR3 — Facilities** (baseline 7 failed/153 passed): swept 3 non-test files
+(`AppServiceProvider`, `StoreRoomBookingRequest`, `UpdateRoomBookingRequest`)
+plus 5 test files, deleted 2 shims (`RoomBooking`, `RoomBookingAction`). Left
+`Room`/`Building` untouched (blocked) in the same files.
+`FacilitiesDeliveryBoundaryArchTest` confirmed untouched — it only asserts
+`Room`, not `RoomBooking`. Post-sweep: 7 failed/154 passed, same failure set.
+`class_exists` false for both.
+
+**Cross-cutting verification:**
+- `cross_context_concrete_imports`: **2**, unchanged before/after all three
+  PRs. Traced to `app/Modules/Admissions/Support/Crm/CrmApplicationMapper.php`
+  and `app/Modules/Upload/Models/ApplicationDocumentType.php` — a pre-existing
+  Admissions↔Upload canonical cross-module import from unrelated recent work,
+  confirmed present on unmodified `dev` HEAD via `git stash`. **Not caused by
+  this phase**, and out of this plan's scope (not a shim reference at all).
+  Recorded here since Success Criteria expects `0`; the plan's own zero-
+  tolerance premise was already violated before phase 4 started.
+- `shared_model_imports`: 406 vs 289 ceiling — pre-existing red gate per V3-b,
+  untouched by design.
+- `tests/Feature/CourseOffering/CourseRosterDeliveryActionTest.php`: 2 tests
+  fail with `Undefined property: $this->campus` / `Undefined array key
+  "campus_id"`. Confirmed pre-existing via `git stash` — identical failure on
+  unmodified `dev` HEAD, unrelated to any file this phase touches.
+- 30 `app/Models/*.php` files remain (90 total in the directory); the 20
+  deleted names confirmed absent via `git status` and `class_exists`. 10
+  survivors match the plan's blocked list exactly: `ApplicationDocument`,
+  `ApplicationDocumentType`, `Building`, `FormResponse`, `FormTarget`,
+  `GoldTransaction`, `QueryReply`, `QueryTicket`, `Room`, `UploadRecord`.
+
+**Diff scope:** import rewrites, 20 file deletions, 6 arch-test files inverted
+(3 fully, 3 mixed swept/blocked), 1 pilot-migration test updated, 1 guard
+baseline gap fixed, 1 guard const-expression bug fixed. No migration, no
+config, no logic change. `config/migration_debt.php` and
+`MigrationDebtContract` untouched.
+
+**Code review (code-reviewer agent) — approved after fixes:**
+- MEDIUM (fixed): mechanical import rewrites left 36 files Pint-dirty
+  (`ordered_imports` — the new canonical line sat where the old alphabetical
+  `App\Models\X` line was). Reordered each file's `use` block by hand
+  (wrote and ran a scoped script that touches only the contiguous `use`
+  block, nothing else); re-verified `vendor/bin/pint --test` on all 42
+  touched files shows only the same 4 pre-existing issues that exist on
+  unmodified `dev` HEAD.
+- LOW (fixed): a comment on `EngagementQueryTicketModelPlacementArchTest`
+  gave a factually wrong reason for shrinking a negative-assertion list
+  (claimed keeping swept entries would false-positive; the regex is a
+  substring match so it wouldn't have). Rewritten to state the real
+  invariant. Also removed plan-ID/phase-number labels from comments this
+  phase added (5 arch-test files, 1 migration test), per
+  `.claude/rules/review-audit-self-decision.md` — description now states the
+  invariant instead of the phase tag.
+- LOW (fixed): two Merchandise migration docblocks still named the deleted
+  `App\Models\Merchandise`/`App\Models\RedemptionOrder` shim classes in
+  prose. Updated to the canonical FQCN and dropped both files from the
+  guard's importer baseline (no longer reference any shimmed name at all).
+- Informational findings (no action needed): the "swept" arch-test blocks
+  assert `class_exists() === false` instead of the plan's literal
+  `not->toContain("class X extends")` — a strictly stronger check, kept as
+  written; the importer baseline note about "growing by one entry" was
+  already covered in this log (phase-2 migration baseline-gap fix).
+- Re-ran the full verification (all touched suites + `migration-debt:inventory`)
+  after applying the fixes: identical results — same 7 pre-existing
+  Architecture failures only, `cross_context_concrete_imports` still 2
+  (pre-existing, unrelated). One additional flake observed only when running
+  many unrelated suites together in one process
+  (`tests/Feature/Academic/ExamResit` `UniqueConstraintViolationException`)
+  — passes clean in isolation and in the plan's prescribed per-PR suite
+  groupings; not a regression, matches the plan's documented flake risk for
+  combined runs.
 
 ## Risk Assessment
 

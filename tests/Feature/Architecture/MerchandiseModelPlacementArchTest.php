@@ -33,26 +33,37 @@ it('keeps the 7 Merchandise models inside the Merchandise module', function (): 
     }
 });
 
-it('has no real (non-shim) Merchandise model class under app/Models', function (): void {
+it('has deleted the app/Models shim for the 6 swept Merchandise models', function (): void {
     $workspace = dirname(__DIR__, 3);
 
-    $models = [
+    $sweptModels = [
         'Merchandise',
         'MerchandiseImage',
         'MerchandiseVariant',
         'RedemptionOrder',
         'RedemptionOrderItem',
         'StockMovement',
-        'GoldTransaction',
     ];
 
-    foreach ($models as $model) {
+    foreach ($sweptModels as $model) {
         $legacyPath = $workspace."/app/Models/{$model}.php";
-        expect(file_exists($legacyPath))->toBeTrue("Expected shim to remain at app/Models/{$model}.php.");
-
-        $contents = file_get_contents($legacyPath) ?: '';
-        expect($contents)
-            ->toContain('class_alias(')
-            ->not->toContain("class {$model} extends");
+        expect(file_exists($legacyPath))->toBeFalse("Expected shim to be deleted at app/Models/{$model}.php.");
+        expect(class_exists("App\\Models\\{$model}"))->toBeFalse("App\\Models\\{$model} must not resolve by class_alias, subclass, or otherwise.");
     }
+});
+
+it('has no real (non-shim) GoldTransaction model class under app/Models', function (): void {
+    $workspace = dirname(__DIR__, 3);
+
+    // GoldTransaction stays blocked: an Engagement -> Merchandise
+    // cross-module read still resolves it through this shim, and rewriting
+    // that caller to the canonical namespace would trip the zero-tolerance
+    // cross_context_concrete_imports boundary rule.
+    $legacyPath = $workspace.'/app/Models/GoldTransaction.php';
+    expect(file_exists($legacyPath))->toBeTrue('Expected shim to remain at app/Models/GoldTransaction.php.');
+
+    $contents = file_get_contents($legacyPath) ?: '';
+    expect($contents)
+        ->toContain('class_alias(')
+        ->not->toContain('class GoldTransaction extends');
 });

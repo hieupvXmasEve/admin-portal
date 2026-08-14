@@ -2,9 +2,9 @@
 
 namespace App\Services;
 
-use App\Models\Event;
 use App\Models\Student;
 use App\Modules\Engagement\Actions\EventNotificationPublisher;
+use App\Modules\Engagement\Models\Event;
 
 class NotificationService
 {

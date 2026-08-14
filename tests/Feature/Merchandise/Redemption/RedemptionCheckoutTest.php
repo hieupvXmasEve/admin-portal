@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 use App\Models\Campus;
 use App\Models\GoldTransaction;
-use App\Models\Merchandise;
-use App\Models\MerchandiseVariant;
-use App\Models\RedemptionOrder;
-use App\Models\RedemptionOrderItem;
 use App\Models\Semester;
-use App\Models\StockMovement;
 use App\Models\Student;
+use App\Modules\Merchandise\Models\Merchandise;
+use App\Modules\Merchandise\Models\MerchandiseVariant;
+use App\Modules\Merchandise\Models\RedemptionOrder;
+use App\Modules\Merchandise\Models\RedemptionOrderItem;
+use App\Modules\Merchandise\Models\StockMovement;
 use App\Modules\Merchandise\Support\RedemptionService;
 use App\Modules\Merchandise\Support\StockService;
 use App\Services\GoldService;

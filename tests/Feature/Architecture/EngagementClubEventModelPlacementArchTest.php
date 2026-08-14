@@ -25,18 +25,14 @@ it('keeps Club, ClubMember, ClubMemberRoleHistory, Event, EventParticipant insid
     }
 });
 
-it('has no real (non-shim) Club/Event sub-batch model class under app/Models', function (): void {
+it('has deleted the app/Models shim for the Club/Event sub-batch', function (): void {
     $workspace = dirname(__DIR__, 3);
 
     $models = ['Club', 'ClubMember', 'ClubMemberRoleHistory', 'Event', 'EventParticipant'];
 
     foreach ($models as $model) {
         $legacyPath = $workspace."/app/Models/{$model}.php";
-        expect(file_exists($legacyPath))->toBeTrue("Expected shim to remain at app/Models/{$model}.php.");
-
-        $contents = file_get_contents($legacyPath) ?: '';
-        expect($contents)
-            ->toContain('class_alias(')
-            ->not->toContain("class {$model} extends");
+        expect(file_exists($legacyPath))->toBeFalse("Expected shim to be deleted at app/Models/{$model}.php.");
+        expect(class_exists("App\\Models\\{$model}"))->toBeFalse("App\\Models\\{$model} must not resolve by class_alias, subclass, or otherwise.");
     }
 });
