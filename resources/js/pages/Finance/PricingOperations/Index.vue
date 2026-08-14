@@ -35,6 +35,7 @@ interface PricingRuleRow {
     rule_version: string;
     description: string | null;
     facts_match: Record<string, unknown> | null;
+    facts_match_label: string | null;
     is_active: boolean;
     effective_from: string | null;
     effective_until: string | null;
@@ -136,11 +137,14 @@ function deactivate(rule: PricingRuleRow): void {
     router.post(financeRoutes.pricingOperations.deactivate(rule.id), {}, { preserveScroll: true });
 }
 
-function formatFacts(facts: Record<string, unknown> | null): string {
-    if (!facts || Object.keys(facts).length === 0) {
+function formatFacts(rule: PricingRuleRow): string {
+    if (rule.facts_match_label) {
+        return rule.facts_match_label;
+    }
+    if (!rule.facts_match || Object.keys(rule.facts_match).length === 0) {
         return '—';
     }
-    return JSON.stringify(facts);
+    return JSON.stringify(rule.facts_match);
 }
 </script>
 
@@ -295,7 +299,7 @@ function formatFacts(facts: Record<string, unknown> | null): string {
                             <TableHead class="text-right">Amount</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead>Effective</TableHead>
-                            <TableHead>facts_match</TableHead>
+                            <TableHead>Applies to</TableHead>
                             <TableHead class="text-right">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -325,8 +329,8 @@ function formatFacts(facts: Record<string, unknown> | null): string {
                                 <div>{{ rule.effective_from ? String(rule.effective_from).slice(0, 10) : '—' }}</div>
                                 <div>→ {{ rule.effective_until ? String(rule.effective_until).slice(0, 10) : 'open' }}</div>
                             </TableCell>
-                            <TableCell class="max-w-[180px] truncate font-mono text-xs" :title="formatFacts(rule.facts_match)">
-                                {{ formatFacts(rule.facts_match) }}
+                            <TableCell class="max-w-[180px] truncate font-mono text-xs" :title="formatFacts(rule)">
+                                {{ formatFacts(rule) }}
                             </TableCell>
                             <TableCell class="text-right">
                                 <div v-if="canManage" class="flex justify-end gap-2">

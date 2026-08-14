@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Pricing;
 
+use App\Models\Unit;
 use App\Modules\Finance\Models\FinancePricingCatalogItem;
 use App\Modules\Finance\Support\ObligationType\ObligationTypeRegistry;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -27,10 +28,40 @@ class ListPricingRulesQuery
             $query->where('obligation_type', $obligationType);
         }
 
+        $paginator = $query->paginate(max(1, min($perPage, 100)))->withQueryString();
+
         return [
-            'items' => $query->paginate(max(1, min($perPage, 100)))->withQueryString(),
+            'items' => $this->withUnitLabels($paginator),
             'obligation_types' => $this->obligationTypeOptions(),
         ];
+    }
+
+    /**
+     * facts_match commonly scopes a rule to a single subject via {"unit_id": N}.
+     * Resolve those ids to subject names in one batched query so the UI can show
+     * "MATH101 - Calculus I" instead of raw JSON.
+     */
+    private function withUnitLabels(LengthAwarePaginator $paginator): LengthAwarePaginator
+    {
+        $unitIds = collect($paginator->items())
+            ->map(fn (FinancePricingCatalogItem $item) => data_get($item->facts_match, 'unit_id'))
+            ->filter()
+            ->unique()
+            ->values();
+
+        $unitLabels = $unitIds->isEmpty()
+            ? collect()
+            : Unit::query()->whereIn('id', $unitIds)->get(['id', 'code', 'name'])
+                ->mapWithKeys(fn (Unit $unit) => [$unit->id => "{$unit->code} - {$unit->name}"]);
+
+        return $paginator->through(function (FinancePricingCatalogItem $item) use ($unitLabels) {
+            $unitId = data_get($item->facts_match, 'unit_id');
+
+            return [
+                ...$item->toArray(),
+                'facts_match_label' => $unitId !== null ? ($unitLabels[$unitId] ?? "Unit #{$unitId}") : null,
+            ];
+        });
     }
 
     /**
