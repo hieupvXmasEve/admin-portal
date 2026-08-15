@@ -33,9 +33,9 @@ Route::middleware([
     'api.actor:student_or_parent',
 ])->group(function () {
 
-    // Sub-group with either middleware requirement
+    // Sub-group requiring Student OR Parent access
     Route::middleware([
-        'either:parent.student.access,student.api.auth',
+        'parent_or_student',
         //    'student.api.rate:student-api',
     ])->group(function () {
 

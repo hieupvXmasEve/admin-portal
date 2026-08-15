@@ -29,9 +29,13 @@ Route::prefix('v1/student')->name('api.student.')->group(function () {
 
     // Protected routes
     Route::middleware(['auth:sanctum', 'api.logging', 'api.actor:student_or_parent'])->group(function () {
-        Route::middleware(['either:parent.student.access,student.api.auth'])->group(function () {
+        // Logout deletes the current token only — never status-gated, so it
+        // stays outside `parent_or_student` (which now enforces the full
+        // StudentApiAuthorization chain for students).
+        Route::post('/auth/logout', [StudentAuthController::class, 'logout'])->name('auth.logout');
+
+        Route::middleware(['parent_or_student'])->group(function () {
             Route::prefix('auth')->name('auth.')->group(function () {
-                Route::post('/logout', [StudentAuthController::class, 'logout'])->name('logout');
                 Route::post('/refresh', [StudentAuthController::class, 'refresh'])->name('refresh');
             });
 

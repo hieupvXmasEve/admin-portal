@@ -53,7 +53,7 @@ Route::prefix('v1/student')->name('v1.student.')->middleware([
     'api.logging',
     'api.actor:student_or_parent',
 ])->group(function (): void {
-    Route::middleware(['either:parent.student.access,student.api.auth'])->group(function (): void {
+    Route::middleware(['parent_or_student'])->group(function (): void {
         Route::prefix('clubs')->name('clubs.')->group(function (): void {
             Route::get('/', [ClubController::class, 'index'])->name('index');
             Route::get('/my-memberships', [ClubController::class, 'myMemberships'])->name('my-memberships');

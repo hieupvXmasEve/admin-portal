@@ -7,11 +7,11 @@ use App\Http\Middleware\Admissions\AuthorizeAdmissionsIngest;
 use App\Http\Middleware\ApiActorAuthorize;
 use App\Http\Middleware\ApiLogging;
 use App\Http\Middleware\CheckCampusSelected;
-use App\Http\Middleware\EitherMiddleware;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\LecturerApiAuthorization;
 use App\Http\Middleware\LecturerApiRateLimiter;
+use App\Http\Middleware\ParentOrStudentAccess;
 use App\Http\Middleware\ParentStudentAccess;
 use App\Http\Middleware\SetCampus;
 use App\Http\Middleware\StudentApiAuthorization;
@@ -71,9 +71,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'lecturer.api.auth' => LecturerApiAuthorization::class,
             'lecturer.api.rate' => LecturerApiRateLimiter::class,
             'parent.student.access' => ParentStudentAccess::class,
+            'parent_or_student' => ParentOrStudentAccess::class,
             'api.actor' => ApiActorAuthorize::class,
             'api.logging' => ApiLogging::class,
-            'either' => EitherMiddleware::class,
             'admissions.ingest' => AuthorizeAdmissionsIngest::class,
             'admissions.audit' => AuditAdmissionsIngest::class,
         ]);
