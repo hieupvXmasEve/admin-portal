@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-use App\Models\Building;
 use App\Models\Campus;
 use App\Models\ClassSession;
-use App\Modules\Facilities\Models\Room;
 use App\Models\User;
 use App\Modules\Facilities\Actions\CreateRoomBookingSeriesAction;
 use App\Modules\Facilities\Exceptions\RoomBookingSeriesConflictException;
+use App\Modules\Facilities\Models\Building;
+use App\Modules\Facilities\Models\Room;
 use App\Modules\Facilities\Models\RoomBooking;
 use App\Modules\Facilities\Models\RoomBookingAction;
 use App\Modules\Facilities\Queries\GetRoomBookingCloneDraftQuery;

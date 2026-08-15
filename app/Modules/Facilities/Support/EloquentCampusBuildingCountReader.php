@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Academic\Support;
+namespace App\Modules\Facilities\Support;
 
-use App\Models\Building;
-use App\Shared\Contracts\Academic\CampusBuildingCountReader as CampusBuildingCountReaderContract;
+use App\Modules\Facilities\Models\Building;
+use App\Shared\Contracts\Academic\CampusBuildingCountReader;
 
-class CampusBuildingCountReader implements CampusBuildingCountReaderContract
+class EloquentCampusBuildingCountReader implements CampusBuildingCountReader
 {
     /**
      * @param  list<int>  $campusIds

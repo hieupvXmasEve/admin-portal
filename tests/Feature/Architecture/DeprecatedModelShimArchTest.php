@@ -37,26 +37,29 @@ const ALL_MIGRATED_MODELS = [
 // used as the still-shimmed allow-list; the import regex is built from
 // ALL_MIGRATED_MODELS instead so it never blinds itself (phase 3, D3).
 //
-// 21 of the 30 migrated models have had their app/Models shim swept and
+// 22 of the 30 migrated models have had their app/Models shim swept and
 // deleted already: Merchandise, MerchandiseImage, MerchandiseVariant,
 // RedemptionOrder, RedemptionOrderItem, StockMovement, Club, ClubMember,
 // ClubMemberRoleHistory, Event, EventParticipant, Form,
 // FormResultVisibility, FormSection, FormSurvey, FormVersion,
-// QueryAssignment, QueryTopic, Room, RoomBooking, RoomBookingAction.
+// QueryAssignment, QueryTopic, Building, Room, RoomBooking, RoomBookingAction.
 //
-// Room joined that list once Academic stopped reading rooms directly and
-// went through App\Shared\Contracts\Facilities\SpaceReferenceReader instead.
-// That is the shape the remaining nine need: a shim survives only because a
-// live cross-module read still resolves through it, and rewriting that caller
-// to the canonical namespace would trip the zero-tolerance
-// cross_context_concrete_imports boundary rule. Routing the read through a
-// shared contract removes the blocker; sweeping the import alone just moves
-// the violation into view.
+// Room and Building both joined that list the same way: the cross-module read
+// blocking each (Academic reading rooms, Academic counting buildings per
+// campus) moved behind a Facilities-owned contract —
+// App\Shared\Contracts\Facilities\SpaceReferenceReader and
+// App\Shared\Contracts\Academic\CampusBuildingCountReader respectively, both
+// now implemented inside app/Modules/Facilities/Support. That is the shape the
+// remaining eight need: a shim survives only because a live cross-module read
+// still resolves through it, and rewriting that caller to the canonical
+// namespace would trip the zero-tolerance cross_context_concrete_imports
+// boundary rule. Routing the read through a shared contract removes the
+// blocker; sweeping the import alone just moves the violation into view.
 //
 // Written as a literal (not array_diff) because top-level `const` requires a
 // compile-time constant expression.
 const SHIMMED_MODELS = [
-    'ApplicationDocument', 'ApplicationDocumentType', 'Building',
+    'ApplicationDocument', 'ApplicationDocumentType',
     'FormResponse', 'FormTarget', 'GoldTransaction',
     'QueryReply', 'QueryTicket', 'UploadRecord',
 ];
@@ -73,7 +76,6 @@ const SHIMMED_MODEL_IMPORT_BASELINE = [
     'app/Http/Controllers/Api/GoldTransactionController.php',
     'app/Http/Controllers/Api/V1/Admissions/IngestionController.php',
     'app/Modules/Academic/Delivery/Queries/GetCourseOfferingSurveyQuery.php',
-    'app/Modules/Academic/Support/CampusBuildingCountReader.php',
     'app/Modules/Admissions/Actions/UpsertCrmApplicationAction.php',
     'app/Modules/Admissions/Http/Api/IngestionController.php',
     'app/Modules/Admissions/Queries/GetApplicantDocumentChecklistQuery.php',
@@ -89,7 +91,6 @@ const SHIMMED_MODEL_IMPORT_BASELINE = [
     'app/Services/GoldService.php',
     'database/migrations/2026_08_11_021157_backfill_clubmember_shimmed_morph_subject_type.php',
     'database/migrations/2026_08_11_085516_backfill_remaining_shimmed_morph_subject_types.php',
-    'database/seeders/InitialSetup/InstitutionSetupSeeder.php',
     'tests/Feature/Architecture/EngagementQueryTicketModelPlacementArchTest.php',
     'tests/Feature/Architecture/FacilitiesDeliveryBoundaryArchTest.php',
     'tests/Feature/Academic/StudentLifecycleTimelineQueryTest.php',
@@ -99,9 +100,6 @@ const SHIMMED_MODEL_IMPORT_BASELINE = [
     'tests/Feature/Api/V1/Student/EngagementFormsApiTest.php',
     'tests/Feature/Api/V1/Student/QueryTicketApiTest.php',
     'tests/Feature/Engagement/ClubMemberShimMorphBackfillMigrationTest.php',
-    'tests/Feature/Facilities/RoomAvailabilityExamBlockTest.php',
-    'tests/Feature/Facilities/RoomBookingExamConflictTest.php',
-    'tests/Feature/Facilities/RoomBookingSeriesTest.php',
     'tests/Feature/Form/AdminQueryInboxTest.php',
     'tests/Feature/Form/FormManagementWorkflowTest.php',
     'tests/Feature/Form/QueryTicketWorkflowTest.php',

@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-use App\Models\Building;
 use App\Models\Campus;
 use App\Models\ExamResitSession;
 use App\Models\ExamRoomSlot;
-use App\Modules\Facilities\Models\Room;
 use App\Models\Unit;
 use App\Models\User;
+use App\Modules\Facilities\Models\Building;
+use App\Modules\Facilities\Models\Room;
 use App\Modules\Facilities\Models\RoomBooking;
 use App\Modules\Facilities\Queries\GetRoomAvailabilityBoardQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;

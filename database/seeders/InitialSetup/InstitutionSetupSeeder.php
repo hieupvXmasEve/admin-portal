@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Database\Seeders\InitialSetup;
 
-use App\Models\Building;
 use App\Models\Campus;
+use App\Modules\Facilities\Models\Building;
 use App\Modules\Facilities\Models\Room;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -71,7 +71,7 @@ class InstitutionSetupSeeder extends Seeder
 
         foreach ($campuses as $campusData) {
             $campus = Campus::create($campusData);
-//            $this->createBuildingsForCampus($campus);
+            //            $this->createBuildingsForCampus($campus);
             $this->command->info("📍 Created campus: {$campus->name}");
         }
     }
