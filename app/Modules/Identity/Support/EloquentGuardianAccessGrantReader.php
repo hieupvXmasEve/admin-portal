@@ -10,7 +10,6 @@ use App\Shared\Contracts\Identity\DTO\GuardianAccessAccount;
 use App\Shared\Contracts\Identity\DTO\GuardianAccessGrant as GuardianAccessGrantDto;
 use App\Shared\Contracts\Identity\GuardianAccessGrantReader;
 use App\Shared\Support\Enums\UserType;
-use Illuminate\Support\Facades\DB;
 
 final class EloquentGuardianAccessGrantReader implements GuardianAccessGrantReader
 {
@@ -68,12 +67,14 @@ final class EloquentGuardianAccessGrantReader implements GuardianAccessGrantRead
 
     public function primaryAccountForStudent(int $studentId): ?GuardianAccessAccount
     {
-        $account = DB::table('parent_student')
-            ->join('parents', 'parents.id', '=', 'parent_student.parent_id')
+        $account = GuardianAccessGrant::query()
+            ->join('student_guardian_relationships', 'student_guardian_relationships.id', '=', 'guardian_access_grants.guardian_relationship_id')
+            ->join('parents', 'parents.id', '=', 'guardian_access_grants.parent_id')
             ->join('users', 'users.id', '=', 'parents.user_id')
-            ->where('parent_student.student_id', $studentId)
-            ->where('parent_student.is_primary', true)
-            ->orderBy('parent_student.id')
+            ->where('guardian_access_grants.student_id', $studentId)
+            ->where('guardian_access_grants.status', GuardianAccessGrant::STATUS_ACTIVE)
+            ->where('student_guardian_relationships.is_primary', true)
+            ->orderBy('guardian_access_grants.id')
             ->first(['users.id', 'users.name', 'users.email']);
 
         return $account === null ? null : $this->toAccountDto($account);
@@ -81,7 +82,7 @@ final class EloquentGuardianAccessGrantReader implements GuardianAccessGrantRead
 
     public function accountsForStudent(int $studentId): array
     {
-        $accounts = GuardianAccessGrant::query()
+        return GuardianAccessGrant::query()
             ->join('parents', 'parents.id', '=', 'guardian_access_grants.parent_id')
             ->join('users', 'users.id', '=', 'parents.user_id')
             ->where('guardian_access_grants.student_id', $studentId)
@@ -89,20 +90,7 @@ final class EloquentGuardianAccessGrantReader implements GuardianAccessGrantRead
             ->where('users.type', UserType::PARENT->value)
             ->where('users.status', 'active')
             ->orderBy('guardian_access_grants.id')
-            ->get(['users.id', 'users.name', 'users.email']);
-
-        $legacyAccounts = DB::table('parent_student')
-            ->join('parents', 'parents.id', '=', 'parent_student.parent_id')
-            ->join('users', 'users.id', '=', 'parents.user_id')
-            ->where('parent_student.student_id', $studentId)
-            ->where('parents.status', 'active')
-            ->where('users.type', UserType::PARENT->value)
-            ->where('users.status', 'active')
-            ->orderBy('parent_student.id')
-            ->get(['users.id', 'users.name', 'users.email']);
-
-        return $accounts
-            ->concat($legacyAccounts)
+            ->get(['users.id', 'users.name', 'users.email'])
             ->filter(static fn (object $account): bool => is_string($account->email) && trim($account->email) !== '')
             ->map(fn (object $account): GuardianAccessAccount => $this->toAccountDto($account))
             ->unique(static fn (GuardianAccessAccount $account): string => strtolower($account->email))
@@ -116,7 +104,7 @@ final class EloquentGuardianAccessGrantReader implements GuardianAccessGrantRead
             return [];
         }
 
-        $grantStudentIds = GuardianAccessGrant::query()
+        return GuardianAccessGrant::query()
             ->join('parents', 'parents.id', '=', 'guardian_access_grants.parent_id')
             ->join('users', 'users.id', '=', 'parents.user_id')
             ->whereIn('guardian_access_grants.student_id', $studentIds)
@@ -125,20 +113,7 @@ final class EloquentGuardianAccessGrantReader implements GuardianAccessGrantRead
             ->where('users.status', 'active')
             ->whereNotNull('users.email')
             ->where('users.email', '!=', '')
-            ->pluck('guardian_access_grants.student_id');
-        $legacyStudentIds = DB::table('parent_student')
-            ->join('parents', 'parents.id', '=', 'parent_student.parent_id')
-            ->join('users', 'users.id', '=', 'parents.user_id')
-            ->whereIn('parent_student.student_id', $studentIds)
-            ->where('parents.status', 'active')
-            ->where('users.type', UserType::PARENT->value)
-            ->where('users.status', 'active')
-            ->whereNotNull('users.email')
-            ->where('users.email', '!=', '')
-            ->pluck('parent_student.student_id');
-
-        return $grantStudentIds
-            ->merge($legacyStudentIds)
+            ->pluck('guardian_access_grants.student_id')
             ->map(static fn (int|string $studentId): int => (int) $studentId)
             ->unique()
             ->values()
@@ -147,20 +122,10 @@ final class EloquentGuardianAccessGrantReader implements GuardianAccessGrantRead
 
     public function hasRelationshipForOtherStudent(int $accountId, int $studentId): bool
     {
-        $hasGrant = GuardianAccessGrant::query()
+        return GuardianAccessGrant::query()
             ->join('parents', 'parents.id', '=', 'guardian_access_grants.parent_id')
             ->where('parents.user_id', $accountId)
             ->where('guardian_access_grants.student_id', '!=', $studentId)
-            ->exists();
-
-        if ($hasGrant) {
-            return true;
-        }
-
-        return DB::table('parent_student')
-            ->join('parents', 'parents.id', '=', 'parent_student.parent_id')
-            ->where('parents.user_id', $accountId)
-            ->where('parent_student.student_id', '!=', $studentId)
             ->exists();
     }
 

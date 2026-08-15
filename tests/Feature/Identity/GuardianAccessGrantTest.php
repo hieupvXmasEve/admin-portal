@@ -222,6 +222,108 @@ it('allows Guardian access to a deferred Student but blocks a suspended one', fu
         ->and($suspendedResponse->getStatusCode())->toBe(403);
 });
 
+it('resolves the primary account for a Student from the relationship flag, not the legacy pivot', function (): void {
+    $semester = Semester::factory()->create();
+    $student = Student::factory()->state(['intake' => $semester->id, 'intake_semester_id' => $semester->id])->create();
+    $relationship = app(StudentGuardianRelationshipWriter::class)->preserveForStudent((int) $student->id, [[
+        'full_name' => 'Primary Guardian',
+        'email' => 'primary-guardian@example.test',
+        'is_primary' => true,
+    ]])[0];
+    $grant = app(GuardianAccessGrantWriter::class)->grant($relationship, isPrimaryPortalAccount: true);
+    $user = User::query()->findOrFail(DB::table('parents')->where('id', $grant->parentId)->value('user_id'));
+
+    DB::table('parent_student')->where('student_id', $student->id)->update(['is_primary' => false]);
+    $pivotOnlyProfile = ParentProfile::factory()->create();
+    DB::table('parent_student')->insert([
+        'parent_id' => $pivotOnlyProfile->id,
+        'student_id' => $student->id,
+        'relationship' => 'guardian',
+        'is_primary' => true,
+        'access_level' => 'read_only',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $account = app(GuardianAccessGrantReader::class)->primaryAccountForStudent((int) $student->id);
+
+    expect($account)->not->toBeNull()
+        ->and($account->id)->toBe((int) $user->id);
+});
+
+it('returns only grant-backed accounts for a Student, ignoring a pivot-only relationship', function (): void {
+    $semester = Semester::factory()->create();
+    $student = Student::factory()->state(['intake' => $semester->id, 'intake_semester_id' => $semester->id])->create();
+    $relationship = app(StudentGuardianRelationshipWriter::class)->preserveForStudent((int) $student->id, [[
+        'full_name' => 'Grant Backed Guardian',
+        'email' => 'grant-backed-guardian@example.test',
+        'is_primary' => true,
+    ]])[0];
+    $grant = app(GuardianAccessGrantWriter::class)->grant($relationship, isPrimaryPortalAccount: true);
+    $grantedUser = User::query()->findOrFail(DB::table('parents')->where('id', $grant->parentId)->value('user_id'));
+
+    $pivotOnlyUser = User::factory()->create(['type' => UserType::PARENT, 'status' => 'active']);
+    $pivotOnlyProfile = ParentProfile::factory()->create(['user_id' => $pivotOnlyUser->id, 'status' => 'active']);
+    DB::table('parent_student')->insert([
+        'parent_id' => $pivotOnlyProfile->id,
+        'student_id' => $student->id,
+        'relationship' => 'guardian',
+        'is_primary' => false,
+        'access_level' => 'read_only',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $accounts = app(GuardianAccessGrantReader::class)->accountsForStudent((int) $student->id);
+
+    expect(collect($accounts)->pluck('id')->all())->toBe([(int) $grantedUser->id]);
+});
+
+it('deactivates the Guardian account when a pure-legacy primary link is revoked and no Identity grant backs it', function (): void {
+    $semester = Semester::factory()->create();
+    $student = Student::factory()->state(['intake' => $semester->id, 'intake_semester_id' => $semester->id])->create();
+    $user = User::factory()->create(['type' => UserType::PARENT, 'status' => 'active']);
+    $profile = ParentProfile::factory()->create(['user_id' => $user->id, 'status' => 'active']);
+
+    // Legacy-only link, no Identity grant behind it — pre-migration data shape.
+    DB::table('parent_student')->insert([
+        'parent_id' => $profile->id,
+        'student_id' => $student->id,
+        'relationship' => 'guardian',
+        'is_primary' => true,
+        'access_level' => 'read_only',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    app(GuardianAccessGrantWriter::class)->revokeLegacyPrimaryForStudent((int) $student->id);
+
+    expect($profile->fresh()->status)->toBe('inactive')
+        ->and(DB::table('parent_student')->where('parent_id', $profile->id)->exists())->toBeFalse();
+});
+
+it('keeps the Guardian account active when a stale legacy row is revoked but its Identity grant remains active', function (): void {
+    $semester = Semester::factory()->create();
+    $staleStudent = Student::factory()->state(['intake' => $semester->id, 'intake_semester_id' => $semester->id])->create();
+    $grantedStudent = Student::factory()->state(['intake' => $semester->id, 'intake_semester_id' => $semester->id])->create();
+    $relationship = app(StudentGuardianRelationshipWriter::class)->preserveForStudent((int) $grantedStudent->id, [[
+        'full_name' => 'Multi Link Guardian',
+        'email' => 'multi-link-guardian@example.test',
+        'is_primary' => true,
+    ]])[0];
+    $grant = app(GuardianAccessGrantWriter::class)->grant($relationship, isPrimaryPortalAccount: true);
+    $profile = ParentProfile::query()->findOrFail($grant->parentId);
+
+    // Simulate legacy-projection drift: the pivot row still points at a Student
+    // the grant no longer covers, while the real grant (grantedStudent) is untouched.
+    DB::table('parent_student')->where('parent_id', $profile->id)->update(['student_id' => $staleStudent->id]);
+
+    app(GuardianAccessGrantWriter::class)->revokeLegacyPrimaryForStudent((int) $staleStudent->id);
+
+    expect($profile->fresh()->status)->toBe('active')
+        ->and(DB::table('parent_student')->where('parent_id', $profile->id)->exists())->toBeFalse();
+});
+
 it('refreshes tokens and filters Parent context using active Identity grants', function (): void {
     $semester = Semester::factory()->create();
     $student = Student::factory()->state(['intake' => $semester->id, 'intake_semester_id' => $semester->id])->create();
