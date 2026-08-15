@@ -37,13 +37,13 @@ const ALL_MIGRATED_MODELS = [
 // used as the still-shimmed allow-list; the import regex is built from
 // ALL_MIGRATED_MODELS instead so it never blinds itself (phase 3, D3).
 //
-// 24 of the 30 migrated models have had their app/Models shim swept and
+// 27 of the 30 migrated models have had their app/Models shim swept and
 // deleted already: Merchandise, MerchandiseImage, MerchandiseVariant,
 // RedemptionOrder, RedemptionOrderItem, StockMovement, Club, ClubMember,
 // ClubMemberRoleHistory, Event, EventParticipant, Form,
 // FormResultVisibility, FormSection, FormSurvey, FormVersion, FormTarget,
 // QueryAssignment, QueryTopic, ApplicationDocumentType, Building, Room,
-// RoomBooking, RoomBookingAction.
+// RoomBooking, RoomBookingAction, FormResponse, QueryReply, QueryTicket.
 //
 // Room, Building, FormTarget, and ApplicationDocumentType all joined that
 // list the same way: the cross-module read blocking each (Academic reading
@@ -55,15 +55,26 @@ const ALL_MIGRATED_MODELS = [
 // Facilities despite the Academic-named namespace),
 // App\Shared\Contracts\Engagement\CourseSurveyTargetReader, and
 // App\Shared\Contracts\Upload\ApplicationDocumentCatalogReader. That is the
-// shape the remaining six need: a shim survives only because a live
-// cross-module read still resolves through it, and rewriting that caller to
-// the canonical namespace would trip the zero-tolerance
+// shape a cross-module-read blocker needs: a shim survives only because a
+// live cross-module read still resolves through it, and rewriting that
+// caller to the canonical namespace would trip the zero-tolerance
 // cross_context_concrete_imports boundary rule. Routing the read through a
 // shared contract removes the blocker; sweeping the import alone just moves
 // the violation into view.
 //
-// ApplicationDocument is the odd one out among the six: unlike the other
-// five, it is not blocked by a read alone.
+// FormResponse, QueryReply, and QueryTicket joined by a different route: the
+// only cross-module edge was Upload\UploadRecord's inverse relations
+// (queryReply()/response()/ticket()) reading them back, and a model-anchored
+// consumer inventory (phase 2) confirmed those inverse relations had zero
+// real consumers — the relations were deleted outright rather than routed
+// through a contract, since there was no live read left to preserve.
+//
+// The remaining three (ApplicationDocument, GoldTransaction, UploadRecord)
+// are still blocked by a live cross-module read or write and need the
+// contract or deletion treatment above.
+//
+// ApplicationDocument is the odd one out among the three: unlike the other
+// two, it is not blocked by a read alone.
 // App\Modules\Admissions\Actions\UpsertCrmApplicationAction writes it
 // (updateOrCreate with two different field shapes for the push vs NE CRM
 // sync paths, plus a delete-not-in-set reconciliation) as part of what its
@@ -77,8 +88,8 @@ const ALL_MIGRATED_MODELS = [
 // compile-time constant expression.
 const SHIMMED_MODELS = [
     'ApplicationDocument',
-    'FormResponse', 'GoldTransaction',
-    'QueryReply', 'QueryTicket', 'UploadRecord',
+    'GoldTransaction',
+    'UploadRecord',
 ];
 
 // Baseline of files that already reference `App\Models\<shim>`, measured
@@ -90,34 +101,25 @@ const SHIMMED_MODELS = [
 const SHIMMED_MODEL_IMPORT_BASELINE = [
     'app/Models/Answer.php',
     'app/Http/Controllers/Api/GoldTransactionController.php',
-    'app/Http/Controllers/Api/V1/Admissions/IngestionController.php',
     'app/Modules/Admissions/Actions/UpsertCrmApplicationAction.php',
     'app/Modules/Engagement/Actions/EventParticipationOperations.php',
     'app/Modules/Engagement/Models/FormResponse.php',
     'app/Modules/Engagement/Models/QueryReply.php',
-    'app/Modules/Upload/Models/UploadRecord.php',
     'app/Services/Admissions/ApplicationBackfillService.php',
-    'app/Services/Admissions/ApplicationIngestionService.php',
-    'app/Services/ApplicationDocumentService.php',
     'app/Services/GoldService.php',
     'database/migrations/2026_08_11_021157_backfill_clubmember_shimmed_morph_subject_type.php',
     'database/migrations/2026_08_11_085516_backfill_remaining_shimmed_morph_subject_types.php',
-    'tests/Feature/Architecture/EngagementQueryTicketModelPlacementArchTest.php',
     'tests/Feature/Architecture/FacilitiesDeliveryBoundaryArchTest.php',
     'tests/Feature/Academic/StudentLifecycleTimelineQueryTest.php',
     'tests/Feature/Admissions/ApplicationBackfillTest.php',
     'tests/Feature/Admissions/IngestionApplicationsTest.php',
-    'tests/Feature/Api/V1/Student/EngagementFormsApiTest.php',
     'tests/Feature/Api/V1/Student/QueryTicketApiTest.php',
     'tests/Feature/Engagement/ClubMemberShimMorphBackfillMigrationTest.php',
     'tests/Feature/Form/AdminQueryInboxTest.php',
     'tests/Feature/Form/QueryTicketWorkflowTest.php',
-    'tests/Feature/Form/SurveyAggregateConfigTest.php',
-    'tests/Feature/Form/SurveyResultDownloadTest.php',
     'tests/Feature/Gold/GoldServiceTest.php',
     'tests/Feature/Gold/GoldTransactionOwnershipTest.php',
     'tests/Feature/Gold/ReclaimGoldRewardTest.php',
-    'tests/Feature/Lecture/LecturerGpaReportTest.php',
     'tests/Feature/Merchandise/Redemption/RedemptionAccessControlTest.php',
     'tests/Feature/Merchandise/Redemption/RedemptionCheckoutTest.php',
     'tests/Feature/Merchandise/Redemption/RedemptionRefundAndStateMachineTest.php',

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Modules\Engagement\Models\ClubMember;
+use App\Modules\Engagement\Models\FormResponse;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Models\BillingAccount;
 use Illuminate\Database\Eloquent\Factories\HasFactory;

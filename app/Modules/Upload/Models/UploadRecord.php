@@ -5,16 +5,12 @@ declare(strict_types=1);
 namespace App\Modules\Upload\Models;
 
 use App\Models\Answer;
-use App\Models\FormResponse;
-use App\Models\QueryReply;
-use App\Models\QueryTicket;
 use App\Models\Student;
 use App\Models\User;
 use App\Modules\Upload\Support\UploadPlatform;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Storage;
 
 class UploadRecord extends Model
@@ -84,27 +80,9 @@ class UploadRecord extends Model
         return $this->belongsTo(Student::class);
     }
 
-    /**
-     * Get the query reply associated with this upload (if any).
-     */
-    public function queryReply(): HasOne
-    {
-        return $this->hasOne(QueryReply::class);
-    }
-
-    public function response(): BelongsTo
-    {
-        return $this->belongsTo(FormResponse::class, 'response_id');
-    }
-
     public function answer(): BelongsTo
     {
         return $this->belongsTo(Answer::class, 'answer_id');
-    }
-
-    public function ticket(): BelongsTo
-    {
-        return $this->belongsTo(QueryTicket::class, 'ticket_id');
     }
 
     /**

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 /**
  * Placement guard for the Engagement-owned Forms sub-batch (sub-PR 4b). The
- * real classes must live under app/Modules/Engagement/Models; the
- * app/Models copy is a class_alias shim kept only for cross-module backward
- * compatibility.
+ * real classes must live under app/Modules/Engagement/Models. All 7 app/Models
+ * shims for this batch (including FormResponse, swept in plan
+ * 260815-1320 phase 2) have been deleted.
  */
 it('keeps the 7 Forms models inside the Engagement module', function (): void {
     $workspace = dirname(__DIR__, 3);
@@ -33,14 +33,19 @@ it('keeps the 7 Forms models inside the Engagement module', function (): void {
     }
 });
 
-it('has deleted the app/Models shim for the 6 swept Forms models', function (): void {
+it('has deleted the app/Models shim for the 7 swept Forms models', function (): void {
     $workspace = dirname(__DIR__, 3);
 
     // FormTarget joined the swept group once Academic stopped reading a
     // course's survey target directly and went through
     // App\Shared\Contracts\Engagement\CourseSurveyTargetReader instead.
+    // FormResponse joined once the Upload<->Engagement inverse relations
+    // (UploadRecord::queryReply/response/ticket) were confirmed unused and
+    // deleted, and the 4 in-namespace bare `FormResponse::class` bindings in
+    // app/Models were qualified with explicit imports.
     $sweptModels = [
         'Form',
+        'FormResponse',
         'FormResultVisibility',
         'FormSection',
         'FormSurvey',
@@ -52,25 +57,5 @@ it('has deleted the app/Models shim for the 6 swept Forms models', function (): 
         $legacyPath = $workspace."/app/Models/{$model}.php";
         expect(file_exists($legacyPath))->toBeFalse("Expected shim to be deleted at app/Models/{$model}.php.");
         expect(class_exists("App\\Models\\{$model}"))->toBeFalse("App\\Models\\{$model} must not resolve by class_alias, subclass, or otherwise.");
-    }
-});
-
-it('has no real (non-shim) FormResponse model class under app/Models', function (): void {
-    $workspace = dirname(__DIR__, 3);
-
-    // FormResponse stays blocked: an Upload <-> Engagement cross-module read
-    // still resolves it through this shim, and rewriting that caller to the
-    // canonical namespace would trip the zero-tolerance
-    // cross_context_concrete_imports boundary rule.
-    $blockedModels = ['FormResponse'];
-
-    foreach ($blockedModels as $model) {
-        $legacyPath = $workspace."/app/Models/{$model}.php";
-        expect(file_exists($legacyPath))->toBeTrue("Expected shim to remain at app/Models/{$model}.php.");
-
-        $contents = file_get_contents($legacyPath) ?: '';
-        expect($contents)
-            ->toContain('class_alias(')
-            ->not->toContain("class {$model} extends");
     }
 });
