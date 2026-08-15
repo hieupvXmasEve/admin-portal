@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Modules\Admissions\Actions;
 
-use App\Models\ApplicationDocument;
 use App\Models\ApplicationGuardian;
 use App\Models\StudentApplication;
 use App\Modules\Admissions\Models\ApplicationAcademicScore;
 use App\Modules\Admissions\Support\ApplicantGuardianManager;
 use App\Services\Admissions\Exceptions\ApplicationFrozenException;
 use App\Shared\Contracts\Upload\ApplicationDocumentCatalogReader;
+use App\Shared\Contracts\Upload\ApplicationDocumentWriter;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -33,6 +33,7 @@ final class UpsertCrmApplicationAction
     public function __construct(
         private readonly ApplicantGuardianManager $guardians,
         private readonly ApplicationDocumentCatalogReader $documentCatalog,
+        private readonly ApplicationDocumentWriter $documentWriter,
     ) {}
 
     /** @param array<string, mixed> $data
@@ -193,7 +194,15 @@ final class UpsertCrmApplicationAction
             ->update(['is_primary' => true]);
     }
 
-    /** @param array<int, array<string, mixed>> $documents */
+    /**
+     * Matched by `(crm_file_id, student_application_id)`, not `crm_file_id`
+     * alone — `crm_file_id` is globally unique in storage, and a payload for
+     * a different application carrying this application's `crm_file_id`
+     * must not silently re-point that document here (finding 5). The
+     * ApplicationDocumentWriter contract enforces this.
+     *
+     * @param  array<int, array<string, mixed>>  $documents
+     */
     private function syncDocuments(StudentApplication $application, array $documents): void
     {
         if ($documents === []) {
@@ -204,8 +213,7 @@ final class UpsertCrmApplicationAction
 
         foreach ($documents as $document) {
             $code = $document['file_type_code'];
-            ApplicationDocument::query()->updateOrCreate(['crm_file_id' => $document['crm_file_id']], [
-                'student_application_id' => $application->id,
+            $this->documentWriter->upsert($application->id, $document['crm_file_id'], [
                 'file_type_code' => $code,
                 'file_type_name' => $document['file_type_name'] ?? $catalogNames[$code] ?? null,
                 'page_index' => $document['page_index'] ?? 0,
@@ -225,10 +233,19 @@ final class UpsertCrmApplicationAction
      * leave a stale row pointing at a dead file (finding 12) — every `ne:`
      * document not in the just-written set is deleted.
      *
+     * An empty `documents` array is a no-op (ADR-0050 decision 2), matching
+     * the push shape above: nothing distinguishes "the applicant genuinely
+     * has zero documents now" from a partial/glitched NE response, so an
+     * ambiguous empty payload must never delete previously-synced documents.
+     *
      * @param  list<array{crm_file_id_suffix: string, file_type_code: string, page_index: int, link: string}>  $documents
      */
     private function reconcileNeDocuments(StudentApplication $application, array $documents): void
     {
+        if ($documents === []) {
+            return;
+        }
+
         $codes = array_values(array_unique(array_column($documents, 'file_type_code')));
         $catalogNames = $this->documentCatalog->namesByCode($codes);
 
@@ -237,24 +254,17 @@ final class UpsertCrmApplicationAction
             $crmFileId = "ne:{$application->id}:{$document['crm_file_id_suffix']}";
             $code = $document['file_type_code'];
 
-            ApplicationDocument::query()->updateOrCreate(
-                ['crm_file_id' => $crmFileId, 'student_application_id' => $application->id],
-                [
-                    'file_type_code' => $code,
-                    'file_type_name' => $catalogNames[$code] ?? null,
-                    'page_index' => $document['page_index'],
-                    'link' => $document['link'],
-                ],
-            );
+            $this->documentWriter->upsert($application->id, $crmFileId, [
+                'file_type_code' => $code,
+                'file_type_name' => $catalogNames[$code] ?? null,
+                'page_index' => $document['page_index'],
+                'link' => $document['link'],
+            ]);
 
             $writtenIds[] = $crmFileId;
         }
 
-        ApplicationDocument::query()
-            ->where('student_application_id', $application->id)
-            ->where('crm_file_id', 'like', 'ne:%')
-            ->whereNotIn('crm_file_id', $writtenIds)
-            ->delete();
+        $this->documentWriter->deleteStalePrefixed($application->id, 'ne:', $writtenIds);
     }
 
     /**

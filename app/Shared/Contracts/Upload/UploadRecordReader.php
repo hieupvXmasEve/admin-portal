@@ -28,16 +28,16 @@ interface UploadRecordReader
      *
      * @param  list<int>  $replyIds
      * @return array<int, UploadRecordSummary> keyed by query_replies.id; a
-     *                                          reply with no attachment is
-     *                                          simply absent from the map
+     *                                         reply with no attachment is
+     *                                         simply absent from the map
      */
     public function byReplyIds(array $replyIds): array;
 
     /**
      * @param  list<int>  $responseIds
      * @return array<int, list<UploadRecordSummary>> keyed by responses.id; a
-     *                                                response with no
-     *                                                attachments maps to []
+     *                                               response with no
+     *                                               attachments maps to []
      */
     public function byResponseIds(array $responseIds): array;
 }

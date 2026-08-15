@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\Admissions;
 
-use App\Models\ApplicationDocument;
 use App\Models\ApplicationGuardian;
 use App\Models\StudentApplication;
+use App\Modules\Upload\Models\ApplicationDocument;
 use App\Services\ApplicationDocumentTypeSyncService;
 use App\Services\ApplicationGuardianService;
 use Illuminate\Database\Eloquent\Collection;

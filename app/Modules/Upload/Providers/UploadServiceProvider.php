@@ -8,10 +8,12 @@ use App\Modules\Upload\Models\UploadRecord;
 use App\Modules\Upload\Policies\StudentAvatarTargetPolicy;
 use App\Modules\Upload\Policies\UploadRecordPolicy;
 use App\Modules\Upload\Support\EloquentApplicationDocumentCatalogReader;
+use App\Modules\Upload\Support\EloquentApplicationDocumentWriter;
 use App\Modules\Upload\Support\EloquentUploadRecordReader;
 use App\Modules\Upload\Support\StudentAvatarTarget;
 use App\Modules\Upload\Support\UploadFileGateway;
 use App\Shared\Contracts\Upload\ApplicationDocumentCatalogReader;
+use App\Shared\Contracts\Upload\ApplicationDocumentWriter;
 use App\Shared\Contracts\Upload\FileUploadGateway;
 use App\Shared\Contracts\Upload\UploadRecordReader;
 use Illuminate\Support\Facades\Gate;
@@ -25,6 +27,7 @@ class UploadServiceProvider extends ServiceProvider
         $this->app->bind(FileUploadGateway::class, UploadFileGateway::class);
         $this->app->bind(ApplicationDocumentCatalogReader::class, EloquentApplicationDocumentCatalogReader::class);
         $this->app->bind(UploadRecordReader::class, EloquentUploadRecordReader::class);
+        $this->app->bind(ApplicationDocumentWriter::class, EloquentApplicationDocumentWriter::class);
     }
 
     public function boot(): void

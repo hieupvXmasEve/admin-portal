@@ -3,11 +3,11 @@
 declare(strict_types=1);
 
 use App\Exports\StudentApplicationExport;
-use App\Models\ApplicationDocument;
 use App\Models\ApplicationGuardian;
 use App\Models\Campus;
 use App\Models\StudentApplication;
 use App\Models\User;
+use App\Modules\Upload\Models\ApplicationDocument;
 use App\Modules\Upload\Models\ApplicationDocumentType;
 use App\Shared\Contracts\Identity\CampusPermissionReader;
 use App\Shared\Support\Enums\UserType;

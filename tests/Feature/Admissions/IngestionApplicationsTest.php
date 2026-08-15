@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-use App\Models\ApplicationDocument;
 use App\Models\Campus;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\StudentApplication;
 use App\Models\User;
+use App\Modules\Upload\Models\ApplicationDocument;
 use App\Modules\Upload\Models\ApplicationDocumentType;
 use App\Shared\Support\Admissions\AdmissionsIngestion;
 use App\Shared\Support\Enums\UserType;
@@ -137,11 +137,12 @@ it('upserts a document by crm_file_id instead of duplicating it', function () {
         ->toBe('renamed.jpeg');
 });
 
-it('re-points a document to the latest admission without colliding on its global crm_file_id', function () {
-    // crm_file_id is globally unique; the same file arriving under a different
-    // admission must upsert (re-point) rather than hit the unique index. The two
-    // applications carry distinct applicant identity (email/national_id/code are
-    // independently unique on the core).
+it('refuses to re-point a document onto a different application via a colliding crm_file_id (ADR-0050)', function () {
+    // crm_file_id is globally unique in storage. A payload for a second,
+    // genuinely unrelated application (distinct email/national_id/code)
+    // that happens to carry the first application's crm_file_id must not
+    // silently steal that document — it must fail cleanly and leave the
+    // original document untouched.
     $this->postJson(ingestUrl(), ingestionPayload([
         'crm_admission_id' => 'adm-1',
         'student_code' => 'CODE-1',
@@ -149,18 +150,26 @@ it('re-points a document to the latest admission without colliding on its global
         'national_id' => '1111111111',
     ]))->assertCreated();
 
+    $original = StudentApplication::where('crm_admission_id', 'adm-1')->firstOrFail();
+
     $this->postJson(ingestUrl(), ingestionPayload([
         'crm_admission_id' => 'adm-2',
         'student_code' => 'CODE-2',
         'email' => 'two@example.test',
         'national_id' => '2222222222',
-    ]))->assertCreated();
+    ]))
+        ->assertUnprocessable()
+        ->assertJson(['success' => false, 'errors' => [['code' => 'BUSINESS_LOGIC_ERROR']]]);
 
     expect(ApplicationDocument::where('crm_file_id', 'file-1')->count())->toBe(1);
 
     $document = ApplicationDocument::where('crm_file_id', 'file-1')->firstOrFail();
-    $latest = StudentApplication::where('crm_admission_id', 'adm-2')->firstOrFail();
-    expect($document->student_application_id)->toBe($latest->id);
+    expect($document->student_application_id)->toBe($original->id);
+
+    // The whole handle() call runs in one DB::transaction — the document
+    // write failure rolls back the newly-created application row too, not
+    // just the document.
+    expect(StudentApplication::where('crm_admission_id', 'adm-2')->exists())->toBeFalse();
 });
 
 it('overwrites fields while the application is pending', function () {

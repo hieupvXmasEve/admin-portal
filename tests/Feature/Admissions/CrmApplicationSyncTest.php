@@ -214,6 +214,30 @@ it('removes a stale ne:-prefixed document when its CRM URL goes null on a second
         ->and($application->documents()->where('file_type_code', 'transcript')->exists())->toBeTrue();
 });
 
+it('treats an all-documents-null second run as a no-op, not a delete-all (ADR-0050)', function () {
+    // Distinct from the test above: here EVERY file_* field goes null on the
+    // second run, so the mapper produces a genuinely empty documents array —
+    // the exact case that used to wipe every previously-synced ne:-prefixed
+    // document (no ambiguity signal exists to tell "applicant now has zero
+    // documents" apart from "partial/glitched response").
+    $call = 0;
+    Http::fake([
+        'https://crm.test/api/login' => Http::response(['status' => 'success', 'data' => ['token' => 'tok']], 200),
+        'https://crm.test/api/ne' => function () use (&$call) {
+            $call++;
+
+            return Http::response(['data' => [neRecord($call === 1 ? [] : ['file_diploma' => null, 'file_transcript' => null])]], 200);
+        },
+    ]);
+    $service = app(CrmApplicationSyncService::class);
+    $service->run(false, null);
+    $service->run(false, null);
+
+    $application = StudentApplication::query()->where('student_code', 'NES0000001')->first();
+    expect($application->documents()->where('file_type_code', 'diploma')->exists())->toBeTrue()
+        ->and($application->documents()->where('file_type_code', 'transcript')->exists())->toBeTrue();
+});
+
 it('flips the primary guardian from father to mother on a second run without hitting the one-primary index', function () {
     $call = 0;
     Http::fake([

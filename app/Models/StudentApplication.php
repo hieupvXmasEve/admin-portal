@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Modules\Admissions\Models\ApplicationAcademicScore;
+use App\Modules\Upload\Models\ApplicationDocument;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;

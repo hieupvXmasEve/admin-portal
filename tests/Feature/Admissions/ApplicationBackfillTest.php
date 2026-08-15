@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-use App\Models\ApplicationDocument;
 use App\Models\ApplicationGuardian;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentApplication;
+use App\Modules\Upload\Models\ApplicationDocument;
 use App\Modules\Upload\Models\ApplicationDocumentType;
 use App\Services\Admissions\ApplicationBackfillService;
 use App\Services\Admissions\BackfillReport;

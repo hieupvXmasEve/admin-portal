@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 /**
  * Placement guard for the Upload-owned document models. The real classes
- * must live under app/Modules/Upload/Models. Only ApplicationDocument still
- * has an app/Models class_alias shim (a live cross-module write blocks it —
- * see DeprecatedModelShimArchTest); ApplicationDocumentType and UploadRecord
- * have had theirs deleted.
+ * must live under app/Modules/Upload/Models. All 3 app/Models shims for
+ * this batch, including ApplicationDocument (its cross-module write from
+ * CRM ingest now goes through App\Shared\Contracts\Upload\ApplicationDocumentWriter
+ * instead — see ADR-0050), have been deleted.
  */
 it('keeps UploadRecord, ApplicationDocument, ApplicationDocumentType inside Upload module', function (): void {
     $workspace = dirname(__DIR__, 3);
@@ -26,23 +26,7 @@ it('keeps UploadRecord, ApplicationDocument, ApplicationDocumentType inside Uplo
     }
 });
 
-it('has no real (non-shim) ApplicationDocument class under app/Models', function (): void {
-    $workspace = dirname(__DIR__, 3);
-
-    // ApplicationDocument stays blocked: it is written, not just read — see
-    // DeprecatedModelShimArchTest for why that write path is not swept yet.
-    $model = 'ApplicationDocument';
-
-    $legacyPath = $workspace."/app/Models/{$model}.php";
-    expect(file_exists($legacyPath))->toBeTrue("Expected shim to remain at app/Models/{$model}.php.");
-
-    $contents = file_get_contents($legacyPath) ?: '';
-    expect($contents)
-        ->toContain('class_alias(')
-        ->not->toContain("class {$model} extends");
-});
-
-it('has deleted the app/Models shim for ApplicationDocumentType and UploadRecord', function (): void {
+it('has deleted the app/Models shim for ApplicationDocumentType, UploadRecord, and ApplicationDocument', function (): void {
     $workspace = dirname(__DIR__, 3);
 
     // ApplicationDocumentType left this list once Admissions stopped reading
@@ -50,8 +34,10 @@ it('has deleted the app/Models shim for ApplicationDocumentType and UploadRecord
     // App\Shared\Contracts\Upload\ApplicationDocumentCatalogReader.
     // UploadRecord joined once Engagement's query-reply and form-response
     // attachment reads went through App\Shared\Contracts\Upload\UploadRecordReader
-    // instead.
-    $sweptModels = ['ApplicationDocumentType', 'UploadRecord'];
+    // instead. ApplicationDocument joined last, once Admissions' CRM-ingest
+    // write path went through App\Shared\Contracts\Upload\ApplicationDocumentWriter
+    // instead of the Eloquent model directly (ADR-0050).
+    $sweptModels = ['ApplicationDocumentType', 'UploadRecord', 'ApplicationDocument'];
 
     foreach ($sweptModels as $model) {
         $legacyPath = $workspace."/app/Models/{$model}.php";

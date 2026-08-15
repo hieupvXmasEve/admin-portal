@@ -37,14 +37,14 @@ const ALL_MIGRATED_MODELS = [
 // used as the still-shimmed allow-list; the import regex is built from
 // ALL_MIGRATED_MODELS instead so it never blinds itself (phase 3, D3).
 //
-// 29 of the 30 migrated models have had their app/Models shim swept and
-// deleted already: Merchandise, MerchandiseImage, MerchandiseVariant,
+// SWEEP COMPLETE: all 30 migrated models have had their app/Models shim
+// swept and deleted: Merchandise, MerchandiseImage, MerchandiseVariant,
 // RedemptionOrder, RedemptionOrderItem, StockMovement, Club, ClubMember,
 // ClubMemberRoleHistory, Event, EventParticipant, Form,
 // FormResultVisibility, FormSection, FormSurvey, FormVersion, FormTarget,
 // QueryAssignment, QueryTopic, ApplicationDocumentType, Building, Room,
 // RoomBooking, RoomBookingAction, FormResponse, QueryReply, QueryTicket,
-// GoldTransaction, UploadRecord.
+// GoldTransaction, UploadRecord, ApplicationDocument.
 //
 // Room, Building, FormTarget, ApplicationDocumentType, GoldTransaction, and
 // UploadRecord all joined that list the same way: the cross-module read
@@ -85,23 +85,25 @@ const ALL_MIGRATED_MODELS = [
 // attachments) were very much live — that's what phase 4's
 // UploadRecordReader contract above finally routes.
 //
-// The remaining one (ApplicationDocument) is still blocked by a live
-// cross-module write and needs a design pass before it can take either
-// treatment above.
-// App\Modules\Admissions\Actions\UpsertCrmApplicationAction writes it
-// (updateOrCreate with two different field shapes for the push vs NE CRM
-// sync paths, plus a delete-not-in-set reconciliation) as part of what its
-// own docblock calls "the live write path" for fraud-sensitive CRM ingest
-// (findings 7 and 12). Collapsing that into a generic writer contract risks
-// silently changing which fields get overwritten on update — deferred
-// pending its own design pass rather than rushed alongside the read-only
-// sweeps.
+// ApplicationDocument (phase 5, the last one) was the odd one out: unlike
+// every other shim here, it was blocked by a live cross-module WRITE, not a
+// read — App\Modules\Admissions\Actions\UpsertCrmApplicationAction writes it
+// from both CRM ingest surfaces (push webhook, NE pull sync). ADR-0050
+// records the write-ownership decision (Admissions keeps orchestration,
+// Upload exposes a narrow App\Shared\Contracts\Upload\ApplicationDocumentWriter
+// for the raw persistence) plus three CRM-ingest safety fixes the
+// investigation surfaced along the way: the push shape's document match key
+// widened from crm_file_id alone (globally unique, so a payload for a
+// different application carrying this one's crm_file_id could silently
+// re-point it) to (crm_file_id, student_application_id); an NE-sync empty
+// documents payload changed from delete-all to a no-op, matching the push
+// shape; and documents.*.link gained an http/https scheme requirement on
+// the push path (the NE path already had this via the pre-existing
+// CrmDocumentUrlValidator).
 //
 // Written as a literal (not array_diff) because top-level `const` requires a
 // compile-time constant expression.
-const SHIMMED_MODELS = [
-    'ApplicationDocument',
-];
+const SHIMMED_MODELS = [];
 
 // Baseline of files that already reference `App\Models\<shim>`, measured
 // 2026-08-11 (plan Evidence Base). Grandfathered until each module's phase
@@ -110,17 +112,10 @@ const SHIMMED_MODELS = [
 // they intentionally store the old FQCN as data (a WHERE clause value), not
 // as an import, and historical migrations are never rewritten or deleted.
 const SHIMMED_MODEL_IMPORT_BASELINE = [
-    'app/Modules/Admissions/Actions/UpsertCrmApplicationAction.php',
-    'app/Services/Admissions/ApplicationBackfillService.php',
     'database/migrations/2026_08_11_021157_backfill_clubmember_shimmed_morph_subject_type.php',
     'database/migrations/2026_08_11_085516_backfill_remaining_shimmed_morph_subject_types.php',
     'tests/Feature/Architecture/FacilitiesDeliveryBoundaryArchTest.php',
-    'tests/Feature/Admissions/ApplicationBackfillTest.php',
-    'tests/Feature/Admissions/IngestionApplicationsTest.php',
     'tests/Feature/Engagement/ClubMemberShimMorphBackfillMigrationTest.php',
-    'tests/Feature/StudentApplication/DocumentsTest.php',
-    'tests/Feature/StudentApplication/ExportTest.php',
-    'tests/Feature/StudentApplication/IndexCampusScopeTest.php',
 ];
 
 it('has no class_alias shim under app/Models beyond the known allow-list', function (): void {

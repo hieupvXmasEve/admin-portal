@@ -11,6 +11,7 @@ use App\Models\StudentApplication;
 use App\Modules\Admissions\Actions\UpsertCrmApplicationAction;
 use App\Modules\Admissions\Http\Requests\Admissions\IngestApplicationRequest;
 use App\Services\Admissions\Exceptions\ApplicationFrozenException;
+use App\Shared\Contracts\Upload\ApplicationDocumentConflictException;
 use App\Shared\Support\Admissions\AdmissionsIngestion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -34,6 +35,8 @@ final class IngestionController extends Controller
             $result = $this->upsertApplication->handle($request->validated());
         } catch (ApplicationFrozenException) {
             return ApiResponse::conflict('This application is frozen at approval and can no longer be updated via ingestion.');
+        } catch (ApplicationDocumentConflictException $exception) {
+            return ApiResponse::businessLogicError($exception->getMessage());
         }
 
         return ApiResponse::success(
