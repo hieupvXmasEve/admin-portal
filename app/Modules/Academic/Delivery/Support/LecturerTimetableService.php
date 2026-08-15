@@ -6,7 +6,6 @@ namespace App\Modules\Academic\Delivery\Support;
 
 use App\Models\ClassSession;
 use App\Models\CourseOffering;
-use App\Modules\Facilities\Models\Room;
 use App\Shared\Contracts\Identity\LecturerTeachingActor as Lecture;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
@@ -296,57 +295,6 @@ class LecturerTimetableService
                 'message' => 'Session cancelled successfully',
             ];
         });
-    }
-
-    /**
-     * Get available rooms for a time slot
-     */
-    public function getAvailableRooms(
-        string $date,
-        string $startTime,
-        string $endTime,
-        ?int $excludeSessionId = null
-    ): array {
-        $conflictingRoomIds = ClassSession::where('session_date', $date)
-            ->where('status', '!=', 'cancelled')
-            ->when($excludeSessionId, function ($query, $excludeSessionId) {
-                return $query->where('id', '!=', $excludeSessionId);
-            })
-            ->where(function ($query) use ($startTime, $endTime) {
-                $query->where(function ($q) use ($startTime, $endTime) {
-                    // Session starts during the requested time
-                    $q->where('start_time', '>=', $startTime)
-                        ->where('start_time', '<', $endTime);
-                })->orWhere(function ($q) use ($startTime, $endTime) {
-                    // Session ends during the requested time
-                    $q->where('end_time', '>', $startTime)
-                        ->where('end_time', '<=', $endTime);
-                })->orWhere(function ($q) use ($startTime, $endTime) {
-                    // Session encompasses the requested time
-                    $q->where('start_time', '<=', $startTime)
-                        ->where('end_time', '>=', $endTime);
-                });
-            })
-            ->whereNotNull('room_id')
-            ->pluck('room_id')
-            ->toArray();
-
-        return Room::whereNotIn('id', $conflictingRoomIds)
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->get()
-            ->map(function ($room) {
-                return [
-                    'id' => $room->id,
-                    'name' => $room->name,
-                    'building' => $room->building,
-                    'floor' => $room->floor,
-                    'capacity' => $room->capacity,
-                    'room_type' => $room->room_type,
-                    'equipment' => $room->equipment,
-                ];
-            })
-            ->toArray();
     }
 
     /**

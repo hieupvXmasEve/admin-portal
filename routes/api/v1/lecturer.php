@@ -102,7 +102,6 @@ Route::middleware([
 
         // Route::get('/summary', [TimetableController::class, 'summary'])->name('summary');
         // Route::get('/upcoming-sessions', [TimetableController::class, 'upcomingSessions'])->name('upcoming-sessions');
-        // Route::get('/available-rooms', [TimetableController::class, 'availableRooms'])->name('available-rooms');
     });
 
     // Session management endpoints

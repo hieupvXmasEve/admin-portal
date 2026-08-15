@@ -10,4 +10,13 @@ interface SpaceReferenceReader
 {
     /** @return list<SpaceReference> */
     public function forCampus(?int $campusId): array;
+
+    /**
+     * Rooms a caller may actually schedule into: bookable and currently
+     * available. Narrower than {@see self::forCampus()}, which also returns
+     * rooms under maintenance or closed to booking.
+     *
+     * @return list<SpaceReference>
+     */
+    public function bookableForCampus(int $campusId): array;
 }

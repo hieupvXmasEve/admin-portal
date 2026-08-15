@@ -18,7 +18,6 @@ use App\Shared\Contracts\Identity\LecturerTeachingActor;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\ValidationException;
 
 class TimetableController extends Controller
 {
@@ -205,41 +204,6 @@ class TimetableController extends Controller
             }
 
             return ApiResponse::serverError('Failed to cancel session');
-        }
-    }
-
-    /**
-     * Get available rooms for a time slot
-     */
-    public function availableRooms(Request $request): JsonResponse
-    {
-        try {
-            $validated = $request->validate([
-                'date' => 'required|date|after_or_equal:today',
-                'start_time' => 'required|date_format:H:i',
-                'end_time' => 'required|date_format:H:i|after:start_time',
-                'exclude_session_id' => 'nullable|integer',
-            ]);
-
-            $rooms = $this->timetableService->getAvailableRooms(
-                $validated['date'],
-                $validated['start_time'].':00',
-                $validated['end_time'].':00',
-                $validated['exclude_session_id'] ?? null
-            );
-
-            return ApiResponse::success(
-                $rooms,
-                [],
-                'Available rooms retrieved successfully'
-            );
-        } catch (ValidationException $e) {
-            return ApiResponse::validationError(
-                $e->errors(),
-                'Room availability validation failed'
-            );
-        } catch (\Exception $e) {
-            return ApiResponse::serverError('Failed to retrieve available rooms');
         }
     }
 

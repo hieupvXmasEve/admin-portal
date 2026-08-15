@@ -6,13 +6,17 @@ namespace App\Modules\Academic\Delivery\Queries;
 
 use App\Models\ClassSession;
 use App\Models\CourseOffering;
-use App\Modules\Facilities\Models\Room;
 use App\Modules\Academic\Delivery\Support\ClassSessionService;
+use App\Shared\Contracts\Facilities\DTO\SpaceReference;
+use App\Shared\Contracts\Facilities\SpaceReferenceReader;
 use App\Shared\Contracts\Identity\ActiveLecturerReader;
 
 final class GetClassSessionFormOptionsQuery
 {
-    public function __construct(private readonly ActiveLecturerReader $lecturersReader) {}
+    public function __construct(
+        private readonly ActiveLecturerReader $lecturersReader,
+        private readonly SpaceReferenceReader $spaceReferences,
+    ) {}
 
     public function handle(string $operation, mixed ...$arguments): mixed
     {
@@ -81,22 +85,36 @@ final class GetClassSessionFormOptionsQuery
         ];
     }
 
-    private function roomsForCampus(int $campusId): mixed
+    /** @return list<array<string, mixed>> */
+    private function roomsForCampus(int $campusId): array
     {
-        return Room::forCampus($campusId)
-            ->with('building:id,name,code')
-            ->orderBy('name')
-            ->get(['id', 'name', 'code', 'capacity', 'type', 'building_id']);
+        return $this->roomOptions($this->spaceReferences->forCampus($campusId));
     }
 
-    private function bookableRooms(int $campusId): mixed
+    /** @return list<array<string, mixed>> */
+    private function bookableRooms(int $campusId): array
     {
-        return Room::bookable()
-            ->withStatus(Room::STATUS_AVAILABLE)
-            ->forCampus($campusId)
-            ->with('building:id,name')
-            ->orderBy('name')
-            ->get(['id', 'name', 'code', 'capacity', 'type', 'building_id']);
+        return $this->roomOptions($this->spaceReferences->bookableForCampus($campusId));
+    }
+
+    /**
+     * Shape the Facilities references into the room-picker payload these forms
+     * render. Academic owns this view shape; Facilities owns the data.
+     *
+     * @param  list<SpaceReference>  $references
+     * @return list<array<string, mixed>>
+     */
+    private function roomOptions(array $references): array
+    {
+        return array_map(fn (SpaceReference $reference): array => [
+            'id' => $reference->id,
+            'name' => $reference->name,
+            'code' => $reference->code,
+            'capacity' => $reference->capacity,
+            'type' => $reference->type,
+            'building_id' => $reference->building['id'] ?? null,
+            'building' => $reference->building,
+        ], $references);
     }
 
     private function lecturers(): mixed
