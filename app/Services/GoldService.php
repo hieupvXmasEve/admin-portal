@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Models\GoldTransaction;
 use App\Models\Student;
 use App\Models\StudentWallet;
+use App\Modules\Merchandise\Models\GoldTransaction;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +22,15 @@ use InvalidArgumentException;
  */
 class GoldService
 {
+    // Re-exported so callers outside app/Modules (e.g. Engagement's event
+    // reward orchestration) can reference these without importing the
+    // Merchandise-owned GoldTransaction model directly.
+    public const SOURCE_EVENT = GoldTransaction::SOURCE_EVENT;
+
+    public const TYPE_EARN = GoldTransaction::TYPE_EARN;
+
+    public const TYPE_SPEND = GoldTransaction::TYPE_SPEND;
+
     /**
      * Get or create a wallet for a student.
      */
@@ -372,5 +381,66 @@ class GoldService
         }
 
         return $transactions;
+    }
+
+    /**
+     * Whether a gold transaction exists for this student/event source pairing
+     * created after the given timestamp. Guards against reclaiming gold while
+     * a newer transaction for the same event source is still in flight.
+     *
+     * A null $since (no award timestamp recorded) means nothing can be
+     * "newer than" it, so this returns false rather than raising — matches
+     * the original inline query's behavior of a where-clause against null
+     * matching zero rows.
+     */
+    public function hasPendingEventTransaction(int $studentId, int $eventId, ?\DateTimeInterface $since): bool
+    {
+        if ($since === null) {
+            return false;
+        }
+
+        return GoldTransaction::where('student_id', $studentId)
+            ->where('source_type', self::SOURCE_EVENT)
+            ->where('source_id', $eventId)
+            ->where('created_at', '>', $since)
+            ->exists();
+    }
+
+    /**
+     * Event-sourced gold transactions with optional filters, eager-loaded
+     * with student.
+     *
+     * Unbounded ->get() today, same as before this method moved here —
+     * pagination/limit is a real gap but out of scope for this sweep.
+     *
+     * @param  array{student_id?: int, event_id?: int, start_date?: string, end_date?: string, type?: string}  $filters
+     */
+    public function getEventRewardAuditTrail(array $filters = []): Collection
+    {
+        $query = GoldTransaction::where('source_type', self::SOURCE_EVENT)
+            ->with(['student'])
+            ->orderBy('created_at', 'desc');
+
+        if (isset($filters['student_id'])) {
+            $query->where('student_id', $filters['student_id']);
+        }
+
+        if (isset($filters['event_id'])) {
+            $query->where('source_id', $filters['event_id']);
+        }
+
+        if (isset($filters['start_date'])) {
+            $query->where('created_at', '>=', $filters['start_date']);
+        }
+
+        if (isset($filters['end_date'])) {
+            $query->where('created_at', '<=', $filters['end_date']);
+        }
+
+        if (isset($filters['type'])) {
+            $query->where('type', $filters['type']);
+        }
+
+        return $query->get();
     }
 }

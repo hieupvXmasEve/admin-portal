@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Engagement\Actions;
 
-use App\Models\GoldTransaction;
 use App\Models\User;
 use App\Modules\Engagement\Models\Event;
 use App\Modules\Engagement\Models\EventParticipant;
@@ -222,7 +221,7 @@ final class EventParticipationOperations
                 $transaction = $this->GoldService->addGold(
                     $student,
                     $goldAmount,
-                    GoldTransaction::SOURCE_EVENT,
+                    GoldService::SOURCE_EVENT,
                     $event->id,
                     "Gold reward for attending event: {$event->title}",
                     auth()->id()
@@ -292,7 +291,7 @@ final class EventParticipationOperations
                 $transaction = $this->GoldService->addGold(
                     $student,
                     (int) $totalGoldAmount,
-                    GoldTransaction::SOURCE_EVENT,
+                    GoldService::SOURCE_EVENT,
                     $event->id,
                     $notes,
                     auth()->id()
@@ -377,7 +376,7 @@ final class EventParticipationOperations
     /**
      * Enhanced audit logging for gold rewards.
      */
-    private function logGoldRewardAudit(EventParticipant $participant, GoldTransaction $transaction, string $action, array $metadata = []): void
+    private function logGoldRewardAudit(EventParticipant $participant, object $transaction, string $action, array $metadata = []): void
     {
         $auditData = [
             'action' => $action,
@@ -430,7 +429,7 @@ final class EventParticipationOperations
                 $result = $this->GoldService->reclaimGold(
                     $student,
                     $goldAmount,
-                    GoldTransaction::SOURCE_EVENT,
+                    GoldService::SOURCE_EVENT,
                     $event->id,
                     "Gold reclaimed due to event participation cancellation: {$event->title}",
                     $actorId
@@ -499,11 +498,11 @@ final class EventParticipationOperations
         }
 
         // Check if there are any pending transactions that might affect this reclaim
-        $pendingTransactions = GoldTransaction::where('student_id', $student->id)
-            ->where('source_type', GoldTransaction::SOURCE_EVENT)
-            ->where('source_id', $event->id)
-            ->where('created_at', '>', $participant->awarded_at)
-            ->exists();
+        $pendingTransactions = $this->GoldService->hasPendingEventTransaction(
+            (int) $student->id,
+            (int) $event->id,
+            $participant->awarded_at,
+        );
 
         if ($pendingTransactions) {
             Log::warning('Pending transactions found during gold reclaim', [
@@ -581,32 +580,7 @@ final class EventParticipationOperations
      */
     public function getGoldRewardAuditTrail(array $filters = []): Collection
     {
-        $query = GoldTransaction::where('source_type', GoldTransaction::SOURCE_EVENT)
-            ->with(['student'])
-            ->orderBy('created_at', 'desc');
-
-        // Apply filters
-        if (isset($filters['student_id'])) {
-            $query->where('student_id', $filters['student_id']);
-        }
-
-        if (isset($filters['event_id'])) {
-            $query->where('source_id', $filters['event_id']);
-        }
-
-        if (isset($filters['start_date'])) {
-            $query->where('created_at', '>=', $filters['start_date']);
-        }
-
-        if (isset($filters['end_date'])) {
-            $query->where('created_at', '<=', $filters['end_date']);
-        }
-
-        if (isset($filters['type'])) {
-            $query->where('type', $filters['type']);
-        }
-
-        return $query->get();
+        return $this->GoldService->getEventRewardAuditTrail($filters);
     }
 
     /**
@@ -618,10 +592,10 @@ final class EventParticipationOperations
 
         return [
             'total_transactions' => $transactions->count(),
-            'total_awarded' => $transactions->where('type', GoldTransaction::TYPE_EARN)->count(),
-            'total_reclaimed' => $transactions->where('type', GoldTransaction::TYPE_SPEND)->count(),
-            'total_amount_awarded' => $transactions->where('type', GoldTransaction::TYPE_EARN)->sum('amount'),
-            'total_amount_reclaimed' => abs($transactions->where('type', GoldTransaction::TYPE_SPEND)->sum('amount')),
+            'total_awarded' => $transactions->where('type', GoldService::TYPE_EARN)->count(),
+            'total_reclaimed' => $transactions->where('type', GoldService::TYPE_SPEND)->count(),
+            'total_amount_awarded' => $transactions->where('type', GoldService::TYPE_EARN)->sum('amount'),
+            'total_amount_reclaimed' => abs($transactions->where('type', GoldService::TYPE_SPEND)->sum('amount')),
             'net_amount' => $transactions->sum('amount'),
             'unique_students' => $transactions->pluck('student_id')->unique()->count(),
             'unique_events' => $transactions->pluck('source_id')->unique()->count(),
@@ -1392,7 +1366,7 @@ final class EventParticipationOperations
                     $transaction = $this->GoldService->addGold(
                         $student,
                         $goldAmount,
-                        GoldTransaction::SOURCE_EVENT,
+                        GoldService::SOURCE_EVENT,
                         $event->id,
                         "Gold reward for attending event: {$event->title}",
                         auth()->id()

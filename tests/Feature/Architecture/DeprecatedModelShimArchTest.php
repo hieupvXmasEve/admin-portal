@@ -37,30 +37,37 @@ const ALL_MIGRATED_MODELS = [
 // used as the still-shimmed allow-list; the import regex is built from
 // ALL_MIGRATED_MODELS instead so it never blinds itself (phase 3, D3).
 //
-// 27 of the 30 migrated models have had their app/Models shim swept and
+// 28 of the 30 migrated models have had their app/Models shim swept and
 // deleted already: Merchandise, MerchandiseImage, MerchandiseVariant,
 // RedemptionOrder, RedemptionOrderItem, StockMovement, Club, ClubMember,
 // ClubMemberRoleHistory, Event, EventParticipant, Form,
 // FormResultVisibility, FormSection, FormSurvey, FormVersion, FormTarget,
 // QueryAssignment, QueryTopic, ApplicationDocumentType, Building, Room,
-// RoomBooking, RoomBookingAction, FormResponse, QueryReply, QueryTicket.
+// RoomBooking, RoomBookingAction, FormResponse, QueryReply, QueryTicket,
+// GoldTransaction.
 //
-// Room, Building, FormTarget, and ApplicationDocumentType all joined that
-// list the same way: the cross-module read blocking each (Academic reading
-// rooms, Academic counting buildings per campus, Academic reading a course's
-// survey target, Admissions reading the document-type catalog) moved behind
-// a contract implemented in the data's owning module —
-// App\Shared\Contracts\Facilities\SpaceReferenceReader,
+// Room, Building, FormTarget, ApplicationDocumentType, and GoldTransaction
+// all joined that list the same way: the cross-module read blocking each
+// (Academic reading rooms, Academic counting buildings per campus, Academic
+// reading a course's survey target, Admissions reading the document-type
+// catalog, Engagement's event-reward reclaim guard + audit trail reading
+// gold transactions) moved behind a contract implemented in the data's
+// owning module — App\Shared\Contracts\Facilities\SpaceReferenceReader,
 // App\Shared\Contracts\Academic\CampusBuildingCountReader (implemented in
 // Facilities despite the Academic-named namespace),
-// App\Shared\Contracts\Engagement\CourseSurveyTargetReader, and
-// App\Shared\Contracts\Upload\ApplicationDocumentCatalogReader. That is the
-// shape a cross-module-read blocker needs: a shim survives only because a
-// live cross-module read still resolves through it, and rewriting that
-// caller to the canonical namespace would trip the zero-tolerance
-// cross_context_concrete_imports boundary rule. Routing the read through a
-// shared contract removes the blocker; sweeping the import alone just moves
-// the violation into view.
+// App\Shared\Contracts\Engagement\CourseSurveyTargetReader,
+// App\Shared\Contracts\Upload\ApplicationDocumentCatalogReader, and (for
+// GoldTransaction, phase 3) two new public methods on the existing global
+// App\Services\GoldService rather than a new App\Shared\Contracts entry,
+// since GoldService already owned every other gold-mutating query and is
+// exempt from the cross-context rule (it is not under namespace
+// App\Modules\…). That is the shape a cross-module-read blocker needs: a
+// shim survives only because a live cross-module read still resolves
+// through it, and rewriting that caller to the canonical namespace would
+// trip the zero-tolerance cross_context_concrete_imports boundary rule.
+// Routing the read through a shared contract (or an existing global
+// service already exempt from the rule) removes the blocker; sweeping the
+// import alone just moves the violation into view.
 //
 // FormResponse, QueryReply, and QueryTicket joined by a different route: the
 // only cross-module edge was Upload\UploadRecord's inverse relations
@@ -69,12 +76,12 @@ const ALL_MIGRATED_MODELS = [
 // real consumers — the relations were deleted outright rather than routed
 // through a contract, since there was no live read left to preserve.
 //
-// The remaining three (ApplicationDocument, GoldTransaction, UploadRecord)
-// are still blocked by a live cross-module read or write and need the
-// contract or deletion treatment above.
+// The remaining two (ApplicationDocument, UploadRecord) are still blocked
+// by a live cross-module read or write and need the contract or deletion
+// treatment above.
 //
-// ApplicationDocument is the odd one out among the three: unlike the other
-// two, it is not blocked by a read alone.
+// ApplicationDocument is the odd one out among the two: unlike UploadRecord,
+// it is not blocked by a read alone.
 // App\Modules\Admissions\Actions\UpsertCrmApplicationAction writes it
 // (updateOrCreate with two different field shapes for the push vs NE CRM
 // sync paths, plus a delete-not-in-set reconciliation) as part of what its
@@ -88,7 +95,6 @@ const ALL_MIGRATED_MODELS = [
 // compile-time constant expression.
 const SHIMMED_MODELS = [
     'ApplicationDocument',
-    'GoldTransaction',
     'UploadRecord',
 ];
 
@@ -100,13 +106,10 @@ const SHIMMED_MODELS = [
 // as an import, and historical migrations are never rewritten or deleted.
 const SHIMMED_MODEL_IMPORT_BASELINE = [
     'app/Models/Answer.php',
-    'app/Http/Controllers/Api/GoldTransactionController.php',
     'app/Modules/Admissions/Actions/UpsertCrmApplicationAction.php',
-    'app/Modules/Engagement/Actions/EventParticipationOperations.php',
     'app/Modules/Engagement/Models/FormResponse.php',
     'app/Modules/Engagement/Models/QueryReply.php',
     'app/Services/Admissions/ApplicationBackfillService.php',
-    'app/Services/GoldService.php',
     'database/migrations/2026_08_11_021157_backfill_clubmember_shimmed_morph_subject_type.php',
     'database/migrations/2026_08_11_085516_backfill_remaining_shimmed_morph_subject_types.php',
     'tests/Feature/Architecture/FacilitiesDeliveryBoundaryArchTest.php',
@@ -117,13 +120,6 @@ const SHIMMED_MODEL_IMPORT_BASELINE = [
     'tests/Feature/Engagement/ClubMemberShimMorphBackfillMigrationTest.php',
     'tests/Feature/Form/AdminQueryInboxTest.php',
     'tests/Feature/Form/QueryTicketWorkflowTest.php',
-    'tests/Feature/Gold/GoldServiceTest.php',
-    'tests/Feature/Gold/GoldTransactionOwnershipTest.php',
-    'tests/Feature/Gold/ReclaimGoldRewardTest.php',
-    'tests/Feature/Merchandise/Redemption/RedemptionAccessControlTest.php',
-    'tests/Feature/Merchandise/Redemption/RedemptionCheckoutTest.php',
-    'tests/Feature/Merchandise/Redemption/RedemptionRefundAndStateMachineTest.php',
-    'tests/Feature/Merchandise/Reports/MerchandiseReportDataTest.php',
     'tests/Feature/Platform/SystemConfigurationMigrationTest.php',
     'tests/Feature/StudentApplication/DocumentsTest.php',
     'tests/Feature/StudentApplication/ExportTest.php',

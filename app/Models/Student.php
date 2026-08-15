@@ -8,6 +8,7 @@ use App\Modules\Engagement\Models\ClubMember;
 use App\Modules\Engagement\Models\FormResponse;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Models\BillingAccount;
+use App\Modules\Merchandise\Models\GoldTransaction;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;

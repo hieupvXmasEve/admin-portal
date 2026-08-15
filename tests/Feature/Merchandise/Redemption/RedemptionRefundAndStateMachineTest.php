@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 use App\Models\Campus;
-use App\Models\GoldTransaction;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Modules\Merchandise\Exceptions\RedemptionStateConflictException;
+use App\Modules\Merchandise\Models\GoldTransaction;
 use App\Modules\Merchandise\Models\Merchandise;
 use App\Modules\Merchandise\Models\MerchandiseVariant;
 use App\Modules\Merchandise\Models\RedemptionOrder;

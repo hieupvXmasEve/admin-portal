@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-use App\Models\GoldTransaction;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
+use App\Modules\Merchandise\Models\GoldTransaction;
 use App\Services\GoldService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
