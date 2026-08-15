@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\Admissions\Support\Crm;
 
 use App\Modules\Admissions\Models\ApplicationAcademicScore;
-use App\Modules\Upload\Models\ApplicationDocumentType;
 use InvalidArgumentException;
 
 /**
@@ -32,9 +31,12 @@ final class CrmApplicationMapper
     /**
      * `_1`/`_2`/typo variant fields fold onto their base `file_type_code`, kept
      * apart only by `page_index`. `transcript_1`, `english_certificare`, and
-     * `other_achievements_2` are catalog codes retired via
-     * {@see ApplicationDocumentType::RETIRED_CODES} —
-     * this mapper never writes documents under those codes, only under the base.
+     * `other_achievements_2` are catalog codes retired via Upload's
+     * `ApplicationDocumentType::RETIRED_CODES` (deliberately named in prose, not
+     * linked: a `{@see}` would make Pint's fully_qualified_strict_types fixer
+     * import it, and a concrete Admissions → Upload import trips the
+     * zero-tolerance cross_context_concrete_imports boundary rule).
+     * This mapper never writes documents under those codes, only under the base.
      *
      * @var list<array{crm_field: string, file_type_code: string, page_index: int}>
      */

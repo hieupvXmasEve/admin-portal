@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\Upload\Models;
 
 use App\Models\StudentApplication;
-use App\Modules\Admissions\Support\Crm\CrmApplicationMapper;
 use App\Services\ApplicationDocumentTypeSyncService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -27,7 +26,11 @@ class ApplicationDocumentType extends Model
 
     /**
      * Codes deactivated because they duplicate a base document concept —
-     * `page_index` variants that {@see CrmApplicationMapper}
+     * `page_index` variants that Admissions' `CrmApplicationMapper` (deliberately
+     * named in prose, not linked: a `{@see}` would make Pint's
+     * fully_qualified_strict_types fixer import it, and a concrete Upload →
+     * Admissions import trips the zero-tolerance cross_context_concrete_imports
+     * boundary rule)
      * folds onto their base `file_type_code` and that CRM sync will never fill
      * again. {@see ApplicationDocumentTypeSyncService::sync()} forces these
      * inactive regardless of payload, so a catalog re-sync cannot reactivate
