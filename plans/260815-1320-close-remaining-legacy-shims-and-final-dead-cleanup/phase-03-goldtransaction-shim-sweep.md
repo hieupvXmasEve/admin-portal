@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "GoldTransaction shim sweep"
-status: pending
+status: completed
 priority: P1
 effort: "1-1.5d"
 dependencies: [1]

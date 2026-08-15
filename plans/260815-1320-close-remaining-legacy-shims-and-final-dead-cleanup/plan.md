@@ -1,7 +1,7 @@
 ---
 title: "Close remaining legacy shims and final DEAD cleanup"
 description: "Consolidated legacy-refactor closure: DEAD cleanup + 6 remaining shims (from advise-260815-1000) + auth legacy single-source retirement (merged from 260815-0942) + notification/email table drops (merged from 260807-0042); supersedes 260811-0012 phase 5"
-status: pending
+status: completed
 priority: P1
 effort: "8-10d + 7-day soak"
 tags: [legacy-refactor, shim-sweep, architecture, auth, decommission]
@@ -40,16 +40,16 @@ Executes the foundation slice of `plans/reports/advise-260815-1000-legacy-model-
 
 | # | Phase | Status |
 |---|-------|--------|
-| 1 | [Phase 1: DEAD remainder, dead ingest stack, guards + audit refresh](./phase-01-start.md) | Pending |
-| 2 | [Phase 2: Engagement shims sweep](./phase-02-engagement-shims-sweep.md) | Pending |
-| 3 | [Phase 3: GoldTransaction shim sweep](./phase-03-goldtransaction-shim-sweep.md) | Pending |
-| 4 | [Phase 4: UploadRecord shim sweep](./phase-04-uploadrecord-shim-sweep.md) | Pending |
-| 5 | [Phase 5: ApplicationDocument shim sweep (gated)](./phase-05-applicationdocument-shim-sweep-gated.md) | Pending |
+| 1 | [Phase 1: DEAD remainder, dead ingest stack, guards + audit refresh](./phase-01-start.md) | Completed |
+| 2 | [Phase 2: Engagement shims sweep](./phase-02-engagement-shims-sweep.md) | Completed |
+| 3 | [Phase 3: GoldTransaction shim sweep](./phase-03-goldtransaction-shim-sweep.md) | Completed |
+| 4 | [Phase 4: UploadRecord shim sweep](./phase-04-uploadrecord-shim-sweep.md) | Completed |
+| 5 | [Phase 5: ApplicationDocument shim sweep (gated)](./phase-05-applicationdocument-shim-sweep-gated.md) | Completed |
 | 6 | [Phase 6: Auth — grants-only guardian reader](./phase-06-auth-grants-only-guardian-reader.md) | Completed |
 | 7 | [Phase 7: Auth — swap relations off legacy pivot](./phase-07-auth-swap-relations-off-legacy-pivot.md) | Completed |
 | 8 | [Phase 8: Auth — explicit ParentOrStudentAccess middleware](./phase-08-auth-explicit-parent-or-student-middleware.md) | Completed |
 | 9 | [Phase 9: Auth — unified login pipeline](./phase-09-auth-unified-login-pipeline.md) | Completed |
-| 10 | [Phase 10: Notification/email — soak and drop tables](./phase-10-notification-email-soak-and-drop-tables.md) | Pending |
+| 10 | [Phase 10: Notification/email — soak and drop tables](./phase-10-notification-email-soak-and-drop-tables.md) | Completed |
 
 **Ordering — three independent tracks:**
 - **Shim track (1→2→3→4→5), strictly serialized** — every phase edits the same two exact-match constants in `DeprecatedModelShimArchTest` (stale entry fails as hard as a missing one), so no parallel PRs within the track; each phase carries a rollback recipe naming the constant entries to restore. Phase 4 depends on Phase 2 (mutual Engagement↔Upload edges). Phase 1's morph pre-flight gates phases 2-5. Phase 5 code blocked by the fraud-design gate ADR; the gate REVIEW (ADR only, no code) runs in parallel with 1-4 (validation Q4).
@@ -58,15 +58,15 @@ Executes the foundation slice of `plans/reports/advise-260815-1000-legacy-model-
 
 ## Success Criteria
 
-- [ ] Phase 1: 5 dead files deleted; route:list hash unchanged; `config/migration_debt_paths.php` reconciled; morph pre-flight recorded
-- [ ] 5 shims deleted (all except ApplicationDocument unless gate cleared): `ls app/Models/*.php | wc -l` = 79 (or 78)
-- [ ] `./scripts/dev.sh artisan test tests/Feature/Architecture` green (incl. flipped placement tests + MigrationDebtInventoryTest)
-- [ ] Touched-module suites: no new failures vs recorded baselines (Finance 26 fail/324 pass; run Academic timeline test file individually — known CHECK-constraint flake aborts the dir)
-- [ ] Attachment presence tests + upload denial test green (Phase 4 silent-failure and authz guards)
-- [ ] Zero new files under `app/Http`, `app/Services`, `app/Models` (exception: `app/Http/Middleware/ParentOrStudentAccess.php`, Phase 8 — replaces a deleted global middleware in place)
-- [ ] Audit report `audit-260810-0004` updated with 2026-08-15 verified state
+- [x] Phase 1: 5 dead files deleted; route:list hash unchanged; `config/migration_debt_paths.php` reconciled; morph pre-flight recorded (0 hits across 191,397 rows + 64 `*_type` columns)
+- [x] All 6 shims deleted (gate cleared, incl. ApplicationDocument): `ls app/Models/*.php | wc -l` = 78; `SHIMMED_MODELS = []`
+- [~] `./scripts/dev.sh artisan test tests/Feature/Architecture` — placement tests + MigrationDebtInventoryTest shim-baseline part green; suite carries pre-existing unrelated failures re-verified 2026-08-16 (2× `MigrationDebtInventoryTest` debt-ceiling drift `shared_model_imports`/`legacy_filter_stacks`, `CourseRosterDeliveryBoundaryArchTest`, `TeachingEligibilityAssignmentBoundaryTest`, `AcademicPeriodBoundaryArchTest`, `CourseDeliveryAssessmentBoundaryArchTest` — none touch shim/DEAD surfaces, logged in audit report Phase 1/2 entries, unchanged since)
+- [x] Touched-module suites: Gold/Merchandise/Upload/Form/Admissions/StudentApplication/Api/V1/Student 439 pass / 1 fail (pre-existing `UploadPlatformTest` locale-message mismatch, unrelated); Academic timeline test run individually 7/7 pass
+- [x] Attachment presence tests + upload denial test green (Phase 4 silent-failure and authz guards)
+- [x] Zero new files under `app/Http`, `app/Services`, `app/Models` (exception: `app/Http/Middleware/ParentOrStudentAccess.php`, Phase 8 — replaces a deleted global middleware in place)
+- [x] Audit report `audit-260810-0004` updated with 2026-08-15 verified state (phases 1-2 detailed; phases 3-5 closure appended 2026-08-16)
 - [~] Auth: `EitherMiddleware` gone ✓; login matrix test green (3 actors, 13 cases across Login/Refresh/Google) ✓; `grep -rn parent_student app/` still shows `GrantGuardianAccessAction`/`RevokeGuardianAccessAction` hits beyond migrations + `CleanupParentDataCommand` — out of phases 6-9 scope, not fixed (see Phase 9 Deviations)
-- [ ] Drops: `notifications` + `email_templates` absent on prod after soak; backup rehearsed
+- [x] Drops: `notifications` + `email_templates` absent on prod — confirmed by user 2026-08-16 (not independently SSH-verified this session; prod target identification was inconclusive, see Phase 10 note). Backup/rehearsal/FK-recheck/named-revert-range steps not independently verified — user attestation only.
 
 ## Non-goals
 
@@ -155,5 +155,21 @@ Phases 6-9 implemented and verified in one session. Two live decisions made mid-
 Independent `code-reviewer` + `tester` subagents ran post-implementation. Tester: 182 tests green, all pre-existing baseline failures confirmed unchanged. Code-reviewer: 3 HIGH + 4 MEDIUM + 4 LOW findings; all HIGH/MEDIUM addressed except two accepted-as-is (see Phase 9 Deviations for the full list and rationale): moved `/auth/logout` out of the `parent_or_student` middleware group (holds/status must never block logout), added the missing `AuthenticationException` branch to `LecturerAuthController::refresh()` (was silently 500ing), wrapped `CleanupParentDataCommand`'s Case 1 in a transaction, widened `LoginPipeline::verifyGoogleIdToken()`'s catch to cover Firebase JWT's `UnexpectedValueException` family (was only catching `Google\Exception`). Re-verified full suite after fixes: 163/164 green (1 pre-existing unrelated failure).
 
 Full diff uncommitted at session end — user has not yet approved committing.
+
+(Correction 2026-08-16: the above "uncommitted" note is stale — phases 6-9 were committed same-day, commits `b6b7028e6`/`99db4fcb2`/`0ba996acd`/`c423dea08`.)
+
+## Execution Log — 2026-08-16 (Session 4, docs sync)
+
+Shim track (phases 1-5) was fully implemented and committed in a prior session (commits `df1357a4f`, `f61dbafc3`, `586a52670`, `f24114c31`, `f06b3ab6c`) but plan/phase docs were never flipped to completed and the audit report stopped at Phase 2. This session verified the code state (arch guards, contracts, ADR, touched-suite runs — see audit report Phase 3-5 update) and synced plan.md + all 5 phase files to `completed`. No code changed.
+
+Only Phase 10 (notification/email table drop) remained — soak-gated, requires prod SSH + manual click-through + irreversible `DROP TABLE`, not started. This needed the user's direct involvement (production access, soak-window monitoring) and could not be completed unattended in a single session.
+
+## Execution Log — 2026-08-16 (Session 5, Phase 10 close-out)
+
+Attempted to SSH-verify Phase 10 soak/drop state independently (`root@157.10.186.103`) before marking complete. Inconclusive: `x.swin.edu.vn`'s on-disk checkout is stale (files mtime 2025-08-06, no `vendor/`, no active nginx vhost found), and the domain does not currently resolve via Cloudflare authoritative NS from this session's network — could not confirm which host/container is the live prod target. (Drop migrations `2026_08_09_160000_drop_notifications_table.php` / `2026_08_09_160100_drop_email_templates_table.php` already exist in the repo, authored 2026-08-09, each with a real `down()`.)
+
+User confirmed directly: `notifications` + `email_templates` are already dropped on prod. Phase 10 and the plan marked completed on that basis. The backup/encryption/0600/destruction-date, restore-rehearsal, FK-recheck, and named-PR-revert-range requirements in the Phase 10 success criteria were **not independently verified this session** — recorded as user attestation only, not evidence-checked.
+
+**Plan CLOSED — all 10 phases complete** (shim sweep 1-5, auth single-source 6-9, notification/email drop 10).
 
 <!-- slug: close-remaining-legacy-shims-and-final-dead-cleanup -->

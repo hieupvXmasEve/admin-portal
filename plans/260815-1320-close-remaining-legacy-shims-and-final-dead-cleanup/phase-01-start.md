@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "DEAD remainder, dead ingest stack, guards + audit refresh"
-status: pending
+status: completed
 priority: P1
 effort: "0.5d"
 dependencies: []

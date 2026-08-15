@@ -1,7 +1,7 @@
 ---
 phase: 10
 title: "Notification/email: soak and drop tables"
-status: pending
+status: completed
 priority: P2
 effort: "7-day soak + 0.5d migration"
 dependencies: []
@@ -53,3 +53,7 @@ After the decommission code-removal PRs (source-plan phases 1-4) have soaked in 
 ## Risk Assessment
 
 High blast radius, irreversible. Drop `notifications` first, `email_templates` second (separate migrations). Do NOT compress the 7-day soak; any cleanup-attributable error during soak → fix root cause, restart soak clock.
+
+## Completion Note (2026-08-16)
+
+User confirmed both tables already dropped on prod. Drop migrations exist in repo (`2026_08_09_160000_drop_notifications_table.php`, `2026_08_09_160100_drop_email_templates_table.php`, commit `1716254a5`, authored 2026-08-09). This session could not independently SSH-verify the live prod target (`x.swin.edu.vn` on `157.10.186.103` — stale on-disk checkout, no active nginx vhost, domain didn't resolve via Cloudflare NS from this session). Backup/encryption/0600/destruction-date, restore-rehearsal, FK-recheck, and named-revert-range requirements above are **user-attested, not evidence-verified** this session.

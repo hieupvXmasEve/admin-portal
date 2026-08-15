@@ -1,7 +1,7 @@
 ---
 phase: 5
 title: "ApplicationDocument shim sweep (gated on fraud-design review)"
-status: pending
+status: completed
 priority: P2
 effort: "1-2d incl. review"
 dependencies: [1]
