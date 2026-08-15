@@ -120,6 +120,7 @@ class ParentStudentAccess
             'intake',
             'pre_uni',
             'intake_course',
+            'deferred',
         ];
 
         if (! in_array($student->status, $allowedStatuses)) {

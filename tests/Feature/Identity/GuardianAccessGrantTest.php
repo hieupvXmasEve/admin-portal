@@ -177,6 +177,51 @@ it('authorizes Guardian Student context from the active Identity grant only', fu
         ->and($revokedResponse->getStatusCode())->toBe(403);
 });
 
+it('allows Guardian access to a deferred Student but blocks a suspended one', function (): void {
+    $semester = Semester::factory()->create();
+    $deferredStudent = Student::factory()->state([
+        'intake' => $semester->id,
+        'intake_semester_id' => $semester->id,
+        'status' => 'deferred',
+    ])->create();
+    $suspendedStudent = Student::factory()->state([
+        'intake' => $semester->id,
+        'intake_semester_id' => $semester->id,
+        'status' => 'suspended',
+    ])->create();
+
+    $deferredRelationship = app(StudentGuardianRelationshipWriter::class)->preserveForStudent((int) $deferredStudent->id, [[
+        'full_name' => 'Deferred Guardian',
+        'email' => 'deferred-guardian@example.test',
+        'is_primary' => true,
+    ]])[0];
+    $deferredGrant = app(GuardianAccessGrantWriter::class)->grant($deferredRelationship, isPrimaryPortalAccount: true);
+    $deferredProfile = ParentProfile::query()->findOrFail($deferredGrant->parentId);
+    $deferredUser = User::query()->findOrFail($deferredProfile->user_id);
+
+    $suspendedRelationship = app(StudentGuardianRelationshipWriter::class)->preserveForStudent((int) $suspendedStudent->id, [[
+        'full_name' => 'Suspended Guardian',
+        'email' => 'suspended-guardian@example.test',
+        'is_primary' => true,
+    ]])[0];
+    $suspendedGrant = app(GuardianAccessGrantWriter::class)->grant($suspendedRelationship, isPrimaryPortalAccount: true);
+    $suspendedProfile = ParentProfile::query()->findOrFail($suspendedGrant->parentId);
+    $suspendedUser = User::query()->findOrFail($suspendedProfile->user_id);
+
+    $middleware = app(ParentStudentAccess::class);
+
+    $deferredRequest = Request::create('/student-context', 'GET', ['student_id' => $deferredStudent->student_id]);
+    $deferredRequest->setUserResolver(static fn (): User => $deferredUser);
+    $deferredResponse = $middleware->handle($deferredRequest, static fn (): Response => new Response(status: 204));
+
+    $suspendedRequest = Request::create('/student-context', 'GET', ['student_id' => $suspendedStudent->student_id]);
+    $suspendedRequest->setUserResolver(static fn (): User => $suspendedUser);
+    $suspendedResponse = $middleware->handle($suspendedRequest, static fn (): Response => new Response(status: 204));
+
+    expect($deferredResponse->getStatusCode())->toBe(204)
+        ->and($suspendedResponse->getStatusCode())->toBe(403);
+});
+
 it('refreshes tokens and filters Parent context using active Identity grants', function (): void {
     $semester = Semester::factory()->create();
     $student = Student::factory()->state(['intake' => $semester->id, 'intake_semester_id' => $semester->id])->create();
