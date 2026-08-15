@@ -16,6 +16,7 @@ use App\Modules\Engagement\Models\QueryTicket;
 use App\Shared\Contracts\Identity\DTO\StaffActorReference;
 use App\Shared\Contracts\Institution\DepartmentReferenceReader;
 use App\Shared\Contracts\Upload\FileUploadGateway;
+use App\Shared\Contracts\Upload\UploadRecordReader;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -25,6 +26,7 @@ class QueryController extends Controller
     public function __construct(
         private FileUploadGateway $imageUploadService,
         private DepartmentReferenceReader $departments,
+        private UploadRecordReader $uploadRecordReader,
     ) {
         $this->middleware('can:view_queries')->only('index');
         $this->middleware('can:detail_queries')->only(['show', 'assign', 'reply', 'updateStatus']);
@@ -81,17 +83,30 @@ class QueryController extends Controller
             'answers.question.options',
             'answers.selectedOptions',
             'answers.attachments',
-            'attachments',
             'queryTicket.topic',
             'queryTicket.replies.author',
             'queryTicket.replies.authorStudent',
-            'queryTicket.replies.uploadRecord',
             'campus',
             'formTarget',
             'assignments.assignedBy',
             'assignments.fromAssignee',
             'assignments.toAssignee',
         ]);
+
+        $response->setRelation(
+            'attachments',
+            collect($this->uploadRecordReader->byResponseIds([$response->id])[$response->id] ?? [])
+        );
+
+        if ($response->queryTicket) {
+            $replySummaries = $this->uploadRecordReader->byReplyIds(
+                $response->queryTicket->replies->pluck('id')->all()
+            );
+
+            foreach ($response->queryTicket->replies as $reply) {
+                $reply->setRelation('uploadRecord', $replySummaries[$reply->id] ?? null);
+            }
+        }
 
         $departmentId = null;
         if ($response->formTarget && $response->formTarget->scope_type === 'department') {

@@ -6,7 +6,6 @@ use App\Models\Campus;
 use App\Models\Department;
 use App\Models\DepartmentMembership;
 use App\Models\Role;
-use App\Models\UploadRecord;
 use App\Models\User;
 use App\Modules\Engagement\Models\Form;
 use App\Modules\Engagement\Models\FormResponse;
@@ -14,6 +13,7 @@ use App\Modules\Engagement\Models\FormTarget;
 use App\Modules\Engagement\Models\FormVersion;
 use App\Modules\Engagement\Models\QueryReply;
 use App\Modules\Engagement\Models\QueryTicket;
+use App\Modules\Upload\Models\UploadRecord;
 use App\Shared\Contracts\Identity\CampusPermissionReader;
 use App\Shared\Contracts\Upload\FileUploadGateway;
 use App\Shared\Contracts\Upload\StoredUpload;
@@ -276,11 +276,16 @@ it('rejects assignment by a staff member without department-head or administrato
 
 it('stores an official reply with an uploaded attachment and marks the ticket answered', function (): void {
     $response = createAdminQueryInboxResponse($this, $this->academicService);
+    $ticketId = $response->queryTicket()->firstOrFail()->id;
     $uploadRecord = UploadRecord::factory()->create([
         'context' => 'form_attachment',
         'user_id' => $this->user->id,
     ]);
 
+    // linkToQueryReply()'s real effect (writing upload_records.reply_id,
+    // which the new UploadRecordReader read path depends on) is simulated
+    // here rather than delegated to a real gateway — UploadFileGateway is
+    // final, so Mockery can't partial-mock a wrapped instance of it.
     $uploadGateway = Mockery::mock(FileUploadGateway::class);
     $uploadGateway
         ->shouldReceive('store')
@@ -291,6 +296,13 @@ it('stores an official reply with an uploaded attachment and marks the ticket an
                 && $userId === $this->user->id;
         })
         ->andReturn(new StoredUpload($uploadRecord->id));
+    $uploadGateway
+        ->shouldReceive('linkToQueryReply')
+        ->once()
+        ->withArgs(fn (int $uploadId, int $ticketId2, int $replyId): bool => $uploadId === $uploadRecord->id && $ticketId2 === $ticketId)
+        ->andReturnUsing(function (int $uploadId, int $ticketId2, int $replyId) use ($uploadRecord): void {
+            $uploadRecord->update(['reply_id' => $replyId, 'ticket_id' => $ticketId2]);
+        });
     app()->instance(FileUploadGateway::class, $uploadGateway);
 
     actingAs($this->user)
@@ -308,12 +320,13 @@ it('stores an official reply with an uploaded attachment and marks the ticket an
 
     $reply = QueryReply::query()->sole();
 
-    expect($reply->ticket_id)->toBe($response->queryTicket()->firstOrFail()->id)
+    expect($reply->ticket_id)->toBe($ticketId)
         ->and($reply->author_user_id)->toBe($this->user->id)
         ->and($reply->message)->toBe('We have reviewed your request.')
         ->and($reply->is_official_answer)->toBeTrue()
         ->and($reply->upload_record_id)->toBe($uploadRecord->id)
-        ->and($response->fresh()->query_status)->toBe(QueryTicket::STATUS_ANSWERED);
+        ->and($response->fresh()->query_status)->toBe(QueryTicket::STATUS_ANSWERED)
+        ->and($uploadRecord->fresh()->reply_id)->toBe($reply->id);
 });
 
 it('validates status and reply content before changing a query ticket', function (): void {

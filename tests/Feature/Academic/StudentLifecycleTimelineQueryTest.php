@@ -13,10 +13,10 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentActionLog;
 use App\Models\StudentDecision;
-use App\Models\UploadRecord;
 use App\Models\User;
 use App\Modules\Academic\Progression\Actions\RecordStudentActionAction;
 use App\Modules\Academic\Progression\Queries\GetStudentLifecycleTimelineQuery;
+use App\Modules\Upload\Models\UploadRecord;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

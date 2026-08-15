@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Models\Campus;
 use App\Models\Semester;
 use App\Models\Student;
-use App\Models\UploadRecord;
 use App\Models\User;
 use App\Modules\Engagement\Models\Form;
 use App\Modules\Engagement\Models\FormResponse;
@@ -13,6 +12,8 @@ use App\Modules\Engagement\Models\FormTarget;
 use App\Modules\Engagement\Models\FormVersion;
 use App\Modules\Engagement\Models\QueryReply;
 use App\Modules\Engagement\Models\QueryTicket;
+use App\Modules\Upload\Models\UploadRecord;
+use App\Modules\Upload\Support\UploadPlatform;
 use App\Shared\Contracts\Upload\FileUploadGateway;
 use App\Shared\Contracts\Upload\StoredUpload;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -65,6 +66,77 @@ it('shows an owned query ticket with its response and reply details', function (
         ->assertJsonPath('data.response.form.type', 'query')
         ->assertJsonPath('data.response.answers.0.answer_text', 'I need an academic transcript.')
         ->assertJsonPath('data.replies.0.message', 'We are reviewing your request.');
+});
+
+it('shows response attachments through the UploadRecordReader contract', function (): void {
+    $campus = Campus::factory()->create();
+    $student = createStudentQueryApiStudent($campus);
+    $ticket = createStudentQueryTicketFixture($student, $campus);
+    $attachment = UploadRecord::factory()->create([
+        'context' => 'form_attachment',
+        'student_id' => $student->id,
+        'response_id' => $ticket->response_id,
+    ]);
+
+    Sanctum::actingAs($student);
+
+    $this->getJson(route('v1.student.queries.show', $ticket))
+        ->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonCount(1, 'data.response.attachments')
+        ->assertJsonPath('data.response.attachments.0.id', $attachment->id)
+        ->assertJsonPath('data.response.attachments.0.file_name', $attachment->original_name);
+});
+
+it('does not leak another student ticket attachment behind the pre-existing ticket-ownership 404', function (): void {
+    $campus = Campus::factory()->create();
+    $student = createStudentQueryApiStudent($campus);
+    $otherStudent = createStudentQueryApiStudent($campus);
+    $otherTicket = createStudentQueryTicketFixture($otherStudent, $campus);
+    $otherReply = QueryReply::create([
+        'ticket_id' => $otherTicket->id,
+        'author_user_id' => User::factory()->create()->id,
+        'message' => 'Internal note on the other student ticket.',
+        'is_official_answer' => true,
+    ]);
+    $otherResponseAttachment = UploadRecord::factory()->create([
+        'context' => 'form_attachment',
+        'student_id' => $otherStudent->id,
+        'response_id' => $otherTicket->response_id,
+    ]);
+    $otherReplyAttachment = UploadRecord::factory()->create([
+        'context' => 'form_attachment',
+        'student_id' => $otherStudent->id,
+        'reply_id' => $otherReply->id,
+        'ticket_id' => $otherTicket->id,
+    ]);
+
+    Sanctum::actingAs($student);
+
+    // The ticket-ownership check (assertNotFound, unchanged by this phase)
+    // is what actually blocks the leak: a non-owner never gets far enough
+    // to have byReplyIds()/byResponseIds() called with the other student's
+    // reply/response ids at all. Assert the response carries no `data` key
+    // whatsoever, rather than string-scanning the 404 envelope — a short
+    // numeric id can coincidentally appear inside an unrelated field (e.g.
+    // the error timestamp) and make substring matching an unreliable proof.
+    $response = $this->getJson(route('v1.student.queries.show', $otherTicket))->assertNotFound();
+
+    expect($response->json())->not->toHaveKey('data');
+
+    // Sanity: the fixture actually persisted attachments in this scenario
+    // (read back from the DB, not the in-memory factory objects), so a
+    // future change that silently dropped the 404 (widening the ticket
+    // query, say) would have real data available to leak — this isn't a
+    // vacuous denial test.
+    $this->assertDatabaseHas('upload_records', [
+        'id' => $otherResponseAttachment->id,
+        'response_id' => $otherTicket->response_id,
+    ]);
+    $this->assertDatabaseHas('upload_records', [
+        'id' => $otherReplyAttachment->id,
+        'reply_id' => $otherReply->id,
+    ]);
 });
 
 it('does not expose or allow a reply on another student ticket', function (): void {
@@ -121,6 +193,10 @@ it('stores a student reply attachment through the upload contract', function ():
         'student_id' => $student->id,
     ]);
 
+    // linkToQueryReply()'s real effect (writing upload_records.reply_id,
+    // which the new UploadRecordReader read path depends on) is simulated
+    // here rather than delegated to a real gateway — UploadFileGateway is
+    // final, so Mockery can't partial-mock a wrapped instance of it.
     $uploadGateway = Mockery::mock(FileUploadGateway::class);
     $uploadGateway
         ->shouldReceive('store')
@@ -140,27 +216,28 @@ it('stores a student reply attachment through the upload contract', function ():
     $uploadGateway
         ->shouldReceive('linkToQueryReply')
         ->once()
-        ->with($uploadRecord->id, $ticket->id, Mockery::type('int'));
-    $uploadGateway
-        ->shouldReceive('urlFor')
-        ->once()
-        ->with($uploadRecord->id)
-        ->andReturn('/uploads/student-reply.pdf');
+        ->withArgs(fn (int $uploadId, int $ticketId, int $replyId): bool => $uploadId === $uploadRecord->id && $ticketId === $ticket->id)
+        ->andReturnUsing(function (int $uploadId, int $ticketId, int $replyId) use ($uploadRecord): void {
+            $uploadRecord->update(['reply_id' => $replyId, 'ticket_id' => $ticketId]);
+        });
     app()->instance(FileUploadGateway::class, $uploadGateway);
 
     Sanctum::actingAs($student);
 
-    $this->withHeader('Accept', 'application/json')
+    $response = $this->withHeader('Accept', 'application/json')
         ->post(route('v1.student.queries.replies.store', $ticket), [
             'message' => 'I have attached the requested evidence.',
             'attachment' => UploadedFile::fake()->create('student-reply.pdf', 8, 'application/pdf'),
         ])
         ->assertOk()
         ->assertJsonPath('success', true)
-        ->assertJsonPath('data.attachment.id', $uploadRecord->id)
-        ->assertJsonPath('data.attachment.download_url', '/uploads/student-reply.pdf');
+        ->assertJsonPath('data.attachment.id', $uploadRecord->id);
 
-    expect(QueryReply::query()->sole()->upload_record_id)->toBe($uploadRecord->id);
+    $reply = QueryReply::query()->sole();
+    expect($reply->upload_record_id)->toBe($uploadRecord->id)
+        ->and($uploadRecord->fresh()->reply_id)->toBe($reply->id);
+
+    $response->assertJsonPath('data.attachment.download_url', app(UploadPlatform::class)->getUrl($uploadRecord->fresh()));
 });
 
 it('does not allow a student reply after the ticket is closed', function (): void {

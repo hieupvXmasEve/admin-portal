@@ -5,7 +5,6 @@ namespace App\Modules\Engagement\Models;
 use App\Models\Answer;
 use App\Models\Campus;
 use App\Models\Student;
-use App\Models\UploadRecord;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -105,14 +104,6 @@ class FormResponse extends Model
     public function answers(): HasMany
     {
         return $this->hasMany(Answer::class, 'response_id');
-    }
-
-    /**
-     * Get the attachments for the response.
-     */
-    public function attachments(): HasMany
-    {
-        return $this->hasMany(UploadRecord::class, 'response_id');
     }
 
     /**

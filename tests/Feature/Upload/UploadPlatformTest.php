@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Models\UploadRecord;
 use App\Models\User;
+use App\Modules\Upload\Models\UploadRecord;
 use App\Modules\Upload\Policies\UploadRecordPolicy;
 use App\Modules\Upload\Support\ChunkedUploadManager;
 use App\Modules\Upload\Support\FileValidator;

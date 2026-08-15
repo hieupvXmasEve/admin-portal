@@ -5,8 +5,9 @@ declare(strict_types=1);
 /**
  * Placement guard for the Merchandise-owned store/redemption models. The
  * real classes must live under app/Modules/Merchandise/Models. All 7
- * app/Models shims for this batch (including GoldTransaction, swept in
- * plan 260815-1320 phase 3) have been deleted.
+ * app/Models shims for this batch, including GoldTransaction (its
+ * cross-module reclaim-guard and audit-trail reads now go through
+ * App\Services\GoldService instead), have been deleted.
  */
 it('keeps the 7 Merchandise models inside the Merchandise module', function (): void {
     $workspace = dirname(__DIR__, 3);
@@ -38,7 +39,7 @@ it('has deleted the app/Models shim for the 7 swept Merchandise models', functio
 
     // GoldTransaction joined the swept group once Engagement's event-reward
     // reclaim guard and audit-trail queries moved behind App\Services\GoldService
-    // (plan 260815-1320 phase 3) instead of querying the model directly.
+    // instead of querying the model directly.
     $sweptModels = [
         'Merchandise',
         'MerchandiseImage',

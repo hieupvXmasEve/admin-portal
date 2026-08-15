@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\Engagement\Http\Resources;
 
 use App\Http\Resources\AnswerResource;
-use App\Http\Resources\AttachmentResource;
 use App\Modules\Engagement\Models\QueryTicket;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -85,7 +84,7 @@ class QueryTicketResource extends JsonResource
                             ]
                         ),
                         'answers' => AnswerResource::collection($this->whenLoadedResponseAnswers($response)),
-                        'attachments' => AttachmentResource::collection($this->whenLoadedResponseAttachments($response)),
+                        'attachments' => $this->responseAttachmentSummaries($response),
                     ];
                 }
             ),
@@ -100,10 +99,23 @@ class QueryTicketResource extends JsonResource
             : [];
     }
 
-    protected function whenLoadedResponseAttachments($response)
+    /**
+     * `attachments` is never a real Eloquent relation on FormResponse — it is
+     * a list<UploadRecordSummary> the caller injects via setRelation() from
+     * App\Shared\Contracts\Upload\UploadRecordReader::byResponseIds(). Each
+     * summary already carries the same fields AttachmentResource used to
+     * shape (file_name, size, mime_type, download_url, ...), so mapping
+     * ->toArray() directly reproduces the prior JSON shape without routing
+     * through AttachmentResource — that resource's download_url calculation
+     * requires a real App\Modules\Upload\Models\UploadRecord instance, which
+     * a DTO deliberately is not.
+     *
+     * @return list<array<string, mixed>>
+     */
+    protected function responseAttachmentSummaries($response): array
     {
-        return $response->relationLoaded('attachments')
-            ? $response->attachments
-            : [];
+        $summaries = $response->attachments ?? [];
+
+        return collect($summaries)->map(fn ($summary) => $summary->toArray())->all();
     }
 }

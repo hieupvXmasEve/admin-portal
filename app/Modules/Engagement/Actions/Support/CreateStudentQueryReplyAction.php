@@ -12,6 +12,7 @@ use App\Shared\Contracts\Institution\DepartmentReferenceReader;
 use App\Shared\Contracts\Notification\NotificationPayloadFactory;
 use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
 use App\Shared\Contracts\Upload\FileUploadGateway;
+use App\Shared\Contracts\Upload\UploadRecordReader;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +26,7 @@ class CreateStudentQueryReplyAction
         private DomainEventPublisher $domainEventPublisher,
         private NotificationPayloadFactory $notificationPayloadFactory,
         private DepartmentReferenceReader $departments,
+        private UploadRecordReader $uploadRecordReader,
     ) {}
 
     public function execute(QueryTicket $ticket, StudentReference $student, array $data): QueryReply
@@ -55,7 +57,11 @@ class CreateStudentQueryReplyAction
                 ]);
             }
 
-            $reply->load(['authorStudent', 'uploadRecord']);
+            $reply->load(['authorStudent']);
+            $reply->setRelation(
+                'uploadRecord',
+                $this->uploadRecordReader->byReplyIds([$reply->id])[$reply->id] ?? null
+            );
 
             $this->dispatchReplyCreatedNotification($ticket, $reply, $student);
 

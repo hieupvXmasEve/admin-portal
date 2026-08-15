@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Support\Entitlement\FinanceEntitlementType;
+use App\Modules\Upload\Models\UploadRecord;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;

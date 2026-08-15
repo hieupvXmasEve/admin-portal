@@ -14,6 +14,7 @@ use App\Modules\Engagement\Http\Resources\QueryTicketResource;
 use App\Modules\Engagement\Models\QueryTicket;
 use App\Modules\Engagement\Support\QueryTicketWorkflow;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
+use App\Shared\Contracts\Upload\UploadRecordReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -23,6 +24,7 @@ class QueryTicketController extends Controller
     public function __construct(
         private QueryTicketWorkflow $queryTicketService,
         private StudentReferenceReader $students,
+        private UploadRecordReader $uploadRecordReader,
     ) {}
 
     public function index(ListStudentQueryTicketsRequest $request): JsonResponse
@@ -74,13 +76,23 @@ class QueryTicketController extends Controller
                     'answers.question',
                     'answers.selectedOptions',
                     'answers.attachments',
-                    'attachments',
                 ]);
             },
             'replies.author',
             'replies.authorStudent',
-            'replies.uploadRecord',
         ]);
+
+        if ($ticket->response) {
+            $ticket->response->setRelation(
+                'attachments',
+                collect($this->uploadRecordReader->byResponseIds([$ticket->response->id])[$ticket->response->id] ?? [])
+            );
+        }
+
+        $replySummaries = $this->uploadRecordReader->byReplyIds($ticket->replies->pluck('id')->all());
+        foreach ($ticket->replies as $reply) {
+            $reply->setRelation('uploadRecord', $replySummaries[$reply->id] ?? null);
+        }
 
         return ApiResponse::success(
             new QueryTicketResource($ticket),

@@ -3,7 +3,6 @@
 namespace App\Modules\Engagement\Models;
 
 use App\Models\Student;
-use App\Models\UploadRecord;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -50,14 +49,6 @@ class QueryReply extends Model
     public function authorStudent(): BelongsTo
     {
         return $this->belongsTo(Student::class, 'author_student_id');
-    }
-
-    /**
-     * Get the attachment for the reply.
-     */
-    public function uploadRecord(): BelongsTo
-    {
-        return $this->belongsTo(UploadRecord::class);
     }
 
     /**

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Modules\Upload\Models\UploadRecord;
 use App\Shared\Support\Enums\UserType;
 use App\Traits\LazyPermissions;
 use Illuminate\Database\Eloquent\Factories\HasFactory;

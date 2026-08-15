@@ -5,8 +5,8 @@ declare(strict_types=1);
 /**
  * Placement guard for the Engagement-owned Forms sub-batch (sub-PR 4b). The
  * real classes must live under app/Modules/Engagement/Models. All 7 app/Models
- * shims for this batch (including FormResponse, swept in plan
- * 260815-1320 phase 2) have been deleted.
+ * shims for this batch, including FormResponse (its Upload<->Engagement
+ * inverse relations had zero real consumers), have been deleted.
  */
 it('keeps the 7 Forms models inside the Engagement module', function (): void {
     $workspace = dirname(__DIR__, 3);

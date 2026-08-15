@@ -9,13 +9,17 @@ use App\Models\User;
 use App\Modules\Engagement\Models\QueryReply;
 use App\Modules\Engagement\Models\QueryTicket;
 use App\Shared\Contracts\Upload\FileUploadGateway;
+use App\Shared\Contracts\Upload\UploadRecordReader;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 
 final class QueryTicketWorkflow
 {
-    public function __construct(private FileUploadGateway $imageUploadService) {}
+    public function __construct(
+        private FileUploadGateway $imageUploadService,
+        private UploadRecordReader $uploadRecordReader,
+    ) {}
 
     /**
      * Get paginated query tickets for a campus with optional filters.
@@ -97,7 +101,7 @@ final class QueryTicketWorkflow
                 },
                 'replies' => function ($repliesQuery) {
                     $repliesQuery
-                        ->with(['author', 'authorStudent', 'uploadRecord'])
+                        ->with(['author', 'authorStudent'])
                         ->orderByDesc('created_at');
                 },
             ])
@@ -109,10 +113,23 @@ final class QueryTicketWorkflow
             $query->where('status', $filters['status']);
         }
 
-        return $query
+        $tickets = $query
             ->orderByDesc('created_at')
             ->paginate($perPage)
             ->withQueryString();
+
+        $replyIds = $tickets->getCollection()
+            ->flatMap(fn (QueryTicket $ticket) => $ticket->replies->pluck('id'))
+            ->all();
+        $replySummaries = $this->uploadRecordReader->byReplyIds($replyIds);
+
+        foreach ($tickets->getCollection() as $ticket) {
+            foreach ($ticket->replies as $reply) {
+                $reply->setRelation('uploadRecord', $replySummaries[$reply->id] ?? null);
+            }
+        }
+
+        return $tickets;
     }
 
     /**
@@ -141,7 +158,13 @@ final class QueryTicketWorkflow
                 $ticket->update(['status' => QueryTicket::STATUS_PENDING, 'closed_at' => null]);
             }
 
-            return $reply->load(['author', 'authorStudent', 'uploadRecord']);
+            $reply->load(['author', 'authorStudent']);
+            $reply->setRelation(
+                'uploadRecord',
+                $this->uploadRecordReader->byReplyIds([$reply->id])[$reply->id] ?? null
+            );
+
+            return $reply;
         });
     }
 
@@ -172,7 +195,13 @@ final class QueryTicketWorkflow
                 ]);
             }
 
-            return $reply->load(['authorStudent', 'uploadRecord']);
+            $reply->load(['authorStudent']);
+            $reply->setRelation(
+                'uploadRecord',
+                $this->uploadRecordReader->byReplyIds([$reply->id])[$reply->id] ?? null
+            );
+
+            return $reply;
         });
     }
 

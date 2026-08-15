@@ -5,9 +5,9 @@ declare(strict_types=1);
 /**
  * Placement guard for the Engagement-owned Query/Ticketing sub-batch
  * (sub-PR 4c). The real classes must live under
- * app/Modules/Engagement/Models. All 4 app/Models shims for this batch
- * (including QueryReply/QueryTicket, swept in plan 260815-1320 phase 2)
- * have been deleted.
+ * app/Modules/Engagement/Models. All 4 app/Models shims for this batch,
+ * including QueryReply/QueryTicket (their Upload<->Engagement inverse
+ * relations had zero real consumers), have been deleted.
  */
 it('keeps QueryAssignment, QueryReply, QueryTicket, QueryTopic inside Engagement module', function (): void {
     $workspace = dirname(__DIR__, 3);

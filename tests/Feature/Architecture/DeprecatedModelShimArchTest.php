@@ -37,51 +37,57 @@ const ALL_MIGRATED_MODELS = [
 // used as the still-shimmed allow-list; the import regex is built from
 // ALL_MIGRATED_MODELS instead so it never blinds itself (phase 3, D3).
 //
-// 28 of the 30 migrated models have had their app/Models shim swept and
+// 29 of the 30 migrated models have had their app/Models shim swept and
 // deleted already: Merchandise, MerchandiseImage, MerchandiseVariant,
 // RedemptionOrder, RedemptionOrderItem, StockMovement, Club, ClubMember,
 // ClubMemberRoleHistory, Event, EventParticipant, Form,
 // FormResultVisibility, FormSection, FormSurvey, FormVersion, FormTarget,
 // QueryAssignment, QueryTopic, ApplicationDocumentType, Building, Room,
 // RoomBooking, RoomBookingAction, FormResponse, QueryReply, QueryTicket,
-// GoldTransaction.
+// GoldTransaction, UploadRecord.
 //
-// Room, Building, FormTarget, ApplicationDocumentType, and GoldTransaction
-// all joined that list the same way: the cross-module read blocking each
-// (Academic reading rooms, Academic counting buildings per campus, Academic
-// reading a course's survey target, Admissions reading the document-type
-// catalog, Engagement's event-reward reclaim guard + audit trail reading
-// gold transactions) moved behind a contract implemented in the data's
-// owning module — App\Shared\Contracts\Facilities\SpaceReferenceReader,
+// Room, Building, FormTarget, ApplicationDocumentType, GoldTransaction, and
+// UploadRecord all joined that list the same way: the cross-module read
+// blocking each (Academic reading rooms, Academic counting buildings per
+// campus, Academic reading a course's survey target, Admissions reading the
+// document-type catalog, Engagement's event-reward reclaim guard + audit
+// trail reading gold transactions, Engagement's query/response attachment
+// reads) moved behind a contract implemented in the data's owning module —
+// App\Shared\Contracts\Facilities\SpaceReferenceReader,
 // App\Shared\Contracts\Academic\CampusBuildingCountReader (implemented in
 // Facilities despite the Academic-named namespace),
 // App\Shared\Contracts\Engagement\CourseSurveyTargetReader,
-// App\Shared\Contracts\Upload\ApplicationDocumentCatalogReader, and (for
-// GoldTransaction, phase 3) two new public methods on the existing global
-// App\Services\GoldService rather than a new App\Shared\Contracts entry,
-// since GoldService already owned every other gold-mutating query and is
-// exempt from the cross-context rule (it is not under namespace
-// App\Modules\…). That is the shape a cross-module-read blocker needs: a
-// shim survives only because a live cross-module read still resolves
-// through it, and rewriting that caller to the canonical namespace would
-// trip the zero-tolerance cross_context_concrete_imports boundary rule.
-// Routing the read through a shared contract (or an existing global
-// service already exempt from the rule) removes the blocker; sweeping the
-// import alone just moves the violation into view.
+// App\Shared\Contracts\Upload\ApplicationDocumentCatalogReader,
+// App\Shared\Contracts\Upload\UploadRecordReader (phase 4, keyed by the
+// owning reply/response id rather than upload id — see that interface's
+// docblock for why), and (for GoldTransaction, phase 3) two new public
+// methods on the existing global App\Services\GoldService rather than a new
+// App\Shared\Contracts entry, since GoldService already owned every other
+// gold-mutating query and is exempt from the cross-context rule (it is not
+// under namespace App\Modules\…). That is the shape a cross-module-read
+// blocker needs: a shim survives only because a live cross-module read
+// still resolves through it, and rewriting that caller to the canonical
+// namespace would trip the zero-tolerance cross_context_concrete_imports
+// boundary rule. Routing the read through a shared contract (or an existing
+// global service already exempt from the rule) removes the blocker;
+// sweeping the import alone just moves the violation into view.
 //
-// FormResponse, QueryReply, and QueryTicket joined by a different route: the
-// only cross-module edge was Upload\UploadRecord's inverse relations
-// (queryReply()/response()/ticket()) reading them back, and a model-anchored
-// consumer inventory (phase 2) confirmed those inverse relations had zero
-// real consumers — the relations were deleted outright rather than routed
-// through a contract, since there was no live read left to preserve.
+// FormResponse and QueryReply's OWN relations (the ones QueryReply and
+// FormResponse themselves used to define pointing at UploadRecord) joined by
+// a different, narrower route than the contract above: the only cross-module
+// edge for those two specific relations was Upload\UploadRecord's inverse
+// relations (queryReply()/response()/ticket()) reading them back, and a
+// model-anchored consumer inventory (phase 2) confirmed those inverse
+// relations had zero real consumers — the relations were deleted outright
+// rather than routed through a contract, since there was no live read left
+// to preserve. UploadRecord itself stayed shimmed through phase 2 because
+// Engagement's OWN reads of it (query reply attachments, response
+// attachments) were very much live — that's what phase 4's
+// UploadRecordReader contract above finally routes.
 //
-// The remaining two (ApplicationDocument, UploadRecord) are still blocked
-// by a live cross-module read or write and need the contract or deletion
+// The remaining one (ApplicationDocument) is still blocked by a live
+// cross-module write and needs a design pass before it can take either
 // treatment above.
-//
-// ApplicationDocument is the odd one out among the two: unlike UploadRecord,
-// it is not blocked by a read alone.
 // App\Modules\Admissions\Actions\UpsertCrmApplicationAction writes it
 // (updateOrCreate with two different field shapes for the push vs NE CRM
 // sync paths, plus a delete-not-in-set reconciliation) as part of what its
@@ -95,7 +101,6 @@ const ALL_MIGRATED_MODELS = [
 // compile-time constant expression.
 const SHIMMED_MODELS = [
     'ApplicationDocument',
-    'UploadRecord',
 ];
 
 // Baseline of files that already reference `App\Models\<shim>`, measured
@@ -105,26 +110,17 @@ const SHIMMED_MODELS = [
 // they intentionally store the old FQCN as data (a WHERE clause value), not
 // as an import, and historical migrations are never rewritten or deleted.
 const SHIMMED_MODEL_IMPORT_BASELINE = [
-    'app/Models/Answer.php',
     'app/Modules/Admissions/Actions/UpsertCrmApplicationAction.php',
-    'app/Modules/Engagement/Models/FormResponse.php',
-    'app/Modules/Engagement/Models/QueryReply.php',
     'app/Services/Admissions/ApplicationBackfillService.php',
     'database/migrations/2026_08_11_021157_backfill_clubmember_shimmed_morph_subject_type.php',
     'database/migrations/2026_08_11_085516_backfill_remaining_shimmed_morph_subject_types.php',
     'tests/Feature/Architecture/FacilitiesDeliveryBoundaryArchTest.php',
-    'tests/Feature/Academic/StudentLifecycleTimelineQueryTest.php',
     'tests/Feature/Admissions/ApplicationBackfillTest.php',
     'tests/Feature/Admissions/IngestionApplicationsTest.php',
-    'tests/Feature/Api/V1/Student/QueryTicketApiTest.php',
     'tests/Feature/Engagement/ClubMemberShimMorphBackfillMigrationTest.php',
-    'tests/Feature/Form/AdminQueryInboxTest.php',
-    'tests/Feature/Form/QueryTicketWorkflowTest.php',
-    'tests/Feature/Platform/SystemConfigurationMigrationTest.php',
     'tests/Feature/StudentApplication/DocumentsTest.php',
     'tests/Feature/StudentApplication/ExportTest.php',
     'tests/Feature/StudentApplication/IndexCampusScopeTest.php',
-    'tests/Feature/Upload/UploadPlatformTest.php',
 ];
 
 it('has no class_alias shim under app/Models beyond the known allow-list', function (): void {

@@ -10,6 +10,7 @@ use App\Shared\Contracts\DomainEvents\DomainEvent;
 use App\Shared\Contracts\DomainEvents\DomainEventPublisher;
 use App\Shared\Contracts\Identity\DTO\StaffActorReference;
 use App\Shared\Contracts\Notification\NotificationPayloadFactory;
+use App\Shared\Contracts\Upload\FileUploadGateway;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -19,6 +20,7 @@ class ReplyToQueryAction
     public function __construct(
         private DomainEventPublisher $domainEventPublisher,
         private NotificationPayloadFactory $notificationPayloadFactory,
+        private FileUploadGateway $imageUploadService,
     ) {}
 
     public function execute(
@@ -46,6 +48,10 @@ class ReplyToQueryAction
                 'is_official_answer' => $isOfficial,
                 'upload_record_id' => $uploadRecordId,
             ]);
+
+            if ($uploadRecordId !== null) {
+                $this->imageUploadService->linkToQueryReply($uploadRecordId, (int) $ticket->id, (int) $reply->id);
+            }
 
             $newStatus = $isOfficial ? 'answered' : ($setPending ? 'pending' : 'open');
 
