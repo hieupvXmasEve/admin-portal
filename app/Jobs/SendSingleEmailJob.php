@@ -75,27 +75,31 @@ class SendSingleEmailJob implements ShouldQueue
             // Mark email as sending
             $this->emailLog->markAsSending();
 
-            // Resolve campus-specific config — must exist, .env fallback is not allowed
-            $config = EmailConfiguration::getActiveForCampus($this->campusId);
+            // Local: send through the default configured mailer (Mailpit) instead of
+            // per-campus EmailConfiguration credentials.
+            if (! app()->environment('local')) {
+                // Resolve campus-specific config — must exist, .env fallback is not allowed
+                $config = EmailConfiguration::getActiveForCampus($this->campusId);
 
-            if (! $config) {
-                throw new \RuntimeException(
-                    'No active EmailConfiguration found for campus_id=' . ($this->campusId ?? 'null') . '. Configure an active email configuration in the database.'
-                );
+                if (! $config) {
+                    throw new \RuntimeException(
+                        'No active EmailConfiguration found for campus_id=' . ($this->campusId ?? 'null') . '. Configure an active email configuration in the database.'
+                    );
+                }
+
+                if (! Config::get('mail.allow_outbound')) {
+                    Log::warning('Outbound email blocked: MAIL_ALLOW_OUTBOUND is disabled', [
+                        'email_log_id' => $this->emailLog->id,
+                        'recipient' => $this->emailLog->recipient,
+                        'subject' => $this->emailLog->subject,
+                    ]);
+                    $this->emailLog->markAsRejected('Outbound email blocked: MAIL_ALLOW_OUTBOUND is disabled');
+
+                    return;
+                }
+
+                $this->configureMailer($config);
             }
-
-            if (! Config::get('mail.allow_outbound')) {
-                Log::warning('Outbound email blocked: MAIL_ALLOW_OUTBOUND is disabled', [
-                    'email_log_id' => $this->emailLog->id,
-                    'recipient' => $this->emailLog->recipient,
-                    'subject' => $this->emailLog->subject,
-                ]);
-                $this->emailLog->markAsRejected('Outbound email blocked: MAIL_ALLOW_OUTBOUND is disabled');
-
-                return;
-            }
-
-            $this->configureMailer($config);
 
             // Create and send the email
             $email = new GenericEmail(

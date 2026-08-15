@@ -35,7 +35,9 @@ class SmtpEmailTransport
         $emailLog = $this->resolveEmailLog($delivery, $recipient, $subject, $message->campus_id);
         $emailLog->markAsSending();
 
-        if (! Config::get('mail.allow_outbound')) {
+        $isLocal = app()->environment('local');
+
+        if (! $isLocal && ! Config::get('mail.allow_outbound')) {
             Log::warning('Outbound email blocked: MAIL_ALLOW_OUTBOUND is disabled', [
                 'email_log_id' => $emailLog->id,
                 'recipient' => $recipient,
@@ -50,7 +52,11 @@ class SmtpEmailTransport
         }
 
         try {
-            $this->configureMailer($this->resolveConfiguration($message->campus_id));
+            // Local: send through the default configured mailer (Mailpit) instead of
+            // per-campus EmailConfiguration credentials.
+            if (! $isLocal) {
+                $this->configureMailer($this->resolveConfiguration($message->campus_id));
+            }
             Mail::to($recipient)->send(new RenderedNotificationEmail($subject, $html, $text));
 
             $providerMessageId = null;
