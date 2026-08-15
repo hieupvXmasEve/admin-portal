@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Models\Campus;
-use App\Models\ParentProfile;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
@@ -15,6 +14,8 @@ use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Notification\Models\NotificationEmailTemplate;
 use App\Modules\Notification\Models\NotificationEventOutbox;
+use App\Shared\Contracts\Identity\GuardianAccessGrantWriter;
+use App\Shared\Contracts\StudentRegistry\StudentGuardianRelationshipWriter;
 use App\Shared\Support\Enums\UserType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -83,6 +84,18 @@ function addParentReminderInvoiceLine(StudentInvoice $invoice, Student $student,
     ]);
 }
 
+function grantParentReminderAccess(Student $student, User $parent, bool $isPrimary = false): void
+{
+    $relationship = app(StudentGuardianRelationshipWriter::class)->preserveForStudent((int) $student->id, [[
+        'full_name' => $parent->name,
+        'relationship_type' => 'guardian',
+        'email' => $parent->email,
+        'is_primary' => $isPrimary,
+    ]])[0];
+
+    app(GuardianAccessGrantWriter::class)->grant($relationship, isPrimaryPortalAccount: $isPrimary);
+}
+
 it('sends reminders to all linked parent emails for unpaid invoices and updates invoice marker', function () {
     $campus = Campus::factory()->create();
     $semester = Semester::factory()->active()->create();
@@ -115,11 +128,8 @@ it('sends reminders to all linked parent emails for unpaid invoices and updates 
         'status' => User::STATUS_ACTIVE,
     ]);
 
-    $parentOne = ParentProfile::factory()->create(['user_id' => $parentUserOne->id]);
-    $parentTwo = ParentProfile::factory()->create(['user_id' => $parentUserTwo->id]);
-
-    $student->parentProfiles()->attach($parentOne->id, ['relationship' => 'father']);
-    $student->parentProfiles()->attach($parentTwo->id, ['relationship' => 'mother']);
+    grantParentReminderAccess($student, $parentUserOne, isPrimary: true);
+    grantParentReminderAccess($student, $parentUserTwo);
 
     $result = SendParentPaymentRemindersAction::run([
         'invoice_ids' => [$invoice->id],
@@ -167,8 +177,7 @@ it('routes campus_id to the db email provider and renders campus-specific templa
         'type' => UserType::PARENT,
         'status' => User::STATUS_ACTIVE,
     ]);
-    $parentProfile = ParentProfile::factory()->create(['user_id' => $parentUser->id]);
-    $student->parentProfiles()->attach($parentProfile->id, ['relationship' => 'father']);
+    grantParentReminderAccess($student, $parentUser, isPrimary: true);
 
     SendParentPaymentRemindersAction::run(['invoice_ids' => [$invoice->id]]);
 
@@ -257,22 +266,9 @@ it('dedupes duplicate parent emails and still updates reminder marker when one d
         'status' => User::STATUS_INACTIVE,
     ]);
 
-    $profileOne = ParentProfile::factory()->create([
-        'user_id' => $duplicateEmailUser->id,
-        'status' => 'active',
-    ]);
-    $profileTwo = ParentProfile::factory()->create([
-        'user_id' => $successfulParentUser->id,
-        'status' => 'active',
-    ]);
-    $profileThree = ParentProfile::factory()->create([
-        'user_id' => $inactiveParentUser->id,
-        'status' => 'active',
-    ]);
-
-    $student->parentProfiles()->attach($profileOne->id, ['relationship' => 'guardian']);
-    $student->parentProfiles()->attach($profileTwo->id, ['relationship' => 'guardian']);
-    $student->parentProfiles()->attach($profileThree->id, ['relationship' => 'guardian']);
+    grantParentReminderAccess($student, $duplicateEmailUser, isPrimary: true);
+    grantParentReminderAccess($student, $successfulParentUser);
+    grantParentReminderAccess($student, $inactiveParentUser);
 
     $result = SendParentPaymentRemindersAction::run([
         'invoice_ids' => [$invoice->id],

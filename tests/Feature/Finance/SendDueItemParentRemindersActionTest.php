@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Models\Campus;
-use App\Models\ParentProfile;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
@@ -16,6 +15,8 @@ use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Notification\Models\NotificationEmailTemplate;
 use App\Modules\Notification\Models\NotificationEventOutbox;
+use App\Shared\Contracts\Identity\GuardianAccessGrantWriter;
+use App\Shared\Contracts\StudentRegistry\StudentGuardianRelationshipWriter;
 use App\Shared\Support\Enums\UserType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -39,6 +40,18 @@ function makeDueItemParentStudent(Campus $campus, Program $program, Semester $se
             'intake_major' => $semester->id,
         ])
         ->create();
+}
+
+function grantDueItemParentAccess(Student $student, User $parent, bool $isPrimary = true): void
+{
+    $relationship = app(StudentGuardianRelationshipWriter::class)->preserveForStudent((int) $student->id, [[
+        'full_name' => $parent->name,
+        'relationship_type' => 'guardian',
+        'email' => $parent->email,
+        'is_primary' => $isPrimary,
+    ]])[0];
+
+    app(GuardianAccessGrantWriter::class)->grant($relationship, isPrimaryPortalAccount: $isPrimary);
 }
 
 it('sends parent reminder for a DNG request and updates last_reminder_at', function () {
@@ -112,8 +125,7 @@ it('sends parent reminder for a DNG request and updates last_reminder_at', funct
         'type' => UserType::PARENT,
         'status' => User::STATUS_ACTIVE,
     ]);
-    $parentProfile = ParentProfile::factory()->create(['user_id' => $parentUser->id]);
-    $student->parentProfiles()->attach($parentProfile->id, ['relationship' => 'father']);
+    grantDueItemParentAccess($student, $parentUser);
 
     // Seed a NotificationEmailTemplate — proves campus_id reaches the provider
     config(['notifications.use_db_templates' => true]);
