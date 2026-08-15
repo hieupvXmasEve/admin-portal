@@ -1,7 +1,7 @@
 ---
 phase: 5
-title: "Soak and drop tables"
-status: pending
+title: "Soak and drop tables (MOVED → 260815-1320 phase 10)"
+status: done
 priority: P2
 effort: "7-day soak + 0.5d migration"
 dependencies: [4]

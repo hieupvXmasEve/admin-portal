@@ -1,13 +1,15 @@
 ---
 phase: 5
 title: "Close out and spin out the 10 blocked shims"
-status: pending
+status: done
 priority: P2
 effort: "1h"
 dependencies: [1, 2, 3, 4]
 ---
 
 # Phase 5: Close out and spin out the 10 blocked shims
+
+> **Fulfilled 2026-08-15**: successor plan `260815-1320-close-remaining-legacy-shims-and-final-dead-cleanup` created (red-teamed + validated) covering the remaining blocked shims (6 left by then — Room, Building, FormTarget, ApplicationDocumentType were closed by interim work).
 
 <!-- Rewritten after red-team session 1: was "Merchandise sweep and final shim removal". Merchandise moved into phase 4; this phase now closes the plan honestly at 20/30 -->
 

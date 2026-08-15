@@ -1,7 +1,7 @@
 ---
 title: "Deprecated model shim namespace sweep"
 description: "Repoint all callers from App\\Models\\* class_alias shims to the canonical App\\Modules\\<Owner>\\Models\\* namespace, then delete the shims."
-status: in-progress
+status: completed
 priority: P3
 effort: "4-5 PRs, ~1-2h each"
 tags: [modularization, arch-test, php, tech-debt]
@@ -9,6 +9,8 @@ created: 2026-08-11
 ---
 
 # Deprecated model shim namespace sweep
+
+> **CLOSED 2026-08-15.** Phases 1-4 shipped (24/30 shims deleted after later Room/Building/FormTarget/ApplicationDocumentType work). Phase 5's spin-out is fulfilled by `plans/260815-1320-close-remaining-legacy-shims-and-final-dead-cleanup/` — the successor plan sweeping the 6 remaining blocked shims with contract routing. All further work happens there.
 
 ## Overview
 

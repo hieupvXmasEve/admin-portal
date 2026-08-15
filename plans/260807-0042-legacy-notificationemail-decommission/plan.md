@@ -1,7 +1,7 @@
 ---
 title: "Legacy Notification/Email Decommission"
 description: "Staged removal of legacy notification/email surfaces + dead-code cleanup, replacing the 'zero-risk grep deletion' framing that scout disproved"
-status: in_progress
+status: completed
 priority: P1
 effort: "3-5 PRs, few days + 7-day soak"
 tags: [cleanup, notifications, email, finance-events-deferred]
@@ -9,6 +9,8 @@ created: 2026-08-07
 ---
 
 # Legacy Notification/Email Decommission
+
+> **CLOSED 2026-08-15.** Phases 1-4 completed & deployed. Phase 5 (soak + drop tables) MERGED into `plans/260815-1320-close-remaining-legacy-shims-and-final-dead-cleanup/` as phase 10, per user consolidation request. Execute the drop from there.
 
 ## Overview
 
