@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Modules\Engagement\Models\FormTarget;
 use Carbon\Carbon;
 use Database\Factories\CourseOfferingFactory;
 use Illuminate\Database\Eloquent\Builder;

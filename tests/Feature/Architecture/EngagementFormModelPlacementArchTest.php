@@ -33,14 +33,18 @@ it('keeps the 7 Forms models inside the Engagement module', function (): void {
     }
 });
 
-it('has deleted the app/Models shim for the 5 swept Forms models', function (): void {
+it('has deleted the app/Models shim for the 6 swept Forms models', function (): void {
     $workspace = dirname(__DIR__, 3);
 
+    // FormTarget joined the swept group once Academic stopped reading a
+    // course's survey target directly and went through
+    // App\Shared\Contracts\Engagement\CourseSurveyTargetReader instead.
     $sweptModels = [
         'Form',
         'FormResultVisibility',
         'FormSection',
         'FormSurvey',
+        'FormTarget',
         'FormVersion',
     ];
 
@@ -51,15 +55,14 @@ it('has deleted the app/Models shim for the 5 swept Forms models', function (): 
     }
 });
 
-it('has no real (non-shim) FormResponse/FormTarget model class under app/Models', function (): void {
+it('has no real (non-shim) FormResponse model class under app/Models', function (): void {
     $workspace = dirname(__DIR__, 3);
 
-    // FormResponse and FormTarget stay blocked: an Upload <-> Engagement and
-    // an Academic -> Engagement cross-module read still resolve them through
-    // this shim, and rewriting either caller to the canonical namespace
-    // would trip the zero-tolerance cross_context_concrete_imports boundary
-    // rule.
-    $blockedModels = ['FormResponse', 'FormTarget'];
+    // FormResponse stays blocked: an Upload <-> Engagement cross-module read
+    // still resolves it through this shim, and rewriting that caller to the
+    // canonical namespace would trip the zero-tolerance
+    // cross_context_concrete_imports boundary rule.
+    $blockedModels = ['FormResponse'];
 
     foreach ($blockedModels as $model) {
         $legacyPath = $workspace."/app/Models/{$model}.php";

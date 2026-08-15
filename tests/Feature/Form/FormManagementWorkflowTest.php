@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 use App\Models\Campus;
 use App\Models\Department;
-use App\Models\FormTarget;
 use App\Models\Role;
 use App\Models\User;
 use App\Modules\Engagement\Models\Form;
+use App\Modules\Engagement\Models\FormTarget;
 use App\Modules\Engagement\Models\FormVersion;
 use App\Shared\Contracts\Identity\CampusPermissionReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
