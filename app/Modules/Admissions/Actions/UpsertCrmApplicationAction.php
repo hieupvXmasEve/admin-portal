@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Modules\Admissions\Actions;
 
 use App\Models\ApplicationDocument;
-use App\Models\ApplicationDocumentType;
 use App\Models\ApplicationGuardian;
 use App\Models\StudentApplication;
 use App\Modules\Admissions\Models\ApplicationAcademicScore;
 use App\Modules\Admissions\Support\ApplicantGuardianManager;
 use App\Services\Admissions\Exceptions\ApplicationFrozenException;
+use App\Shared\Contracts\Upload\ApplicationDocumentCatalogReader;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -30,7 +30,10 @@ final class UpsertCrmApplicationAction
 {
     private const SOURCE_NE = 'ne';
 
-    public function __construct(private readonly ApplicantGuardianManager $guardians) {}
+    public function __construct(
+        private readonly ApplicantGuardianManager $guardians,
+        private readonly ApplicationDocumentCatalogReader $documentCatalog,
+    ) {}
 
     /** @param array<string, mixed> $data
      * @return array{application: StudentApplication, created: bool}
@@ -197,7 +200,7 @@ final class UpsertCrmApplicationAction
             return;
         }
         $codes = array_values(array_unique(array_column($documents, 'file_type_code')));
-        $catalogNames = ApplicationDocumentType::query()->whereIn('code', $codes)->pluck('name', 'code')->all();
+        $catalogNames = $this->documentCatalog->namesByCode($codes);
 
         foreach ($documents as $document) {
             $code = $document['file_type_code'];
@@ -227,7 +230,7 @@ final class UpsertCrmApplicationAction
     private function reconcileNeDocuments(StudentApplication $application, array $documents): void
     {
         $codes = array_values(array_unique(array_column($documents, 'file_type_code')));
-        $catalogNames = ApplicationDocumentType::query()->whereIn('code', $codes)->pluck('name', 'code')->all();
+        $catalogNames = $this->documentCatalog->namesByCode($codes);
 
         $writtenIds = [];
         foreach ($documents as $document) {

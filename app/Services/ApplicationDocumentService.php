@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\ApplicationDocument;
-use App\Models\ApplicationDocumentType;
 use App\Models\StudentApplication;
+use App\Modules\Upload\Models\ApplicationDocumentType;
 use Illuminate\Support\Collection;
 
 /**

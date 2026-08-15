@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 use App\Models\ApplicationDocument;
-use App\Models\ApplicationDocumentType;
 use App\Models\Campus;
 use App\Models\StudentApplication;
 use App\Models\User;
+use App\Modules\Upload\Models\ApplicationDocumentType;
 use App\Services\ApplicationDocumentTypeSyncService;
 use App\Shared\Contracts\Identity\CampusPermissionReader;
 use App\Shared\Support\Enums\UserType;

@@ -37,30 +37,47 @@ const ALL_MIGRATED_MODELS = [
 // used as the still-shimmed allow-list; the import regex is built from
 // ALL_MIGRATED_MODELS instead so it never blinds itself (phase 3, D3).
 //
-// 22 of the 30 migrated models have had their app/Models shim swept and
+// 24 of the 30 migrated models have had their app/Models shim swept and
 // deleted already: Merchandise, MerchandiseImage, MerchandiseVariant,
 // RedemptionOrder, RedemptionOrderItem, StockMovement, Club, ClubMember,
 // ClubMemberRoleHistory, Event, EventParticipant, Form,
-// FormResultVisibility, FormSection, FormSurvey, FormVersion,
-// QueryAssignment, QueryTopic, Building, Room, RoomBooking, RoomBookingAction.
+// FormResultVisibility, FormSection, FormSurvey, FormVersion, FormTarget,
+// QueryAssignment, QueryTopic, ApplicationDocumentType, Building, Room,
+// RoomBooking, RoomBookingAction.
 //
-// Room and Building both joined that list the same way: the cross-module read
-// blocking each (Academic reading rooms, Academic counting buildings per
-// campus) moved behind a Facilities-owned contract —
-// App\Shared\Contracts\Facilities\SpaceReferenceReader and
-// App\Shared\Contracts\Academic\CampusBuildingCountReader respectively, both
-// now implemented inside app/Modules/Facilities/Support. That is the shape the
-// remaining eight need: a shim survives only because a live cross-module read
-// still resolves through it, and rewriting that caller to the canonical
-// namespace would trip the zero-tolerance cross_context_concrete_imports
-// boundary rule. Routing the read through a shared contract removes the
-// blocker; sweeping the import alone just moves the violation into view.
+// Room, Building, FormTarget, and ApplicationDocumentType all joined that
+// list the same way: the cross-module read blocking each (Academic reading
+// rooms, Academic counting buildings per campus, Academic reading a course's
+// survey target, Admissions reading the document-type catalog) moved behind
+// a contract implemented in the data's owning module —
+// App\Shared\Contracts\Facilities\SpaceReferenceReader,
+// App\Shared\Contracts\Academic\CampusBuildingCountReader (implemented in
+// Facilities despite the Academic-named namespace),
+// App\Shared\Contracts\Engagement\CourseSurveyTargetReader, and
+// App\Shared\Contracts\Upload\ApplicationDocumentCatalogReader. That is the
+// shape the remaining six need: a shim survives only because a live
+// cross-module read still resolves through it, and rewriting that caller to
+// the canonical namespace would trip the zero-tolerance
+// cross_context_concrete_imports boundary rule. Routing the read through a
+// shared contract removes the blocker; sweeping the import alone just moves
+// the violation into view.
+//
+// ApplicationDocument is the odd one out among the six: unlike the other
+// five, it is not blocked by a read alone.
+// App\Modules\Admissions\Actions\UpsertCrmApplicationAction writes it
+// (updateOrCreate with two different field shapes for the push vs NE CRM
+// sync paths, plus a delete-not-in-set reconciliation) as part of what its
+// own docblock calls "the live write path" for fraud-sensitive CRM ingest
+// (findings 7 and 12). Collapsing that into a generic writer contract risks
+// silently changing which fields get overwritten on update — deferred
+// pending its own design pass rather than rushed alongside the read-only
+// sweeps.
 //
 // Written as a literal (not array_diff) because top-level `const` requires a
 // compile-time constant expression.
 const SHIMMED_MODELS = [
-    'ApplicationDocument', 'ApplicationDocumentType',
-    'FormResponse', 'FormTarget', 'GoldTransaction',
+    'ApplicationDocument',
+    'FormResponse', 'GoldTransaction',
     'QueryReply', 'QueryTicket', 'UploadRecord',
 ];
 
@@ -71,15 +88,10 @@ const SHIMMED_MODELS = [
 // they intentionally store the old FQCN as data (a WHERE clause value), not
 // as an import, and historical migrations are never rewritten or deleted.
 const SHIMMED_MODEL_IMPORT_BASELINE = [
-    'app/Exports/StudentApplicationExport.php',
     'app/Models/Answer.php',
     'app/Http/Controllers/Api/GoldTransactionController.php',
     'app/Http/Controllers/Api/V1/Admissions/IngestionController.php',
-    'app/Modules/Academic/Delivery/Queries/GetCourseOfferingSurveyQuery.php',
     'app/Modules/Admissions/Actions/UpsertCrmApplicationAction.php',
-    'app/Modules/Admissions/Http/Api/IngestionController.php',
-    'app/Modules/Admissions/Queries/GetApplicantDocumentChecklistQuery.php',
-    'app/Modules/Admissions/Queries/ListApplicationsQuery.php',
     'app/Modules/Engagement/Actions/EventParticipationOperations.php',
     'app/Modules/Engagement/Models/FormResponse.php',
     'app/Modules/Engagement/Models/QueryReply.php',
@@ -87,7 +99,6 @@ const SHIMMED_MODEL_IMPORT_BASELINE = [
     'app/Services/Admissions/ApplicationBackfillService.php',
     'app/Services/Admissions/ApplicationIngestionService.php',
     'app/Services/ApplicationDocumentService.php',
-    'app/Services/ApplicationDocumentTypeSyncService.php',
     'app/Services/GoldService.php',
     'database/migrations/2026_08_11_021157_backfill_clubmember_shimmed_morph_subject_type.php',
     'database/migrations/2026_08_11_085516_backfill_remaining_shimmed_morph_subject_types.php',
@@ -95,13 +106,11 @@ const SHIMMED_MODEL_IMPORT_BASELINE = [
     'tests/Feature/Architecture/FacilitiesDeliveryBoundaryArchTest.php',
     'tests/Feature/Academic/StudentLifecycleTimelineQueryTest.php',
     'tests/Feature/Admissions/ApplicationBackfillTest.php',
-    'tests/Feature/Admissions/CrmApplicationSyncTest.php',
     'tests/Feature/Admissions/IngestionApplicationsTest.php',
     'tests/Feature/Api/V1/Student/EngagementFormsApiTest.php',
     'tests/Feature/Api/V1/Student/QueryTicketApiTest.php',
     'tests/Feature/Engagement/ClubMemberShimMorphBackfillMigrationTest.php',
     'tests/Feature/Form/AdminQueryInboxTest.php',
-    'tests/Feature/Form/FormManagementWorkflowTest.php',
     'tests/Feature/Form/QueryTicketWorkflowTest.php',
     'tests/Feature/Form/SurveyAggregateConfigTest.php',
     'tests/Feature/Form/SurveyResultDownloadTest.php',

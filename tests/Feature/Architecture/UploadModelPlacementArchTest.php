@@ -24,10 +24,15 @@ it('keeps UploadRecord, ApplicationDocument, ApplicationDocumentType inside Uplo
     }
 });
 
-it('has no real (non-shim) UploadRecord, ApplicationDocument, ApplicationDocumentType class under app/Models', function (): void {
+it('has no real (non-shim) UploadRecord, ApplicationDocument class under app/Models', function (): void {
     $workspace = dirname(__DIR__, 3);
 
-    $models = ['UploadRecord', 'ApplicationDocument', 'ApplicationDocumentType'];
+    // ApplicationDocumentType left this list once Admissions stopped reading
+    // the document-type catalog directly and went through
+    // App\Shared\Contracts\Upload\ApplicationDocumentCatalogReader.
+    // ApplicationDocument stays blocked: it is written, not just read — see
+    // DeprecatedModelShimArchTest for why that write path is not swept yet.
+    $models = ['UploadRecord', 'ApplicationDocument'];
 
     foreach ($models as $model) {
         $legacyPath = $workspace."/app/Models/{$model}.php";
@@ -38,4 +43,13 @@ it('has no real (non-shim) UploadRecord, ApplicationDocument, ApplicationDocumen
             ->toContain('class_alias(')
             ->not->toContain("class {$model} extends");
     }
+});
+
+it('has deleted the app/Models shim for ApplicationDocumentType', function (): void {
+    $workspace = dirname(__DIR__, 3);
+    $model = 'ApplicationDocumentType';
+
+    $legacyPath = $workspace."/app/Models/{$model}.php";
+    expect(file_exists($legacyPath))->toBeFalse("Expected shim to be deleted at app/Models/{$model}.php.");
+    expect(class_exists("App\\Models\\{$model}"))->toBeFalse("App\\Models\\{$model} must not resolve by class_alias, subclass, or otherwise.");
 });

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Admissions\Queries;
 
-use App\Models\ApplicationDocumentType;
 use App\Models\StudentApplication;
 use App\Modules\Admissions\Actions\ExportApplicationsAction;
+use App\Shared\Contracts\Upload\ApplicationDocumentCatalogReader;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -33,7 +33,10 @@ final class ListApplicationsQuery
         'synced', 'gpa_min', 'gpa_max', 'overall_min', 'overall_max', 'paid_min', 'paid_max',
     ];
 
-    public function __construct(private readonly GetApplicationConversionReadinessQuery $readinessQuery) {}
+    public function __construct(
+        private readonly GetApplicationConversionReadinessQuery $readinessQuery,
+        private readonly ApplicationDocumentCatalogReader $documentCatalog,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $filters
@@ -92,7 +95,8 @@ final class ListApplicationsQuery
     public function filters(?string $campusCode): array
     {
         return [
-            'document_types' => ApplicationDocumentType::query()->activeOrdered()->get(['code', 'name']),
+            'document_types' => collect($this->documentCatalog->activeOrdered())
+                ->map(fn ($type): array => ['code' => $type->code, 'name' => $type->name]),
             'intakes' => StudentApplication::query()->when($campusCode !== null, fn ($query) => $query->where('campus_code', $campusCode))->whereNotNull('intake')->where('intake', '!=', '')->distinct()->orderBy('intake')->pluck('intake'),
         ];
     }

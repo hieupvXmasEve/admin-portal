@@ -2,11 +2,12 @@
 
 declare(strict_types=1);
 
-use App\Models\ApplicationDocument;
 use App\Models\ApplicationGuardian;
 use App\Models\StudentApplication;
 use App\Modules\Admissions\Models\ApplicationAcademicScore;
+use App\Modules\Admissions\Services\CrmApplicationSyncService;
 use App\Modules\Admissions\Support\Crm\CrmIntegrationSettings;
+use App\Modules\Upload\Models\ApplicationDocumentType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 
@@ -65,7 +66,7 @@ function neRecord(array $overrides = []): array
 it('creates a new application from a CRM record', function () {
     fakeNeResponse([neRecord()]);
 
-    $result = app(\App\Modules\Admissions\Services\CrmApplicationSyncService::class)->run(false, null);
+    $result = app(CrmApplicationSyncService::class)->run(false, null);
 
     expect($result['created'])->toBe(1)
         ->and($result['failed'])->toBe(0);
@@ -85,7 +86,7 @@ it('updates an existing pending application matched by student_code', function (
 
     fakeNeResponse([neRecord(['name' => 'New Name'])]);
 
-    $result = app(\App\Modules\Admissions\Services\CrmApplicationSyncService::class)->run(false, null);
+    $result = app(CrmApplicationSyncService::class)->run(false, null);
 
     expect($result['updated'])->toBe(1)
         ->and($application->fresh()->full_name)->toBe('New Name');
@@ -93,7 +94,7 @@ it('updates an existing pending application matched by student_code', function (
 
 it('does not create duplicates on two consecutive runs', function () {
     fakeNeResponse([neRecord()]);
-    $service = app(\App\Modules\Admissions\Services\CrmApplicationSyncService::class);
+    $service = app(CrmApplicationSyncService::class);
 
     $service->run(false, null);
     fakeNeResponse([neRecord()]);
@@ -111,7 +112,7 @@ it('skips a non-pending application and logs it, leaving local edits untouched',
 
     fakeNeResponse([neRecord(['name' => 'Should Not Apply'])]);
 
-    $result = app(\App\Modules\Admissions\Services\CrmApplicationSyncService::class)->run(false, null);
+    $result = app(CrmApplicationSyncService::class)->run(false, null);
 
     expect($result['skipped'])->toBe(1)
         ->and($result['failed'])->toBe(0)
@@ -124,7 +125,7 @@ it('isolates a bad record so the rest of the batch still lands, and reports non-
         neRecord(['student_code' => 'NES0000002', 'date_of_birth' => 'garbage']),
     ]);
 
-    $result = app(\App\Modules\Admissions\Services\CrmApplicationSyncService::class)->run(false, null);
+    $result = app(CrmApplicationSyncService::class)->run(false, null);
 
     expect($result['created'])->toBe(1)
         ->and($result['failed'])->toBe(1)
@@ -141,7 +142,7 @@ it('a pre-existing manual application with null crm_admission_id is untouched by
     ]);
 
     fakeNeResponse([neRecord(['student_code' => 'NES0000001'])]);
-    app(\App\Modules\Admissions\Services\CrmApplicationSyncService::class)->run(false, null);
+    app(CrmApplicationSyncService::class)->run(false, null);
 
     expect($manual->fresh()->full_name)->toBe('Manual Applicant')
         ->and($manual->fresh()->student_code)->toBe('MANUAL0001');
@@ -154,7 +155,7 @@ it('preserves crm_admission_id on a push-created row matched by student_code (H1
     ]);
 
     fakeNeResponse([neRecord(['student_code' => 'NES0000001'])]);
-    app(\App\Modules\Admissions\Services\CrmApplicationSyncService::class)->run(false, null);
+    app(CrmApplicationSyncService::class)->run(false, null);
 
     expect($pushCreated->fresh()->crm_admission_id)->toBe('push-743');
 });
@@ -169,14 +170,14 @@ it('does not demote the existing primary guardian when the CRM record has no fat
     ]);
 
     fakeNeResponse([neRecord(['father_name' => null, 'father_phone' => null, 'mother_name' => null, 'mother_phone' => null])]);
-    app(\App\Modules\Admissions\Services\CrmApplicationSyncService::class)->run(false, null);
+    app(CrmApplicationSyncService::class)->run(false, null);
 
     expect($staffGuardian->fresh()->is_primary)->toBeTrue();
 });
 
 it('persists transcript, diploma document rows and per-subject scores', function () {
     fakeNeResponse([neRecord()]);
-    app(\App\Modules\Admissions\Services\CrmApplicationSyncService::class)->run(false, null);
+    app(CrmApplicationSyncService::class)->run(false, null);
 
     $application = StudentApplication::query()->where('student_code', 'NES0000001')->first();
 
@@ -188,7 +189,7 @@ it('persists transcript, diploma document rows and per-subject scores', function
 
 it('rejects a non-https document URL so it never reaches the database', function () {
     fakeNeResponse([neRecord(['file_diploma' => 'javascript:alert(1)'])]);
-    app(\App\Modules\Admissions\Services\CrmApplicationSyncService::class)->run(false, null);
+    app(CrmApplicationSyncService::class)->run(false, null);
 
     $application = StudentApplication::query()->where('student_code', 'NES0000001')->first();
     expect($application->documents()->where('file_type_code', 'diploma')->exists())->toBeFalse();
@@ -204,7 +205,7 @@ it('removes a stale ne:-prefixed document when its CRM URL goes null on a second
             return Http::response(['data' => [neRecord($call === 1 ? [] : ['file_diploma' => null])]], 200);
         },
     ]);
-    $service = app(\App\Modules\Admissions\Services\CrmApplicationSyncService::class);
+    $service = app(CrmApplicationSyncService::class);
     $service->run(false, null);
     $service->run(false, null);
 
@@ -223,7 +224,7 @@ it('flips the primary guardian from father to mother on a second run without hit
             return Http::response(['data' => [neRecord($call === 1 ? [] : ['father_name' => null, 'father_phone' => null])]], 200);
         },
     ]);
-    $service = app(\App\Modules\Admissions\Services\CrmApplicationSyncService::class);
+    $service = app(CrmApplicationSyncService::class);
     $service->run(false, null);
 
     $application = StudentApplication::query()->where('student_code', 'NES0000001')->first();
@@ -246,7 +247,7 @@ it('leaves a staff-added guardian on a different relationship untouched by a syn
     ]);
 
     fakeNeResponse([neRecord()]);
-    app(\App\Modules\Admissions\Services\CrmApplicationSyncService::class)->run(false, null);
+    app(CrmApplicationSyncService::class)->run(false, null);
 
     expect(ApplicationGuardian::query()->where('student_application_id', $application->id)->where('relationship', 'guardian')->exists())->toBeTrue();
 });
@@ -255,7 +256,7 @@ it('accepts a record with blank or duplicated email', function () {
     StudentApplication::factory()->pending()->create(['student_code' => 'EXISTING001', 'email' => 'shared@example.test']);
 
     fakeNeResponse([neRecord(['student_code' => 'NES0000001', 'email' => 'shared@example.test'])]);
-    $result = app(\App\Modules\Admissions\Services\CrmApplicationSyncService::class)->run(false, null);
+    $result = app(CrmApplicationSyncService::class)->run(false, null);
 
     expect($result['failed'])->toBe(0)
         ->and(StudentApplication::query()->where('student_code', 'NES0000001')->exists())->toBeTrue();
@@ -264,7 +265,7 @@ it('accepts a record with blank or duplicated email', function () {
 it('--dry-run performs zero writes', function () {
     fakeNeResponse([neRecord()]);
 
-    $result = app(\App\Modules\Admissions\Services\CrmApplicationSyncService::class)->run(true, null);
+    $result = app(CrmApplicationSyncService::class)->run(true, null);
 
     expect($result['created'])->toBe(1)
         ->and(StudentApplication::query()->where('student_code', 'NES0000001')->exists())->toBeFalse();
@@ -284,11 +285,11 @@ it('artisan command exits zero on a fully successful run', function () {
 
 it('seeds id_card_back and scholarship_certificate document types idempotently', function () {
     fakeNeResponse([neRecord()]);
-    $service = app(\App\Modules\Admissions\Services\CrmApplicationSyncService::class);
+    $service = app(CrmApplicationSyncService::class);
     $service->run(false, null);
     fakeNeResponse([neRecord()]);
     $service->run(false, null);
 
-    expect(\App\Models\ApplicationDocumentType::query()->where('code', 'id_card_back')->count())->toBe(1)
-        ->and(\App\Models\ApplicationDocumentType::query()->where('code', 'scholarship_certificate')->count())->toBe(1);
+    expect(ApplicationDocumentType::query()->where('code', 'id_card_back')->count())->toBe(1)
+        ->and(ApplicationDocumentType::query()->where('code', 'scholarship_certificate')->count())->toBe(1);
 });

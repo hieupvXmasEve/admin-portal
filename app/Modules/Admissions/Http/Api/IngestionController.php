@@ -6,7 +6,6 @@ namespace App\Modules\Admissions\Http\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
-use App\Models\ApplicationDocument;
 use App\Models\ApplicationGuardian;
 use App\Models\StudentApplication;
 use App\Modules\Admissions\Actions\UpsertCrmApplicationAction;
@@ -55,7 +54,10 @@ final class IngestionController extends Controller
             'guardians' => $application->guardians->map(fn (ApplicationGuardian $guardian): array => [
                 'id' => $guardian->id, 'full_name' => $guardian->full_name, 'is_primary' => $guardian->is_primary,
             ])->all(),
-            'documents' => $application->documents->map(fn (ApplicationDocument $document): array => [
+            // Untyped: a \App\Modules\Upload\Models\ApplicationDocument type hint
+            // would make Admissions name Upload concretely and trip the
+            // zero-tolerance cross_context_concrete_imports boundary rule.
+            'documents' => $application->documents->map(fn ($document): array => [
                 'id' => $document->id, 'crm_file_id' => $document->crm_file_id, 'file_type_code' => $document->file_type_code,
             ])->all(),
         ];

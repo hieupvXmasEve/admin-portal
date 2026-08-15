@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Services\Admissions;
 
 use App\Models\ApplicationDocument;
-use App\Models\ApplicationDocumentType;
 use App\Models\StudentApplication;
+use App\Modules\Upload\Models\ApplicationDocumentType;
 use App\Services\Admissions\Exceptions\ApplicationFrozenException;
 use App\Services\ApplicationGuardianService;
 use Illuminate\Support\Arr;

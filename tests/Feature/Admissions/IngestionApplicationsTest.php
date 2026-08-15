@@ -3,12 +3,12 @@
 declare(strict_types=1);
 
 use App\Models\ApplicationDocument;
-use App\Models\ApplicationDocumentType;
 use App\Models\Campus;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\StudentApplication;
 use App\Models\User;
+use App\Modules\Upload\Models\ApplicationDocumentType;
 use App\Shared\Support\Admissions\AdmissionsIngestion;
 use App\Shared\Support\Enums\UserType;
 use Illuminate\Foundation\Testing\RefreshDatabase;

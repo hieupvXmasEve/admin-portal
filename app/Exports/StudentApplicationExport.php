@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Exports;
 
-use App\Models\ApplicationDocumentType;
 use App\Models\StudentApplication;
+use App\Modules\Upload\Models\ApplicationDocumentType;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromQuery;

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Models\ApplicationDocumentType;
+use App\Modules\Upload\Models\ApplicationDocumentType;
 use Illuminate\Support\Facades\DB;
 
 /**
