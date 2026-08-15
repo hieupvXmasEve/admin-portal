@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Delivery\Queries;
 
 use App\Models\CourseOffering;
-use App\Models\FormTarget;
+use App\Shared\Contracts\Engagement\CourseSurveyTargetReader;
 
 /**
  * Return survey data for a course offering's deferred prop.
@@ -18,45 +18,35 @@ use App\Models\FormTarget;
  *   formVersion: array{id: int, title: string, code: string}|null,
  * }|null
  */
-class GetCourseOfferingSurveyQuery
+final class GetCourseOfferingSurveyQuery
 {
-    public static function handle(CourseOffering $courseOffering): ?array
+    public function __construct(private readonly CourseSurveyTargetReader $surveyTargets) {}
+
+    public function handle(CourseOffering $courseOffering): ?array
     {
-        /** @var FormTarget|null $target */
-        $target = FormTarget::with(['form', 'assignments'])
-            ->where('scope_type', 'course')
-            ->where('scope_id', $courseOffering->id)
-            ->latest()
-            ->first();
+        $target = $this->surveyTargets->forCourseOffering($courseOffering->id);
 
         if (! $target) {
             return null;
         }
 
-        $form = $target->form;
-
-        // Completion stats from student assignments
-        $total = $target->assignments()->count();
-        $completed = $target->assignments()->where('status', 'completed')->count();
-        $pending = $total - $completed;
-
         return [
             'surveyTarget' => [
                 'id' => $target->id,
-                'form_id' => $target->form_id,
+                'form_id' => $target->formId,
                 'status' => $target->status,
-                'start_at' => $target->start_at->toIso8601String(),
-                'end_at' => $target->end_at?->toIso8601String(),
+                'start_at' => $target->startAt,
+                'end_at' => $target->endAt,
             ],
             'completionStats' => [
-                'total' => $total,
-                'completed' => $completed,
-                'pending' => $pending,
+                'total' => $target->totalAssignments,
+                'completed' => $target->completedAssignments,
+                'pending' => $target->totalAssignments - $target->completedAssignments,
             ],
-            'formVersion' => $form ? [
-                'id' => $form->id,
-                'title' => $form->title,
-                'code' => $form->code,
+            'formVersion' => $target->formTitle !== null ? [
+                'id' => $target->formId,
+                'title' => $target->formTitle,
+                'code' => $target->formCode,
             ] : null,
         ];
     }

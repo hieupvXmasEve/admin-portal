@@ -24,6 +24,7 @@ final class CourseOfferingCockpitController extends Controller
         private readonly GetCourseOfferingCockpitQuery $showQuery,
         private readonly GetCourseOfferingOperationalStateQuery $operationalStateQuery,
         private readonly ListCourseOfferingSurveyFormsQuery $activeSurveyForms,
+        private readonly GetCourseOfferingSurveyQuery $surveyQuery,
     ) {}
 
     public function index(ListCourseOfferingsRequest $request): Response
@@ -59,7 +60,7 @@ final class CourseOfferingCockpitController extends Controller
                 'scores',
             ),
             'surveyData' => Inertia::defer(
-                fn (): ?array => GetCourseOfferingSurveyQuery::handle($data['courseOffering']),
+                fn (): ?array => $this->surveyQuery->handle($data['courseOffering']),
                 'survey',
             ),
         ]);

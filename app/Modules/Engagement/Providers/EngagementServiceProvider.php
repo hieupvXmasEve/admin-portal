@@ -7,7 +7,9 @@ namespace App\Modules\Engagement\Providers;
 use App\Modules\Engagement\Console\ProcessEventCompletions;
 use App\Modules\Engagement\Console\ProcessFailedGoldRewards;
 use App\Modules\Engagement\Console\SendEventReminders;
+use App\Modules\Engagement\Support\EloquentCourseSurveyTargetReader;
 use App\Modules\Engagement\Support\EloquentFormPortalGateReader;
+use App\Shared\Contracts\Engagement\CourseSurveyTargetReader;
 use App\Shared\Contracts\Engagement\FormPortalGateReader;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -17,6 +19,7 @@ final class EngagementServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(FormPortalGateReader::class, EloquentFormPortalGateReader::class);
+        $this->app->bind(CourseSurveyTargetReader::class, EloquentCourseSurveyTargetReader::class);
     }
 
     public function boot(): void
