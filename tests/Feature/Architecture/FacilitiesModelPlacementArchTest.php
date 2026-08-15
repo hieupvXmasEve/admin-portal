@@ -24,10 +24,12 @@ it('keeps Building, Room, RoomBooking, RoomBookingAction inside Facilities modul
     }
 });
 
-it('has deleted the app/Models shim for RoomBooking and RoomBookingAction', function (): void {
+it('has deleted the app/Models shim for Room, RoomBooking and RoomBookingAction', function (): void {
     $workspace = dirname(__DIR__, 3);
 
-    $sweptModels = ['RoomBooking', 'RoomBookingAction'];
+    // Room joined this list once Academic stopped reading rooms directly and
+    // went through App\Shared\Contracts\Facilities\SpaceReferenceReader.
+    $sweptModels = ['Room', 'RoomBooking', 'RoomBookingAction'];
 
     foreach ($sweptModels as $model) {
         $legacyPath = $workspace."/app/Models/{$model}.php";
@@ -36,14 +38,16 @@ it('has deleted the app/Models shim for RoomBooking and RoomBookingAction', func
     }
 });
 
-it('has no real (non-shim) Building/Room model class under app/Models', function (): void {
+it('has no real (non-shim) Building model class under app/Models', function (): void {
     $workspace = dirname(__DIR__, 3);
 
-    // Room and Building stay blocked: an Academic -> Facilities cross-module
-    // read still resolves them through this shim, and rewriting either
-    // caller to the canonical namespace would trip the zero-tolerance
-    // cross_context_concrete_imports boundary rule.
-    $blockedModels = ['Building', 'Room'];
+    // Building stays blocked: App\Modules\Academic\Support\CampusBuildingCountReader
+    // still resolves it through this shim, and rewriting that caller to the
+    // canonical namespace would trip the zero-tolerance
+    // cross_context_concrete_imports boundary rule. Unblocking it means moving
+    // that reader's Eloquent implementation into Facilities, the way Room was
+    // unblocked by SpaceReferenceReader.
+    $blockedModels = ['Building'];
 
     foreach ($blockedModels as $model) {
         $legacyPath = $workspace."/app/Models/{$model}.php";

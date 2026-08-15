@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Modules\Engagement\Models\FormSection;
+use App\Modules\Engagement\Models\FormVersion;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -126,7 +128,7 @@ class Question extends Model
             return false;
         }
 
-        if (!$this->validation_json) {
+        if (! $this->validation_json) {
             return true;
         }
 

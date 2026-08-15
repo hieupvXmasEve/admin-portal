@@ -37,24 +37,28 @@ const ALL_MIGRATED_MODELS = [
 // used as the still-shimmed allow-list; the import regex is built from
 // ALL_MIGRATED_MODELS instead so it never blinds itself (phase 3, D3).
 //
-// 20 of the 30 migrated models have had their app/Models shim swept and
+// 21 of the 30 migrated models have had their app/Models shim swept and
 // deleted already: Merchandise, MerchandiseImage, MerchandiseVariant,
 // RedemptionOrder, RedemptionOrderItem, StockMovement, Club, ClubMember,
 // ClubMemberRoleHistory, Event, EventParticipant, Form,
 // FormResultVisibility, FormSection, FormSurvey, FormVersion,
-// QueryAssignment, QueryTopic, RoomBooking, RoomBookingAction.
-// The remaining 10 (ApplicationDocument, ApplicationDocumentType, Building,
-// FormResponse, FormTarget, GoldTransaction, QueryReply, QueryTicket, Room,
-// UploadRecord) stay shimmed: a still-live cross-module read resolves each
-// through its shim, and rewriting that caller to the canonical namespace
-// would trip the zero-tolerance cross_context_concrete_imports boundary
-// rule — see plan.md "Only 20 of 30 shims can be deleted". Written as a
-// literal (not array_diff) because top-level `const` requires a
+// QueryAssignment, QueryTopic, Room, RoomBooking, RoomBookingAction.
+//
+// Room joined that list once Academic stopped reading rooms directly and
+// went through App\Shared\Contracts\Facilities\SpaceReferenceReader instead.
+// That is the shape the remaining nine need: a shim survives only because a
+// live cross-module read still resolves through it, and rewriting that caller
+// to the canonical namespace would trip the zero-tolerance
+// cross_context_concrete_imports boundary rule. Routing the read through a
+// shared contract removes the blocker; sweeping the import alone just moves
+// the violation into view.
+//
+// Written as a literal (not array_diff) because top-level `const` requires a
 // compile-time constant expression.
 const SHIMMED_MODELS = [
     'ApplicationDocument', 'ApplicationDocumentType', 'Building',
     'FormResponse', 'FormTarget', 'GoldTransaction',
-    'QueryReply', 'QueryTicket', 'Room', 'UploadRecord',
+    'QueryReply', 'QueryTicket', 'UploadRecord',
 ];
 
 // Baseline of files that already reference `App\Models\<shim>`, measured
@@ -68,11 +72,7 @@ const SHIMMED_MODEL_IMPORT_BASELINE = [
     'app/Models/Answer.php',
     'app/Http/Controllers/Api/GoldTransactionController.php',
     'app/Http/Controllers/Api/V1/Admissions/IngestionController.php',
-    'app/Http/Controllers/Web/StudentApplicationController.php',
-    'app/Http/Requests/GenerateClassSessionsRequest.php',
-    'app/Modules/Academic/Delivery/Queries/GetClassSessionFormOptionsQuery.php',
     'app/Modules/Academic/Delivery/Queries/GetCourseOfferingSurveyQuery.php',
-    'app/Modules/Academic/Delivery/Support/LecturerTimetableService.php',
     'app/Modules/Academic/Support/CampusBuildingCountReader.php',
     'app/Modules/Admissions/Actions/UpsertCrmApplicationAction.php',
     'app/Modules/Admissions/Http/Api/IngestionController.php',
@@ -82,45 +82,26 @@ const SHIMMED_MODEL_IMPORT_BASELINE = [
     'app/Modules/Engagement/Models/FormResponse.php',
     'app/Modules/Engagement/Models/QueryReply.php',
     'app/Modules/Upload/Models/UploadRecord.php',
-    'app/Services/AdminScheduleService.php',
     'app/Services/Admissions/ApplicationBackfillService.php',
     'app/Services/Admissions/ApplicationIngestionService.php',
     'app/Services/ApplicationDocumentService.php',
     'app/Services/ApplicationDocumentTypeSyncService.php',
-    'app/Services/DashboardStatsService.php',
     'app/Services/GoldService.php',
-    'database/factories/ClassSessionFactory.php',
-    'database/factories/ExamRoomSlotFactory.php',
     'database/migrations/2026_08_11_021157_backfill_clubmember_shimmed_morph_subject_type.php',
     'database/migrations/2026_08_11_085516_backfill_remaining_shimmed_morph_subject_types.php',
     'database/seeders/InitialSetup/InstitutionSetupSeeder.php',
-    'tests/Feature/Academic/ExamResit/AssignExamResitInvigilatorActionTest.php',
     'tests/Feature/Architecture/EngagementQueryTicketModelPlacementArchTest.php',
     'tests/Feature/Architecture/FacilitiesDeliveryBoundaryArchTest.php',
-    'tests/Feature/Academic/ExamResit/CancelExamResitAttemptActionTest.php',
-    'tests/Feature/Academic/ExamResit/CreateExamResitSessionActionTest.php',
-    'tests/Feature/Academic/ExamResit/CreateExamRoomSlotActionTest.php',
-    'tests/Feature/Academic/ExamResit/ExamScheduleControllerTest.php',
-    'tests/Feature/Academic/ExamResit/ListExamResitAttemptsQueryTest.php',
-    'tests/Feature/Academic/ExamResit/ListExamRoomSlotsQueryTest.php',
-    'tests/Feature/Academic/ExamResit/ScheduleExamResitAttemptActionTest.php',
-    'tests/Feature/Academic/RemediateEgcAttendanceFailuresCommandTest.php',
     'tests/Feature/Academic/StudentLifecycleTimelineQueryTest.php',
     'tests/Feature/Admissions/ApplicationBackfillTest.php',
     'tests/Feature/Admissions/CrmApplicationSyncTest.php',
     'tests/Feature/Admissions/IngestionApplicationsTest.php',
-    'tests/Feature/Api/V1/Lecturer/LecturerInvigilationTimetableTest.php',
     'tests/Feature/Api/V1/Student/EngagementFormsApiTest.php',
     'tests/Feature/Api/V1/Student/QueryTicketApiTest.php',
-    'tests/Feature/Api/V1/Student/StudentExamResitTimetableTest.php',
-    'tests/Feature/CourseOffering/CourseOfferingRosterRouteCutoverTest.php',
-    'tests/Feature/CourseOffering/CourseRosterDeliveryActionTest.php',
     'tests/Feature/Engagement/ClubMemberShimMorphBackfillMigrationTest.php',
     'tests/Feature/Facilities/RoomAvailabilityExamBlockTest.php',
     'tests/Feature/Facilities/RoomBookingExamConflictTest.php',
     'tests/Feature/Facilities/RoomBookingSeriesTest.php',
-    'tests/Feature/Facilities/SpaceReservationContractTest.php',
-    'tests/Feature/Finance/Operations/exam_resit_due_helpers.php',
     'tests/Feature/Form/AdminQueryInboxTest.php',
     'tests/Feature/Form/FormManagementWorkflowTest.php',
     'tests/Feature/Form/QueryTicketWorkflowTest.php',
@@ -180,6 +161,58 @@ it('has no App\Models\<shim> reintroduced by any means once its shim is deleted'
     ));
 
     expect($stillResolvable)->toBe([], "App\\Models\\<Name> must not resolve for a swept model, by class_alias, subclass, or otherwise:\n".implode("\n", $stillResolvable));
+});
+
+it('has no unqualified reference to a swept model from inside the App\Models namespace', function (): void {
+    // Inside the shim namespace a bare `Room::class` resolves to the shim
+    // itself — no import, no fully qualified name, nothing for the textual
+    // scan below to match (that scan reads whole files, so this note avoids
+    // spelling the pattern out). ClassSession and ExamRoomSlot both bound
+    // `belongsTo(Room::class)` that way; deleting the Room shim broke them at
+    // runtime while every textual guard stayed green. The same scan then found
+    // five older relations already broken by phase 4's deletions.
+    //
+    // PHP does not fall back to the global namespace for class names, so only
+    // files declaring the shim namespace can bind a swept model this way.
+    $workspace = dirname(__DIR__, 3);
+    $sweptModels = array_values(array_diff(ALL_MIGRATED_MODELS, SHIMMED_MODELS));
+
+    $offenders = [];
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($workspace.'/app/Models', FilesystemIterator::SKIP_DOTS)
+    );
+
+    foreach ($iterator as $file) {
+        if (! $file->isFile() || $file->getExtension() !== 'php') {
+            continue;
+        }
+
+        $contents = file_get_contents($file->getPathname()) ?: '';
+        if (preg_match('/^namespace\s+App\\\\Models;/m', $contents) !== 1) {
+            continue;
+        }
+
+        $relativePath = ltrim(substr($file->getPathname(), strlen($workspace)), '/');
+
+        foreach ($sweptModels as $model) {
+            // A bare `Model::` or a bare type hint. An aliased import of the
+            // canonical class makes the same token resolve correctly, so a
+            // file that imports it is not an offender.
+            if (preg_match('/(?<![\\\\\w])'.preg_quote($model, '/').'::/', $contents) !== 1) {
+                continue;
+            }
+
+            if (preg_match('/^use\s+App\\\\Modules\\\\[A-Za-z0-9_\\\\]+\\\\'.preg_quote($model, '/').';/m', $contents) === 1) {
+                continue;
+            }
+
+            $offenders[] = $relativePath.' → '.$model;
+        }
+    }
+
+    sort($offenders);
+
+    expect($offenders)->toBe([], "A file in namespace App\\Models references a swept model unqualified, which resolves to the deleted App\\Models\\<Name> at runtime. Import the canonical App\\Modules\\<Owner>\\Models\\<Name> instead:\n".implode("\n", $offenders));
 });
 
 it('has no new caller importing App\Models\<shim> beyond the recorded baseline', function (): void {
