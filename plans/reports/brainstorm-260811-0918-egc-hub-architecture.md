@@ -73,8 +73,40 @@ EGC Hub (Laravel + Vue 3 + Inertia, app mới)
 - Canvas module: `app/Modules/Academic/Delivery/Support/Canvas/` (HttpClient, ApiService, TokenService, sync services) — port gần nguyên.
 - UI components điểm danh/lịch từ `resources/js` — copy chọn lọc.
 
+## Bổ sung chốt 2026-08-13 (đợt 2)
+- Student trên hub: CHỈ tạo qua roster API từ portal. Hub admin không có quyền tạo/sửa danh tính student (portal = master). Student không login hub — bản ghi phục vụ xếp lớp/điểm danh.
+- Hub có 2 role: EGC admin (xếp lớp, lịch, phòng, sync monitor, quản GV) + Lecturer (lớp mình dạy, điểm danh, roster, lịch). Tài khoản GV do EGC admin cấp trên hub.
+- Phòng học: trường đẩy danh mục phòng lên hub (`POST /v1/rooms`, reference data theo school/campus). Hub xếp lịch gán phòng thật, tự check trùng phòng nội bộ hub. Session sync về trường sở hữu phòng kèm room reference (lịch phòng trường thấy bận); trường khác nhận địa điểm text. Conflict check với booking nội bộ trường = v2.
+- Đổi lịch/đổi phòng: thao tác trên hub → webhook `session.updated` → adapter trường bắn notification sẵn có tới student ảnh hưởng. Hub không nhắn student trực tiếp.
+- Các trường CÙNG lịch học kỳ → bỏ gap mapping semester, adapter map block↔semester_id thẳng.
+
+## Bổ sung chốt 2026-08-13
+- Lịch học: hub KHÔNG biết lịch trường, cán bộ tự né trùng giờ. Đồng bộ lịch = tính năng tương lai (non-goal v1).
+- Enrollment lifecycle status qua inbound API: `active | suspended | deferred | withdrawn` + `reason` (vd `unpaid_tuition`). Hub không bao giờ nhận số tiền — chỉ trạng thái đủ điều kiện.
+- Suspend (nợ học phí...): flag trong lớp + chặn điểm danh + deactivate Canvas, GIỮ lịch sử attendance/điểm. Không hard-delete. Loại hẳn khỏi lớp = thao tác tay của cán bộ EGC sau khi thấy flag.
+- Kỹ thuật bắt buộc trong plan: sandbox hub + API docs công khai cho bên thứ 3; audit log mọi thao tác ảnh hưởng điểm/điểm danh/xếp lớp; Canvas bulk pull phân trang + throttle; cutover backfill block đang học dở + giai đoạn song song Excel.
+
 ## Chưa chốt (giải quyết khi plan)
 1. Thứ tự rollout: pilot trường nào trước, chạy song song Excel bao lâu.
 2. Chi tiết webhook retry/signature (HMAC?), rate limit per client.
 3. Hub hosting/domain, CI/CD (tái dùng pattern Docker + dev.sh).
-4. Lịch học conflict với lịch chính khóa của trường: hub có cần biết lịch trường để tránh trùng giờ không, hay cán bộ tự né? (nghiệp vụ, hỏi user khi plan)
+4. PII cross-school chung 1 DB hub: cần thỏa thuận chia sẻ dữ liệu (pháp lý, ngoài code).
+
+## Gap triage 2026-08-13 — scope v1 bổ sung
+Bắt buộc v1:
+1. Finalize block: quyền `finalize-block` (permission đơn cấp, không cần 2-tier approve) → review → finalize → mới bắn `block.completed`. Trước finalize, điểm không chảy về trường ở mức block result.
+2. Buổi nghỉ/học bù/dạy thay: cancel session, tạo session bù, gán GV thay per buổi (ảnh hưởng export giờ dạy) → bắn `session.updated`.
+3. Attendance status: `present | absent | late | excused`. CHỐT: excused vẫn TÍNH LÀ NGHỈ trong attendance_rate — chỉ là note để GV đánh giá thái độ học tập. Payload sync xuống mang status đầy đủ.
+4. Event log + replay: `GET /v1/events?since=` cho consumer kéo bù sau downtime dài.
+5. Đối soát định kỳ: job đêm so count/checksum hub vs từng trường, lệch → alert trên monitor.
+6. Capacity per lớp + cảnh báo đầy (waitlist = v2).
+7. Chuyển lớp giữa block, lịch sử attendance đi theo student.
+8. Canvas provision GV (role Teacher) bên cạnh student.
+9. Báo cáo EGC org (pass rate/attendance theo trường-level-GV) + export Excel mọi danh sách.
+
+Bỏ qua v1 (user không veto): xếp lớp tự động, student chuyển trường link hồ sơ, khóa sổ điểm danh theo thời gian, workflow phúc khảo riêng (re-sync cover).
+
+## Bổ sung chốt 2026-08-13 (đợt 3)
+- Giờ dạy GV: hub track + audit export tách riêng trên hub. KHÔNG đẩy về trường, không quan tâm ai trả lương (ngoài scope).
+- Stack hub chốt: PHP 8.3+/Laravel 12, MySQL 8, Redis queue + Horizon (kiêm sync monitor), Vue 3 + Inertia, Pest, Docker + dev.sh pattern.
+- API auth chốt: Sanctum static API key, MỖI TRƯỜNG 1 KEY RIÊNG (không key chung) — hash trong DB, 2 key active/trường để rotate không downtime, track last_used_at. Consumer = tập đóng server-to-server TLS nên bỏ Passport OAuth2 (YAGNI, tránh bắt bên thứ 3 code token-refresh loop); cân nhắc lại chỉ khi mở API cho integrator lạ. Tải sync (~chục nghìn job/tuần, I/O-bound) << năng lực Laravel queue; nghẽn thật = Canvas rate limit + contract design, không phụ thuộc framework. Tính năng tương lai cần throughput đặc thù → sidecar service qua public API, không đập hub.
