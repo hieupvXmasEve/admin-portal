@@ -286,17 +286,16 @@ class User extends UserAuditableModel
     }
 
     /**
-     * Get children (students) for this parent user via ParentProfile and parent_student pivot
+     * Get children (students) for this parent user via active Guardian access grants
      */
     public function children()
     {
-        // Access students through the parent_student pivot table
         if ($this->parentProfile) {
             return $this->parentProfile->students();
         }
 
         // Return empty relationship if no parent profile exists
-        return $this->belongsToMany(Student::class, 'parent_student', 'parent_id', 'student_id')
+        return $this->belongsToMany(Student::class, 'guardian_access_grants', 'parent_id', 'student_id')
             ->whereRaw('1 = 0'); // Always return empty
     }
 

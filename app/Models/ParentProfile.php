@@ -31,12 +31,13 @@ class ParentProfile extends Model
     }
 
     /**
-     * The students that belong to the parent.
+     * The students the parent has an active Guardian access grant for.
      */
     public function students(): BelongsToMany
     {
-        return $this->belongsToMany(Student::class, 'parent_student', 'parent_id', 'student_id')
-            ->withPivot(['relationship', 'is_primary', 'access_level'])
+        return $this->belongsToMany(Student::class, 'guardian_access_grants', 'parent_id', 'student_id')
+            ->wherePivot('status', 'active')
+            ->withPivot(['status', 'access_level'])
             ->withTimestamps();
     }
 }

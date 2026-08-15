@@ -6,6 +6,7 @@ use App\Models\ParentProfile;
 use App\Models\User;
 use App\Shared\Support\Enums\UserType;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 
 class CleanupParentDataCommand extends Command
 {
@@ -59,17 +60,23 @@ class CleanupParentDataCommand extends Command
         foreach ($invalidProfiles as $profile) {
             $this->warn("Found Case 1: ParentProfile ID {$profile->id} linked to student User: {$profile->user->email}");
 
-            if (!$dryRun) {
-                // Check if it's linked to students
-                $students = $profile->students;
-                $studentCount = $students->count();
+            if (! $dryRun) {
+                DB::transaction(function () use ($profile): void {
+                    // Guardian relationship rows (Registry-owned) are left intact —
+                    // they describe the person, not the portal grant, and stay
+                    // valid even without an access grant behind them.
+                    $grantCount = DB::table('guardian_access_grants')->where('parent_id', $profile->id)->count();
 
-                if ($studentCount > 0) {
-                    $this->info("Detaching {$studentCount} students from ParentProfile ID {$profile->id}");
-                    $profile->students()->detach();
-                }
+                    if ($grantCount > 0) {
+                        $this->info("Detaching {$grantCount} students from ParentProfile ID {$profile->id}");
+                        DB::table('guardian_access_grants')->where('parent_id', $profile->id)->delete();
+                    }
 
-                $profile->delete();
+                    // Legacy pivot hygiene: clear any remaining row even if no grant exists.
+                    DB::table('parent_student')->where('parent_id', $profile->id)->delete();
+
+                    $profile->delete();
+                });
                 $this->info("Deleted ParentProfile ID {$profile->id}");
             }
         }
@@ -94,7 +101,7 @@ class CleanupParentDataCommand extends Command
         foreach ($usersWithoutProfile as $user) {
             $this->warn("Found Case 2: User ID {$user->id} ({$user->email}) has type 'parent' but no ParentProfile.");
 
-            if (!$dryRun) {
+            if (! $dryRun) {
                 ParentProfile::create([
                     'user_id' => $user->id,
                     'full_name' => $user->name,

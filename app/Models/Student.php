@@ -54,7 +54,9 @@ class Student extends StudentAuditableModel
         'dropout_transfer',
         'graduated',
         'pending',
-        // 'admission_deferred',
+        'suspended',
+        'admission_deferred',
+        'pending_course_opening',
     ];
 
     /**
@@ -244,17 +246,10 @@ class Student extends StudentAuditableModel
 
     public function parentProfiles(): BelongsToMany
     {
-        return $this->belongsToMany(ParentProfile::class, 'parent_student', 'student_id', 'parent_id')
-            ->withPivot(['relationship', 'is_primary', 'access_level'])
+        return $this->belongsToMany(ParentProfile::class, 'guardian_access_grants', 'student_id', 'parent_id')
+            ->wherePivot('status', 'active')
+            ->withPivot(['status', 'access_level'])
             ->withTimestamps();
-    }
-
-    /**
-     * Get the primary parent profile for this student
-     */
-    public function primaryParentProfile(): ?ParentProfile
-    {
-        return $this->parentProfiles()->wherePivot('is_primary', true)->first();
     }
 
     public function program(): BelongsTo
