@@ -4,52 +4,34 @@ declare(strict_types=1);
 
 namespace App\Modules\Identity\Actions;
 
-use App\Models\User;
+use App\Modules\Identity\Support\LoginPipeline;
 use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
-use Exception;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Auth\AuthenticationException;
 
 class StudentLoginAction
 {
     /**
-     * @throws Exception
+     * @throws AuthenticationException
      */
     public static function run(array $data, string $ip): array
     {
         $key = 'login:'.$ip;
+        LoginPipeline::checkRateLimit($key);
 
-        // Check rate limiting
-        if (RateLimiter::tooManyAttempts($key, 5)) {
-            $seconds = RateLimiter::availableIn($key);
-            throw new Exception("Too many login attempts. Try again in {$seconds} seconds.");
-        }
+        $user = LoginPipeline::authenticateByPassword($data['email'], $data['password'], $key);
+        LoginPipeline::verifyAccountActive($user);
 
-        // 1. Find User by email (Single Source of Truth)
-        $user = User::where('email', $data['email'])->first();
-
-        if (! $user || ! Hash::check($data['password'], $user->password)) {
-            RateLimiter::hit($key, 900);
-            throw new Exception('Invalid credentials');
-        }
-
-        // 2. Verify User is active
-        if (! $user->isActive()) {
-            throw new Exception('Account is not active. Please contact administration.');
-        }
-
-        // 3. Retrieve Associated Student Profile
         $student = $user->student;
 
         if (! $student) {
-            throw new Exception('This account is not associated with a student profile.');
+            throw new AuthenticationException('This account is not associated with a student profile.');
         }
 
         $lifecycleStatus = app(ProgramEnrollmentReader::class)
             ->forStudentId((int) $student->id)
             ->legacyCompatibleStatus();
 
-        // 4. Check for blocking academic holds. Authentication itself is
+        // Check for blocking academic holds. Authentication itself is
         // controlled by Account Status, independently of enrollment lifecycle.
         $blockingHolds = $student->academicHolds()
             ->where('status', 'active')
@@ -57,11 +39,10 @@ class StudentLoginAction
             ->exists();
 
         if ($blockingHolds) {
-            throw new Exception('Account access is restricted due to academic holds.');
+            throw new AuthenticationException('Account access is restricted due to academic holds.');
         }
 
-        RateLimiter::clear($key);
-
+        LoginPipeline::clearRateLimit($key);
         $user->update(['last_login_at' => now()]);
 
         $deviceName = $data['device_name'] ?? 'Student Portal';

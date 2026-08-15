@@ -106,28 +106,7 @@ class ParentStudentAccess
      */
     protected function isStudentAccessible(Student $student): bool
     {
-        // Use the Model's logic for consistency
-        if (! $student->isActive()) {
-            return false;
-        }
-
-        // Specific allowed statuses for parents (may include 'pending' or 'intake' types)
-        $allowedStatuses = [
-            'active',
-            'enrolled',
-            'intake_pre_uni_gc',
-            'intake_pre_uni',
-            'intake',
-            'pre_uni',
-            'intake_course',
-            'deferred',
-        ];
-
-        if (! in_array($student->status, $allowedStatuses)) {
-            return false;
-        }
-
-        return true;
+        return $student->isActive();
     }
 
     /**

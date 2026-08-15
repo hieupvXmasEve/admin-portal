@@ -102,6 +102,10 @@ class LecturerAuthController extends Controller
                 message: 'Token refreshed successfully'
             );
         } catch (\Exception $e) {
+            if ($e instanceof AuthenticationException) {
+                return ApiResponse::authenticationError($e->getMessage());
+            }
+
             return ApiResponse::serverError($e->getMessage());
         }
     }
@@ -162,6 +166,9 @@ class LecturerAuthController extends Controller
                 message: 'Google login successful'
             );
         } catch (\Exception $e) {
+            if ($e instanceof AuthenticationException) {
+                return ApiResponse::authenticationError($e->getMessage());
+            }
             if ($e instanceof ValidationException) {
                 throw $e;
             }
