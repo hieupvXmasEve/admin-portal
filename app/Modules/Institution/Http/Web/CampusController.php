@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Modules\Institution\Actions\CreateCampusAction;
 use App\Modules\Institution\Actions\UpdateCampusAction;
 use App\Modules\Institution\Http\Requests\Campus\ListCampusRequest;
+use App\Modules\Institution\Http\Requests\Campus\ShowCampusRequest;
 use App\Modules\Institution\Http\Requests\Campus\StoreCampusRequest;
 use App\Modules\Institution\Http\Requests\Campus\UpdateCampusRequest;
 use App\Modules\Institution\Queries\GetCampusQuery;
@@ -43,6 +44,17 @@ class CampusController extends Controller
         Inertia::flash('message', 'Campus created successfully.');
 
         return back();
+    }
+
+    public function show(ShowCampusRequest $request, int|string $campus): Response
+    {
+        $detail = $this->campuses->forShow($campus, $request->validated());
+
+        return Inertia::render('Campuses/Show', [
+            'campus' => $detail['campus'],
+            'buildings' => $detail['buildings'],
+            'filters' => $request->only(['search', 'sort', 'direction', 'per_page']),
+        ]);
     }
 
     public function edit(int|string $campus): Response

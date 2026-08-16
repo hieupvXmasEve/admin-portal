@@ -7,6 +7,7 @@ namespace App\Modules\Academic\Catalog\Http\Web;
 use App\Constants\ProgramRoutes;
 use App\Constants\SpecializationRoutes;
 use App\Http\Controllers\Controller;
+use App\Http\Responses\ApiResponse;
 use App\Models\CurriculumVersion;
 use App\Models\Program;
 use App\Models\Semester;
@@ -17,6 +18,7 @@ use App\Modules\Academic\Catalog\Http\Requests\StoreSpecializationRequest;
 use App\Modules\Academic\Catalog\Http\Requests\UpdateSpecializationCurriculumVersionRequest;
 use App\Modules\Academic\Catalog\Http\Requests\UpdateSpecializationRequest;
 use App\Services\SpecializationService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -232,7 +234,7 @@ class SpecializationController extends Controller
         }
     }
 
-    public function apiDestroy(Specialization $specialization)
+    public function apiDestroy(Specialization $specialization): JsonResponse
     {
         try {
             DB::beginTransaction();
@@ -242,22 +244,16 @@ class SpecializationController extends Controller
 
             DB::commit();
 
-            return response()->json([
-                'success' => true,
-                'message' => "Specialization '{$specializationName}' deleted successfully.",
-            ]);
+            return ApiResponse::success(message: "Specialization '{$specializationName}' deleted successfully.");
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Specialization API deletion failed: '.$e->getMessage());
 
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 500);
+            return ApiResponse::error($e->getMessage(), status: 500);
         }
     }
 
-    public function bulkDelete(BulkDeleteSpecializationsRequest $request)
+    public function bulkDelete(BulkDeleteSpecializationsRequest $request): JsonResponse
     {
         $validated = $request->validated();
 
@@ -268,7 +264,9 @@ class SpecializationController extends Controller
 
             DB::commit();
 
-            return response()->json([
+            // ApiResponse::compatible(): the flat deleted/failed envelope is pinned
+            // by SpecializationManagementTest's raw-envelope characterization test.
+            return ApiResponse::compatible([
                 'success' => true,
                 'deleted' => $result['deleted'],
                 'failed' => $result['failed'],
@@ -277,14 +275,14 @@ class SpecializationController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
 
-            return response()->json([
+            return ApiResponse::compatible([
                 'success' => false,
                 'message' => 'Bulk delete failed: '.$e->getMessage(),
             ], 500);
         }
     }
 
-    public function apiUpdateCurriculumVersion(UpdateSpecializationCurriculumVersionRequest $request, $curriculumVersionId)
+    public function apiUpdateCurriculumVersion(UpdateSpecializationCurriculumVersionRequest $request, $curriculumVersionId): JsonResponse
     {
         $validated = $request->validated();
 
@@ -294,10 +292,7 @@ class SpecializationController extends Controller
             // Check if curriculum version belongs to this specialization context
             $specializationId = $request->route('specialization');
             if ($specializationId && $curriculumVersion->specialization_id != $specializationId) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Curriculum version does not belong to this specialization.',
-                ], 403);
+                return ApiResponse::error('Curriculum version does not belong to this specialization.', status: 403);
             }
 
             DB::beginTransaction();
@@ -310,19 +305,12 @@ class SpecializationController extends Controller
 
             DB::commit();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Curriculum version updated successfully.',
-                'data' => $curriculumVersion->fresh(),
-            ]);
+            return ApiResponse::success($curriculumVersion->fresh(), message: 'Curriculum version updated successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Curriculum version update failed: '.$e->getMessage());
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update curriculum version. Please try again.',
-            ], 500);
+            return ApiResponse::error('Failed to update curriculum version. Please try again.', status: 500);
         }
     }
 }

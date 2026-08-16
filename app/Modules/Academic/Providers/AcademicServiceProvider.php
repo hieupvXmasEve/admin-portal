@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Academic\Providers;
 
-use App\Models\CourseRegistration;
 use App\Modules\Academic\Actions\CompleteFinanceCancellationOperationAction;
 use App\Modules\Academic\Catalog\Queries\GetStudentDirectoryFormOptionsQuery;
 use App\Modules\Academic\Catalog\Support\EloquentAdmissionsIntentReader;
@@ -17,8 +16,8 @@ use App\Modules\Academic\Delivery\Actions\CommitCourseResultsAndTranscriptEntrie
 use App\Modules\Academic\Delivery\Actions\MarkCourseOfferingCompletedAction;
 use App\Modules\Academic\Delivery\Actions\SyncPaidExamResitAttemptsAction;
 use App\Modules\Academic\Delivery\Actions\SyncPaidRetakeRegistrationsAction;
-use App\Modules\Academic\Delivery\Observers\CourseRegistrationObserver;
 use App\Modules\Academic\Delivery\Support\AssessmentGradeExcelService;
+use App\Modules\Academic\Delivery\Support\CourseRegistrationObserverRegistrar;
 use App\Modules\Academic\Delivery\Support\DeliveryAssessmentDefinitionWriter;
 use App\Modules\Academic\Delivery\Support\DeliveryInstructorAssignmentWriter;
 use App\Modules\Academic\Delivery\Support\EloquentAcademicSpaceOccupancyReader;
@@ -184,7 +183,7 @@ class AcademicServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        CourseRegistration::observe(CourseRegistrationObserver::class);
+        app(CourseRegistrationObserverRegistrar::class)->register();
 
         Route::middleware('web')
             ->group(__DIR__.'/../routes/web.php');

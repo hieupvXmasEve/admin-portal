@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Http\Requests;
 
 use App\Enums\StudentActionType;
-use App\Models\StudentActionLog;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -18,7 +17,6 @@ class UpdateStudentActionRequest extends FormRequest
 
     public function rules(): array
     {
-        /** @var StudentActionLog $actionLog */
         $actionLog = $this->route('actionLog');
         $actionType = $actionLog->action_type;
 
@@ -50,7 +48,6 @@ class UpdateStudentActionRequest extends FormRequest
 
     protected function deferRules(): array
     {
-        /** @var StudentActionLog $actionLog */
         $actionLog = $this->route('actionLog');
         $isEgcDefer = $actionLog->previous_status === 'intake_pre_uni_gc'
             || $actionLog->egc_defer_from_block_number !== null;

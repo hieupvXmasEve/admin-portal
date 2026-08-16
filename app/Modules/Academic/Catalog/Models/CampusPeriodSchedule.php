@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Academic\Catalog\Models;
 
-use App\Models\Campus;
 use App\Models\Semester;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -28,11 +27,6 @@ class CampusPeriodSchedule extends Model
         'registration_start_date' => 'immutable_date:Y-m-d',
         'registration_end_date' => 'immutable_date:Y-m-d',
     ];
-
-    public function campus(): BelongsTo
-    {
-        return $this->belongsTo(Campus::class);
-    }
 
     public function academicPeriod(): BelongsTo
     {

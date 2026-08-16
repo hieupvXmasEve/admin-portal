@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Delivery\Http\Api\Lecturer;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\Lecturer\StudentBulkActionRequest;
 use App\Http\Requests\Api\V1\Lecturer\StudentFilterRequest;
 use App\Http\Requests\Api\V1\Lecturer\StudentNoteRequest;
 use App\Http\Resources\Api\V1\Lecturer\StudentDetailResource;
@@ -256,18 +257,13 @@ class StudentController extends Controller
     /**
      * Bulk actions on students
      */
-    public function bulkActions(Request $request): JsonResponse
+    public function bulkActions(StudentBulkActionRequest $request): JsonResponse
     {
         /** @var LecturerTeachingActor $lecturer */
         $lecturer = $request->user();
 
         try {
-            $validated = $request->validate([
-                'action' => 'required|string|in:add_note,send_notification,mark_for_follow_up',
-                'student_ids' => 'required|array|min:1|max:50',
-                'student_ids.*' => 'integer',
-                'data' => 'required|array',
-            ]);
+            $validated = $request->validated();
 
             $results = [];
             $successCount = 0;
@@ -304,7 +300,7 @@ class StudentController extends Controller
                 'successful_actions' => $successCount,
                 'failed_actions' => $errorCount,
                 'results' => $results,
-            ], 'Bulk action completed');
+            ], message: 'Bulk action completed');
         } catch (\Exception $e) {
             return ApiResponse::serverError('Failed to process bulk actions');
         }

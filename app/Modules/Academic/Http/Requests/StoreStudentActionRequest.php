@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Http\Requests;
 
 use App\Enums\StudentActionType;
-use App\Models\Semester;
+use App\Modules\Academic\Catalog\Queries\GetSemesterFilterOptionsQuery;
 use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use App\Shared\Contracts\Academic\StudentLifecycleCourseRegistrationGateway;
@@ -229,7 +229,7 @@ class StoreStudentActionRequest extends FormRequest
                     return;
                 }
 
-                $selectedSemester = Semester::query()->find($value);
+                $selectedSemester = app(GetSemesterFilterOptionsQuery::class)->find((int) $value);
                 if ($selectedSemester === null) {
                     return;
                 }

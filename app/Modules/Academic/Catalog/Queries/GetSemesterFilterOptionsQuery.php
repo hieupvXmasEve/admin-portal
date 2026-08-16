@@ -43,4 +43,13 @@ class GetSemesterFilterOptionsQuery
             ->orderBy('start_date', 'desc')
             ->get(['id', 'name', 'code']);
     }
+
+    /**
+     * Single-record lookup through the same Catalog-owned seam, for
+     * non-Catalog consumers that need a full `Semester` by id.
+     */
+    public function find(int $semesterId): ?Semester
+    {
+        return Semester::find($semesterId);
+    }
 }

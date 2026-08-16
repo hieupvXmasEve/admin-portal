@@ -713,6 +713,71 @@ controllers/services/routes and frontend debt with each migrated workflow.
      model its own context owns.
      The `course-attendance` defect found in the previous slice is recorded in
      the plan index under Deferred defects, at the user's direction.
+   - [x] Remaining `direct_json_responses`/`inline_request_validation` mechanical
+     cleanup, 2026-08-16. `Catalog/Http/Web/SpecializationController` moved
+     `apiDestroy`/`apiUpdateCurriculumVersion` to `ApiResponse::success()`/`error()`
+     (test-verified compatible: both only assert `success`/`message`/`data.*`).
+     `bulkDelete` kept its flat `deleted`/`failed` envelope via
+     `ApiResponse::compatible()`, documented inline, because
+     `SpecializationManagementTest` pins that exact raw shape and the frontend
+     caller never parses the response body. `Delivery/Http/Api/Lecturer/StudentController::bulkActions`
+     and `TimetableController::cancelSession`/`bulkUpdateSessions` moved inline
+     `$request->validate()` to three new FormRequests
+     (`StudentBulkActionRequest`, `CancelSessionRequest`, `BulkUpdateSessionsRequest`)
+     under `App\Http\Requests\Api\V1\Lecturer`, matching the existing sibling
+     FormRequests in that namespace. Added first-time characterization coverage
+     (`tests/Feature/Api/V1/Lecturer/LecturerBulkAndSessionActionsFormRequestTest.php`)
+     since none of the three endpoints had a test before. Coverage exposed a
+     pre-existing bug unrelated to the extraction: `bulkActions` passed its
+     message string positionally as `ApiResponse::success()`'s `$meta` array
+     argument, 500ing on every call; fixed to a named `message:` argument.
+     Ratchet: `direct_json_responses` 21 -> 20, `inline_request_validation` 40 -> 38.
+   - [x] Remaining `shared_model_imports` one-offs, 2026-08-16 (8 findings across
+     8 files, all in generic `Academic/*` dirs not owned by any submodule):
+     - `Catalog/Models/CampusPeriodSchedule`: deleted an unused `campus()`
+       belongsTo (no caller anywhere; every consumer already filters by
+       `campus_id` directly). Dead code, not a seam.
+     - `Providers/AcademicServiceProvider`: its one `CourseRegistration::observe()`
+       call moved into a new `Delivery/Support/CourseRegistrationObserverRegistrar`,
+       since Delivery already owns that model. The provider now only calls the
+       registrar — it stays the single cross-cutting provider for the whole
+       Academic module (one provider per top-level module in
+       `bootstrap/providers.php`) without importing a model it doesn't own.
+       Rejected an `OWNED_SHARED_MODELS` allowlist grant for this first — that's
+       exactly the "allowlist increase to hide findings" the plan's non-goals
+       forbid; reverted once the registrar seam proved it wasn't needed.
+     - `Queries/GetCampusDetailQuery` + `Http/Web/CampusDetailController` +
+       `Http/Requests/Campus/ShowCampusRequest`: this whole slice was Institution's
+       domain wearing an Academic path — pure Campus/Building read, no Academic
+       model or logic anywhere. Moved into `Institution/Http/Web/CampusController::show`
+       (a `forShow()` method added next to the existing `forEdit()` on
+       `Institution/Queries/GetCampusQuery`), same route name `campuses.show` and
+       `can:view_campus` gate preserved. Route re-registered after `edit`/`update`
+       in `Institution/routes/web.php`, not before `create` — a `{campus}` wildcard
+       ahead of the literal `/create` segment would have swallowed it. First-time
+       coverage added to `InstitutionBoundaryTest`'s existing campus-URL-parity test.
+     - `Http/Web/StudentCompletedUnitsController` (3 findings: `Campus`, `Program`,
+       `Semester`): all three were `::find($id)?->name` label lookups for the
+       export filename, not queries. Routed through contracts already injected
+       or available — `CampusReferenceReader`, `ProgramReferenceReader` (added to
+       `export()`'s params), and a new `find()` method on the already-injected
+       `Catalog/Queries/GetSemesterFilterOptionsQuery` (its docblock already
+       stated the seam's purpose: "so consumers reach Semester through a
+       Catalog-owned seam instead of importing the shared model directly").
+     - `Http/Requests/StoreStudentActionRequest`: its one `Semester::query()->find()`
+       (inside the from-semester-not-before-active-semester rule) now goes through
+       the same new `GetSemesterFilterOptionsQuery::find()` seam.
+     - `Http/Requests/UpdateStudentActionRequest`: its `use App\Models\StudentActionLog`
+       was docblock-only (`@var StudentActionLog $actionLog` on a route-bound
+       value, no runtime use). Pint's `fully_qualified_strict_types` fixer
+       reintroduces the import for any FQCN reference in a docblock, including a
+       leading-backslash one — tried that first, watched Pint revert it — so the
+       fix is dropping the annotation, not qualifying it.
+     Ratchet: `shared_model_imports` 398 -> 379. Only 8 of those 19 are this
+     slice; the other 11 were already earned by the `DeferCase`/`DeferCaseItem`
+     move in `c78b66f6e`, which shipped without lowering its own baseline. Caught
+     here by re-measuring instead of trusting the previous run, and re-pinned in
+     the same change, so every rule sits at its ceiling again.
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
    - [x] Ratchet tighten: earlier slices lowered the frozen-* ceilings per
      move but left incidental headroom on the other rules. Re-pinned every
@@ -731,37 +796,35 @@ controllers/services/routes and frontend debt with each migrated workflow.
 
 ## Remaining Scope
 
-Measured 2026-07-28 from `migration-debt:inventory --format=json`, filtered to
-work packages tagged `phase-04:academic`, after the retake-registration pass.
-Route retirement is complete: Academic owns zero frozen routes and zero frozen
-controllers.
+Re-measured 2026-08-16 from `migration-debt:inventory --format=json`, filtered to
+work packages tagged `phase-04`. Route retirement is complete: Academic owns zero
+frozen routes and zero frozen controllers.
 
-| Rule | Count | Concentration |
-|---|---|---|
-| `shared_model_imports` | 53 | 26 in unassigned generic dirs, 26 Delivery, 1 Catalog |
-| `inline_request_validation` | 2 | `Delivery/Http/Api/Lecturer/{Student,Timetable}Controller` |
-| `direct_json_responses` | 1 | `Catalog/Http/Web/SpecializationController` |
+| Rule | 2026-07-28 | 2026-08-16 (session start) | 2026-08-16 (after this slice) | Concentration at the July measurement |
+|---|---:|---:|---:|---|
+| `shared_model_imports` | 53 | 55 | 47 | 26 in unassigned generic dirs, 26 Delivery, 1 Catalog |
+| `inline_request_validation` | 2 | 2 | 0 | `Delivery/Http/Api/Lecturer/{Student,Timetable}Controller` — cleared |
+| `direct_json_responses` | 1 | 1 | 0 | `Catalog/Http/Web/SpecializationController` — cleared |
+
+Total 47 remaining (was 58 at session start; 55 after the mechanical slice; 47
+after the one-off slice). The cluster analysis below is from July and still
+describes the shape of the remainder; re-derive exact paths before starting a
+slice.
 
 Requirement 1 (assign every generic Academic class to one logical context) is the
-dominant remainder. The unassigned findings sit in `Academic/Support` (16),
-`Academic/Http/Requests` (2), `Academic/Actions` (2), `Academic/Queries` (1),
-and `Providers` (1).
+dominant remainder. What was unassigned now reduces to two clusters that both
+need an architecture decision rather than a move — all 8 one-off findings that
+didn't need one are cleared (see step 5 above):
 
-No coherent vertical remains. The 27 unassigned findings are two clusters plus
-one-offs, and both clusters need an architecture decision rather than a move:
-
-- **Finance charge/obligation gateway** (10): `AcademicFinanceChargeSourceGateway`
-  (6), `AcademicFinanceObligationSource` (2), `AcademicObligationSettlement` (2),
+- **Finance charge/obligation gateway** (12 at the 2026-08-16 live measurement,
+  10 at the July measurement): `AcademicFinanceChargeSourceGateway` (6),
+  `AcademicFinanceObligationSource` (2), `AcademicObligationSettlement` (2),
   plus `CompleteFinanceCancellationOperationAction` (2). This is the
   Academic-Finance boundary and is governed by ADR-0026.
 - **AI academic readers** (9): `AiAcademicStudentProfileReader` (5) and
   `AiAcademicEntitySearchReader` (4). Both read across Catalog, Delivery, and
   Progression, so they belong to no single submodule; the likely answer is a
   contract rather than an owner.
-
-The remaining 8 are one-offs: the two student-action FormRequests, the
-Academic service provider, `GetCampusDetailQuery`, `CampusBuildingCountReader`,
-and `FailureReasonClassifier`.
 
 The larger remaining block is not unassigned at all: 26 shared imports sit
 inside Delivery. `Student` is down to 6 files: `LecturerStudentService`,
@@ -774,13 +837,14 @@ dependencies (`instanceof`, return types) that need DTOs rather than a
 different call.
 
 Explicitly not phase-04 scope, tagged to later phases by the scanner:
-`AcademicRecordGenerationServiceOptimized` (frozen service) and
-`routes/api/v1/lecturer.php` (frozen route) belong to phase 9; the 18
-`literal_frontend_urls` and 8 `legacy_filter_stacks` under Academic-adjacent
-page owners belong to phase 8; 4 migration commands belong to phase 10; and the
-shared-model imports plus inline validation now inside `Academic/Progression`
-re-tag to phase 5, which is why phase-04's counts drop faster than the global
-ratchet does.
+`AcademicRecordGenerationServiceOptimized` (frozen service) belongs to phase 9;
+`routes/api/v1/lecturer.php` carries a live portal workflow and was retagged from
+phase 9 to phase 5 on 2026-08-16; the `literal_frontend_urls` and
+`legacy_filter_stacks` under Academic-adjacent page owners belong to phase 8
+(18 and 8 respectively at the July measurement, against phase-8 totals of 40 and
+24 on 2026-08-16); 4 migration commands belong to phase 10; and the shared-model
+imports plus inline validation now inside `Academic/Progression` re-tag to
+phase 5, which is why phase-04's counts drop faster than the global ratchet does.
 
 ## Test Scenario Matrix
 

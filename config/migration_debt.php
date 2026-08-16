@@ -69,7 +69,7 @@ return [
             'reason' => 'Module consumers still use transitional shared Eloquent models.',
             'canonical_replacement' => 'Shared Contract, neutral reference, Domain Event, or Read Projection.',
             'retirement_condition' => 'The consumer is cut over and the shared-model read is removed.',
-            'baseline' => 398,
+            'baseline' => 379,
             'mode' => 'max',
         ],
         'cross_context_concrete_imports' => [
@@ -85,7 +85,7 @@ return [
             'reason' => 'Legacy JSON response sites remain while API envelopes are migrated.',
             'canonical_replacement' => 'ApiResponse::success(), error(), paginated(), or validationError().',
             'retirement_condition' => 'The endpoint uses the canonical envelope and its contract test passes.',
-            'baseline' => 21,
+            'baseline' => 20,
             'mode' => 'max',
         ],
         'inline_request_validation' => [
@@ -93,7 +93,7 @@ return [
             'reason' => 'Legacy controllers still validate inline during staged extraction.',
             'canonical_replacement' => 'A typed FormRequest owned by the endpoint context.',
             'retirement_condition' => 'The controller delegates validation to the FormRequest.',
-            'baseline' => 40,
+            'baseline' => 38,
             'mode' => 'max',
         ],
         'missing_strict_types' => [

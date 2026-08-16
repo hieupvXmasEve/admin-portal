@@ -24,6 +24,9 @@ Route::middleware(['web', 'auth', 'verified', 'campus.selected'])->group(functio
         Route::put('/{campus}', [CampusController::class, 'update'])
             ->middleware('can:edit_campus')
             ->name('update');
+        Route::get('/{campus}', [CampusController::class, 'show'])
+            ->middleware('can:view_campus')
+            ->name('show');
     });
 
     Route::prefix('admin/departments')->name('admin.departments.')->group(function (): void {

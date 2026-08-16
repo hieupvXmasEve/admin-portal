@@ -40,7 +40,6 @@ use App\Modules\Academic\Delivery\Http\Web\RecordClassSessionAttendanceControlle
 use App\Modules\Academic\Delivery\Http\Web\RetakeCourseRegistrationController;
 use App\Modules\Academic\Delivery\Http\Web\UnitStatisticsController;
 use App\Modules\Academic\Http\Web\AcademicReportController;
-use App\Modules\Academic\Http\Web\CampusDetailController;
 use App\Modules\Academic\Http\Web\CourseRankingController;
 use App\Modules\Academic\Http\Web\GpaManagementController;
 use App\Modules\Academic\Http\Web\StudentCompletedUnitsController;
@@ -324,10 +323,6 @@ Route::middleware(['auth', 'verified', 'campus.selected'])->group(function () {
             ->middleware('can:edit_course_offering')
             ->name(CourseOfferingRoutes::API_CHANGE_ROOM);
     });
-
-    Route::get('campuses/{campus}', [CampusDetailController::class, 'show'])
-        ->middleware('can:view_campus')
-        ->name('campuses.show');
 
     // Student Academic Summary routes
     Route::prefix('students/{student}/academic-summary')->group(function () {

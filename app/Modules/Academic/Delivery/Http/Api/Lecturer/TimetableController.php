@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Delivery\Http\Api\Lecturer;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\Lecturer\BulkUpdateSessionsRequest;
+use App\Http\Requests\Api\V1\Lecturer\CancelSessionRequest;
 use App\Http\Requests\Api\V1\Lecturer\CreateSessionRequest;
 use App\Http\Requests\Api\V1\Lecturer\ScheduleFilterRequest;
 use App\Http\Requests\Api\V1\Lecturer\TimetableFilterRequest;
@@ -173,15 +175,13 @@ class TimetableController extends Controller
     /**
      * Cancel a session
      */
-    public function cancelSession(Request $request, int $sessionId): JsonResponse
+    public function cancelSession(CancelSessionRequest $request, int $sessionId): JsonResponse
     {
         /** @var LecturerTeachingActor $lecturer */
         $lecturer = $request->user();
 
         try {
-            $validated = $request->validate([
-                'reason' => 'nullable|string|max:500',
-            ]);
+            $validated = $request->validated();
 
             $reason = $validated['reason'] ?? null;
 
@@ -279,17 +279,13 @@ class TimetableController extends Controller
     /**
      * Bulk update sessions
      */
-    public function bulkUpdateSessions(Request $request): JsonResponse
+    public function bulkUpdateSessions(BulkUpdateSessionsRequest $request): JsonResponse
     {
         /** @var LecturerTeachingActor $lecturer */
         $lecturer = $request->user();
 
         try {
-            $validated = $request->validate([
-                'sessions' => 'required|array|min:1|max:20',
-                'sessions.*.session_id' => 'required|integer',
-                'sessions.*.updates' => 'required|array',
-            ]);
+            $validated = $request->validated();
 
             $results = [];
             $successCount = 0;

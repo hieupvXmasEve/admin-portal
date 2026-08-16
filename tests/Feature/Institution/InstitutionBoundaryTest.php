@@ -178,6 +178,13 @@ it('preserves campus administration URLs and authorization through Institution',
     $this->actingAs($staff)
         ->get(route('campuses.index', ['per_page' => 101]))
         ->assertSessionHasErrors('per_page');
+
+    $this->actingAs($staff)
+        ->get(route('campuses.show', $managedCampus))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Campuses/Show')
+            ->where('campus.id', $managedCampus->id));
 });
 
 it('preserves department membership administration URLs through Institution', function (): void {

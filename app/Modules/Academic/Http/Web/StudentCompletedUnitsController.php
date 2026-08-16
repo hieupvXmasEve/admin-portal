@@ -6,14 +6,12 @@ namespace App\Modules\Academic\Http\Web;
 
 use App\Exports\StudentCompletedUnitsExport;
 use App\Http\Controllers\Controller;
-use App\Models\Campus;
-use App\Models\Program;
-use App\Models\Semester;
 use App\Modules\Academic\Catalog\Queries\GetSemesterFilterOptionsQuery;
 use App\Modules\Academic\Http\Requests\ListStudentCompletedUnitsRequest;
 use App\Services\ExcelExportService;
 use App\Shared\Contracts\Academic\ProgramReferenceReader;
 use App\Shared\Contracts\Academic\StudentCompletedUnitsReader;
+use App\Shared\Contracts\Institution\CampusReferenceReader;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -45,7 +43,7 @@ class StudentCompletedUnitsController extends Controller
                         ->values()
                         ->all(),
                     'semesters' => $semesterOptions->semesters()
-                        ->map(static fn (Semester $semester): array => [
+                        ->map(static fn ($semester): array => [
                             'id' => $semester->id,
                             'name' => $semester->name,
                             'code' => $semester->code,
@@ -61,15 +59,18 @@ class StudentCompletedUnitsController extends Controller
         ListStudentCompletedUnitsRequest $request,
         StudentCompletedUnitsReader $reader,
         ExcelExportService $excel,
+        CampusReferenceReader $campuses,
+        ProgramReferenceReader $programs,
+        GetSemesterFilterOptionsQuery $semesterOptions,
     ): BinaryFileResponse {
         $filters = $this->resolveFilters($request);
         $rows = $reader->handleExport($filters);
 
         $exportFilters = array_filter([
-            'campus_name' => Campus::find($filters['campus_id'])?->name,
+            'campus_name' => $campuses->find((int) $filters['campus_id'])?->name,
             'keyword' => $filters['keyword'] ?? null,
-            'program_name' => ! empty($filters['program_id']) ? Program::find($filters['program_id'])?->name : null,
-            'semester_name' => ! empty($filters['semester_id']) ? Semester::find($filters['semester_id'])?->name : null,
+            'program_name' => ! empty($filters['program_id']) ? $programs->find((int) $filters['program_id'])['name'] ?? null : null,
+            'semester_name' => ! empty($filters['semester_id']) ? $semesterOptions->find((int) $filters['semester_id'])?->name : null,
         ]);
 
         $filename = 'student-registered-units-'.now()->format('Y-m-d-His');
