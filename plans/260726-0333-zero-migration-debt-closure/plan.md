@@ -118,13 +118,13 @@ not protect an irreversible drop.
 | 11 | [Rehearse schema cleanup per campus](./phase-11-rehearse-schema-cleanup-per-campus.md) | 10 |
 | 12 | [Lock exact zero and roll out production](./phase-12-lock-exact-zero-and-roll-out-production.md) | 11 |
 
-### Measured distribution (2026-08-16, after the owner-map correction)
+### Measured distribution (2026-08-16, live — sums to the 746 above)
 
 | Phase | Findings | Dominant rules |
 |---|---:|---|
-| 4 | 47 | shared model imports |
+| 4 | 44 | shared model imports |
 | 5 | 117 | `Academic/Progression` imports plus the Student/Lecturer API shells |
-| 6 | 144 | shared model imports, concentrated in Finance models and queries |
+| 6 | 133 | shared model imports, concentrated in Finance models and queries |
 | 7 | 167 | shared model imports; Engagement largest, Merchandise new |
 | 8 | 97 | literal URLs, AI model imports, filter stacks |
 | 9 | 181 | strict types |
@@ -138,7 +138,9 @@ Student and Lecturer API surfaces to phase 5, the scholarship, tuition-plan,
 voucher, and financial-import surfaces to phase 6, and the email, notification,
 gold, wallet, and Admissions surfaces to phase 7; genuine residue still falls
 through to 9. Phase 9 dropped from 241 to 181 and is now strict-types dominated,
-which is the correct shape for a residue phase. Total findings are unchanged at 771.
+which is the correct shape for a residue phase. That re-routing moved findings
+between phases without changing the total, which stood at 771 when it landed; the
+table above has since dropped to 746 through the phase 4 and phase 6 slices.
 
 ## Execution rules
 

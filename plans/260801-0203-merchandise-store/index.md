@@ -1,6 +1,7 @@
 # Plan: Merchandise Store (Student Portal)
 
-Status: DRAFT — chờ user chốt. Chưa implement.
+Status: COMPLETED 2026-08-02 — cả 4 phase DONE (xem bảng Phases). Dòng status cũ ghi "DRAFT — chưa implement" là sót, sửa 2026-08-16.
+Deferred: Excel export (stakeholder-gated), staff cancellation-request notification (PII), Gold Transfer (ngoài scope D10).
 Nguồn: FR Notion + review [review-260801-0147-merchandise-store-fr.md](../reports/review-260801-0147-merchandise-store-fr.md) + quyết định user 2026-08-01.
 
 ## Quyết định đã chốt (2026-08-01)

@@ -634,7 +634,7 @@ final class MigrationDebtInventory
             'shared_model_imports' => $this->domainPhase($path, $owner),
             'direct_json_responses', 'inline_request_validation' => $this->domainPhase($path, $owner),
             'legacy_filter_stacks', 'literal_frontend_urls' => 8,
-            'frozen_services', 'frozen_controllers', 'frozen_routes',
+            'frozen_services', 'frozen_controllers', 'frozen_routes' => $this->frozenShellPhase($path),
             'missing_strict_types', 'missing_route_strict_types' => 9,
             'migration_commands' => 10,
             default => 9,
@@ -643,6 +643,77 @@ final class MigrationDebtInventory
         $ownerSlug = trim($ownerSlug, '-');
 
         return sprintf('phase-%02d:%s:%s', $phase, $ownerSlug, $rule);
+    }
+
+    /**
+     * A frozen shell belongs to the phase that owns its workflow, not to the
+     * residue sweep. Phase 9 only deletes dead or already-replaced code, so a
+     * shell still serving a live workflow has to route to the owner that will
+     * actually cut it over. Anything without a live owner falls through to 9.
+     */
+    private function frozenShellPhase(string $path): int
+    {
+        // Student and Lecturer portal APIs: live portal contracts, cut over in phase 5.
+        if (str_starts_with($path, 'app/Http/Controllers/Api/V1/Student/')
+            || str_starts_with($path, 'app/Services/V1/Student/')
+            || $path === 'routes/api/v1/student.php'
+            || $path === 'routes/api/v1/lecturer.php') {
+            return 5;
+        }
+
+        // Scholarship, tuition plan, voucher, and financial import: live money workflows,
+        // cut over with the rest of Finance in phase 6.
+        $financeShells = [
+            'app/Http/Controllers/ScholarshipController.php',
+            'app/Http/Controllers/StudentScholarshipController.php',
+            'app/Http/Controllers/StudentFinancialImportController.php',
+            'app/Http/Controllers/TuitionPlanController.php',
+            'app/Http/Controllers/VoucherController.php',
+            'app/Services/ScholarshipService.php',
+            'app/Services/StudentFinancialImportService.php',
+            'app/Services/TuitionPlanService.php',
+            'app/Services/VoucherService.php',
+            'routes/web/scholarships.php',
+            'routes/web/student-scholarships.php',
+            'routes/web/tuition-plans.php',
+            'routes/web/vouchers.php',
+        ];
+
+        if (in_array($path, $financeShells, true)) {
+            return 6;
+        }
+
+        // Email, notification, gold, and wallet surfaces belong to the operational
+        // domains migrated in phase 7.
+        $operationalShells = [
+            'app/Http/Controllers/EmailLogController.php',
+            'app/Http/Controllers/Api/GoldTransactionController.php',
+            'app/Http/Controllers/Api/NotificationController.php',
+            'app/Http/Controllers/Api/StudentWalletController.php',
+            'app/Http/Controllers/Api/V1/Admin/EmailConfigurationController.php',
+            'app/Http/Controllers/Api/V1/Admin/EmailController.php',
+            'app/Http/Controllers/Web/Admin/NotificationController.php',
+            'app/Http/Controllers/Web/ApplicationGuardianController.php',
+            'app/Http/Controllers/Web/EmailConfigurationController.php',
+            'app/Services/EmailCredentialEncryptionService.php',
+            'app/Services/EmailLoggingService.php',
+            'app/Services/EmailService.php',
+            'app/Services/GoldService.php',
+            'app/Services/NotificationService.php',
+            'app/Services/UserEmailPreferenceService.php',
+            'routes/web/notifications.php',
+            'routes/api/admin/notification.php',
+        ];
+
+        if (in_array($path, $operationalShells, true)) {
+            return 7;
+        }
+
+        if (str_starts_with($path, 'app/Services/Admissions/')) {
+            return 7;
+        }
+
+        return 9;
     }
 
     private function domainPhase(string $path, string $owner): int

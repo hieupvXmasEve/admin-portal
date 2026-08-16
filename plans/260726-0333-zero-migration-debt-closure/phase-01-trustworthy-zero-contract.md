@@ -18,7 +18,11 @@ endpoint behavior.
 ## Requirements
 
 - [x] Freeze the immutable 14-rule ID set, required roots, and full manifest.
-- [x] Prune 31 stale frozen-path approvals and make path/baseline drift fail CI.
+- [x] Prune 31 stale frozen-path approvals.
+- [~] Make path/baseline drift fail CI — **moved to [phase 1b](./phase-01b-enforce-ratchet-in-ci.md)**.
+  Recorded as satisfied here, but verification on 2026-08-16 found no test or check
+  workflow in the repository at all; the guard has only ever run by hand, and the
+  baseline drifted upward unnoticed.
 - [x] Add shadow occurrence/coverage metrics without changing guarded file-count semantics.
 - [x] Reconcile the current Academic compatibility consumer manifest (15 versus 18).
 - [x] Suspend automatic cleanup rollout; pin an immutable candidate SHA.
@@ -80,7 +84,10 @@ Canonical rule IDs: `shared_model_imports`, `frozen_services`,
 
 ## Success Criteria
 
-- [x] Live inventory is reproducible and `--check` is green without baseline growth.
+- [x] Live inventory is reproducible.
+- [~] `--check` green without baseline growth — **regressed, recovery moved to phase 1b**.
+  On 2026-08-16 the guard failed with `shared_model_imports` at 398 against baseline 289
+  and `legacy_filter_stacks` at 24 against 22.
 - [x] Route and schedule baselines exist for later compatibility comparisons.
 - [x] All current findings have exactly one owner package and measurable debt delta.
 - [x] Production schema cleanup remains disabled until phase 11.
