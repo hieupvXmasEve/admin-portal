@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Services;
 
-use App\Models\DeferCase;
-use App\Models\DeferCaseItem;
+use App\Modules\Finance\Models\DeferCase;
+use App\Modules\Finance\Models\DeferCaseItem;
 use App\Modules\Finance\Support\DeferChargePolicy;
 use App\Shared\Contracts\Academic\StudentLifecycleCourseRegistrationGateway;
 

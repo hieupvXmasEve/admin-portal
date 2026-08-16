@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Enums\StudentActionType;
 use App\Models\Campus;
-use App\Models\DeferCase;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
@@ -15,6 +14,7 @@ use App\Modules\Finance\Actions\Operations\ApplyDeferFinancePolicyAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestReservationTarget;
+use App\Modules\Finance\Models\DeferCase;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Models\FinanceObligation;

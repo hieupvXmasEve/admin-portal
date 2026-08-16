@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
-namespace App\Models;
+namespace App\Modules\Finance\Models;
 
-use App\Modules\Finance\Models\FinanceCharge;
+use App\Models\Semester;
+use App\Models\Student;
+use App\Models\StudentActionLog;
+use App\Models\User;
 use App\Modules\Finance\Support\Entitlement\FinanceEntitlementType;
-use App\Modules\Upload\Models\UploadRecord;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -76,11 +78,6 @@ class DeferCase extends Model
     public function items(): HasMany
     {
         return $this->hasMany(DeferCaseItem::class);
-    }
-
-    public function uploadRecord(): BelongsTo
-    {
-        return $this->belongsTo(UploadRecord::class);
     }
 
     public function changedBy(): BelongsTo

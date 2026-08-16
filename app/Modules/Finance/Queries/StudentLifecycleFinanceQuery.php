@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries;
 
-use App\Models\DeferCase;
-use App\Models\DeferCaseItem;
+use App\Modules\Finance\Models\DeferCase;
+use App\Modules\Finance\Models\DeferCaseItem;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Services\FinanceChargeService;
 use App\Shared\Contracts\Finance\DTO\StudentLifecycleFinanceCharge;

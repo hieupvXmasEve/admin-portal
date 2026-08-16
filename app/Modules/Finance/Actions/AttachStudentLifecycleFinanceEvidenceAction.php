@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions;
 
-use App\Models\DeferCase;
+use App\Modules\Finance\Models\DeferCase;
 use App\Shared\Contracts\Finance\StudentLifecycleFinanceEvidenceWriter;
 
 final class AttachStudentLifecycleFinanceEvidenceAction implements StudentLifecycleFinanceEvidenceWriter

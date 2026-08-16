@@ -2,8 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Models;
+namespace App\Modules\Finance\Models;
 
+use App\Models\Student;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -40,11 +41,6 @@ class DeferCaseItem extends Model
         return $this->belongsTo(DeferCase::class);
     }
 
-    public function courseRegistration(): BelongsTo
-    {
-        return $this->belongsTo(CourseRegistration::class);
-    }
-
     // =====================
     // Accessors
     // =====================
@@ -52,11 +48,6 @@ class DeferCaseItem extends Model
     public function getStudentAttribute(): ?Student
     {
         return $this->deferCase?->student;
-    }
-
-    public function getCourseOfferingAttribute(): ?CourseOffering
-    {
-        return $this->courseRegistration?->courseOffering;
     }
 
     public function getEffectiveFeePolicyAttribute(): string

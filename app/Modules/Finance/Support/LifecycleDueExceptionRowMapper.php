@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Support;
 
-use App\Models\DeferCase;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Enums\LifecycleDueExceptionReviewStatus;
+use App\Modules\Finance\Models\DeferCase;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceLifecycleDueExceptionReview;
 use App\Shared\Contracts\Academic\DTO\StudentLifecycleActionSummary;

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Services;
 
-use App\Models\DeferCase;
 use App\Modules\Finance\Actions\VoidFinanceChargeAction;
+use App\Modules\Finance\Models\DeferCase;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceCreditEntitlement;
 use App\Modules\Finance\Queries\GetStudentChargesQuery;

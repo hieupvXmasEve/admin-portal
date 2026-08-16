@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Services;
 
-use App\Models\DeferCase;
-use App\Models\DeferCaseItem;
+use App\Modules\Finance\Models\DeferCase;
+use App\Modules\Finance\Models\DeferCaseItem;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
@@ -303,7 +303,7 @@ class DeferCaseService
     public function getStudentDeferCases(int $studentId): Collection
     {
         return DeferCase::where('student_id', $studentId)
-            ->with(['actionLog', 'semester', 'items.courseRegistration'])
+            ->with(['actionLog', 'semester', 'items'])
             ->orderBy('effective_at', 'desc')
             ->get();
     }
@@ -317,8 +317,7 @@ class DeferCaseService
             'actionLog',
             'student',
             'semester',
-            'items.courseRegistration.courseOffering.unit',
-            'uploadRecord',
+            'items',
             'changedBy',
         ])->findOrFail($deferCaseId);
     }

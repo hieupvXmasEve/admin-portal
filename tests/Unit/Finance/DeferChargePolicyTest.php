@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Models\DeferCase;
+use App\Modules\Finance\Models\DeferCase;
 use App\Modules\Finance\Support\DeferChargePolicy;
 
 // FULL-scope semester skipping is no longer policy-driven: FIN-REV-020-02 (M2)

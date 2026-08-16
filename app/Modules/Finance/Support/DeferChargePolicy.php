@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Support;
 
-use App\Models\DeferCase;
+use App\Modules\Finance\Models\DeferCase;
 
 /**
  * Course-level (COURSES-scope) defer charge-skip policy.

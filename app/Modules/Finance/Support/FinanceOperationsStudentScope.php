@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Support;
 
-use App\Models\DeferCase;
+use App\Modules\Finance\Models\DeferCase;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Shared\Contracts\Academic\AcademicFinanceChargeSourceGateway;
 use App\Shared\Contracts\Academic\DTO\ProgramEnrollmentSummary;
