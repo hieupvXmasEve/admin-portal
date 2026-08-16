@@ -22,7 +22,7 @@ class ModifyCurriculumVersionAction
         $curriculumVersion->delete();
     }
 
-    /** @param array{version_code: string, notes?: string|null, include_curriculum_units: bool} $data */
+    /** @param array{version_code: string, semester_id?: int|null, notes?: string|null, include_curriculum_units: bool} $data */
     public function duplicate(CurriculumVersion $curriculumVersion, array $data): CurriculumVersion
     {
         return DB::transaction(function () use ($curriculumVersion, $data): CurriculumVersion {
@@ -30,7 +30,7 @@ class ModifyCurriculumVersionAction
                 'program_id' => $curriculumVersion->program_id,
                 'specialization_id' => $curriculumVersion->specialization_id,
                 'version_code' => $data['version_code'],
-                'semester_id' => $curriculumVersion->semester_id,
+                'semester_id' => $data['semester_id'] ?? $curriculumVersion->semester_id,
                 'notes' => $data['notes'] ?? $curriculumVersion->notes,
             ]);
 

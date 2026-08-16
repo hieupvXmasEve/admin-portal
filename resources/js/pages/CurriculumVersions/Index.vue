@@ -76,7 +76,7 @@ const props = defineProps<{
     statistics: Statistics;
     programs: Array<{ id: number; name: string; code: string }>;
     specializations: Array<{ id: number; name: string; code: string; program_id: number }>;
-    semesters?: Array<{ id: number; name: string; code: string }>;
+    semesters: Array<{ id: number; name: string; code: string }>;
 }>();
 
 // Reactive data
@@ -156,6 +156,7 @@ const editFormSchema = toTypedSchema(
 const duplicateFormSchema = toTypedSchema(
     z.object({
         version_code: z.string().min(1, 'Version code is required').max(20, 'Version code cannot exceed 20 characters'),
+        semester_id: z.string().min(1, 'Semester is required'),
         notes: z.string().max(ValidationRules.curriculumVersion.notes.maxLength, 'Notes cannot exceed 1000 characters').optional(),
         include_curriculum_units: z.boolean(),
     }),
@@ -257,6 +258,7 @@ const onDuplicateSubmit = (values: any) => {
 
     const submitData = {
         version_code: values.version_code,
+        semester_id: values.semester_id ? parseInt(values.semester_id) : null,
         notes: values.notes || null,
         include_curriculum_units: values.include_curriculum_units,
     };
@@ -713,6 +715,7 @@ const navigateToCreate = () => {
                 :validation-schema="duplicateFormSchema"
                 :initial-values="{
                     version_code: generateSuggestedVersionCode(curriculumVersionToDuplicate.version_code),
+                    semester_id: curriculumVersionToDuplicate.semester_id?.toString() || '',
                     notes: curriculumVersionToDuplicate.notes || '',
                     include_curriculum_units: true,
                 }"
@@ -724,6 +727,23 @@ const navigateToCreate = () => {
                             <FormLabel>New Version Code *</FormLabel>
                             <FormControl>
                                 <Input v-bind="componentField" placeholder="Enter new version code" :maxlength="20" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <FormField v-slot="{ componentField }" name="semester_id">
+                        <FormItem>
+                            <FormLabel>Effective From Semester *</FormLabel>
+                            <FormControl>
+                                <Select v-bind="componentField">
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select semester" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id.toString()"> {{ semester.name }} ({{ semester.code }}) </SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </FormControl>
                             <FormMessage />
                         </FormItem>

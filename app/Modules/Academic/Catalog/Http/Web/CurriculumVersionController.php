@@ -56,7 +56,7 @@ class CurriculumVersionController extends Controller
             ],
             'programs' => Program::query()->select('id', 'name', 'code')->orderBy('name')->get(),
             'specializations' => Specialization::query()->select('id', 'name', 'code', 'program_id')->orderBy('name')->get(),
-            'semesters' => Semester::query()->select('id', 'name', 'code')->orderBy('name')->get(),
+            'semesters' => Semester::query()->select('id', 'name', 'code', 'start_date')->orderBy('start_date')->get(),
         ]);
     }
 
