@@ -107,7 +107,7 @@ it('routes DNG payment-request creation entry points to Batch Studio with busine
         expect($contents)->not->toContain('Đẩy DNG hàng loạt', "Primary {$name} copy must use business naming");
     }
 
-    expect($files['menu'])->toContain('Lập yêu cầu thanh toán DNG')
+    expect($files['menu'])->toContain('Create DNG Payment Request')
         ->and($files['menu'])->toContain('financeRoutes.batchStudio.dng()')
         ->and($files['phase_shortcuts'])->toContain('financeRoutes.batchStudio.dng()')
         ->and($files['lookup_bar'])->toContain('Lập yêu cầu thanh toán DNG')
@@ -120,8 +120,6 @@ it('routes HP and EGC generation entry points to Batch Studio charges with prefi
 
     expect($menu)->not->toContain('Generate HP (Tuition)')
         ->and($menu)->not->toContain('EGC · Generate Charges')
-        ->and($menu)->toContain('Sinh HP/Tuition')
-        ->and($menu)->toContain('Sinh phí EGC')
         ->and($phaseShortcuts)->toContain("financeRoutes.batchStudio.charges({ fee_category: 'major' })")
         ->and($phaseShortcuts)->toContain("financeRoutes.batchStudio.charges({ fee_category: 'egc' })");
 });

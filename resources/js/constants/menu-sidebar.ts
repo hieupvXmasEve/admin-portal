@@ -1,4 +1,4 @@
-import type { NavGroup, NavItem } from '@/types';
+import type { NavGroup } from '@/types';
 import {
     AlertCircle,
     ArrowRightLeft,
@@ -115,6 +115,12 @@ export const mainNavGroups: NavGroup[] = [
                         requiredPermissions: ['view_course_offering'],
                     },
                     {
+                        title: 'Course Statistics',
+                        href: '/course-statistics',
+                        icon: BarChart3,
+                        requiredPermissions: ['view_attendance'],
+                    },
+                    {
                         title: 'Class Schedule',
                         href: courseRoutes.classSchedule(),
                         icon: CalendarIcon,
@@ -133,13 +139,13 @@ export const mainNavGroups: NavGroup[] = [
                         requiredPermissions: ['view_retake_course'],
                     },
                     {
-                        title: 'Thi lại',
+                        title: 'Exam Resit',
                         href: '/exam-resit',
                         icon: GraduationCap,
                         requiredPermissions: ['view_exam_resit'],
                     },
                     {
-                        title: 'Lịch thi lại',
+                        title: 'Exam Resit Schedule',
                         href: '/exam-schedule',
                         icon: CalendarIcon,
                         requiredPermissions: ['manage_exam_schedule'],
@@ -150,19 +156,19 @@ export const mainNavGroups: NavGroup[] = [
                         icon: Link2,
                         requiredPermissions: ['view_canvas_integration'],
                     },
+                    {
+                        title: 'Canvas Settings',
+                        href: '/admin/canvas/integrations',
+                        icon: Settings2,
+                        requiredPermissions: ['view_canvas_integration'],
+                    },
                 ],
             },
             {
-                title: 'Attendance & Completion',
+                title: 'Attendance',
                 href: '#',
                 icon: ClipboardCheck,
                 children: [
-                    {
-                        title: 'Course Statistics',
-                        href: '/course-statistics',
-                        icon: BarChart3,
-                        requiredPermissions: ['view_attendance'],
-                    },
                     {
                         title: 'Attendance Summary',
                         href: attendanceRoutes.attendance.index(),
@@ -200,8 +206,42 @@ export const mainNavGroups: NavGroup[] = [
                         icon: AlertCircle,
                         requiredPermissions: ['view_attendance', 'view_grade'],
                     },
+                    {
+                        title: 'Scholarship Adjustments',
+                        href: '/scholarship-adjustments',
+                        icon: Award,
+                        requiredPermissions: ['view_scholarship_adjustment'],
+                    },
                     // Aggregate analytics (Performance Dashboard, Academic Report, Course Ranking)
                     // live in the management "Reports & Audits" group (ADR-0007, issue 07).
+                ],
+            },
+            {
+                // Wrapper — requiredPermissions on a wrapper item is never evaluated
+                // (usePermissions.ts:36-44 returns early for items with children);
+                // visibility is decided entirely by the children below.
+                title: 'Faculty',
+                href: '#',
+                icon: Users,
+                children: [
+                    {
+                        title: 'Lecturer List',
+                        href: lecturerRoutes.index(),
+                        icon: Users,
+                        requiredPermissions: ['view_lecturer'],
+                    },
+                    {
+                        title: 'Lecturer Hours',
+                        href: lecturerRoutes.teachingHours(),
+                        icon: Clock,
+                        requiredPermissions: ['view_lecturer'],
+                    },
+                    {
+                        title: 'Lecturer GPA',
+                        href: lecturerRoutes.gpa(),
+                        icon: TrendingUp,
+                        requiredPermissions: ['view_lecturer', 'view_survey_results_aggregate'],
+                    },
                 ],
             },
         ],
@@ -211,7 +251,7 @@ export const mainNavGroups: NavGroup[] = [
         // which opens the student list and from there the per-student Student Hub.
         // The aggregate audits/reports that used to be scattered here now live in the
         // separate management "Reports & Audits" group below (issue 07).
-        label: 'Student Services',
+        label: 'Students',
         items: [
             {
                 title: 'Students',
@@ -335,33 +375,10 @@ export const mainNavGroups: NavGroup[] = [
         ],
     },
     {
-        label: 'Faculty & Teaching',
+        label: 'Finance',
         items: [
             {
-                title: 'Lecturer List',
-                href: lecturerRoutes.index(),
-                icon: Users,
-                requiredPermissions: ['view_lecturer'],
-            },
-            {
-                title: 'Lecturer Hours',
-                href: lecturerRoutes.teachingHours(),
-                icon: Clock,
-                requiredPermissions: ['view_lecturer'],
-            },
-            {
-                title: 'Lecturer GPA',
-                href: lecturerRoutes.gpa(),
-                icon: TrendingUp,
-                requiredPermissions: ['view_lecturer', 'view_survey_results_aggregate'],
-            },
-        ],
-    },
-    {
-        label: 'Finance Office (New UI)',
-        items: [
-            {
-                title: 'Hôm nay',
+                title: 'Today',
                 href: financeRoutes.cockpit.index(),
                 icon: LayoutDashboard,
                 requiredPermissions: ['view_finance_cockpit'],
@@ -373,13 +390,13 @@ export const mainNavGroups: NavGroup[] = [
                 requiredPermissions: ['view_finance_reporting'],
             },
             {
-                title: 'Doanh thu',
+                title: 'Revenue',
                 href: financeRoutes.revenue.index(),
                 icon: TrendingUp,
                 requiredPermissions: ['view_finance_revenue_report'],
             },
             {
-                title: 'Sinh phí',
+                title: 'Fee Generation',
                 href: '#',
                 icon: DollarSign,
                 children: [
@@ -391,7 +408,7 @@ export const mainNavGroups: NavGroup[] = [
                         requiredPermissions: ['view_finance_pricing_operations'],
                     },
                     {
-                        title: 'EGC · Kết quả & học lại',
+                        title: 'EGC Block Results & Retakes',
                         href: financeRoutes.feeGeneration.egcBlockResults(),
                         icon: TrendingUp,
                         requiredPermissions: ['view_egc_block_results'],
@@ -400,20 +417,24 @@ export const mainNavGroups: NavGroup[] = [
                 ],
             },
             {
-                title: 'Thu & Đối soát',
+                title: 'Collections & Settlement',
                 href: '#',
                 icon: Send,
                 children: [
                     { title: 'DNG Due Reminders', href: financeRoutes.collect.dueReminders(), icon: CalendarIcon, requiredPermissions: ['view_finance_operations_due_calendar'] },
-                    { title: 'DNG Campus Mapping', href: financeRoutes.collect.dngCampusMapping(), icon: Settings2, requiredPermissions: ['view_finance_dng_campus_mappings'] },
-                    { title: 'Lập yêu cầu thanh toán DNG', href: financeRoutes.batchStudio.dng(), icon: Send, requiredPermissions: ['view_finance_batch_studio', 'create_finance_payments'] },
+                    { title: 'Create DNG Payment Request', href: financeRoutes.batchStudio.dng(), icon: Send, requiredPermissions: ['view_finance_batch_studio', 'create_finance_payments'] },
                     { title: 'Settlement Worklist', href: financeRoutes.collect.settlement(), icon: Sparkles, requiredPermissions: ['allocate_finance_payment'] },
                     { title: 'Payments', href: financeRoutes.collect.payments(), icon: BarChart3, requiredPermissions: ['view_finance_payments'] },
-                    { title: 'Finance Settings', href: financeRoutes.settings.show(), icon: Settings2, requiredPermissions: ['view_finance_settings'] },
+                    {
+                        title: 'Finance Settings',
+                        href: financeRoutes.settings.show(),
+                        icon: Settings2,
+                        requiredPermissions: ['view_finance_settings', 'view_finance_dng_campus_mappings'],
+                    },
                 ],
             },
             {
-                title: 'Ngoại lệ',
+                title: 'Exceptions',
                 href: '#',
                 icon: FileWarning,
                 children: [
@@ -423,54 +444,9 @@ export const mainNavGroups: NavGroup[] = [
                 ],
             },
             {
-                title: 'Tra cứu & Audit',
-                href: '#',
-                icon: Search,
-                children: [
-                    { title: 'Audit Workspace', href: financeRoutes.audit(), icon: Search, requiredPermissions: ['view_finance_audit_workspace'] },
-                    { title: 'Charge Ledger (Global)', href: financeRoutes.lookup.chargeLedger(), icon: BarChart3, requiredPermissions: ['view_finance_charges'] },
-                    { title: 'Invoices', href: financeRoutes.lookup.invoices(), icon: Receipt, requiredPermissions: ['view_finance_invoices'] },
-                    { title: 'DNG Payment Requests', href: financeRoutes.collect.dngPaymentRequests(), icon: Receipt, requiredPermissions: ['view_finance_dng_payment_requests'] },
-                    { title: 'DNG · Cần kiểm tra', href: financeRoutes.collect.dngReceiptExceptions(), icon: AlertCircle, requiredPermissions: ['view_finance_dng_receipt_exceptions'] },
-                    { title: 'DNG Webhook Events', href: financeRoutes.collect.dngWebhookEvents(), icon: Receipt, requiredPermissions: ['view_finance_dng_receipt_exceptions'] },
-                ],
-            },
-        ],
-    },
-    // {
-    //     label: 'Finance Legacy (Old UI)',
-    //     items: [
-    //         {
-    //             title: 'Legacy Sinh phí',
-    //             href: '#',
-    //             icon: DollarSign,
-    //             children: [
-    //                 { title: 'Sinh HP/Tuition', href: financeRoutes.feeGeneration.majorCharges(), icon: Play, requiredPermissions: ['create_finance_charges'] },
-    //                 { title: 'Batch Studio Sinh phí', href: financeRoutes.feeGeneration.batchCharges(), icon: Layers, requiredPermissions: ['view_finance_batch_studio'] },
-    //                 { title: 'Sinh phí EGC', href: financeRoutes.feeGeneration.egcCharges(), icon: GraduationCap, requiredPermissions: ['generate_egc_finance_charges'] },
-    //                 { title: 'EGC - Block Results', href: financeRoutes.feeGeneration.egcBlockResults(), icon: CheckSquare, requiredPermissions: ['view_egc_block_results'] },
-    //                 { title: 'EGC - Retake Adjustments', href: financeRoutes.feeGeneration.egcRetakeAdjustments(), icon: TrendingUp, requiredPermissions: ['view_egc_retake_adjustments'] },
-
-    //             ],
-    //         },
-    //         {
-    //             title: 'Legacy Thu & Đối soát',
-    //             href: '#',
-    //             icon: Send,
-    //             children: [],
-    //         },
-    //         {
-    //             title: 'Legacy Reports',
-    //             href: '#',
-    //             icon: LayoutDashboard,
-    //             children: [{ title: 'Billing KPIs (Legacy)', href: financeRoutes.today.dashboard(), icon: LayoutDashboard, requiredPermissions: ['view_finance_operations_dashboard'] }],
-    //         },
-    //     ],
-    // },
-    {
-        label: 'Discounts & Funding',
-        items: [
-            {
+                // Wrapper — requiredPermissions on a wrapper item is never evaluated
+                // (usePermissions.ts:36-44 returns early for items with children);
+                // visibility is decided entirely by the children below.
                 title: 'Discounts & Funding',
                 href: '#',
                 icon: Award,
@@ -478,76 +454,62 @@ export const mainNavGroups: NavGroup[] = [
                     { title: 'Tuition Plans', href: '/tuition-plans', icon: Calculator, requiredPermissions: ['view_tuition_plan'] },
                     { title: 'Scholarships', href: '/scholarships', icon: Award, requiredPermissions: ['view_scholarship'] },
                     { title: 'Student Scholarships', href: '/student-scholarships', icon: Users, requiredPermissions: ['view_scholarship'] },
-                    { title: 'Scholarship Adjustments', href: '/scholarship-adjustments', icon: Award, requiredPermissions: ['view_scholarship_adjustment'] },
                     { title: 'Vouchers', href: '/vouchers', icon: Ticket, requiredPermissions: ['view_voucher'] },
                 ],
             },
+            {
+                title: 'Lookup & Audit',
+                href: '#',
+                icon: Search,
+                children: [
+                    { title: 'Audit Workspace', href: financeRoutes.audit(), icon: Search, requiredPermissions: ['view_finance_audit_workspace'] },
+                    { title: 'Charge Ledger (Global)', href: financeRoutes.lookup.chargeLedger(), icon: BarChart3, requiredPermissions: ['view_finance_charges'] },
+                    { title: 'Invoices', href: financeRoutes.lookup.invoices(), icon: Receipt, requiredPermissions: ['view_finance_invoices'] },
+                    { title: 'DNG Payment Requests', href: financeRoutes.collect.dngPaymentRequests(), icon: Receipt, requiredPermissions: ['view_finance_dng_payment_requests'] },
+                    { title: 'DNG Receipts To Review', href: financeRoutes.collect.dngReceiptExceptions(), icon: AlertCircle, requiredPermissions: ['view_finance_dng_receipt_exceptions'] },
+                    { title: 'DNG Webhook Events', href: financeRoutes.collect.dngWebhookEvents(), icon: Receipt, requiredPermissions: ['view_finance_dng_receipt_exceptions'] },
+                ],
+            },
         ],
     },
     {
-        label: 'Forms & Quality',
+        label: 'Store & Clubs',
         items: [
             {
-                title: 'Forms Library',
-                href: '/forms/admin',
-                icon: BookOpen,
-                requiredPermissions: ['view_form'],
+                title: 'Clubs',
+                href: systemRoutes.clubs.index(),
+                icon: Club,
+                requiredPermissions: ['view_clubs'],
             },
             {
-                title: 'Runs',
+                title: 'Merchandise',
                 href: '#',
-                icon: Layers,
+                icon: Package,
                 children: [
                     {
-                        title: 'Runs List',
-                        href: '/forms/admin/runs',
+                        title: 'Store',
+                        href: systemRoutes.merchandise.index(),
+                        icon: Package,
+                        requiredPermissions: ['view_merchandise'],
+                    },
+                    {
+                        title: 'Redemption Orders',
+                        href: systemRoutes.redemptionOrders.index(),
                         icon: ClipboardList,
-                        requiredPermissions: ['view_form'],
+                        requiredPermissions: ['view_redemption_order'],
                     },
                     {
-                        title: 'Create Run',
-                        href: '/forms/admin/runs/create',
-                        icon: FormInput,
-                        requiredPermissions: ['view_form'],
-                    },
-                ],
-            },
-            {
-                title: 'Surveys',
-                href: '#',
-                icon: BarChart3,
-                children: [
-                    {
-                        title: 'Survey Results',
-                        href: '/forms/admin/results',
+                        title: 'Reports',
+                        href: systemRoutes.merchandise.reports(),
                         icon: BarChart3,
-                        requiredPermissions: ['view_survey_results_aggregate'],
-                    },
-                    {
-                        title: 'Program Stats',
-                        href: '/forms/admin/results/stats',
-                        icon: TrendingUp,
-                        requiredPermissions: ['view_survey_results_aggregate'],
-                    },
-                ],
-            },
-            {
-                title: 'Queries',
-                href: '#',
-                icon: ClipboardCheck,
-                children: [
-                    {
-                        title: 'Staff Inbox',
-                        href: '/forms/admin/inbox',
-                        icon: Inbox,
-                        requiredPermissions: ['review_form'],
+                        requiredPermissions: ['view_merchandise_report'],
                     },
                 ],
             },
         ],
     },
     {
-        label: 'Campus Operations',
+        label: 'Campus',
         items: [
             {
                 title: 'Room Management',
@@ -611,36 +573,60 @@ export const mainNavGroups: NavGroup[] = [
                     },
                 ],
             },
+        ],
+    },
+    {
+        label: 'Forms & Surveys',
+        items: [
             {
-                title: 'Clubs',
-                href: systemRoutes.clubs.index(),
-                icon: Club,
-                requiredPermissions: ['view_clubs'],
+                title: 'Forms Library',
+                href: '/forms/admin',
+                icon: BookOpen,
+                requiredPermissions: ['view_form'],
             },
             {
-                title: 'Merchandise',
+                title: 'Runs',
                 href: '#',
-                icon: Package,
+                icon: Layers,
                 children: [
                     {
-                        title: 'Store',
-                        href: systemRoutes.merchandise.index(),
-                        icon: Package,
-                        requiredPermissions: ['view_merchandise'],
-                    },
-                    {
-                        title: 'Redemption Orders',
-                        href: systemRoutes.redemptionOrders.index(),
+                        title: 'Runs List',
+                        href: '/forms/admin/runs',
                         icon: ClipboardList,
-                        requiredPermissions: ['view_redemption_order'],
+                        requiredPermissions: ['view_form'],
                     },
                     {
-                        title: 'Reports',
-                        href: systemRoutes.merchandise.reports(),
-                        icon: BarChart3,
-                        requiredPermissions: ['view_merchandise_report'],
+                        title: 'Create Run',
+                        href: '/forms/admin/runs/create',
+                        icon: FormInput,
+                        requiredPermissions: ['view_form'],
                     },
                 ],
+            },
+            {
+                title: 'Surveys',
+                href: '#',
+                icon: BarChart3,
+                children: [
+                    {
+                        title: 'Survey Results',
+                        href: '/forms/admin/results',
+                        icon: BarChart3,
+                        requiredPermissions: ['view_survey_results_aggregate'],
+                    },
+                    {
+                        title: 'Program Stats',
+                        href: '/forms/admin/results/stats',
+                        icon: TrendingUp,
+                        requiredPermissions: ['view_survey_results_aggregate'],
+                    },
+                ],
+            },
+            {
+                title: 'Staff Inbox',
+                href: '/forms/admin/inbox',
+                icon: Inbox,
+                requiredPermissions: ['review_form'],
             },
         ],
     },
@@ -684,29 +670,22 @@ export const mainNavGroups: NavGroup[] = [
                         requiredPermissions: ['view_notification_email_template'],
                     },
                     {
-                        title: 'Ops',
-                        href: '#',
-                        icon: Settings2,
-                        children: [
-                            {
-                                title: 'Outbox',
-                                href: systemRoutes.notifications.ops.outbox(),
-                                icon: Inbox,
-                                requiredPermissions: ['view_notification_ops'],
-                            },
-                            {
-                                title: 'Messages',
-                                href: systemRoutes.notifications.ops.messages(),
-                                icon: MessageSquare,
-                                requiredPermissions: ['view_notification_ops'],
-                            },
-                            {
-                                title: 'Deliveries',
-                                href: systemRoutes.notifications.ops.deliveries(),
-                                icon: Send,
-                                requiredPermissions: ['view_notification_ops'],
-                            },
-                        ],
+                        title: 'Outbox',
+                        href: systemRoutes.notifications.ops.outbox(),
+                        icon: Inbox,
+                        requiredPermissions: ['view_notification_ops'],
+                    },
+                    {
+                        title: 'Messages',
+                        href: systemRoutes.notifications.ops.messages(),
+                        icon: MessageSquare,
+                        requiredPermissions: ['view_notification_ops'],
+                    },
+                    {
+                        title: 'Deliveries',
+                        href: systemRoutes.notifications.ops.deliveries(),
+                        icon: Send,
+                        requiredPermissions: ['view_notification_ops'],
                     },
                 ],
             },
@@ -759,12 +738,6 @@ export const mainNavGroups: NavGroup[] = [
                 icon: Link2,
                 children: [
                     {
-                        title: 'Canvas Integrations',
-                        href: '/admin/canvas/integrations',
-                        icon: Settings2,
-                        requiredPermissions: ['view_canvas_integration'],
-                    },
-                    {
                         title: 'Staff Copilot',
                         href: systemRoutes.aiCopilot.index(),
                         icon: MessageSquare,
@@ -800,5 +773,3 @@ export const mainNavGroups: NavGroup[] = [
         ],
     },
 ];
-
-export const mainNavItems: NavItem[] = mainNavGroups.flatMap((group) => group.items);
