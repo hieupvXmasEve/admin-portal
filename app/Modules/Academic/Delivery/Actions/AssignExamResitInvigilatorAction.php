@@ -6,8 +6,8 @@ namespace App\Modules\Academic\Delivery\Actions;
 
 use App\Models\ExamRoomSlot;
 use App\Models\ExamRoomSlotInvigilator;
-use App\Models\Lecture;
 use App\Modules\Academic\Delivery\Support\ExamScheduleConflictChecker;
+use App\Shared\Contracts\Identity\LecturerReferenceReader;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -28,7 +28,10 @@ class AssignExamResitInvigilatorAction
         ExamRoomSlotInvigilator::ROLE_BACKUP,
     ];
 
-    public function __construct(private readonly ExamScheduleConflictChecker $conflicts) {}
+    public function __construct(
+        private readonly ExamScheduleConflictChecker $conflicts,
+        private readonly LecturerReferenceReader $lecturers,
+    ) {}
 
     /**
      * @param  array{
@@ -49,13 +52,18 @@ class AssignExamResitInvigilatorAction
                 ]);
             }
 
-            $lecture = Lecture::query()->findOrFail($data['lecture_id']);
+            $lectureId = (int) $data['lecture_id'];
+            if ($this->lecturers->find($lectureId) === null) {
+                throw ValidationException::withMessages([
+                    'lecture_id' => ['Giảng viên không tồn tại.'],
+                ]);
+            }
             $role = $this->resolveRole($data['role'] ?? null);
 
-            $this->assertNotAlreadyAssigned($slot, (int) $lecture->id);
+            $this->assertNotAlreadyAssigned($slot, $lectureId);
 
             $this->conflicts->assertInvigilatorAvailable(
-                (int) $lecture->id,
+                $lectureId,
                 $slot->exam_date->format('Y-m-d'),
                 $slot->start_time->format('H:i:s'),
                 $slot->end_time->format('H:i:s'),
@@ -64,7 +72,7 @@ class AssignExamResitInvigilatorAction
 
             return ExamRoomSlotInvigilator::create([
                 'exam_room_slot_id' => $slot->id,
-                'lecture_id' => $lecture->id,
+                'lecture_id' => $lectureId,
                 'role' => $role,
                 'assigned_by_user_id' => auth()->id(),
                 'notes' => $data['notes'] ?? null,

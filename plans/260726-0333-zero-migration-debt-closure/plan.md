@@ -31,6 +31,14 @@ after its reader/writer count and unexplained data exceptions are both zero.
   of the remaining `shared_model_imports` findings and all frozen-shell work.
   That change shipped without lowering its baseline, so the ratchet held 11
   findings of stale headroom until the phase 4 session below re-pinned it.
+- Phase 4, 2026-08-16: Delivery's `Lecture` cluster (3 `shared_model_imports`
+  findings across `AssignExamResitInvigilatorAction`, `LecturerAssessmentRequest`,
+  `GetCourseOfferingCatalogFormQuery`) moved onto already-bound
+  `LecturerReferenceReader`/`LecturerTeachingActor`/`AvailableLecturerReader`
+  contracts. `shared_model_imports` 379→376, both baselines re-pinned in the
+  same change. Zero regressions; a pre-existing `Architecture` failure
+  (`TeachingEligibilityAssignmentBoundaryTest`) now passes as a side effect.
+  Phase 4 remaining scope: 44 (see phase-04's Remaining Scope table).
 
 ## Goals
 
@@ -40,7 +48,7 @@ these numbers go stale quickly and are recorded for direction, not as authority.
 
 | Goal | Start (2026-07-26) | Live (2026-08-16) | Exit |
 |---|---:|---:|---:|
-| Shared model imports | 568 | 379 | 0 exact |
+| Shared model imports | 568 | 376 | 0 exact |
 | Frozen services / controllers / routes | 86 / 76 / 32 | 55 / 30 / 12 | 0 / 0 / 0 exact |
 | Direct JSON / inline validation | 45 / 77 | 20 / 38 | 0 / 0 exact |
 | Missing PHP / route strict types | 178 / 22 | 133 / 11 | 0 / 0 exact |
@@ -48,8 +56,8 @@ these numbers go stale quickly and are recorded for direction, not as authority.
 | Migration commands | 7 | 7 | 0 migration-classified commands |
 | Cross-context concrete imports / removed Inertia APIs | 0 / 0 | 0 / 0 | remain 0 exact |
 
-Total open findings on 2026-08-16: 771 at the session-start measurement, 749
-live. The delta is 11 from the `DeferCase`/`DeferCaseItem` move in `c78b66f6e`
+Total open findings on 2026-08-16: 771 at the session-start measurement, 746
+live (after the phase-4 `Lecture` cluster below; 749 immediately before it). The delta is 11 from the `DeferCase`/`DeferCaseItem` move in `c78b66f6e`
 (committed without re-pinning its baseline, so the ratchet carried 11 findings of
 stale headroom until this session caught it) plus 11 from the two phase 4 slices
 — 3 `direct_json_responses`/`inline_request_validation` and 8

@@ -76,7 +76,7 @@ final class MigrationDebtContract
         'frozen_services' => 55,
         'frozen_controllers' => 30,
         'frozen_routes' => 12,
-        'shared_model_imports' => 379,
+        'shared_model_imports' => 376,
         'cross_context_concrete_imports' => 0,
         'direct_json_responses' => 20,
         'inline_request_validation' => 38,

@@ -6,7 +6,7 @@ namespace App\Modules\Academic\Delivery\Http\Requests\Api\V1\Lecturer;
 
 use App\Http\Responses\ApiResponse;
 use App\Models\CourseOffering;
-use App\Models\Lecture;
+use App\Shared\Contracts\Identity\LecturerTeachingActor;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -33,7 +33,7 @@ abstract class LecturerAssessmentRequest extends FormRequest
         $lecturer = $this->user();
 
         return $courseOffering instanceof CourseOffering
-            && $lecturer instanceof Lecture
+            && $lecturer instanceof LecturerTeachingActor
             && $courseOffering->classSessions()
                 ->where('lecture_id', $lecturer->lecturerId())
                 ->exists();

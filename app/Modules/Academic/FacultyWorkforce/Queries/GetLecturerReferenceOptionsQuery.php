@@ -27,18 +27,4 @@ class GetLecturerReferenceOptionsQuery
             ->orderBy('first_name')
             ->get(['id', 'first_name', 'last_name']);
     }
-
-    /**
-     * Lecturers eligible for a new teaching assignment, carrying the extra
-     * identity columns the course-offering catalog form renders.
-     *
-     * @return Collection<int, Lecture>
-     */
-    public function availableForAssignment(): Collection
-    {
-        return Lecture::active()
-            ->availableForAssignment()
-            ->orderByName()
-            ->get(['id', 'first_name', 'last_name', 'email', 'academic_rank']);
-    }
 }

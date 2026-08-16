@@ -4,20 +4,18 @@ declare(strict_types=1);
 
 namespace App\Modules\Academic\Delivery\Queries;
 
-use App\Models\Lecture;
-use App\Modules\Academic\FacultyWorkforce\Queries\GetLecturerReferenceOptionsQuery;
 use App\Shared\Contracts\Academic\CourseOfferingCatalogReader;
-use Illuminate\Database\Eloquent\Collection;
+use App\Shared\Contracts\Identity\AvailableLecturerReader;
 
 class GetCourseOfferingCatalogFormQuery
 {
     public function __construct(
         private readonly CourseOfferingCatalogReader $catalog,
-        private readonly GetLecturerReferenceOptionsQuery $lecturers,
+        private readonly AvailableLecturerReader $lecturers,
     ) {}
 
     /**
-     * @return array{active_semester: array{id: int, name: string, code: string, start_date: mixed, end_date: mixed}|null, semesters: list<array{id: int, name: string, code: string, start_date: mixed, end_date: mixed, is_current: bool}>, units: list<array{unit_id: int, code: string, name: string, credit_points: string, level: int|null, unit_type: string|null}>, lectures: Collection<int, Lecture>, syllabus_templates: list<array<string, mixed>>, semester: array{id: int, name: string, code: string, start_date: mixed, end_date: mixed}|null, unit: array{id: int, code: string, name: string, credit_points: string}|null, syllabus_template: array{id: int, title: string|null, version: string|null, description: string|null}|null}
+     * @return array{active_semester: array{id: int, name: string, code: string, start_date: mixed, end_date: mixed}|null, semesters: list<array{id: int, name: string, code: string, start_date: mixed, end_date: mixed, is_current: bool}>, units: list<array{unit_id: int, code: string, name: string, credit_points: string, level: int|null, unit_type: string|null}>, lectures: list<array{id: int, first_name: string, last_name: string, email: string, academic_rank: string|null}>, syllabus_templates: list<array<string, mixed>>, semester: array{id: int, name: string, code: string, start_date: mixed, end_date: mixed}|null, unit: array{id: int, code: string, name: string, credit_points: string}|null, syllabus_template: array{id: int, title: string|null, version: string|null, description: string|null}|null}
      */
     public function handle(?int $academicPeriodId = null, ?int $unitId = null, ?int $syllabusTemplateId = null): array
     {
@@ -80,10 +78,10 @@ class GetCourseOfferingCatalogFormQuery
     }
 
     /**
-     * @return Collection<int, Lecture>
+     * @return list<array{id: int, first_name: string, last_name: string, email: string, academic_rank: string|null}>
      */
-    private function availableLectures(): Collection
+    private function availableLectures(): array
     {
-        return $this->lecturers->availableForAssignment();
+        return $this->lecturers->all();
     }
 }

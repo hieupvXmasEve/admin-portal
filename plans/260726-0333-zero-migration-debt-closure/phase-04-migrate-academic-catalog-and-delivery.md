@@ -778,6 +778,39 @@ controllers/services/routes and frontend debt with each migrated workflow.
      move in `c78b66f6e`, which shipped without lowering its own baseline. Caught
      here by re-measuring instead of trusting the previous run, and re-pinned in
      the same change, so every rule sits at its ceiling again.
+   - [x] Delivery FacultyWorkforce cluster, 2026-08-16 (3 findings, all `Lecture`):
+     `AssignExamResitInvigilatorAction` swapped its `Lecture::query()->findOrFail()`
+     lookup for the already-bound `LecturerReferenceReader::find()`; a miss now
+     throws `ValidationException` on `lecture_id`, consistent with the action's
+     other two failure modes, rather than the `ModelNotFoundException` /
+     `NotFoundHttpException` 404 `findOrFail` gave (same effective outcome for
+     the one real caller, `ExamScheduleController::assignInvigilator`, which had
+     no dedicated 404 handling either way; code review flagged the domain
+     Action's `abort()` HTTP dependency as avoidable, so this closes that too).
+     `LecturerAssessmentRequest::canAccessBoundCourseOffering()` swapped
+     `$lecturer instanceof Lecture` for `$lecturer instanceof LecturerTeachingActor`
+     — the model already implements that contract, so the authenticated-actor
+     check is unchanged at runtime. `GetCourseOfferingCatalogFormQuery` dropped
+     `GetLecturerReferenceOptionsQuery` (which still queries `Lecture` directly
+     for its remaining caller, `ExamScheduleController::forCampus`) for the
+     already-bound `AvailableLecturerReader`, the same precedent
+     `CourseOfferingSplitController` uses. Its now-unused
+     `availableForAssignment()` method (byte-for-byte duplicate of
+     `EloquentAvailableLecturerReader::all()`'s query) was deleted in the same
+     slice so the two don't drift out of sync. Selected columns are identical
+     (`id`, `first_name`, `last_name`, `email`, `academic_rank`); the four
+     appended accessors Eloquent used to serialize (`full_name`, `display_name`,
+     `years_of_service`, `is_contract_active`) are gone from this payload, same
+     as `CourseOfferingSplitController`'s existing `lectures` prop — the
+     `LectureCombobox` consumer already tolerates this via its `display_name`
+     fallback chain, so it's a frontend TS type-vs-runtime gap that predates
+     this slice, not a new one; not fixed here.
+     `tests/Feature/Architecture/TeachingEligibilityAssignmentBoundaryTest` was
+     red before this slice and is now green as a side effect; the other 3
+     pre-existing `Architecture` failures (`AcademicPeriodBoundaryArchTest`,
+     `CourseDeliveryAssessmentBoundaryArchTest`, `CourseRosterDeliveryBoundaryArchTest`)
+     are unchanged, confirmed by running the suite with and without this slice
+     stashed. Ratchet: `shared_model_imports` 379 -> 376.
 6. Remove replaced routes/controllers/services immediately and lower all affected ratchets.
    - [x] Ratchet tighten: earlier slices lowered the frozen-* ceilings per
      move but left incidental headroom on the other rules. Re-pinned every
@@ -800,16 +833,16 @@ Re-measured 2026-08-16 from `migration-debt:inventory --format=json`, filtered t
 work packages tagged `phase-04`. Route retirement is complete: Academic owns zero
 frozen routes and zero frozen controllers.
 
-| Rule | 2026-07-28 | 2026-08-16 (session start) | 2026-08-16 (after this slice) | Concentration at the July measurement |
+| Rule | 2026-07-28 | 2026-08-16 (session start) | 2026-08-16 (after Lecture cluster) | Concentration at the July measurement |
 |---|---:|---:|---:|---|
-| `shared_model_imports` | 53 | 55 | 47 | 26 in unassigned generic dirs, 26 Delivery, 1 Catalog |
+| `shared_model_imports` | 53 | 55 | 44 | 26 in unassigned generic dirs, 26 Delivery, 1 Catalog |
 | `inline_request_validation` | 2 | 2 | 0 | `Delivery/Http/Api/Lecturer/{Student,Timetable}Controller` — cleared |
 | `direct_json_responses` | 1 | 1 | 0 | `Catalog/Http/Web/SpecializationController` — cleared |
 
-Total 47 remaining (was 58 at session start; 55 after the mechanical slice; 47
-after the one-off slice). The cluster analysis below is from July and still
-describes the shape of the remainder; re-derive exact paths before starting a
-slice.
+Total 44 remaining (was 58 at session start; 55 after the mechanical slice; 47
+after the one-off slice; 44 after the Delivery `Lecture` cluster, 2026-08-16 —
+see step 5 above). The cluster analysis below is from July and still describes
+the shape of the remainder; re-derive exact paths before starting a slice.
 
 Requirement 1 (assign every generic Academic class to one logical context) is the
 dominant remainder. What was unassigned now reduces to two clusters that both
@@ -826,15 +859,24 @@ didn't need one are cleared (see step 5 above):
   Progression, so they belong to no single submodule; the likely answer is a
   contract rather than an owner.
 
-The larger remaining block is not unassigned at all: 26 shared imports sit
-inside Delivery. `Student` is down to 6 files: `LecturerStudentService`,
-`AssessmentReportService` and `AssessmentGradeExcelService` (roster and report
-reads), the two eligibility queries, and `SendAttendanceWarningAction`, which
-needs an attendance-warning fixture before its signature can change.
-The tail is `SyllabusTemplate`/`Lecture`/`User`/`Semester` (3 each),
-`Unit`/`Room` (2 each), and 4 one-offs; the `Lecture` and `Unit` ones are type
-dependencies (`instanceof`, return types) that need DTOs rather than a
-different call.
+The larger remaining block is not unassigned at all: 23 shared imports (26
+before the `Lecture` cluster above) sit inside Delivery, live-recounted
+2026-08-16 by model rather than from the July snapshot: `Student` 8 (across
+`LecturerStudentService`, `AssessmentReportService`, `AssessmentGradeExcelService`,
+the three `ListExamResit*`/`ListRetakeCourseEligibleStudentsQuery` eligibility
+queries, `BulkCreateExamResitAttemptsAction`, and one of
+`SendAttendanceWarningAction`'s four), `Semester` 4, `SyllabusTemplate` 3,
+`User` 3, `Unit` 2, `AcademicWarningSetting`/`StudentWarningLog`/`StudentNote`
+1 each. `SendAttendanceWarningAction` needs an attendance-warning fixture
+before its remaining three (`AcademicWarningSetting`, `StudentWarningLog`,
+`User`) can move — those two models are Progression-owned, so the fix is a
+Progression-owned warning reader/writer contract, not a Delivery-local swap.
+`Unit` (`LecturerCourseService`, `CreateRetakeCourseRegistrationAction`) is a
+genuine type dependency needing a Catalog-owned DTO, same shape as the
+`Lecture` cluster just closed; `Semester` and `SyllabusTemplate` are used as
+full Eloquent query subjects (`Semester::where(...)`, `SyllabusTemplate::query()`),
+not just type hints, so each needs a new Catalog-owned query/contract method,
+not a drop-in reader swap.
 
 Explicitly not phase-04 scope, tagged to later phases by the scanner:
 `AcademicRecordGenerationServiceOptimized` (frozen service) belongs to phase 9;
