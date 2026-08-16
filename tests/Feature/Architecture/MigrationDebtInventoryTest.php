@@ -53,7 +53,7 @@ it('keeps the canonical rule roots surfaces and ownership contract immutable', f
         ->and(config('migration_debt.allowlist_entry_baseline'))->toBe(count(MigrationDebtContract::RULES));
 
     foreach (config('migration_debt.allowlists') as $rule => $entry) {
-        expect($entry['baseline'])->toBeLessThanOrEqual(MigrationDebtContract::BASELINE_CEILINGS[$rule]);
+        expect($entry['baseline'])->toBe(MigrationDebtContract::BASELINE_CEILINGS[$rule]);
     }
 });
 

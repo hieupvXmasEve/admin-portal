@@ -1,0 +1,36 @@
+name: Migration Debt Guard
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+  push:
+    branches:
+      - dev
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    name: Check migration-debt baselines
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: mbstring, dom, fileinfo, curl, gd, zip, bcmath, intl
+          coverage: none
+
+      - name: Prepare env
+        run: cp .env.example .env
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Run migration-debt guard
+        run: php artisan migration-debt:inventory --check

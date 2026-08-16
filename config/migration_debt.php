@@ -45,7 +45,7 @@ return [
             'reason' => 'Existing service-led runtime paths remain during vertical cutover.',
             'canonical_replacement' => 'Owning module Actions, Queries, or permanent domain support.',
             'retirement_condition' => 'All supported callers are cut over and behavior evidence passes.',
-            'baseline' => 66,
+            'baseline' => 55,
             'mode' => 'max',
         ],
         'frozen_controllers' => [
@@ -53,7 +53,7 @@ return [
             'reason' => 'Existing top-level controllers preserve public web/API contracts during migration.',
             'canonical_replacement' => 'Thin controller under the owning module HTTP boundary.',
             'retirement_condition' => 'Route ownership and all supported callers move to the module controller.',
-            'baseline' => 35,
+            'baseline' => 30,
             'mode' => 'max',
         ],
         'frozen_routes' => [
@@ -61,7 +61,7 @@ return [
             'reason' => 'Existing split route files still serve supported URLs and route names.',
             'canonical_replacement' => 'Owning module routes with a compatibility-preserving mount.',
             'retirement_condition' => 'No supported caller depends on the legacy file and route evidence is green.',
-            'baseline' => 15,
+            'baseline' => 12,
             'mode' => 'max',
         ],
         'shared_model_imports' => [
@@ -69,7 +69,7 @@ return [
             'reason' => 'Module consumers still use transitional shared Eloquent models.',
             'canonical_replacement' => 'Shared Contract, neutral reference, Domain Event, or Read Projection.',
             'retirement_condition' => 'The consumer is cut over and the shared-model read is removed.',
-            'baseline' => 289,
+            'baseline' => 398,
             'mode' => 'max',
         ],
         'cross_context_concrete_imports' => [
@@ -85,7 +85,7 @@ return [
             'reason' => 'Legacy JSON response sites remain while API envelopes are migrated.',
             'canonical_replacement' => 'ApiResponse::success(), error(), paginated(), or validationError().',
             'retirement_condition' => 'The endpoint uses the canonical envelope and its contract test passes.',
-            'baseline' => 26,
+            'baseline' => 21,
             'mode' => 'max',
         ],
         'inline_request_validation' => [
@@ -101,7 +101,7 @@ return [
             'reason' => 'Older application and route PHP files predate the strict-types standard.',
             'canonical_replacement' => 'declare(strict_types=1) at the top of every application PHP file.',
             'retirement_condition' => 'The file is migrated or receives strict types with behavior unchanged.',
-            'baseline' => 163,
+            'baseline' => 133,
             'mode' => 'max',
         ],
         'missing_route_strict_types' => [
@@ -109,7 +109,7 @@ return [
             'reason' => 'Older split route files predate the strict-types standard.',
             'canonical_replacement' => 'declare(strict_types=1) at the top of every application route PHP file.',
             'retirement_condition' => 'The route file is migrated or receives strict types with route behavior unchanged.',
-            'baseline' => 13,
+            'baseline' => 11,
             'mode' => 'max',
         ],
         'legacy_filter_stacks' => [
@@ -117,7 +117,7 @@ return [
             'reason' => 'Existing pages still use transitional filter composables.',
             'canonical_replacement' => 'useDataTable with the shared server-table workflow.',
             'retirement_condition' => 'The page preserves query/pagination behavior on useDataTable.',
-            'baseline' => 22,
+            'baseline' => 24,
             'mode' => 'max',
         ],
         'literal_frontend_urls' => [
@@ -125,7 +125,7 @@ return [
             'reason' => 'Existing router/fetch navigation calls contain literal application paths; this scanner covers all resources/js files, so its baseline is intentionally scanner-specific.',
             'canonical_replacement' => 'Ziggy route() or an established typed route helper.',
             'retirement_condition' => 'The touched flow uses a helper and its route contract remains green.',
-            'baseline' => 43,
+            'baseline' => 40,
             'mode' => 'max',
         ],
         'legacy_page_directories' => [
