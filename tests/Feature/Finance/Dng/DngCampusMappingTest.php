@@ -62,12 +62,12 @@ it('lets authorized Finance staff view and update the current campus mapping wit
     ]);
 
     actingAs($this->user)
-        ->get(route('finance.dng.campus-mapping.show'))
+        ->get(route('finance.settings.show'))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('Finance/DngCampusMapping/Show')
-            ->where('campus.id', $this->campus->id)
-            ->where('mapping', null));
+            ->component('Finance/Settings/Show')
+            ->where('dng_campus_mapping.campus.id', $this->campus->id)
+            ->where('dng_campus_mapping.mapping', null));
 
     actingAs($this->user)
         ->put(route('finance.dng.campus-mapping.update'), [
@@ -92,7 +92,7 @@ it('rejects a DNG provider code already mapped to another campus', function (): 
     ]);
 
     actingAs($this->user)
-        ->from(route('finance.dng.campus-mapping.show'))
+        ->from(route('finance.settings.show'))
         ->put(route('finance.dng.campus-mapping.update'), [
             '_token' => 'dng-campus-mapping-csrf',
             'provider_code' => 'FAUDN',

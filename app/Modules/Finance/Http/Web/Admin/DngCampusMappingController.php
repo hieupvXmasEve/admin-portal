@@ -8,24 +8,11 @@ use App\Http\Controllers\Controller;
 use App\Models\Campus;
 use App\Modules\Finance\Actions\UpdateDngCampusMappingAction;
 use App\Modules\Finance\Http\Requests\Dng\UpdateDngCampusMappingRequest;
-use App\Modules\Finance\Queries\Dng\GetDngCampusMappingConfigurationQuery;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Inertia\Response;
 
 class DngCampusMappingController extends Controller
 {
-    public function __construct(private readonly GetDngCampusMappingConfigurationQuery $configuration) {}
-
-    public function show(Request $request): Response
-    {
-        return Inertia::render('Finance/DngCampusMapping/Show', [
-            ...$this->configuration->handle($this->currentCampus()),
-            'can_manage' => $request->user()?->can('manage_finance_dng_campus_mappings') ?? false,
-        ]);
-    }
-
     public function update(
         UpdateDngCampusMappingRequest $request,
     ): RedirectResponse {

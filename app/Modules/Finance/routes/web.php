@@ -273,9 +273,6 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
     });
 
     Route::prefix('dng')->name('dng.')->group(function () {
-        Route::get('/campus-mapping', [DngCampusMappingController::class, 'show'])
-            ->middleware('can:view_finance_dng_campus_mappings')
-            ->name('campus-mapping.show');
         Route::put('/campus-mapping', [DngCampusMappingController::class, 'update'])
             ->middleware('can:manage_finance_dng_campus_mappings')
             ->name('campus-mapping.update');
@@ -324,7 +321,6 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
 
     Route::prefix('settings')->name('settings.')->group(function () {
         Route::get('/', [FinanceSettingsController::class, 'show'])
-            ->middleware('can:view_finance_settings')
             ->name('show');
         Route::put('/', [FinanceSettingsController::class, 'update'])
             ->middleware('can:manage_finance_settings')

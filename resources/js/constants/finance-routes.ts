@@ -31,7 +31,6 @@ export const FINANCE_ROUTE_NAMES = {
     DNG_PAYMENT_REQUESTS_SHOW: 'finance.dng.payment-requests.show',
     DNG_WEBHOOK_EVENTS_INDEX: 'finance.dng.webhook-events.index',
     DNG_WEBHOOK_EVENTS_SHOW: 'finance.dng.webhook-events.show',
-    DNG_CAMPUS_MAPPING_SHOW: 'finance.dng.campus-mapping.show',
     DNG_CAMPUS_MAPPING_UPDATE: 'finance.dng.campus-mapping.update',
     SETTINGS_SHOW: 'finance.settings.show',
     SETTINGS_UPDATE: 'finance.settings.update',

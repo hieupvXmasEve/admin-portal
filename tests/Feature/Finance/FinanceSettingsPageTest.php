@@ -34,7 +34,7 @@ it('shows a read-only view when the user lacks manage permission', function (): 
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('Finance/Settings/Show')
-            ->where('can_manage', false)
+            ->where('can_manage_settings', false)
             ->where('settings.credit_offset_enabled', false)
             ->where('settings.credit_offset_min_balance', 0));
 });
@@ -50,7 +50,7 @@ it('lets authorized Finance staff view and update credit offset settings', funct
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('Finance/Settings/Show')
-            ->where('can_manage', true));
+            ->where('can_manage_settings', true));
 
     actingAs($this->user)
         ->put(route('finance.settings.update'), [
@@ -78,6 +78,26 @@ it('rejects an update from a user without manage permission', function (): void 
         ->assertForbidden();
 
     expect(FinanceSetting::current()->credit_offset_enabled)->toBeFalse();
+});
+
+it('shows only the DNG campus mapping section for a user without settings permission', function (): void {
+    grantFinanceSettingsPermissions(['view_finance_dng_campus_mappings']);
+
+    actingAs($this->user)
+        ->get(route('finance.settings.show'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Finance/Settings/Show')
+            ->where('settings', null)
+            ->where('dng_campus_mapping.mapping', null));
+});
+
+it('denies the merged settings page to a user with neither permission', function (): void {
+    grantFinanceSettingsPermissions([]);
+
+    actingAs($this->user)
+        ->get(route('finance.settings.show'))
+        ->assertForbidden();
 });
 
 it('rejects a negative minimum balance', function (): void {

@@ -523,7 +523,6 @@ export const financeRoutes = {
         remindersCommit: () => route(FINANCE_ROUTE_NAMES.BATCH_STUDIO_REMINDERS_COMMIT),
     },
     collect: {
-        dngCampusMapping: () => route(FINANCE_ROUTE_NAMES.DNG_CAMPUS_MAPPING_SHOW),
         updateDngCampusMapping: () => route(FINANCE_ROUTE_NAMES.DNG_CAMPUS_MAPPING_UPDATE),
         dngPaymentRequests: () => route(FINANCE_ROUTE_NAMES.DNG_PAYMENT_REQUESTS_INDEX),
         dngPaymentRequestDetail: (dngPaymentRequestId: number) => route(FINANCE_ROUTE_NAMES.DNG_PAYMENT_REQUESTS_SHOW, { dngPaymentRequest: dngPaymentRequestId }),
