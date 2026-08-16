@@ -9,7 +9,7 @@ source:
   - resources/js/constants/menu-sidebar.ts
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- group table rewritten for the new 10-group tree, plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
 이 장은 시스템에 접속하고 화면 구성을 이해하기 위한 것입니다. 한 번만 읽으면 이후 모든 장을 따라갈 수 있습니다.
 
@@ -59,14 +59,13 @@ source:
 | 메뉴 그룹 | 담당 업무 |
 | --- | --- |
 | Overview | 요약 화면 |
-| Academic Operations | 교육과정, 학기, 개설 강좌, 출석, 성적 |
-| Student Services | 학생 기록, 등록, 학적 처분 |
+| Academic Operations | 교육과정, 학기, 개설 강좌, 출석, 성적, 교원 |
+| Students | 학생 기록, 등록, 학적 처분 |
 | Reports & Audits | 보고서 및 자료 대조 |
-| Faculty & Teaching | 교원 및 강의시수 |
-| Finance Office | 등록금 부과, 수납, 대사 |
-| Discounts & Funding | 장학금, 등록금 요금제, 할인 쿠폰 |
-| Forms & Quality | 양식 및 설문 |
-| Campus Operations | 강의실, 예약, 행사, 동아리 |
+| Finance | 등록금 부과, 수납, 대사, 장학금, 요금제, 할인 쿠폰 |
+| Store & Clubs | Gold 교환 스토어, 학생 동아리 |
+| Campus | 강의실, 예약, 행사 |
+| Forms & Surveys | 양식 및 설문 |
 | Communications | 이메일 및 알림 |
 | Administration | 사용자, 권한, 시스템 설정 |
 

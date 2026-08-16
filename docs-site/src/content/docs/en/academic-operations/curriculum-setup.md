@@ -11,7 +11,7 @@ source:
   - resources/js/pages/Syllabus/TemplatesIndex.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Finance Office" renamed to "Finance", plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
 **Curriculum Setup** prepares the underlying data. You do it **once and reuse it across terms** — it is not daily work.
 
@@ -133,4 +133,4 @@ If the data here is wrong or missing, opening classes, registering students, cal
 - The program and curriculum version match the intake.
 - Units carry the information they need: credits, prerequisites.
 - A syllabus template is ready for the units being opened.
-- If students will retake, check retake fees in the Finance Office area.
+- If students will retake, check retake fees in the Finance area.

@@ -11,7 +11,7 @@ source:
   - resources/js/pages/Syllabus/TemplatesIndex.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Finance Office" renamed to "Finance", plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
 **Curriculum Setup**은 바탕이 되는 자료를 준비하는 그룹입니다. **한 번 만들어 여러 학기에 재사용**하며, 매일 하는 업무가 아닙니다.
 
@@ -133,4 +133,4 @@ source:
 - 학위과정과 교육과정 판본이 해당 입학 연도와 맞는지 확인합니다.
 - 교과목에 학점과 선수과목 정보가 갖추어졌는지 확인합니다.
 - 개설할 교과목에 쓸 강의계획서 서식이 준비되었는지 확인합니다.
-- 재수강 학생이 있다면 Finance Office 영역에서 재수강 등록금을 확인합니다.
+- 재수강 학생이 있다면 Finance 영역에서 재수강 등록금을 확인합니다.

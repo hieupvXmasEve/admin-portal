@@ -1,5 +1,5 @@
 ---
-title: Forms & Quality
+title: Forms & Surveys
 description: 양식 보관함, 배포 회차, 설문 결과, 직원 문의함.
 source:
   - resources/js/constants/menu-sidebar.ts
@@ -9,9 +9,9 @@ source:
   - resources/js/pages/Forms/Queries/Inbox.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Forms & Quality" renamed to "Forms & Surveys"; Queries wrapper flattened, Staff Inbox promoted, plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
-**Forms & Quality**는 학생에게서 정보를 수집합니다. 강의 평가 설문, 신청서, 문의가 이에 해당합니다.
+**Forms & Surveys**는 학생에게서 정보를 수집합니다. 강의 평가 설문, 신청서, 문의가 이에 해당합니다.
 
 다음 세 가지를 구분하십시오.
 
@@ -31,7 +31,7 @@ source:
 
 **절차**
 
-1. **Forms & Quality → Forms Library**로 이동합니다.
+1. **Forms & Surveys → Forms Library**로 이동합니다.
 2. 양식을 새로 만들거나 기존 양식을 열어 수정합니다.
 3. **Clear**를 누르면 필터가 해제됩니다.
 
@@ -48,7 +48,7 @@ source:
 
 **절차**
 
-1. **Forms & Quality → Runs → Runs List**로 이동합니다.
+1. **Forms & Surveys → Runs → Runs List**로 이동합니다.
 2. **Filters** 영역으로 좁힙니다.
 3. **Clear**를 누르면 전체가 다시 표시됩니다.
 4. 회차를 열어 응답 진행 상황을 확인합니다.
@@ -59,7 +59,7 @@ source:
 
 **절차**
 
-1. **Forms & Quality → Runs → Create Run**으로 이동합니다.
+1. **Forms & Surveys → Runs → Create Run**으로 이동합니다.
 2. 배포할 양식을 선택합니다.
 3. 수신 대상 집단과 개방 기간을 선택합니다.
 4. 저장하여 회차를 시작합니다.
@@ -77,7 +77,7 @@ source:
 
 **접근 권한.** 설문 집계 결과 조회 권한이 있는 사용자.
 
-**절차.** **Forms & Quality → Surveys → Survey Results**로 이동해 회차를 선택합니다.
+**절차.** **Forms & Surveys → Surveys → Survey Results**로 이동해 회차를 선택합니다.
 
 **유의 사항.** 강의 평가 결과는 민감한 자료입니다. 허용된 범위 안에서만 공유하십시오.
 
@@ -87,9 +87,7 @@ source:
 
 **다음 화면.** Lecturer GPA, Course Ranking.
 
-## Queries — 문의
-
-### Staff Inbox — 직원 문의함
+## Staff Inbox — 직원 문의함
 
 **용도.** 학생이 양식으로 제출한 요청과 문의를 접수하고 처리합니다.
 
@@ -97,7 +95,7 @@ source:
 
 **절차**
 
-1. **Forms & Quality → Queries → Staff Inbox**로 이동합니다.
+1. **Forms & Surveys → Staff Inbox**로 이동합니다.
 2. 각 문의를 열어 내용을 읽습니다.
 3. 답변하거나 담당 부서로 전달합니다.
 

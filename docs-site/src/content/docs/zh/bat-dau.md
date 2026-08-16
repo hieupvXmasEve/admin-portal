@@ -9,7 +9,7 @@ source:
   - resources/js/constants/menu-sidebar.ts
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- group table rewritten for the new 10-group tree, plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
 本章帮助你进入系统并理解界面布局。只需读一次，后续所有章节都能看懂。
 
@@ -59,14 +59,13 @@ source:
 | 菜单分组 | 工作内容 |
 | --- | --- |
 | Overview | 总览界面 |
-| Academic Operations | 学务：培养方案、学期、开课班级、考勤、成绩 |
-| Student Services | 学生档案、入学、处分决定 |
+| Academic Operations | 学务：培养方案、学期、开课班级、考勤、成绩、教师 |
+| Students | 学生档案、入学、处分决定 |
 | Reports & Audits | 报表与数据核对 |
-| Faculty & Teaching | 教师、授课工时 |
-| Finance Office | 学费：生成收费、收款、对账 |
-| Discounts & Funding | 奖学金、学费套餐、优惠券 |
-| Forms & Quality | 表单、问卷 |
-| Campus Operations | 教室、预约、活动、社团 |
+| Finance | 学费：生成收费、收款、对账、奖学金、学费套餐、优惠券 |
+| Store & Clubs | Gold 兑换商城、学生社团 |
+| Campus | 教室、预约、活动 |
+| Forms & Surveys | 表单、问卷 |
 | Communications | 邮件与通知 |
 | Administration | 用户、权限、系统配置 |
 

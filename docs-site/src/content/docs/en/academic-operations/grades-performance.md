@@ -1,16 +1,18 @@
 ---
 title: Grades & Performance
-description: Finalising GPA, looking up past GPA, and following students on academic warning.
+description: Finalising GPA, looking up past GPA, following students on academic warning, and reviewing scholarship adjustments.
 source:
   - resources/js/constants/menu-sidebar.ts
   - resources/js/pages/Admin/Academic/Gpa/Index.vue
   - resources/js/pages/Admin/Academic/Gpa/History.vue
   - resources/js/pages/Academic/Warnings/Index.vue
+  - resources/js/pages/ScholarshipAdjustments/Index.vue
+  - resources/js/pages/ScholarshipAdjustments/Show.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- Scholarship Adjustments moved here from Discounts & Funding, ADR-0026 makes it a Progression Action, not a money screen, plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
-**Grades & Performance** is where results are closed out: calculating GPA, looking up past results, and spotting students at academic risk.
+**Grades & Performance** is where results are closed out: calculating GPA, looking up past results, spotting students at academic risk, and reviewing scholarship adjustments for students who failed a unit.
 
 University-wide reports — Performance Dashboard, Academic Report, Course Ranking — live in the separate **Reports & Audits** menu group, not here.
 
@@ -69,7 +71,15 @@ University-wide reports — Performance Dashboard, Academic Report, Course Ranki
 - Warnings follow the grade and attendance data, so review them after each GPA finalisation.
 - Review them regularly rather than waiting for the end of term.
 
-**Next.** Attendance Summary, Student Services.
+**Next.** Attendance Summary, Students.
+
+## Scholarship Adjustments
+
+**What it is for.** Reviewing students who failed a unit, logging their interview, and deciding whether their scholarship is reduced for the following term. This is a **Progression Action** — it sits next to Warning Center because it handles a consequence of academic results, not a charge Finance manages directly.
+
+**Who can open it.** Anyone with permission to view/process scholarship adjustment cases (`view_scholarship_adjustment`, `approve_scholarship_adjustment`).
+
+**Step-by-step guide:** [Scholarship Adjustments](/en/academic-operations/scholarship-adjustments/) (finding students, scheduling the interview, confirmation, the decision, applying it, and restoring the next term).
 
 ## Checks after finalising GPA
 

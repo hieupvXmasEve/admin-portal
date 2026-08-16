@@ -1,5 +1,5 @@
 ---
-title: Student Services
+title: Students
 description: 학생 기록, 등록 및 학적 보류, 입학 지원서 처리.
 source:
   - resources/js/constants/menu-sidebar.ts
@@ -8,9 +8,9 @@ source:
   - resources/js/pages/StudentApplications/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item) and Students/Index.vue change (internal stat-refresh fix, no visible behavior change) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Student Services" renamed to "Students", plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
-**Student Services**는 **학생 한 명 단위**로 일하는 영역입니다. 학생 기록, 등록 상태, 입학 지원서를 다룹니다.
+**Students**는 **학생 한 명 단위**로 일하는 영역입니다. 학생 기록, 등록 상태, 입학 지원서를 다룹니다.
 
 **Reports & Audits**와 구분하십시오. 그쪽은 전교 단위 집계이고, 이곳은 개별 학생입니다.
 
@@ -22,7 +22,7 @@ source:
 
 **절차**
 
-1. **Student Services → Students**로 이동합니다. 화면 이름은 **Students Management**입니다.
+1. **Students → Students**로 이동합니다. 화면 이름은 **Students Management**입니다.
 2. 검색창이나 필터로 학생을 찾습니다.
 3. 행을 눌러 상세 기록을 엽니다.
 4. **Đặt lại**(초기화)를 누르면 모든 필터가 해제됩니다.
@@ -49,7 +49,7 @@ source:
 
 **절차**
 
-1. **Student Services → Enrollments & Holds**로 이동합니다. 화면 이름은 **Student Enrollments & Holds Management**입니다.
+1. **Students → Enrollments & Holds**로 이동합니다. 화면 이름은 **Student Enrollments & Holds Management**입니다.
 2. **Student Enrollments** 표에서 누가 어느 학기에 등록되어 있는지 확인합니다.
 3. 처리할 대상을 필터로 좁힙니다.
 4. 행을 열어 상태를 확인하거나 변경합니다.
@@ -70,7 +70,7 @@ source:
 
 **절차**
 
-1. **Student Services → Student Applications**로 이동합니다.
+1. **Students → Student Applications**로 이동합니다.
 2. **Search name, email, code…** 창으로 찾거나, 상태(**Status**)와 모집 회차(**Intake**)로 좁힙니다.
 3. 지원서 안의 파일 이름을 눌러 첨부 서류를 엽니다.
 4. 지원서를 승인하거나 반려합니다.

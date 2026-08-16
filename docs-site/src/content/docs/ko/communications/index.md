@@ -14,7 +14,7 @@ source:
   - resources/js/pages/Admin/Notifications/Ops/Deliveries.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Finance Office" renamed to "Finance", plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
 **Communications**는 메일과 알림을 외부로 보내고, 제대로 도착했는지 확인하는 도구를 제공합니다.
 
@@ -118,4 +118,4 @@ source:
 | 학생이 메일을 못 받음 | Email History → 학생 스팸함 확인 |
 | 알림이 도착하지 않음 | Messages → Outbox → Deliveries |
 | 전교 메일이 갑자기 안 나감 | Email Configuration(Success Rate 확인) |
-| 등록금 납부 기한 안내 | Bulk Email, 또는 Finance Office 영역의 DNG Due Reminders |
+| 등록금 납부 기한 안내 | Bulk Email, 또는 Finance 영역의 DNG Due Reminders |

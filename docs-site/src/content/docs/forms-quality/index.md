@@ -1,5 +1,5 @@
 ---
-title: Forms & Quality
+title: Forms & Surveys
 description: Thư viện biểu mẫu, đợt phát biểu mẫu, kết quả khảo sát và hộp thư yêu cầu.
 source:
   - resources/js/constants/menu-sidebar.ts
@@ -9,9 +9,9 @@ source:
   - resources/js/pages/Forms/Queries/Inbox.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Forms & Quality" renamed to "Forms & Surveys"; Queries wrapper flattened, Staff Inbox promoted, plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
-**Forms & Quality** dùng để thu thập thông tin từ sinh viên: khảo sát chất lượng giảng dạy, phiếu đăng ký, đơn từ.
+**Forms & Surveys** dùng để thu thập thông tin từ sinh viên: khảo sát chất lượng giảng dạy, phiếu đăng ký, đơn từ.
 
 Ba khái niệm cần phân biệt:
 
@@ -31,7 +31,7 @@ Không tạo biểu mẫu mới cho mỗi kỳ. Tạo **đợt phát mới** t�
 
 **Các bước**
 
-1. Vào **Forms & Quality → Forms Library**.
+1. Vào **Forms & Surveys → Forms Library**.
 2. Tạo biểu mẫu mới, hoặc mở biểu mẫu có sẵn để sửa.
 3. Bấm **Clear** để xóa điều kiện lọc.
 
@@ -48,7 +48,7 @@ Không tạo biểu mẫu mới cho mỗi kỳ. Tạo **đợt phát mới** t�
 
 **Các bước**
 
-1. Vào **Forms & Quality → Runs → Runs List**.
+1. Vào **Forms & Surveys → Runs → Runs List**.
 2. Dùng khung **Filters** để lọc.
 3. Bấm **Clear** để xem lại toàn bộ.
 4. Mở một đợt để xem tiến độ trả lời.
@@ -59,7 +59,7 @@ Không tạo biểu mẫu mới cho mỗi kỳ. Tạo **đợt phát mới** t�
 
 **Các bước**
 
-1. Vào **Forms & Quality → Runs → Create Run**.
+1. Vào **Forms & Surveys → Runs → Create Run**.
 2. Chọn biểu mẫu cần phát.
 3. Chọn nhóm người nhận và khoảng thời gian mở.
 4. Lưu để bắt đầu đợt.
@@ -77,7 +77,7 @@ Không tạo biểu mẫu mới cho mỗi kỳ. Tạo **đợt phát mới** t�
 
 **Ai vào được.** Người có quyền xem kết quả khảo sát tổng hợp.
 
-**Các bước.** Vào **Forms & Quality → Surveys → Survey Results**, chọn đợt phát cần xem.
+**Các bước.** Vào **Forms & Surveys → Surveys → Survey Results**, chọn đợt phát cần xem.
 
 **Lưu ý.** Kết quả khảo sát giảng dạy là dữ liệu nhạy cảm. Chỉ chia sẻ trong phạm vi được phép.
 
@@ -87,9 +87,7 @@ Không tạo biểu mẫu mới cho mỗi kỳ. Tạo **đợt phát mới** t�
 
 **Đi tiếp.** Lecturer GPA, Course Ranking.
 
-## Queries — Hộp thư yêu cầu
-
-### Staff Inbox
+## Staff Inbox — Hộp thư yêu cầu
 
 **Dùng để làm gì.** Nhận và xử lý yêu cầu, thắc mắc do sinh viên gửi qua biểu mẫu.
 
@@ -97,7 +95,7 @@ Không tạo biểu mẫu mới cho mỗi kỳ. Tạo **đợt phát mới** t�
 
 **Các bước**
 
-1. Vào **Forms & Quality → Queries → Staff Inbox**.
+1. Vào **Forms & Surveys → Staff Inbox**.
 2. Mở từng yêu cầu, đọc nội dung.
 3. Trả lời hoặc chuyển tiếp cho bộ phận phụ trách.
 

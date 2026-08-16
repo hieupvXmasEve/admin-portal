@@ -1,32 +1,15 @@
 ---
-title: Attendance & Completion
-description: 출석 관리, 교과목 통계, 미이수 학생 명단.
+title: Attendance
+description: 출석 관리와 미이수 학생 명단.
 source:
   - resources/js/constants/menu-sidebar.ts
-  - resources/js/pages/CourseStatistics/Index.vue
   - resources/js/pages/Attendance/Index.vue
   - resources/js/pages/FailedStudents/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Attendance & Completion" renamed to "Attendance"; Course Statistics moved to Course Delivery, plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
-**Attendance & Completion**에서는 학생의 수업 참여 상황, 강좌 이수 결과, 후속 조치가 필요한 사례를 확인합니다.
-
-## Course Statistics — 교과목 통계
-
-**용도.** 한 학기의 교과목별 현황을 봅니다. 수강 인원, 출석률, 전반적인 성적을 확인할 수 있습니다.
-
-**접근 권한.** 출석 조회 권한이 있는 사용자.
-
-**절차**
-
-1. **Academic Operations → Attendance & Completion → Course Statistics**로 이동합니다.
-2. **Select semester** 항목에서 학기를 선택합니다.
-3. **Unit code or name...** 창으로 교과목을 찾습니다.
-
-**유의 사항.** 학기를 먼저 선택해야 하며, 선택하지 않으면 화면에 자료가 표시되지 않습니다.
-
-**다음 화면.** Failed Students.
+**Attendance**에서는 학생의 수업 참여 상황과 후속 조치가 필요한 사례를 확인합니다. 교과목별 통계(**Course Statistics**)는 **Course Delivery** 그룹으로 이동했습니다.
 
 ## Attendance Summary — 출석 집계
 
@@ -36,7 +19,7 @@ source:
 
 **절차**
 
-1. **Academic Operations → Attendance & Completion → Attendance Summary**로 이동합니다.
+1. **Academic Operations → Attendance → Attendance Summary**로 이동합니다.
 2. **Search students or sessions...** 창에 입력해 학생이나 수업을 찾습니다.
 3. 상태(**All Statuses**)나 출석 처리 방식(**All Methods**)으로 더 좁힙니다.
 
@@ -55,7 +38,7 @@ source:
 
 **절차**
 
-1. **Academic Operations → Attendance & Completion → Failed Students**로 이동합니다.
+1. **Academic Operations → Attendance → Failed Students**로 이동합니다.
 2. **Filters** 영역에서 학기, 학위과정, 교과목으로 좁힙니다.
 3. 명단을 확인한 뒤 **Retake Registration**으로 이동해 재수강을 엽니다.
 4. **Clear Filters**를 누르면 전체 명단이 다시 표시됩니다.
@@ -77,7 +60,7 @@ source:
 
 | 질문 | 사용할 화면 |
 | --- | --- |
-| 이 강좌에서 몇 명이 이수했습니까? | Course Statistics |
+| 이 강좌에서 몇 명이 이수했습니까? | Course Statistics(**Course Delivery** 그룹) |
 | 결석이 많은 학생은 누구입니까? | Attendance Summary |
 | 재수강이 필요한 학생은 누구입니까? | Failed Students |
 | 경고를 발송해야 합니까? | Warning Center |
@@ -86,4 +69,4 @@ source:
 
 - **Attendance Summary**는 학기 진행 중 조기 확인에 적합합니다.
 - **Failed Students**는 학기 말 성적이 나온 뒤에 적합합니다.
-- **Course Statistics**는 특정 교과목을 들여다볼 때 좋은 출발점입니다.
+- 특정 교과목을 들여다볼 때는 **Course Delivery** 그룹의 **Course Statistics**를 사용하십시오.

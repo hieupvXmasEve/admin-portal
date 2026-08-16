@@ -1,5 +1,5 @@
 ---
-title: Finance Office
+title: Finance
 description: 등록금 부과, 수납과 대사, 예외 처리, 그리고 장학금과 할인.
 source:
   - resources/js/constants/menu-sidebar.ts
@@ -14,12 +14,12 @@ source:
   - resources/js/pages/TuitionPlans/Index.vue
   - resources/js/pages/Scholarships/Index.vue
   - resources/js/pages/StudentScholarships/Index.vue
-  - resources/js/pages/ScholarshipAdjustments/Index.vue
-  - resources/js/pages/ScholarshipAdjustments/Show.vue
   - resources/js/pages/Vouchers/Index.vue
 ---
 
-등록금 업무는 두 메뉴 그룹에 걸쳐 있습니다. **Finance Office**(부과금의 처리 흐름)와 **Discounts & Funding**(감면과 지원)입니다.
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Finance Office (New UI)" renamed to "Finance"; Discounts & Funding folded in as a subgroup; Scholarship Adjustments moved out to Academic Operations > Grades & Performance (ADR-0026 makes it a Progression Action, not a Finance screen), plans/260816-2125-sidebar-menu-ia-restructure/). -->
+
+**Finance**는 부과금의 처리 흐름과, 그 안의 **Discounts & Funding** 하위 그룹(등록금 요금제, 장학금, 할인 쿠폰)으로 구성됩니다.
 
 부과금은 다음 순서로 진행됩니다.
 
@@ -42,7 +42,7 @@ source:
 - **SV chưa sinh phí** — 부과금이 아직 생성되지 않은 학생. 보통 가장 급한 항목입니다.
 - **Cần xử lý** — 처리 대기 목록.
 
-**절차.** **Finance Office → Hôm nay**로 이동합니다. **Làm mới**(새로 고침)를 누르면 최신 수치를 가져옵니다.
+**절차.** **Finance → Hôm nay**로 이동합니다. **Làm mới**(새로 고침)를 누르면 최신 수치를 가져옵니다.
 
 **유의 사항.** 학기 중간에 **SV chưa sinh phí**가 0이 아니라면, 수업을 듣고 있으나 등록금이 부과되지 않은 학생이 있다는 뜻입니다. 시간이 지날수록 회수가 어려우니 조기에 처리하십시오.
 
@@ -52,7 +52,7 @@ source:
 
 **접근 권한.** 재무 보고 조회 권한이 있는 사용자.
 
-**절차.** **Finance Office → Finance Reporting**으로 이동해 학기나 기간을 선택하고 확인·내보내기합니다.
+**절차.** **Finance → Finance Reporting**으로 이동해 학기나 기간을 선택하고 확인·내보내기합니다.
 
 ## Doanh thu — 매출 현황
 
@@ -60,7 +60,7 @@ source:
 
 **접근 권한.** 전교 매출 보고서 조회 권한이 있는 사용자(캠퍼스 단위 Finance Reporting 권한과 별개).
 
-**절차.** **Finance Office → Doanh thu**로 이동해 학기별 표와 캠퍼스·항목별 세부 내역을 확인합니다. **미배분 금액** 행은 별도로 표시되며 합계에 포함되지 않습니다.
+**절차.** **Finance → Doanh thu**로 이동해 학기별 표와 캠퍼스·항목별 세부 내역을 확인합니다. **미배분 금액** 행은 별도로 표시되며 합계에 포함되지 않습니다.
 
 ## Sinh phí — 부과금 생성
 
@@ -74,7 +74,7 @@ source:
 
 **절차**
 
-1. **Finance Office → Sinh phí → Batch Studio**로 이동합니다.
+1. **Finance → Sinh phí → Batch Studio**로 이동합니다.
 2. **청구 학기**를 선택합니다 — 기본값에 의존하지 말고 명시적으로 고르십시오(기본값은 현재 학기이며, 장학금 감면 결정이 대상으로 하는 학기와 다를 수 있습니다).
 3. 대상 학생 집단과 부과금 종류를 선택합니다.
 4. 실제 실행 전에 **결과를 미리 확인합니다.**
@@ -100,7 +100,7 @@ source:
 
 **절차**
 
-1. **Finance Office → Sinh phí → Pricing Operations**로 이동합니다.
+1. **Finance → Sinh phí → Pricing Operations**로 이동합니다.
 2. **Rule versions**(규칙 판본) 영역에서 기존 목록을 확인합니다.
 3. **Create pricing rule version**을 눌러 생성 패널을 열고, 내용을 입력한 뒤 **Create version**을 누릅니다.
 
@@ -175,19 +175,19 @@ source:
 
 ## Discounts & Funding — 감면 및 지원
 
-학생이 실제로 얼마를 내는지 결정하는 별도 메뉴 그룹입니다.
+**Finance** 안의 하위 그룹으로, 학생이 실제로 얼마를 내는지 결정합니다. **Scholarship Adjustments**(미이수로 인한 장학금 조정)는 여기 없습니다 — Progression Action에 해당하며, **Academic Operations → Grades & Performance**에서 다룹니다.
 
 ### Tuition Plans — 등록금 요금제
 
 **절차**
 
-1. **Discounts & Funding → Tuition Plans**로 이동합니다.
+1. **Finance → Discounts & Funding → Tuition Plans**로 이동합니다.
 2. **Create Tuition Plan**을 눌러 새로 만듭니다.
 3. **Filters** 영역으로 기존 요금제를 찾습니다.
 
 ### Scholarships — 장학금
 
-**절차.** **Discounts & Funding → Scholarships**로 이동해 **Filter Scholarships** 영역으로 장학금 종류를 찾거나 만들거나 수정합니다.
+**절차.** **Finance → Discounts & Funding → Scholarships**로 이동해 **Filter Scholarships** 영역으로 장학금 종류를 찾거나 만들거나 수정합니다.
 
 ### Student Scholarships — 학생 장학금 배정
 
@@ -195,21 +195,13 @@ source:
 
 **접근 권한.** 장학금 배정 권한이 있는 사용자.
 
-**절차.** **Discounts & Funding → Student Scholarships**로 이동해 **Filter Assignments** 영역으로 찾은 뒤 배정하거나 해제합니다.
+**절차.** **Finance → Discounts & Funding → Student Scholarships**로 이동해 **Filter Assignments** 영역으로 찾은 뒤 배정하거나 해제합니다.
 
 **유의 사항.** 장학금은 부과금 생성 **전에** 배정하십시오. 나중에 배정하면 이미 생성된 부과금은 자동으로 줄지 않아 수동으로 조정해야 합니다.
 
-### Scholarship Adjustments — 장학금 조정
-
-**용도.** 낙제 과목이 있는 학생을 검토하고, 면담 내용을 기록하며, 다음 학기 장학금을 줄일지 결정합니다. 원래 장학금은 수정하거나 삭제하지 않고, 영향받는 학기에만 별도 조정을 생성합니다. 학생이 더 이상 낙제하지 않으면 다음 학기에 시스템이 자동으로 원래 비율 복원을 제안합니다.
-
-**접근 권한.** 장학금 조정 건 조회/처리 권한 보유자(`view_scholarship_adjustment`, `approve_scholarship_adjustment`).
-
-**단계별 가이드:** [Scholarship Adjustments — 장학금 조정](/ko/finance-office/scholarship-adjustments/) (대상 학생 찾기, 면담 일정, 학생 확인, 결정/승인, 학비 반영, 다음 학기 복원).
-
 ### Vouchers — 할인 쿠폰
 
-**절차.** **Discounts & Funding → Vouchers**로 이동해 **Filter Vouchers** 영역에서 할인 코드를 관리합니다.
+**절차.** **Finance → Discounts & Funding → Vouchers**로 이동해 **Filter Vouchers** 영역에서 할인 코드를 관리합니다.
 
 ## 자주 있는 상황
 

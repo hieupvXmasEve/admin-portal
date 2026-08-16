@@ -16,11 +16,11 @@ source:
   - resources/js/pages/Academic/Report/StudentUnits/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Student Services" renamed to "Students", plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
 **Reports & Audits** 面向管理层：查看全校数据，以及发现数据缺失之处。
 
-与逐一处理学生的 **Student Services** 不同。这里的每一行报表都 **单向** 链接到对应的学生档案；从档案无法反向回到报表。
+与逐一处理学生的 **Students** 不同。这里的每一行报表都 **单向** 链接到对应的学生档案；从档案无法反向回到报表。
 
 分为两组：**Lifecycle & Decisions**（学籍与处分决定）和 **Academic Performance**（学业表现）。
 

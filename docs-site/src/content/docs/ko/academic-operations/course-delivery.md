@@ -1,6 +1,6 @@
 ---
 title: Course Delivery
-description: 강좌 개설, 시간표 편성, 수강신청, 재수강, 재시험, Canvas 연결.
+description: 강좌 개설, 시간표 편성, 수강신청, 재수강, 재시험, 교과목 통계, Canvas 연결.
 source:
   - resources/js/constants/menu-sidebar.ts
   - resources/js/pages/CourseOfferings/Index.vue
@@ -9,10 +9,11 @@ source:
   - resources/js/pages/Academic/RetakeCourse/Index.vue
   - resources/js/pages/Academic/ExamResit/Index.vue
   - resources/js/pages/Academic/ExamResit/Schedule/Index.vue
+  - resources/js/pages/CourseStatistics/Index.vue
   - resources/js/pages/Admin/Canvas/Courses/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- Course Statistics moved here from Attendance & Completion; Canvas Integrations moved here from Administration, retitled Canvas Settings, plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
 **Course Delivery**는 학기 초 핵심 업무입니다. 강좌 개설, 시간표 편성, 수강신청, 재수강과 재시험 처리를 다룹니다.
 
@@ -36,7 +37,23 @@ source:
 - 학생 수강신청을 열기 **전에** 강좌가 먼저 개설되어 있어야 합니다.
 - 목록은 기본적으로 선택한 캠퍼스로 걸러집니다. 예상한 강좌가 없으면 화면 왼쪽 위 `Campus:` 줄을 확인하십시오.
 
-**다음 화면.** Class Schedule, Course Registration, Attendance Summary.
+**다음 화면.** Course Statistics, Class Schedule, Course Registration, Attendance Summary.
+
+## Course Statistics — 교과목 통계
+
+**용도.** 한 학기의 교과목별 현황을 봅니다. 수강 인원, 출석률, 전반적인 성적을 확인할 수 있습니다.
+
+**접근 권한.** 출석 조회 권한이 있는 사용자.
+
+**절차**
+
+1. **Academic Operations → Course Delivery → Course Statistics**로 이동합니다.
+2. **Select semester** 항목에서 학기를 선택합니다.
+3. **Unit code or name...** 창으로 교과목을 찾습니다.
+
+**유의 사항.** 학기를 먼저 선택해야 하며, 선택하지 않으면 화면에 자료가 표시되지 않습니다.
+
+**다음 화면.** Failed Students(**Attendance** 그룹).
 
 ## Class Schedule — 수업 시간표
 
@@ -129,7 +146,7 @@ source:
 4. 같은 회차에 시간대를 더 넣으려면 **Thêm ca thi**(시간대 추가)를 누릅니다.
 5. **Phân công coi thi**(감독 배정)를 눌러 각 시간대의 감독을 지정합니다.
 
-**유의 사항.** 다른 일정과 겹치지 않도록 **Campus Operations**에서 시험실을 먼저 예약하십시오.
+**유의 사항.** 다른 일정과 겹치지 않도록 **Campus**에서 시험실을 먼저 예약하십시오.
 
 ## Canvas Courses — Canvas 연결
 
@@ -143,11 +160,21 @@ source:
 2. **Integration Status**(연동 상태) 영역에서 연결이 정상인지 확인합니다.
 3. 연결할 강좌를 선택하고 **Map Course**(강의실 연결)를 누릅니다.
 4. 여러 강좌를 한 번에 처리하려면 **Select All**(전체 선택)과 **Deselect All**(전체 해제)을 사용합니다.
-5. 연결에 문제가 있으면 **Manage Integrations** 또는 **Go to Integrations**를 눌러 설정 화면을 엽니다.
+5. 연결에 문제가 있으면 **Manage Integrations** 또는 **Go to Integrations**를 눌러 **Canvas Settings**를 엽니다.
 
 **유의 사항.** 잘못 연결하면 학생이 다른 온라인 강의실로 들어갑니다. 확인 전에 강좌 코드와 학기를 점검하십시오.
 
-**다음 화면.** Course Statistics.
+**다음 화면.** Canvas Settings.
+
+## Canvas Settings — Canvas 연결 설정
+
+**용도.** Canvas 시스템과의 연결(API 키, 엔드포인트)을 설정합니다. 이전에는 Administration에 있었으나, 두 화면 모두 같은 권한(`view_canvas_integration`)을 쓰고 시스템 관리팀이 아니라 학사팀이 사용하는 화면이라 Canvas Courses 옆으로 옮겼습니다.
+
+**접근 권한.** Canvas 연동 조회 권한이 있는 사용자.
+
+**절차.** **Academic Operations → Course Delivery → Canvas Settings**로 이동합니다.
+
+**다음 화면.** Canvas Courses.
 
 ## 권장 흐름
 

@@ -5,7 +5,7 @@ source:
   - resources/js/constants/menu-sidebar.ts
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- group renames and moves: Attendance & Completion -> Attendance, Student Services -> Students, Campus Operations -> Campus, Faculty & Teaching folded into Academic Operations, Finance Office -> Finance, plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
 本页说明工作人员在各界面之间的移动路径。当你知道要做什么但不知道从哪里开始时使用。
 
@@ -14,9 +14,9 @@ source:
 ```text
 Curriculum Setup
   -> Course Delivery
-  -> Attendance & Completion
+  -> Attendance
   -> Grades & Performance
-  -> 需要处理学籍或学费时进入 Student Services / Finance Office
+  -> 需要处理学籍或学费时进入 Students / Finance
 ```
 
 ## 准备学务数据
@@ -68,12 +68,13 @@ Curriculum Setup
 
 | 从 | 前往 | 原因 |
 | --- | --- | --- |
-| Course Registration | Student Services | 登记前先核实学生档案 |
-| Failed Students | Student Services | 查看某学生的成绩、考勤、GPA 详情 |
-| Retake Registration | Finance Office | 处理重修学费 |
-| Lịch thi lại | Campus Operations | 预约考场并避免时间冲突 |
-| Warning Center | Student Services | 记录对学生的处理决定 |
-| Canvas Courses | Faculty & Teaching | 核对该班级的授课教师 |
+| Course Registration | Students | 登记前先核实学生档案 |
+| Failed Students | Students | 查看某学生的成绩、考勤、GPA 详情 |
+| Retake Registration | Finance | 处理重修学费 |
+| Lịch thi lại | Campus | 预约考场并避免时间冲突 |
+| Warning Center | Students | 记录对学生的处理决定 |
+
+Canvas Courses 与 Faculty 现在都位于 **Academic Operations** 内（Faculty 是从旧的 Faculty & Teaching 分组并入的）——核对该班级的授课教师不再需要离开学务区域。
 
 ## 按问题选择起点
 

@@ -1,5 +1,5 @@
 ---
-title: Forms & Quality
+title: Forms & Surveys
 description: 表单库、发放批次、问卷结果与工作人员咨询收件箱。
 source:
   - resources/js/constants/menu-sidebar.ts
@@ -9,9 +9,9 @@ source:
   - resources/js/pages/Forms/Queries/Inbox.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Forms & Quality" renamed to "Forms & Surveys"; Queries wrapper flattened, Staff Inbox promoted, plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
-**Forms & Quality** 用于从学生处收集信息：教学质量问卷、报名表、各类申请。
+**Forms & Surveys** 用于从学生处收集信息：教学质量问卷、报名表、各类申请。
 
 需要区分三个概念：
 
@@ -31,7 +31,7 @@ source:
 
 **操作步骤**
 
-1. 进入 **Forms & Quality → Forms Library**。
+1. 进入 **Forms & Surveys → Forms Library**。
 2. 创建新表单，或打开已有表单进行编辑。
 3. 点击 **Clear** 清除筛选条件。
 
@@ -48,7 +48,7 @@ source:
 
 **操作步骤**
 
-1. 进入 **Forms & Quality → Runs → Runs List**。
+1. 进入 **Forms & Surveys → Runs → Runs List**。
 2. 使用 **Filters** 面板筛选。
 3. 点击 **Clear** 恢复查看全部。
 4. 打开某个批次查看答复进度。
@@ -59,7 +59,7 @@ source:
 
 **操作步骤**
 
-1. 进入 **Forms & Quality → Runs → Create Run**。
+1. 进入 **Forms & Surveys → Runs → Create Run**。
 2. 选择要发放的表单。
 3. 选择接收群体和开放时间段。
 4. 保存以启动该批次。
@@ -77,7 +77,7 @@ source:
 
 **谁可以访问。** 拥有查看问卷汇总结果权限的人员。
 
-**操作步骤。** 进入 **Forms & Quality → Surveys → Survey Results**，选择要查看的批次。
+**操作步骤。** 进入 **Forms & Surveys → Surveys → Survey Results**，选择要查看的批次。
 
 **注意事项。** 教学问卷结果属于敏感数据，仅在被允许的范围内分享。
 
@@ -87,9 +87,7 @@ source:
 
 **接下来。** Lecturer GPA、Course Ranking。
 
-## Queries — 咨询收件箱
-
-### Staff Inbox
+## Staff Inbox — 咨询收件箱
 
 **用途。** 接收并处理学生通过表单提交的请求和问题。
 
@@ -97,7 +95,7 @@ source:
 
 **操作步骤**
 
-1. 进入 **Forms & Quality → Queries → Staff Inbox**。
+1. 进入 **Forms & Surveys → Staff Inbox**。
 2. 打开每条请求，阅读内容。
 3. 回复，或转交给负责部门。
 

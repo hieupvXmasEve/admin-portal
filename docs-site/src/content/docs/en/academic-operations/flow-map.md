@@ -5,7 +5,7 @@ source:
   - resources/js/constants/menu-sidebar.ts
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- group renames and moves: Attendance & Completion -> Attendance, Student Services -> Students, Campus Operations -> Campus, Faculty & Teaching folded into Academic Operations, Finance Office -> Finance, plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
 This page describes how staff move between screens. Use it when you know what you need to do but not where to begin.
 
@@ -14,9 +14,9 @@ This page describes how staff move between screens. Use it when you know what yo
 ```text
 Curriculum Setup
   -> Course Delivery
-  -> Attendance & Completion
+  -> Attendance
   -> Grades & Performance
-  -> Student Services / Finance Office when records or fees need handling
+  -> Students / Finance when records or fees need handling
 ```
 
 ## Preparing academic data
@@ -68,12 +68,13 @@ University-wide reports live in the **Reports & Audits** menu group.
 
 | From | Go to | Why |
 | --- | --- | --- |
-| Course Registration | Student Services | Check the student record before registering |
-| Failed Students | Student Services | See one student's grades, attendance, and GPA |
-| Retake Registration | Finance Office | Handle the retake fee |
-| Lịch thi lại | Campus Operations | Book exam rooms and avoid clashes |
-| Warning Center | Student Services | Record the decision taken on a student |
-| Canvas Courses | Faculty & Teaching | Check the lecturer assigned to the class |
+| Course Registration | Students | Check the student record before registering |
+| Failed Students | Students | See one student's grades, attendance, and GPA |
+| Retake Registration | Finance | Handle the retake fee |
+| Lịch thi lại | Campus | Book exam rooms and avoid clashes |
+| Warning Center | Students | Record the decision taken on a student |
+
+Canvas Courses and Faculty now both live inside **Academic Operations** (Faculty was folded in from the old Faculty & Teaching group) — checking the lecturer assigned to a class no longer means leaving the academic area.
 
 ## Choosing a starting point
 

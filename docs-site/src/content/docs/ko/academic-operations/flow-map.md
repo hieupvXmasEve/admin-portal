@@ -5,7 +5,7 @@ source:
   - resources/js/constants/menu-sidebar.ts
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- group renames and moves: Attendance & Completion -> Attendance, Student Services -> Students, Campus Operations -> Campus, Faculty & Teaching folded into Academic Operations, Finance Office -> Finance, plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
 이 문서는 담당자가 화면 사이를 이동하는 경로를 설명합니다. 할 일은 알지만 어디서 시작할지 모를 때 사용하십시오.
 
@@ -14,9 +14,9 @@ source:
 ```text
 Curriculum Setup
   -> Course Delivery
-  -> Attendance & Completion
+  -> Attendance
   -> Grades & Performance
-  -> 학적이나 등록금 처리가 필요하면 Student Services / Finance Office
+  -> 학적이나 등록금 처리가 필요하면 Students / Finance
 ```
 
 ## 학사 자료 준비
@@ -68,12 +68,13 @@ Curriculum Setup
 
 | 출발 화면 | 이동 대상 | 이유 |
 | --- | --- | --- |
-| Course Registration | Student Services | 등록 전 학생 기록 확인 |
-| Failed Students | Student Services | 한 학생의 성적·출석·평점 상세 확인 |
-| Retake Registration | Finance Office | 재수강 등록금 처리 |
-| Lịch thi lại | Campus Operations | 시험실 예약 및 중복 방지 |
-| Warning Center | Student Services | 학생 처리 결과 기록 |
-| Canvas Courses | Faculty & Teaching | 담당 교원 대조 |
+| Course Registration | Students | 등록 전 학생 기록 확인 |
+| Failed Students | Students | 한 학생의 성적·출석·평점 상세 확인 |
+| Retake Registration | Finance | 재수강 등록금 처리 |
+| Lịch thi lại | Campus | 시험실 예약 및 중복 방지 |
+| Warning Center | Students | 학생 처리 결과 기록 |
+
+Canvas Courses와 Faculty는 이제 모두 **Academic Operations** 안에 있습니다(Faculty는 옛 Faculty & Teaching 그룹이 이곳으로 합쳐진 것입니다) — 담당 교원을 대조하는 데 더 이상 학사 영역을 벗어날 필요가 없습니다.
 
 ## 질문으로 찾는 시작 화면
 

@@ -5,18 +5,22 @@ source:
   - resources/js/constants/menu-sidebar.ts
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- Attendance & Completion renamed to Attendance; Course Statistics moved to Course Delivery; Faculty and Scholarship Adjustments folded in, plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
 **Academic Operations** is the area for running academic work: building the curriculum, opening classes, managing course registration, tracking attendance, finalising GPA, and spotting students at risk.
 
-Its four page groups follow the order of a term:
+Six page groups; the first four follow the order of a term:
 
 1. **Curriculum Setup** — the framework: terms, programs, units.
-2. **Course Delivery** — opening classes, scheduling, registration, retakes, resits.
-3. **Attendance & Completion** — attendance tracking and students who failed.
-4. **Grades & Performance** — finalising grades, GPA, academic warnings.
+2. **Course Delivery** — opening classes, scheduling, registration, retakes, resits, unit statistics, the Canvas link.
+3. **Attendance** — attendance tracking and students who failed.
+4. **Grades & Performance** — finalising grades, GPA, academic warnings, scholarship adjustments for failed units.
 
-Working out of order gets you stuck: no term means no course offering, and no course offering means no student registration.
+One remaining group stands apart from the term sequence:
+
+- **Faculty** — lecturer records, teaching hours, results for the classes they teach.
+
+Working the first four out of order gets you stuck: no term means no course offering, and no course offering means no student registration.
 
 ## Who uses this area
 
@@ -32,9 +36,10 @@ Working out of order gets you stuck: no term means no course offering, and no co
 | Group | Start here when |
 | --- | --- |
 | [Curriculum Setup](/en/academic-operations/curriculum-setup/) | Preparing the framework before a new term, or updating a program |
-| [Course Delivery](/en/academic-operations/course-delivery/) | Opening classes, scheduling, registering students, handling retakes and resits |
-| [Attendance & Completion](/en/academic-operations/attendance-completion/) | Checking attendance, failed students, class statistics |
-| [Grades & Performance](/en/academic-operations/grades-performance/) | Finalising GPA, looking up past results, reviewing warnings |
+| [Course Delivery](/en/academic-operations/course-delivery/) | Opening classes, scheduling, registering students, handling retakes and resits, or checking unit statistics |
+| [Attendance](/en/academic-operations/attendance-completion/) | Checking attendance, failed students |
+| [Grades & Performance](/en/academic-operations/grades-performance/) | Finalising GPA, looking up past results, reviewing warnings, reviewing scholarship adjustments |
+| [Faculty](/en/academic-operations/faculty/) | Looking up a lecturer's record, teaching hours, or class results |
 
 New to the system? Read the [page flow map](/en/academic-operations/flow-map/) to see how the screens connect.
 
@@ -55,12 +60,17 @@ New to the system? Read the [page flow map](/en/academic-operations/flow-map/) t
 | Course Delivery | Thi lại (Exam resit) | Building and tracking the resit list |
 | Course Delivery | Lịch thi lại (Resit schedule) | Exam slots, rooms, invigilator assignment |
 | Course Delivery | Canvas Courses | Linking an offering to its online course |
-| Attendance & Completion | Course Statistics | How each unit is doing this term |
-| Attendance & Completion | Attendance Summary | Attendance records by student and session |
-| Attendance & Completion | Failed Students | Students who failed and why |
+| Course Delivery | Course Statistics | How each unit is doing this term |
+| Course Delivery | Canvas Settings | Configuring the connection to Canvas |
+| Attendance | Attendance Summary | Attendance records by student and session |
+| Attendance | Failed Students | Students who failed and why |
 | Grades & Performance | GPA Management | Finalising GPA for a term |
 | Grades & Performance | GPA History | Looking up GPA finalised in past terms |
 | Grades & Performance | Warning Center | Students on academic or attendance warning |
+| Grades & Performance | Scholarship Adjustments | Reviewing scholarship reductions for failed units |
+| Faculty | Lecturer List | Lecturer directory and records |
+| Faculty | Lecturer Hours | Teaching hours per term |
+| Faculty | Lecturer GPA | Average grades for the classes a lecturer teaches |
 
 University-wide reports — Performance Dashboard, Academic Report, Course Ranking — live in the separate **Reports & Audits** menu group.
 

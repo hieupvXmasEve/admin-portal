@@ -1,5 +1,5 @@
 ---
-title: Student Services
+title: Students
 description: Student records, enrolment, academic holds, and admission applications.
 source:
   - resources/js/constants/menu-sidebar.ts
@@ -8,9 +8,9 @@ source:
   - resources/js/pages/StudentApplications/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item) and Students/Index.vue change (internal stat-refresh fix, no visible behavior change) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Student Services" renamed to "Students", plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
-**Student Services** is where you work with **one student at a time**: their record, their enrolment status, and their admission application.
+**Students** is where you work with **one student at a time**: their record, their enrolment status, and their admission application.
 
 Contrast with **Reports & Audits**: that area shows university-wide figures; this one shows individual people.
 
@@ -22,7 +22,7 @@ Contrast with **Reports & Audits**: that area shows university-wide figures; thi
 
 **Steps**
 
-1. Go to **Student Services → Students**. The screen is titled **Students Management**.
+1. Go to **Students → Students**. The screen is titled **Students Management**.
 2. Find the student with the search box or the filters.
 3. Click the row to open the full record.
 4. Click **Đặt lại** (Reset) to clear every filter.
@@ -49,7 +49,7 @@ Contrast with **Reports & Audits**: that area shows university-wide figures; thi
 
 **Steps**
 
-1. Go to **Student Services → Enrollments & Holds**. The screen is titled **Student Enrollments & Holds Management**.
+1. Go to **Students → Enrollments & Holds**. The screen is titled **Student Enrollments & Holds Management**.
 2. Read the **Student Enrollments** table to see who is enrolled in which term.
 3. Filter to the group you need to handle.
 4. Open a row to view or change its status.
@@ -70,7 +70,7 @@ Contrast with **Reports & Audits**: that area shows university-wide figures; thi
 
 **Steps**
 
-1. Go to **Student Services → Student Applications**.
+1. Go to **Students → Student Applications**.
 2. Find an application with **Search name, email, code…**, or filter by **Status** and **Intake**.
 3. Click a file name in the application to open the attached document.
 4. Approve the application, or reject it.

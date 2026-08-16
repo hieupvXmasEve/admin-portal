@@ -1,5 +1,5 @@
 ---
-title: Finance Office
+title: Finance
 description: Generating charges, collecting and reconciling payments, handling exceptions, plus scholarships and discounts.
 source:
   - resources/js/constants/menu-sidebar.ts
@@ -14,12 +14,12 @@ source:
   - resources/js/pages/TuitionPlans/Index.vue
   - resources/js/pages/Scholarships/Index.vue
   - resources/js/pages/StudentScholarships/Index.vue
-  - resources/js/pages/ScholarshipAdjustments/Index.vue
-  - resources/js/pages/ScholarshipAdjustments/Show.vue
   - resources/js/pages/Vouchers/Index.vue
 ---
 
-Fees span two menu groups: **Finance Office** (the life of a charge) and **Discounts & Funding** (reductions and funding).
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Finance Office (New UI)" renamed to "Finance"; Discounts & Funding folded in as a subgroup (Tuition Plans, Scholarships, Student Scholarships, Vouchers); Scholarship Adjustments moved out to Academic Operations > Grades & Performance (ADR-0026 makes it a Progression Action, not a Finance screen), plans/260816-2125-sidebar-menu-ia-restructure/). -->
+
+**Finance** covers the life of a charge, plus a **Discounts & Funding** subgroup (tuition plans, scholarships, vouchers).
 
 A charge moves in this order:
 
@@ -42,7 +42,7 @@ A mistake at generation propagates through every later step. This area touches r
 - **SV chưa sinh phí** — students with no charge generated yet; usually the most urgent item.
 - **Cần xử lý** — outstanding work.
 
-**Steps.** Go to **Finance Office → Hôm nay**. Click **Làm mới** (Refresh) for current figures.
+**Steps.** Go to **Finance → Hôm nay**. Click **Làm mới** (Refresh) for current figures.
 
 **Note.** A non-zero **SV chưa sinh phí** mid-term means students are studying without being charged. Handle it early; recovery gets harder with time.
 
@@ -52,7 +52,7 @@ A mistake at generation propagates through every later step. This area touches r
 
 **Who can open it.** Anyone with permission to view finance reporting.
 
-**Steps.** Go to **Finance Office → Finance Reporting**, choose a term or date range, then read and export.
+**Steps.** Go to **Finance → Finance Reporting**, choose a term or date range, then read and export.
 
 ## Doanh thu — Revenue
 
@@ -60,7 +60,7 @@ A mistake at generation propagates through every later step. This area touches r
 
 **Who can open it.** Anyone with permission to view the school-wide revenue report (a separate permission from the per-campus Finance Reporting).
 
-**Steps.** Go to **Finance Office → Doanh thu**, read the per-term table and the campus/fee-type breakdown. The **unattributed cash** row is kept separate and never folded into the totals.
+**Steps.** Go to **Finance → Doanh thu**, read the per-term table and the campus/fee-type breakdown. The **unattributed cash** row is kept separate and never folded into the totals.
 
 ## Sinh phí — Generating charges
 
@@ -74,7 +74,7 @@ This group creates the receivables. It carries the most risk in the area.
 
 **Steps**
 
-1. Go to **Finance Office → Sinh phí → Batch Studio**.
+1. Go to **Finance → Sinh phí → Batch Studio**.
 2. Pick the **billing semester** — choose it explicitly, don't rely on the default (the default is the current semester, which can differ from the semester a scholarship reduction decision targets).
 3. Choose the student group and the charge type.
 4. **Preview the result** before running for real.
@@ -100,7 +100,7 @@ No scholarship line even though the student has one → check step 2, the select
 
 **Steps**
 
-1. Go to **Finance Office → Sinh phí → Pricing Operations**.
+1. Go to **Finance → Sinh phí → Pricing Operations**.
 2. Read the existing list under **Rule versions**.
 3. Click **Create pricing rule version**, fill in the panel, then click **Create version**.
 
@@ -175,19 +175,19 @@ Read-only screens for finding and reconciling.
 
 ## Discounts & Funding
 
-A separate menu group that decides how much a student actually pays.
+A subgroup inside **Finance** that decides how much a student actually pays. **Scholarship Adjustments** (the scholarship reduction for a failed unit) does not live here — it is a Progression Action, covered under **Academic Operations → Grades & Performance**.
 
 ### Tuition Plans
 
 **Steps**
 
-1. Go to **Discounts & Funding → Tuition Plans**.
+1. Go to **Finance → Discounts & Funding → Tuition Plans**.
 2. Click **Create Tuition Plan** for a new one.
 3. Use the **Filters** panel to find existing plans.
 
 ### Scholarships
 
-**Steps.** Go to **Discounts & Funding → Scholarships** and use the **Filter Scholarships** panel to find, create, or edit a scholarship type.
+**Steps.** Go to **Finance → Discounts & Funding → Scholarships** and use the **Filter Scholarships** panel to find, create, or edit a scholarship type.
 
 ### Student Scholarships
 
@@ -195,21 +195,13 @@ A separate menu group that decides how much a student actually pays.
 
 **Who can open it.** Anyone with permission to assign scholarships.
 
-**Steps.** Go to **Discounts & Funding → Student Scholarships**, use the **Filter Assignments** panel, then assign or remove.
+**Steps.** Go to **Finance → Discounts & Funding → Student Scholarships**, use the **Filter Assignments** panel, then assign or remove.
 
 **Note.** Assign scholarships **before** generating charges. Assigned afterwards, existing charges do not reduce themselves and must be adjusted by hand.
 
-### Scholarship Adjustments
-
-**What it's for.** Review students who failed a course, log interview sessions, and decide whether their scholarship gets reduced for the next term. The original scholarship is never edited or deleted — the system creates a separate adjustment for the affected term, and the next term it auto-proposes restoring the original rate if the student stops failing.
-
-**Who can access.** Users with permission to view/process scholarship adjustment dossiers (`view_scholarship_adjustment`, `approve_scholarship_adjustment`).
-
-**Step-by-step guide:** [Scholarship Adjustments](/en/finance-office/scholarship-adjustments/) (find candidates, schedule the interview, get student confirmation, decide, apply, and restore next term).
-
 ### Vouchers
 
-**Steps.** Go to **Discounts & Funding → Vouchers** and use the **Filter Vouchers** panel to manage discount codes.
+**Steps.** Go to **Finance → Discounts & Funding → Vouchers** and use the **Filter Vouchers** panel to manage discount codes.
 
 ## Common situations
 

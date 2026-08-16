@@ -12,7 +12,7 @@ source:
   - resources/js/pages/Admin/EmailMonitoring/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- Canvas Integrations moved out of Administration > Integrations to Academic Operations > Course Delivery (retitled Canvas Settings), plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
 **Administration** 面向管理员。这里的修改会影响 **所有用户**，不只是你自己。
 
@@ -80,14 +80,12 @@ source:
 
 | 页面 | 用途 |
 | --- | --- |
-| Canvas Integrations | 配置与在线学习系统 Canvas 的连接 |
 | Staff Copilot | 监控教职员工可用的 AI 助手 |
 | AI Provider Settings | 配置 AI 服务提供商 |
 
-**注意事项**
+**注意事项。** AI 相关页面需要独立权限。此处的更改会影响全系统的 AI 功能。
 
-- 当 **Canvas Courses** 界面报告连接故障时，应在 **Canvas Integrations** 中修复。
-- AI 相关页面需要独立权限。此处的更改会影响全系统的 AI 功能。
+Canvas 连接设置（**Canvas Settings**）已迁移到 **Academic Operations → Course Delivery**，位于它所服务的 **Canvas Courses** 界面旁边——两者共用同一权限，且都由学务团队使用。
 
 ## System Operations — 系统运维
 
@@ -126,7 +124,7 @@ source:
 | 新员工入职 | Users（添加账号、分配角色和校区） |
 | “我看不到 X 菜单” | Users（检查角色） → Roles & Permissions |
 | 员工离职 | Users（停用，不要删除） |
-| Canvas 报告连接错误 | Canvas Integrations |
+| Canvas 报告连接错误 | Canvas Settings（Academic Operations → Course Delivery） |
 | 更改徽标或显示名称 | System Configuration |
 | 调查一次异常变更 | Activity Logs |
 | 全校邮件故障 | Email Monitoring → Email Configuration |

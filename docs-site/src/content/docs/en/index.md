@@ -5,7 +5,7 @@ source:
   - resources/js/constants/menu-sidebar.ts
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- Faculty & Teaching folded into Academic Operations; Campus Operations split into Campus and Store & Clubs; Student Services -> Students, Finance Office -> Finance, Forms & Quality -> Forms & Surveys, plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
 This guide is for **university staff** who use the Portal admin application in a browser. No technical knowledge required.
 
@@ -15,20 +15,20 @@ Students and lecturers use separate portals, which this guide does not cover.
 
 If you are new, read [First steps](/en/bat-dau/) first: signing in, choosing a campus, and reading the screen. Once is enough for every chapter that follows.
 
-Then open the area you work in — ten areas matching the ten menu groups, listed below.
+Then open the area you work in — ten areas matching nine menu groups, listed below.
 
 ## Coverage
 
 | Area | Status |
 | --- | --- |
 | [First steps](/en/bat-dau/) | Written |
-| [Academic Operations](/en/academic-operations/) | Written |
-| [Student Services](/en/student-services/) | Written |
+| [Academic Operations](/en/academic-operations/) (includes Faculty) | Written |
+| [Students](/en/student-services/) | Written |
 | [Reports & Audits](/en/reports-audits/) | Written |
-| [Faculty & Teaching](/en/faculty-teaching/) | Written |
-| [Finance Office](/en/finance-office/) | Written |
-| [Forms & Quality](/en/forms-quality/) | Written |
-| [Campus Operations](/en/campus-operations/) | Written |
+| [Finance](/en/finance-office/) | Written |
+| [Store & Clubs](/en/store-clubs/) | Written |
+| [Campus](/en/campus/) | Written |
+| [Forms & Surveys](/en/forms-quality/) | Written |
 | [Communications](/en/communications/) | Written |
 | [Administration](/en/administration/) | Written |
 

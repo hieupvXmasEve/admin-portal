@@ -1,32 +1,15 @@
 ---
-title: Attendance & Completion
-description: Theo dõi điểm danh, thống kê môn học và danh sách sinh viên rớt môn.
+title: Attendance
+description: Theo dõi điểm danh và danh sách sinh viên rớt môn.
 source:
   - resources/js/constants/menu-sidebar.ts
-  - resources/js/pages/CourseStatistics/Index.vue
   - resources/js/pages/Attendance/Index.vue
   - resources/js/pages/FailedStudents/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Attendance & Completion" renamed to "Attendance"; Course Statistics moved to Course Delivery, plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
-**Attendance & Completion** giúp kiểm tra tình hình đi học, kết quả hoàn tất lớp và các trường hợp cần xử lý tiếp.
-
-## Course Statistics — Thống kê môn học
-
-**Dùng để làm gì.** Xem tình hình từng môn trong một kỳ: sĩ số, tỉ lệ chuyên cần, kết quả chung.
-
-**Ai vào được.** Người có quyền xem điểm danh.
-
-**Các bước**
-
-1. Vào **Academic Operations → Attendance & Completion → Course Statistics**.
-2. Chọn kỳ ở ô **Select semester**.
-3. Tìm môn cần xem bằng ô **Unit code or name...** (mã hoặc tên môn).
-
-**Lưu ý.** Phải chọn kỳ trước, nếu không màn hình sẽ không có dữ liệu.
-
-**Đi tiếp.** Failed Students.
+**Attendance** giúp kiểm tra tình hình đi học và các trường hợp cần xử lý tiếp. Thống kê từng môn (**Course Statistics**) đã chuyển sang nhóm **Course Delivery**.
 
 ## Attendance Summary — Tổng hợp điểm danh
 
@@ -36,7 +19,7 @@ source:
 
 **Các bước**
 
-1. Vào **Academic Operations → Attendance & Completion → Attendance Summary**.
+1. Vào **Academic Operations → Attendance → Attendance Summary**.
 2. Gõ vào ô **Search students or sessions...** để tìm theo sinh viên hoặc buổi học.
 3. Lọc thêm theo trạng thái (**All Statuses**) hoặc cách điểm danh (**All Methods**).
 
@@ -55,7 +38,7 @@ source:
 
 **Các bước**
 
-1. Vào **Academic Operations → Attendance & Completion → Failed Students**.
+1. Vào **Academic Operations → Attendance → Failed Students**.
 2. Dùng khung **Filters** để lọc theo kỳ, chương trình hoặc môn học.
 3. Đối chiếu danh sách rồi chuyển sang **Retake Registration** để mở học lại.
 4. Bấm **Clear Filters** để xem lại toàn bộ danh sách.
@@ -77,7 +60,7 @@ source:
 
 | Câu hỏi | Trang nên dùng |
 | --- | --- |
-| Lớp này có bao nhiêu sinh viên hoàn tất? | Course Statistics |
+| Lớp này có bao nhiêu sinh viên hoàn tất? | Course Statistics (nhóm **Course Delivery**) |
 | Ai đang vắng học nhiều? | Attendance Summary |
 | Sinh viên nào cần học lại? | Failed Students |
 | Có cần gửi cảnh báo cho sinh viên không? | Warning Center |
@@ -86,4 +69,4 @@ source:
 
 - **Attendance Summary** hợp để theo dõi sớm trong lúc lớp đang diễn ra.
 - **Failed Students** hợp khi đã có dữ liệu kết quả cuối kỳ.
-- **Course Statistics** là điểm bắt đầu tốt khi cần soi một môn cụ thể.
+- Cần soi một môn cụ thể thì dùng **Course Statistics** ở nhóm **Course Delivery**.

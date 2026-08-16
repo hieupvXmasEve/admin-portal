@@ -5,7 +5,7 @@ source:
   - resources/js/constants/menu-sidebar.ts
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- Faculty & Teaching folded into Academic Operations; Campus Operations split into Campus and Store & Clubs; Student Services -> Students, Finance Office -> Finance, Forms & Quality -> Forms & Surveys, plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
 Tài liệu dành cho **cán bộ, nhân viên nhà trường** dùng hệ thống Portal trên trình duyệt. Không cần biết kỹ thuật.
 
@@ -15,20 +15,20 @@ Sinh viên và giảng viên dùng cổng riêng, không nằm trong tài liệu
 
 Người mới đọc [Bắt đầu](/bat-dau/) trước: đăng nhập, chọn cơ sở, cách đọc màn hình. Đọc một lần là đủ dùng cho mọi chương sau.
 
-Sau đó vào khu vực công việc của bạn — mười khu vực tương ứng mười nhóm menu, liệt kê bên dưới.
+Sau đó vào khu vực công việc của bạn — mười khu vực tương ứng chín nhóm menu, liệt kê bên dưới.
 
 ## Phạm vi
 
 | Khu vực | Trạng thái |
 | --- | --- |
 | [Bắt đầu](/bat-dau/) | Đã viết |
-| [Academic Operations — Học vụ](/academic-operations/) | Đã viết |
-| [Student Services — Sinh viên](/student-services/) | Đã viết |
+| [Academic Operations — Học vụ (gồm cả Giảng viên)](/academic-operations/) | Đã viết |
+| [Students — Sinh viên](/student-services/) | Đã viết |
 | [Reports & Audits — Báo cáo, đối chiếu](/reports-audits/) | Đã viết |
-| [Faculty & Teaching — Giảng viên](/faculty-teaching/) | Đã viết |
-| [Finance Office — Học phí](/finance-office/) | Đã viết |
-| [Forms & Quality — Biểu mẫu, khảo sát](/forms-quality/) | Đã viết |
-| [Campus Operations — Phòng, sự kiện, câu lạc bộ](/campus-operations/) | Đã viết |
+| [Finance — Học phí](/finance-office/) | Đã viết |
+| [Store & Clubs — Cửa hàng, câu lạc bộ](/store-clubs/) | Đã viết |
+| [Campus — Phòng học, sự kiện](/campus/) | Đã viết |
+| [Forms & Surveys — Biểu mẫu, khảo sát](/forms-quality/) | Đã viết |
 | [Communications — Email, thông báo](/communications/) | Đã viết |
 | [Administration — Người dùng, phân quyền](/administration/) | Đã viết |
 

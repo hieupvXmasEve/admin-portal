@@ -5,7 +5,7 @@ source:
   - resources/js/constants/menu-sidebar.ts
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- group renames and moves: Attendance & Completion -> Attendance, Student Services -> Students, Campus Operations -> Campus, Faculty & Teaching folded into Academic Operations, Finance Office -> Finance, plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
 Trang này mô tả đường đi giữa các màn hình theo công việc thực tế. Dùng khi bạn biết mình cần làm gì nhưng chưa biết bắt đầu ở đâu.
 
@@ -14,9 +14,9 @@ Trang này mô tả đường đi giữa các màn hình theo công việc thự
 ```text
 Curriculum Setup
   -> Course Delivery
-  -> Attendance & Completion
+  -> Attendance
   -> Grades & Performance
-  -> Student Services / Finance Office khi cần xử lý hồ sơ hoặc học phí
+  -> Students / Finance khi cần xử lý hồ sơ hoặc học phí
 ```
 
 ## Chuẩn bị dữ liệu học vụ
@@ -68,12 +68,13 @@ Báo cáo tổng hợp toàn trường nằm ở nhóm menu **Reports & Audits**
 
 | Từ trang | Sang đâu | Vì sao |
 | --- | --- | --- |
-| Course Registration | Student Services | Kiểm tra hồ sơ sinh viên trước khi đăng ký |
-| Failed Students | Student Services | Xem chi tiết điểm, điểm danh, GPA của một sinh viên |
-| Retake Registration | Finance Office | Xử lý học phí học lại |
-| Lịch thi lại | Campus Operations | Đặt phòng thi để tránh trùng lịch |
-| Warning Center | Student Services | Ghi nhận quyết định xử lý sinh viên |
-| Canvas Courses | Faculty & Teaching | Đối chiếu giảng viên phụ trách lớp |
+| Course Registration | Students | Kiểm tra hồ sơ sinh viên trước khi đăng ký |
+| Failed Students | Students | Xem chi tiết điểm, điểm danh, GPA của một sinh viên |
+| Retake Registration | Finance | Xử lý học phí học lại |
+| Lịch thi lại | Campus | Đặt phòng thi để tránh trùng lịch |
+| Warning Center | Students | Ghi nhận quyết định xử lý sinh viên |
+
+Canvas Courses và Faculty giờ cùng nằm trong **Academic Operations** (Faculty đã được gộp vào từ nhóm Faculty & Teaching cũ) — đối chiếu giảng viên phụ trách lớp không còn phải rời khỏi khu vực học vụ.
 
 ## Chọn điểm bắt đầu theo câu hỏi
 

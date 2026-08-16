@@ -1,16 +1,18 @@
 ---
 title: Grades & Performance
-description: 평점 확정, 과거 평점 조회, 학사경고 대상 관리.
+description: 평점 확정, 과거 평점 조회, 학사경고 대상 관리, 장학금 조정 검토.
 source:
   - resources/js/constants/menu-sidebar.ts
   - resources/js/pages/Admin/Academic/Gpa/Index.vue
   - resources/js/pages/Admin/Academic/Gpa/History.vue
   - resources/js/pages/Academic/Warnings/Index.vue
+  - resources/js/pages/ScholarshipAdjustments/Index.vue
+  - resources/js/pages/ScholarshipAdjustments/Show.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- Scholarship Adjustments moved here from Discounts & Funding, ADR-0026 makes it a Progression Action, not a money screen, plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
-**Grades & Performance**는 결과를 마감하는 단계입니다. 평점을 산출하고, 과거 결과를 조회하며, 학업 위험 학생을 찾아냅니다.
+**Grades & Performance**는 결과를 마감하는 단계입니다. 평점을 산출하고, 과거 결과를 조회하며, 학업 위험 학생을 찾아내고, 미이수로 인한 장학금 조정을 검토합니다.
 
 전교 단위 보고서인 Performance Dashboard, Academic Report, Course Ranking은 이곳이 아니라 별도 메뉴 그룹인 **Reports & Audits**에 있습니다.
 
@@ -69,7 +71,15 @@ source:
 - 경고는 성적과 출석 자료에 따라 갱신되므로 평점 확정 후마다 다시 확인하십시오.
 - 학기 말까지 미루지 말고 정기적으로 점검하십시오.
 
-**다음 화면.** Attendance Summary, Student Services.
+**다음 화면.** Attendance Summary, Students.
+
+## Scholarship Adjustments — 장학금 조정
+
+**용도.** 교과목을 미이수한 학생을 검토하고, 면담을 기록하며, 다음 학기 장학금 감액 여부를 결정합니다. **Progression Action**에 해당하며, Finance가 직접 관리하는 금액이 아니라 학업 결과의 후속 조치이므로 Warning Center 옆에 둡니다.
+
+**접근 권한.** 장학금 조정 안건을 조회·처리할 권한이 있는 사용자(`view_scholarship_adjustment`, `approve_scholarship_adjustment`).
+
+**단계별 안내:** [Scholarship Adjustments — 장학금 조정](/ko/academic-operations/scholarship-adjustments/) (대상자 찾기, 면담 일정, 확인, 결정, 적용, 다음 학기 복원).
 
 ## 평점 확정 후 점검
 

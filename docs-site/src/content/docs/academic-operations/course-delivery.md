@@ -1,6 +1,6 @@
 ---
 title: Course Delivery
-description: Mở lớp, xếp lịch, đăng ký môn, học lại, thi lại và liên kết Canvas.
+description: Mở lớp, xếp lịch, đăng ký môn, học lại, thi lại, thống kê môn học và liên kết Canvas.
 source:
   - resources/js/constants/menu-sidebar.ts
   - resources/js/pages/CourseOfferings/Index.vue
@@ -9,10 +9,11 @@ source:
   - resources/js/pages/Academic/RetakeCourse/Index.vue
   - resources/js/pages/Academic/ExamResit/Index.vue
   - resources/js/pages/Academic/ExamResit/Schedule/Index.vue
+  - resources/js/pages/CourseStatistics/Index.vue
   - resources/js/pages/Admin/Canvas/Courses/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- Course Statistics moved here from Attendance & Completion; Canvas Integrations moved here from Administration, retitled Canvas Settings, plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
 **Course Delivery** là phần việc chính đầu mỗi kỳ: mở lớp, xếp lịch, đăng ký sinh viên, xử lý học lại và thi lại.
 
@@ -36,7 +37,23 @@ source:
 - Lớp môn phải được tạo **trước khi** mở đăng ký cho sinh viên.
 - Danh sách mặc định lọc theo cơ sở đang chọn. Không thấy lớp mong đợi thì kiểm tra dòng `Campus:` ở góc trên bên trái.
 
-**Đi tiếp.** Class Schedule, Course Registration, Attendance Summary.
+**Đi tiếp.** Course Statistics, Class Schedule, Course Registration, Attendance Summary.
+
+## Course Statistics — Thống kê môn học
+
+**Dùng để làm gì.** Xem tình hình từng môn trong một kỳ: sĩ số, tỉ lệ chuyên cần, kết quả chung.
+
+**Ai vào được.** Người có quyền xem điểm danh.
+
+**Các bước**
+
+1. Vào **Academic Operations → Course Delivery → Course Statistics**.
+2. Chọn kỳ ở ô **Select semester**.
+3. Tìm môn cần xem bằng ô **Unit code or name...** (mã hoặc tên môn).
+
+**Lưu ý.** Phải chọn kỳ trước, nếu không màn hình sẽ không có dữ liệu.
+
+**Đi tiếp.** Failed Students (nhóm **Attendance**).
 
 ## Class Schedule — Lịch học
 
@@ -129,7 +146,7 @@ source:
 4. Bấm **Thêm ca thi** nếu cần thêm ca cho cùng đợt.
 5. Bấm **Phân công coi thi** để chọn cán bộ coi thi cho từng ca.
 
-**Lưu ý.** Đặt phòng thi trước ở khu vực **Campus Operations** để tránh trùng lịch với hoạt động khác.
+**Lưu ý.** Đặt phòng thi trước ở khu vực **Campus** để tránh trùng lịch với hoạt động khác.
 
 ## Canvas Courses — Liên kết Canvas
 
@@ -143,11 +160,21 @@ source:
 2. Xem khung **Integration Status** (Trạng thái kết nối) để chắc chắn kết nối đang hoạt động.
 3. Chọn lớp môn cần ghép rồi bấm **Map Course** (Ghép khóa học).
 4. Ghép nhiều lớp cùng lúc bằng **Select All** (Chọn tất cả) và **Deselect All** (Bỏ chọn tất cả).
-5. Nếu kết nối có vấn đề, bấm **Manage Integrations** hoặc **Go to Integrations** để mở phần cấu hình kết nối.
+5. Nếu kết nối có vấn đề, bấm **Manage Integrations** hoặc **Go to Integrations** để mở **Canvas Settings**.
 
 **Lưu ý.** Ghép sai lớp sẽ khiến sinh viên vào nhầm lớp học trực tuyến. Kiểm tra mã lớp và kỳ học trước khi xác nhận.
 
-**Đi tiếp.** Course Statistics.
+**Đi tiếp.** Canvas Settings.
+
+## Canvas Settings — Cấu hình kết nối Canvas
+
+**Dùng để làm gì.** Cấu hình kết nối tới hệ thống Canvas (khóa API, endpoint). Trước đây nằm ở nhóm Administration; nay chuyển về cạnh Canvas Courses vì cùng dùng chung một quyền (`view_canvas_integration`) và cùng phục vụ đội học vụ, không phải đội quản trị hệ thống.
+
+**Ai vào được.** Người có quyền xem tích hợp Canvas.
+
+**Các bước.** Vào **Academic Operations → Course Delivery → Canvas Settings**.
+
+**Đi tiếp.** Canvas Courses.
 
 ## Luồng đề xuất
 

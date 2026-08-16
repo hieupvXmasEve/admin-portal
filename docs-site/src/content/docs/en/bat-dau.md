@@ -9,7 +9,7 @@ source:
   - resources/js/constants/menu-sidebar.ts
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- group table rewritten for the new 10-group tree, plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
 This chapter gets you into the system and explains the layout. Read it once and every later chapter will make sense.
 
@@ -59,14 +59,13 @@ The main menu groups:
 | Menu group | Work it covers |
 | --- | --- |
 | Overview | Summary screen |
-| Academic Operations | Curriculum, terms, course offerings, attendance, grades |
-| Student Services | Student records, enrolment, decisions |
+| Academic Operations | Curriculum, terms, course offerings, attendance, grades, lecturers |
+| Students | Student records, enrolment, decisions |
 | Reports & Audits | Reports and data reconciliation |
-| Faculty & Teaching | Lecturers and teaching hours |
-| Finance Office | Fees: generation, collection, reconciliation |
-| Discounts & Funding | Scholarships, tuition plans, vouchers |
-| Forms & Quality | Forms and surveys |
-| Campus Operations | Rooms, bookings, events, clubs |
+| Finance | Fees: generation, collection, reconciliation, scholarships, tuition plans, vouchers |
+| Store & Clubs | The Gold redemption store, student clubs |
+| Campus | Rooms, bookings, events |
+| Forms & Surveys | Forms and surveys |
 | Communications | Email and notifications |
 | Administration | Users, permissions, system configuration |
 

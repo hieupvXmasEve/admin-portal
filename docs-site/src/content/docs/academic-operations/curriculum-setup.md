@@ -11,7 +11,7 @@ source:
   - resources/js/pages/Syllabus/TemplatesIndex.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Finance Office" renamed to "Finance", plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
 **Curriculum Setup** là nhóm trang chuẩn bị dữ liệu nền. Làm **một lần rồi dùng lại nhiều kỳ**, không phải việc hằng ngày.
 
@@ -133,4 +133,4 @@ Nếu dữ liệu ở nhóm này sai hoặc thiếu, các bước mở lớp, đ
 - Chương trình đào tạo và phiên bản chương trình đúng với khóa tuyển sinh.
 - Môn học đã có đủ thông tin: tín chỉ, môn tiên quyết.
 - Mẫu đề cương đã sẵn sàng cho môn cần mở.
-- Nếu có sinh viên học lại, kiểm tra phần học phí học lại ở khu vực Finance Office.
+- Nếu có sinh viên học lại, kiểm tra phần học phí học lại ở khu vực Finance.

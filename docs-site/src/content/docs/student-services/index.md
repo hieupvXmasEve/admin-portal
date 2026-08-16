@@ -1,5 +1,5 @@
 ---
-title: Student Services
+title: Students
 description: Hồ sơ sinh viên, ghi danh, tạm khóa học vụ và hồ sơ nhập học.
 source:
   - resources/js/constants/menu-sidebar.ts
@@ -8,9 +8,9 @@ source:
   - resources/js/pages/StudentApplications/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item) and Students/Index.vue change (internal stat-refresh fix, no visible behavior change) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Student Services" renamed to "Students", plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
-**Student Services** là nơi làm việc với **từng sinh viên**: hồ sơ, tình trạng ghi danh, và hồ sơ ứng tuyển đầu vào.
+**Students** là nơi làm việc với **từng sinh viên**: hồ sơ, tình trạng ghi danh, và hồ sơ ứng tuyển đầu vào.
 
 Phân biệt với nhóm **Reports & Audits**: bên đó là số liệu tổng hợp toàn trường, bên này là từng người cụ thể.
 
@@ -22,7 +22,7 @@ Phân biệt với nhóm **Reports & Audits**: bên đó là số liệu tổng 
 
 **Các bước**
 
-1. Vào **Student Services → Students**. Màn hình tên **Students Management**.
+1. Vào **Students → Students**. Màn hình tên **Students Management**.
 2. Tìm sinh viên bằng ô tìm kiếm hoặc bộ lọc.
 3. Bấm vào dòng sinh viên để mở hồ sơ chi tiết.
 4. Bấm **Đặt lại** để xóa toàn bộ điều kiện lọc.
@@ -49,7 +49,7 @@ Phân biệt với nhóm **Reports & Audits**: bên đó là số liệu tổng 
 
 **Các bước**
 
-1. Vào **Student Services → Enrollments & Holds**. Màn hình tên **Student Enrollments & Holds Management**.
+1. Vào **Students → Enrollments & Holds**. Màn hình tên **Student Enrollments & Holds Management**.
 2. Xem bảng **Student Enrollments** để biết ai đang ghi danh kỳ nào.
 3. Lọc để tìm nhóm cần xử lý.
 4. Mở từng dòng để xem hoặc thay đổi tình trạng.
@@ -70,7 +70,7 @@ Phân biệt với nhóm **Reports & Audits**: bên đó là số liệu tổng 
 
 **Các bước**
 
-1. Vào **Student Services → Student Applications**.
+1. Vào **Students → Student Applications**.
 2. Tìm hồ sơ bằng ô **Search name, email, code…**, hoặc lọc theo trạng thái (**Status**) và đợt tuyển sinh (**Intake**).
 3. Bấm vào tên tệp trong hồ sơ để mở giấy tờ đính kèm.
 4. Duyệt hồ sơ, hoặc từ chối.

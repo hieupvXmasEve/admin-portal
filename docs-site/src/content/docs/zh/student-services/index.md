@@ -1,5 +1,5 @@
 ---
-title: Student Services
+title: Students
 description: 学生档案、入学登记、学籍冻结与入学申请。
 source:
   - resources/js/constants/menu-sidebar.ts
@@ -8,9 +8,9 @@ source:
   - resources/js/pages/StudentApplications/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item) and Students/Index.vue change (internal stat-refresh fix, no visible behavior change) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Student Services" renamed to "Students", plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
-**Student Services** 是处理 **每一名具体学生** 的地方：档案、入学登记状态，以及入学申请。
+**Students** 是处理 **每一名具体学生** 的地方：档案、入学登记状态，以及入学申请。
 
 与 **Reports & Audits** 区分开来：那边是全校范围的汇总数据，这边是具体的个人。
 
@@ -22,7 +22,7 @@ source:
 
 **操作步骤**
 
-1. 进入 **Student Services → Students**。界面名称为 **Students Management**。
+1. 进入 **Students → Students**。界面名称为 **Students Management**。
 2. 使用搜索框或筛选器查找学生。
 3. 点击某行打开详细档案。
 4. 点击 **Đặt lại**（重置）清除全部筛选条件。
@@ -49,7 +49,7 @@ source:
 
 **操作步骤**
 
-1. 进入 **Student Services → Enrollments & Holds**。界面名称为 **Student Enrollments & Holds Management**。
+1. 进入 **Students → Enrollments & Holds**。界面名称为 **Student Enrollments & Holds Management**。
 2. 查看 **Student Enrollments** 表了解谁在哪个学期登记。
 3. 筛选出需要处理的群体。
 4. 打开某行查看或修改状态。
@@ -70,7 +70,7 @@ source:
 
 **操作步骤**
 
-1. 进入 **Student Services → Student Applications**。
+1. 进入 **Students → Student Applications**。
 2. 使用 **Search name, email, code…** 查找申请，或按状态（**Status**）和招生批次（**Intake**）筛选。
 3. 点击申请中的文件名打开附带材料。
 4. 批准或拒绝申请。

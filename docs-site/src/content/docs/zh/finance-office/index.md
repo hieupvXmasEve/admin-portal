@@ -1,5 +1,5 @@
 ---
-title: Finance Office
+title: Finance
 description: 生成收费、收款与对账、处理异常情况，以及奖学金和学费优惠。
 source:
   - resources/js/constants/menu-sidebar.ts
@@ -14,12 +14,12 @@ source:
   - resources/js/pages/TuitionPlans/Index.vue
   - resources/js/pages/Scholarships/Index.vue
   - resources/js/pages/StudentScholarships/Index.vue
-  - resources/js/pages/ScholarshipAdjustments/Index.vue
-  - resources/js/pages/ScholarshipAdjustments/Show.vue
   - resources/js/pages/Vouchers/Index.vue
 ---
 
-学费相关工作跨越两个菜单分组：**Finance Office**（收费项的生命周期）和 **Discounts & Funding**（减免与资助）。
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Finance Office (New UI)" renamed to "Finance"; Discounts & Funding folded in as a subgroup; Scholarship Adjustments moved out to Academic Operations > Grades & Performance (ADR-0026 makes it a Progression Action, not a Finance screen), plans/260816-2125-sidebar-menu-ia-restructure/). -->
+
+**Finance** 涵盖收费项的生命周期，以及其中的 **Discounts & Funding** 子分组（学费套餐、奖学金、优惠券）。
 
 一笔收费项按以下顺序推进：
 
@@ -42,7 +42,7 @@ source:
 - **SV chưa sinh phí** — 尚未生成任何收费项的学生；这通常是最紧急要处理的事项。
 - **Cần xử lý** — 待处理事项列表。
 
-**操作步骤。** 进入 **Finance Office → Hôm nay**。点击 **Làm mới**（刷新）获取最新数据。
+**操作步骤。** 进入 **Finance → Hôm nay**。点击 **Làm mới**（刷新）获取最新数据。
 
 **注意事项。** 学期进行到一半时 **SV chưa sinh phí** 不为零，意味着有学生在读却未被收费。应尽早处理，拖得越久越难追收。
 
@@ -52,7 +52,7 @@ source:
 
 **谁可以访问。** 拥有查看财务报表权限的人员。
 
-**操作步骤。** 进入 **Finance Office → Finance Reporting**，选择学期或时间范围，查看并导出报表。
+**操作步骤。** 进入 **Finance → Finance Reporting**，选择学期或时间范围，查看并导出报表。
 
 ## Doanh thu — 营收
 
@@ -60,7 +60,7 @@ source:
 
 **谁可以访问。** 拥有查看全校营收报表权限的人员（与按校区查看的 Finance Reporting 权限不同）。
 
-**操作步骤。** 进入 **Finance Office → Doanh thu**，查看按学期的表格和按校区/费用类型的明细。**未分配金额** 一行单独列出，不计入总额。
+**操作步骤。** 进入 **Finance → Doanh thu**，查看按学期的表格和按校区/费用类型的明细。**未分配金额** 一行单独列出，不计入总额。
 
 ## Sinh phí — 生成收费项
 
@@ -74,7 +74,7 @@ source:
 
 **操作步骤**
 
-1. 进入 **Finance Office → Sinh phí → Batch Studio**。
+1. 进入 **Finance → Sinh phí → Batch Studio**。
 2. 选择 **收费学期**——请明确选择，不要依赖默认值（默认是当前学期，可能与奖学金减免决定所针对的学期不同）。
 3. 选择学生群体和要生成的收费类型。
 4. 实际运行前先 **预览结果**。
@@ -100,7 +100,7 @@ source:
 
 **操作步骤**
 
-1. 进入 **Finance Office → Sinh phí → Pricing Operations**。
+1. 进入 **Finance → Sinh phí → Pricing Operations**。
 2. 在 **Rule versions**（规则版本）面板查看现有列表。
 3. 点击 **Create pricing rule version** 打开创建面板，填写信息后点击 **Create version**。
 
@@ -175,19 +175,19 @@ source:
 
 ## Discounts & Funding — 减免与资助
 
-独立菜单分组，决定学生实际需要支付的金额。
+**Finance** 内部的子分组，决定学生实际需要支付的金额。**Scholarship Adjustments**（因不及格产生的奖学金调整）不在此处——它属于 Progression Action，请在 **Academic Operations → Grades & Performance** 查看。
 
 ### Tuition Plans — 学费套餐
 
 **操作步骤**
 
-1. 进入 **Discounts & Funding → Tuition Plans**。
+1. 进入 **Finance → Discounts & Funding → Tuition Plans**。
 2. 点击 **Create Tuition Plan** 创建新套餐。
 3. 使用 **Filters** 面板查找已有套餐。
 
 ### Scholarships — 奖学金
 
-**操作步骤。** 进入 **Discounts & Funding → Scholarships**，使用 **Filter Scholarships** 面板查找、创建或编辑奖学金类型。
+**操作步骤。** 进入 **Finance → Discounts & Funding → Scholarships**，使用 **Filter Scholarships** 面板查找、创建或编辑奖学金类型。
 
 ### Student Scholarships — 学生奖学金分配
 
@@ -195,21 +195,13 @@ source:
 
 **谁可以访问。** 拥有分配奖学金权限的人员。
 
-**操作步骤。** 进入 **Discounts & Funding → Student Scholarships**，使用 **Filter Assignments** 面板查找，然后分配或取消。
+**操作步骤。** 进入 **Finance → Discounts & Funding → Student Scholarships**，使用 **Filter Assignments** 面板查找，然后分配或取消。
 
 **注意事项。** 应在生成收费项 **之前** 分配奖学金。事后分配的话，已生成的收费项不会自动减少，必须手动调整。
 
-### Scholarship Adjustments — 奖学金调整
-
-**用途。** 审查因挂科被列入名单的学生，记录面谈过程，决定下一学期是否降低其奖学金比例。系统不修改或删除原始奖学金——只针对受影响学期单独创建一条调整记录，若学生下学期不再挂科，系统会自动提议恢复原比例。
-
-**谁能访问。** 拥有奖学金调整档案查看/处理权限的人员（`view_scholarship_adjustment`、`approve_scholarship_adjustment`）。
-
-**分步指南：** [Scholarship Adjustments — 奖学金调整](/zh/finance-office/scholarship-adjustments/)（查找待审学生、安排面谈、学生确认、决定与审批、应用学费、下学期恢复）。
-
 ### Vouchers — 优惠券
 
-**操作步骤。** 进入 **Discounts & Funding → Vouchers**，使用 **Filter Vouchers** 面板管理优惠码。
+**操作步骤。** 进入 **Finance → Discounts & Funding → Vouchers**，使用 **Filter Vouchers** 面板管理优惠码。
 
 ## 常见情况
 

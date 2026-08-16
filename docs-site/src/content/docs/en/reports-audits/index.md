@@ -16,11 +16,11 @@ source:
   - resources/js/pages/Academic/Report/StudentUnits/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Student Services" renamed to "Students", plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
 **Reports & Audits** is the management area: university-wide figures, and the gaps where data is missing.
 
-Unlike **Student Services**, which handles one student at a time. Here each report row links **one way** into the relevant student record; there is no way back from the record to the report.
+Unlike **Students**, which handles one student at a time. Here each report row links **one way** into the relevant student record; there is no way back from the record to the report.
 
 Two groups: **Lifecycle & Decisions** and **Academic Performance**.
 

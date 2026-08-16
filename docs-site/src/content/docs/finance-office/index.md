@@ -1,5 +1,5 @@
 ---
-title: Finance Office
+title: Finance
 description: Sinh phí, thu tiền, đối soát, xử lý ngoại lệ, cùng học bổng và ưu đãi học phí.
 source:
   - resources/js/constants/menu-sidebar.ts
@@ -14,12 +14,12 @@ source:
   - resources/js/pages/TuitionPlans/Index.vue
   - resources/js/pages/Scholarships/Index.vue
   - resources/js/pages/StudentScholarships/Index.vue
-  - resources/js/pages/ScholarshipAdjustments/Index.vue
-  - resources/js/pages/ScholarshipAdjustments/Show.vue
   - resources/js/pages/Vouchers/Index.vue
 ---
 
-Khu vực học phí gồm hai nhóm menu: **Finance Office** (vòng đời khoản phí) và **Discounts & Funding** (giảm trừ, tài trợ).
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Finance Office (New UI)" renamed to "Finance"; Discounts & Funding folded in as a subgroup (Tuition Plans, Scholarships, Student Scholarships, Vouchers); Scholarship Adjustments moved out to Academic Operations > Grades & Performance (ADR-0026 makes it a Progression Action, not a Finance screen), plans/260816-2125-sidebar-menu-ia-restructure/). -->
+
+**Finance** gồm vòng đời khoản phí và một nhóm con **Discounts & Funding** (gói học phí, học bổng, voucher).
 
 Vòng đời một khoản phí đi theo thứ tự:
 
@@ -42,7 +42,7 @@ Sai ở bước sinh phí thì mọi bước sau đều sai theo. Đây là khu 
 - **SV chưa sinh phí** — sinh viên chưa được sinh khoản phí nào; đây thường là việc cần làm ngay.
 - **Cần xử lý** — danh sách việc tồn đọng.
 
-**Các bước.** Vào **Finance Office → Hôm nay**. Bấm **Làm mới** để lấy số liệu mới nhất.
+**Các bước.** Vào **Finance → Hôm nay**. Bấm **Làm mới** để lấy số liệu mới nhất.
 
 **Lưu ý.** Con số **SV chưa sinh phí** khác 0 vào giữa kỳ nghĩa là có sinh viên đang học mà chưa bị tính tiền. Xử lý sớm, để lâu càng khó truy thu.
 
@@ -52,7 +52,7 @@ Sai ở bước sinh phí thì mọi bước sau đều sai theo. Đây là khu 
 
 **Ai vào được.** Người có quyền xem báo cáo tài chính.
 
-**Các bước.** Vào **Finance Office → Finance Reporting**, chọn kỳ hoặc khoảng thời gian, xem và xuất báo cáo.
+**Các bước.** Vào **Finance → Finance Reporting**, chọn kỳ hoặc khoảng thời gian, xem và xuất báo cáo.
 
 ## Doanh thu
 
@@ -60,7 +60,7 @@ Sai ở bước sinh phí thì mọi bước sau đều sai theo. Đây là khu 
 
 **Ai vào được.** Người có quyền xem báo cáo doanh thu toàn trường (khác quyền xem Finance Reporting theo cơ sở).
 
-**Các bước.** Vào **Finance Office → Doanh thu**, xem bảng theo kỳ và bảng chi tiết theo cơ sở/loại phí. Dòng **tiền chưa phân bổ** tách riêng, không gộp vào tổng.
+**Các bước.** Vào **Finance → Doanh thu**, xem bảng theo kỳ và bảng chi tiết theo cơ sở/loại phí. Dòng **tiền chưa phân bổ** tách riêng, không gộp vào tổng.
 
 ## Sinh phí
 
@@ -74,7 +74,7 @@ Nhóm này tạo ra các khoản phải thu. Đây là bước rủi ro nhất t
 
 **Các bước**
 
-1. Vào **Finance Office → Sinh phí → Batch Studio**.
+1. Vào **Finance → Sinh phí → Batch Studio**.
 2. Chọn **học kỳ sinh phí** — chọn đúng học kỳ, không dùng mặc định (mặc định là học kỳ hiện tại, có thể khác học kỳ mà một quyết định giảm học bổng đang nhắm tới).
 3. Chọn nhóm sinh viên và loại phí cần sinh.
 4. **Xem trước kết quả** trước khi chạy thật.
@@ -100,7 +100,7 @@ Không thấy dòng học bổng dù sinh viên có học bổng → kiểm tra 
 
 **Các bước**
 
-1. Vào **Finance Office → Sinh phí → Pricing Operations**.
+1. Vào **Finance → Sinh phí → Pricing Operations**.
 2. Xem danh sách ở khung **Rule versions** (các phiên bản quy tắc).
 3. Bấm **Create pricing rule version** để mở khung tạo mới, điền thông tin rồi bấm **Create version**.
 
@@ -175,19 +175,19 @@ Nhóm chỉ đọc, dùng để tìm và đối chiếu.
 
 ## Discounts & Funding — Giảm trừ và tài trợ
 
-Nhóm menu riêng, quyết định sinh viên phải trả bao nhiêu.
+Nhóm con bên trong **Finance**, quyết định sinh viên phải trả bao nhiêu. Riêng **Scholarship Adjustments** (điều chỉnh học bổng do trượt môn) không nằm ở đây — đó là một Progression Action, xem ở nhóm **Academic Operations → Grades & Performance**.
 
 ### Tuition Plans — Gói học phí
 
 **Các bước**
 
-1. Vào **Discounts & Funding → Tuition Plans**.
+1. Vào **Finance → Discounts & Funding → Tuition Plans**.
 2. Bấm **Create Tuition Plan** để tạo gói mới.
 3. Dùng khung **Filters** để tìm gói đã có.
 
 ### Scholarships — Học bổng
 
-**Các bước.** Vào **Discounts & Funding → Scholarships**, dùng khung **Filter Scholarships** để tìm, tạo hoặc sửa loại học bổng.
+**Các bước.** Vào **Finance → Discounts & Funding → Scholarships**, dùng khung **Filter Scholarships** để tìm, tạo hoặc sửa loại học bổng.
 
 ### Student Scholarships — Gán học bổng cho sinh viên
 
@@ -195,21 +195,13 @@ Nhóm menu riêng, quyết định sinh viên phải trả bao nhiêu.
 
 **Ai vào được.** Người có quyền gán học bổng.
 
-**Các bước.** Vào **Discounts & Funding → Student Scholarships**, dùng khung **Filter Assignments** để tìm, rồi gán hoặc gỡ.
+**Các bước.** Vào **Finance → Discounts & Funding → Student Scholarships**, dùng khung **Filter Assignments** để tìm, rồi gán hoặc gỡ.
 
 **Lưu ý.** Gán học bổng **trước khi** sinh phí. Gán sau thì khoản phí đã sinh không tự giảm, phải điều chỉnh tay.
 
-### Scholarship Adjustments — Điều chỉnh học bổng
-
-**Dùng để làm gì.** Xét những sinh viên bị trượt môn, ghi nhận buổi phỏng vấn và quyết định học bổng của họ có bị giảm ở học kỳ sau hay không. Không sửa hoặc xóa học bổng gốc — chỉ tạo một điều chỉnh riêng cho học kỳ bị ảnh hưởng, học kỳ sau hệ thống tự đề xuất khôi phục nếu sinh viên không trượt môn nữa.
-
-**Ai vào được.** Người có quyền xem/xử lý hồ sơ điều chỉnh học bổng (`view_scholarship_adjustment`, `approve_scholarship_adjustment`).
-
-**Hướng dẫn từng bước:** [Scholarship Adjustments — Điều chỉnh học bổng](/finance-office/scholarship-adjustments/) (tìm sinh viên, đặt lịch phỏng vấn, xác nhận, ra quyết định, áp dụng và khôi phục kỳ sau).
-
 ### Vouchers
 
-**Các bước.** Vào **Discounts & Funding → Vouchers**, dùng khung **Filter Vouchers** để tìm và quản lý mã ưu đãi.
+**Các bước.** Vào **Finance → Discounts & Funding → Vouchers**, dùng khung **Filter Vouchers** để tìm và quản lý mã ưu đãi.
 
 ## Việc thường gặp
 

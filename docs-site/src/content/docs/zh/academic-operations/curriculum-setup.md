@@ -11,7 +11,7 @@ source:
   - resources/js/pages/Syllabus/TemplatesIndex.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Finance Office" renamed to "Finance", plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
 **Curriculum Setup** 用于准备基础数据。**做一次，跨多个学期重复使用**——不是日常工作。
 
@@ -133,4 +133,4 @@ source:
 - 培养方案与培养方案版本与该招生批次相符。
 - 课程已具备所需信息：学分、先修课程。
 - 要开班的课程已准备好教学大纲模板。
-- 如有学生要重修，请在 Finance Office 区域核实重修学费。
+- 如有学生要重修，请在 Finance 区域核实重修学费。

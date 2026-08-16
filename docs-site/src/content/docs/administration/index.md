@@ -12,7 +12,7 @@ source:
   - resources/js/pages/Admin/EmailMonitoring/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- Canvas Integrations moved out of Administration > Integrations to Academic Operations > Course Delivery (retitled Canvas Settings), plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
 **Administration** dành cho quản trị viên. Thay đổi ở đây ảnh hưởng tới **mọi người dùng**, không riêng bạn.
 
@@ -80,14 +80,12 @@ Nguyên tắc chung: đổi ít một, ghi lại lý do, và kiểm tra lại b�
 
 | Trang | Dùng để làm gì |
 | --- | --- |
-| Canvas Integrations | Cấu hình kết nối tới hệ thống học trực tuyến Canvas |
 | Staff Copilot | Theo dõi trợ lý AI dành cho nhân viên |
 | AI Provider Settings | Cấu hình nhà cung cấp dịch vụ AI |
 
-**Lưu ý**
+**Lưu ý.** Phần AI cần quyền riêng. Đổi cấu hình ở đây ảnh hưởng tính năng AI của toàn hệ thống.
 
-- **Canvas Integrations** là chỗ sửa khi màn hình **Canvas Courses** báo kết nối lỗi.
-- Phần AI cần quyền riêng. Đổi cấu hình ở đây ảnh hưởng tính năng AI của toàn hệ thống.
+Cấu hình kết nối Canvas (**Canvas Settings**) đã chuyển sang **Academic Operations → Course Delivery**, cạnh màn hình **Canvas Courses** mà nó phục vụ — cả hai dùng chung một quyền và cùng phục vụ đội học vụ.
 
 ## System Operations — Vận hành hệ thống
 
@@ -126,7 +124,7 @@ Nguyên tắc chung: đổi ít một, ghi lại lý do, và kiểm tra lại b�
 | Nhân viên mới vào làm | Users (thêm tài khoản, gán vai trò và cơ sở) |
 | "Tôi không thấy menu X" | Users (xem vai trò) → Roles & Permissions |
 | Nhân viên nghỉ việc | Users (vô hiệu hóa, không xóa) |
-| Canvas báo lỗi kết nối | Canvas Integrations |
+| Canvas báo lỗi kết nối | Canvas Settings (Academic Operations → Course Delivery) |
 | Đổi logo, tên hiển thị | System Configuration |
 | Điều tra một thay đổi bất thường | Activity Logs |
 | Thư toàn trường không gửi được | Email Monitoring → Email Configuration |

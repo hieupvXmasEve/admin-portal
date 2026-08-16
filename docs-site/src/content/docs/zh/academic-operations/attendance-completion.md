@@ -1,32 +1,15 @@
 ---
-title: Attendance & Completion
-description: 考勤跟踪、课程统计与不及格学生名单。
+title: Attendance
+description: 考勤跟踪与不及格学生名单。
 source:
   - resources/js/constants/menu-sidebar.ts
-  - resources/js/pages/CourseStatistics/Index.vue
   - resources/js/pages/Attendance/Index.vue
   - resources/js/pages/FailedStudents/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Attendance & Completion" renamed to "Attendance"; Course Statistics moved to Course Delivery, plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
-**Attendance & Completion** 用于检查学生出勤情况、课程完成结果，以及需要跟进处理的情况。
-
-## Course Statistics — 课程统计
-
-**用途。** 查看某学期各课程的情况：选课人数、出勤率、总体成绩。
-
-**谁可以访问。** 拥有查看考勤权限的人员。
-
-**操作步骤**
-
-1. 进入 **Academic Operations → Attendance & Completion → Course Statistics**。
-2. 在 **Select semester** 选择学期。
-3. 使用 **Unit code or name...**（课程代码或名称）查找课程。
-
-**注意事项。** 必须先选择学期，否则界面不会显示任何数据。
-
-**接下来。** Failed Students。
+**Attendance** 用于检查学生出勤情况，以及需要跟进处理的情况。各课程统计（**Course Statistics**）已移至 **Course Delivery** 分组。
 
 ## Attendance Summary — 考勤汇总
 
@@ -36,7 +19,7 @@ source:
 
 **操作步骤**
 
-1. 进入 **Academic Operations → Attendance & Completion → Attendance Summary**。
+1. 进入 **Academic Operations → Attendance → Attendance Summary**。
 2. 在 **Search students or sessions...** 输入以查找学生或课次。
 3. 进一步按状态（**All Statuses**）或考勤方式（**All Methods**）筛选。
 
@@ -55,7 +38,7 @@ source:
 
 **操作步骤**
 
-1. 进入 **Academic Operations → Attendance & Completion → Failed Students**。
+1. 进入 **Academic Operations → Attendance → Failed Students**。
 2. 使用 **Filters** 按学期、培养方案或课程筛选。
 3. 核对名单后转到 **Retake Registration** 开启重修。
 4. 点击 **Clear Filters** 恢复查看完整名单。
@@ -77,7 +60,7 @@ source:
 
 | 问题 | 应使用的页面 |
 | --- | --- |
-| 这个班有多少学生完成课程？ | Course Statistics |
+| 这个班有多少学生完成课程？ | Course Statistics（**Course Delivery** 分组） |
 | 谁的缺勤过多？ | Attendance Summary |
 | 哪些学生需要重修？ | Failed Students |
 | 是否需要发出警示？ | Warning Center |
@@ -86,4 +69,4 @@ source:
 
 - **Attendance Summary** 适合在课程进行期间及早跟踪。
 - **Failed Students** 适合在学期末成绩已出的阶段使用。
-- **Course Statistics** 是查看某一门具体课程情况的良好起点。
+- 查看某一门具体课程情况时，请使用 **Course Delivery** 分组下的 **Course Statistics**。

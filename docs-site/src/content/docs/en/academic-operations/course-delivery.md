@@ -1,6 +1,6 @@
 ---
 title: Course Delivery
-description: Opening classes, scheduling, registration, retakes, resits, and the Canvas link.
+description: Opening classes, scheduling, registration, retakes, resits, unit statistics, and the Canvas link.
 source:
   - resources/js/constants/menu-sidebar.ts
   - resources/js/pages/CourseOfferings/Index.vue
@@ -9,10 +9,11 @@ source:
   - resources/js/pages/Academic/RetakeCourse/Index.vue
   - resources/js/pages/Academic/ExamResit/Index.vue
   - resources/js/pages/Academic/ExamResit/Schedule/Index.vue
+  - resources/js/pages/CourseStatistics/Index.vue
   - resources/js/pages/Admin/Canvas/Courses/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- Course Statistics moved here from Attendance & Completion; Canvas Integrations moved here from Administration, retitled Canvas Settings, plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
 **Course Delivery** is the main work at the start of a term: opening classes, scheduling, registering students, and handling retakes and resits.
 
@@ -36,7 +37,23 @@ source:
 - Offerings must exist **before** registration opens for students.
 - The list is filtered to the selected campus by default. If an offering you expect is missing, check the `Campus:` line in the top left corner.
 
-**Next.** Class Schedule, Course Registration, Attendance Summary.
+**Next.** Course Statistics, Class Schedule, Course Registration, Attendance Summary.
+
+## Course Statistics
+
+**What it is for.** Seeing how each unit is doing in a term: enrolment, attendance rate, overall results.
+
+**Who can open it.** Anyone with permission to view attendance.
+
+**Steps**
+
+1. Go to **Academic Operations → Course Delivery → Course Statistics**.
+2. Choose the term in **Select semester**.
+3. Find the unit using **Unit code or name...**.
+
+**Note.** You must choose a term first, otherwise the screen shows nothing.
+
+**Next.** Failed Students (in the **Attendance** group).
 
 ## Class Schedule
 
@@ -129,7 +146,7 @@ source:
 4. Click **Thêm ca thi** (Add slot) for further slots in the same round.
 5. Click **Phân công coi thi** (Assign invigilators) to staff each slot.
 
-**Note.** Book exam rooms in **Campus Operations** first, so they do not clash with other activities.
+**Note.** Book exam rooms in **Campus** first, so they do not clash with other activities.
 
 ## Canvas Courses
 
@@ -143,11 +160,21 @@ source:
 2. Check the **Integration Status** panel to confirm the connection is working.
 3. Select the offering to link and click **Map Course**.
 4. To link several at once, use **Select All** and **Deselect All**.
-5. If the connection is faulty, click **Manage Integrations** or **Go to Integrations**.
+5. If the connection is faulty, click **Manage Integrations** or **Go to Integrations** to open **Canvas Settings**.
 
 **Note.** A wrong link sends students into the wrong online class. Check the offering code and the term before confirming.
 
-**Next.** Course Statistics.
+**Next.** Canvas Settings.
+
+## Canvas Settings
+
+**What it is for.** Configuring the connection to Canvas (API keys, endpoint). Previously lived under Administration; now sits next to Canvas Courses since both share the same permission (`view_canvas_integration`) and both serve the academic team, not system administrators.
+
+**Who can open it.** Anyone with permission to view the Canvas integration.
+
+**Steps.** Go to **Academic Operations → Course Delivery → Canvas Settings**.
+
+**Next.** Canvas Courses.
 
 ## Suggested flow
 

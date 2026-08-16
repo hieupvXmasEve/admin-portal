@@ -16,11 +16,11 @@ source:
   - resources/js/pages/Academic/Report/StudentUnits/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Student Services" renamed to "Students", plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
 **Reports & Audits** dành cho cấp quản lý: nhìn số liệu toàn trường và phát hiện chỗ dữ liệu bị thiếu.
 
-Khác với **Student Services** — bên đó xử lý từng sinh viên. Ở đây mỗi dòng báo cáo dẫn **một chiều** vào hồ sơ sinh viên liên quan; từ hồ sơ không quay ngược lại báo cáo được.
+Khác với **Students** — bên đó xử lý từng sinh viên. Ở đây mỗi dòng báo cáo dẫn **một chiều** vào hồ sơ sinh viên liên quan; từ hồ sơ không quay ngược lại báo cáo được.
 
 Hai nhóm: **Lifecycle & Decisions** (vòng đời và quyết định) và **Academic Performance** (kết quả học tập).
 

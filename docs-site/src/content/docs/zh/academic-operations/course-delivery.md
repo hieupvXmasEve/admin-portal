@@ -1,6 +1,6 @@
 ---
 title: Course Delivery
-description: 开班、排课、选课登记、重修、补考及 Canvas 关联。
+description: 开班、排课、选课登记、重修、补考、课程统计及 Canvas 关联。
 source:
   - resources/js/constants/menu-sidebar.ts
   - resources/js/pages/CourseOfferings/Index.vue
@@ -9,10 +9,11 @@ source:
   - resources/js/pages/Academic/RetakeCourse/Index.vue
   - resources/js/pages/Academic/ExamResit/Index.vue
   - resources/js/pages/Academic/ExamResit/Schedule/Index.vue
+  - resources/js/pages/CourseStatistics/Index.vue
   - resources/js/pages/Admin/Canvas/Courses/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- Course Statistics moved here from Attendance & Completion; Canvas Integrations moved here from Administration, retitled Canvas Settings, plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
 **Course Delivery** 是每学期开始时的核心工作：开班、排课、登记学生选课、处理重修和补考。
 
@@ -36,7 +37,23 @@ source:
 - 开班必须在向学生开放选课 **之前** 创建完成。
 - 列表默认按当前所选校区筛选。如果看不到预期的开班，检查左上角的 `Campus:` 一行。
 
-**接下来。** Class Schedule、Course Registration、Attendance Summary。
+**接下来。** Course Statistics、Class Schedule、Course Registration、Attendance Summary。
+
+## Course Statistics — 课程统计
+
+**用途。** 查看某学期各课程的情况：选课人数、出勤率、总体成绩。
+
+**谁可以访问。** 拥有查看考勤权限的人员。
+
+**操作步骤**
+
+1. 进入 **Academic Operations → Course Delivery → Course Statistics**。
+2. 在 **Select semester** 选择学期。
+3. 使用 **Unit code or name...**（课程代码或名称）查找课程。
+
+**注意事项。** 必须先选择学期，否则界面不会显示任何数据。
+
+**接下来。** Failed Students（**Attendance** 分组）。
 
 ## Class Schedule — 课表
 
@@ -129,7 +146,7 @@ source:
 4. 如需为同一批次添加更多时段，点击 **Thêm ca thi**（添加时段）。
 5. 点击 **Phân công coi thi**（分配监考）为各时段安排监考人员。
 
-**注意事项。** 先在 **Campus Operations** 预约考场，以避免与其他活动时间冲突。
+**注意事项。** 先在 **Campus** 预约考场，以避免与其他活动时间冲突。
 
 ## Canvas Courses — Canvas 关联
 
@@ -143,11 +160,21 @@ source:
 2. 查看 **Integration Status**（集成状态）面板，确认连接正常。
 3. 选择要关联的开班，点击 **Map Course**（关联课程）。
 4. 使用 **Select All**（全选）和 **Deselect All**（取消全选）一次性关联多个开班。
-5. 如果连接出现问题，点击 **Manage Integrations** 或 **Go to Integrations** 打开配置界面。
+5. 如果连接出现问题，点击 **Manage Integrations** 或 **Go to Integrations** 打开 **Canvas Settings**。
 
 **注意事项。** 关联错误会导致学生进入错误的在线课堂。确认前请核对开班代码和学期。
 
-**接下来。** Course Statistics。
+**接下来。** Canvas Settings。
+
+## Canvas Settings — Canvas 连接设置
+
+**用途。** 配置与 Canvas 系统的连接（API 密钥、端点）。此前位于 Administration 分组下；现移至 Canvas Courses 旁边，因为两者共用同一权限（`view_canvas_integration`），且都服务于学务团队，而非系统管理团队。
+
+**谁可以访问。** 拥有查看 Canvas 集成权限的人员。
+
+**操作步骤。** 进入 **Academic Operations → Course Delivery → Canvas Settings**。
+
+**接下来。** Canvas Courses。
 
 ## 建议流程
 

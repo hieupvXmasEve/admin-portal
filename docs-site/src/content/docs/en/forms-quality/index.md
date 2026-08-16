@@ -1,5 +1,5 @@
 ---
-title: Forms & Quality
+title: Forms & Surveys
 description: The form library, form runs, survey results, and the staff query inbox.
 source:
   - resources/js/constants/menu-sidebar.ts
@@ -9,9 +9,9 @@ source:
   - resources/js/pages/Forms/Queries/Inbox.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Forms & Quality" renamed to "Forms & Surveys"; Queries wrapper flattened, Staff Inbox promoted, plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
-**Forms & Quality** collects information from students: teaching quality surveys, registration forms, requests.
+**Forms & Surveys** collects information from students: teaching quality surveys, registration forms, requests.
 
 Three things to keep apart:
 
@@ -31,7 +31,7 @@ Do not create a new form each term. Create a new **run** from the form you alrea
 
 **Steps**
 
-1. Go to **Forms & Quality → Forms Library**.
+1. Go to **Forms & Surveys → Forms Library**.
 2. Create a form, or open an existing one to edit.
 3. Click **Clear** to reset the filters.
 
@@ -48,7 +48,7 @@ Do not create a new form each term. Create a new **run** from the form you alrea
 
 **Steps**
 
-1. Go to **Forms & Quality → Runs → Runs List**.
+1. Go to **Forms & Surveys → Runs → Runs List**.
 2. Narrow the list with the **Filters** panel.
 3. Click **Clear** to see everything again.
 4. Open a run to check its response progress.
@@ -59,7 +59,7 @@ Do not create a new form each term. Create a new **run** from the form you alrea
 
 **Steps**
 
-1. Go to **Forms & Quality → Runs → Create Run**.
+1. Go to **Forms & Surveys → Runs → Create Run**.
 2. Choose the form to send.
 3. Choose the recipient group and the period it stays open.
 4. Save to start the run.
@@ -77,7 +77,7 @@ Do not create a new form each term. Create a new **run** from the form you alrea
 
 **Who can open it.** Anyone with permission to view aggregate survey results.
 
-**Steps.** Go to **Forms & Quality → Surveys → Survey Results** and choose the run.
+**Steps.** Go to **Forms & Surveys → Surveys → Survey Results** and choose the run.
 
 **Note.** Teaching survey results are sensitive. Share them only within the scope you are permitted.
 
@@ -87,9 +87,7 @@ Do not create a new form each term. Create a new **run** from the form you alrea
 
 **Next.** Lecturer GPA, Course Ranking.
 
-## Queries
-
-### Staff Inbox
+## Staff Inbox
 
 **What it is for.** Receiving and handling requests and questions students submit through forms.
 
@@ -97,7 +95,7 @@ Do not create a new form each term. Create a new **run** from the form you alrea
 
 **Steps**
 
-1. Go to **Forms & Quality → Queries → Staff Inbox**.
+1. Go to **Forms & Surveys → Staff Inbox**.
 2. Open each request and read it.
 3. Reply, or pass it to the responsible team.
 

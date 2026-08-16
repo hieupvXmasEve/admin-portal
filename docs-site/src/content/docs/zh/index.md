@@ -5,7 +5,7 @@ source:
   - resources/js/constants/menu-sidebar.ts
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- Faculty & Teaching folded into Academic Operations; Campus Operations split into Campus and Store & Clubs; Student Services -> Students, Finance Office -> Finance, Forms & Quality -> Forms & Surveys, plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
 本指南面向在浏览器中使用 Portal 管理系统的 **教职员工**。无需技术知识。
 
@@ -15,20 +15,20 @@ source:
 
 初次使用者请先阅读 [开始使用](/zh/bat-dau/)：登录、选择校区、如何阅读界面。只需读一次，后续所有章节都能看懂。
 
-之后进入你负责的工作区域——下表十个区域对应十个菜单分组。
+之后进入你负责的工作区域——下表十个区域对应九个菜单分组。
 
 ## 覆盖范围
 
 | 区域 | 状态 |
 | --- | --- |
 | [开始使用](/zh/bat-dau/) | 已完成 |
-| [Academic Operations — 学务运营](/zh/academic-operations/) | 已完成 |
-| [Student Services — 学生服务](/zh/student-services/) | 已完成 |
+| [Academic Operations — 学务运营（含教师）](/zh/academic-operations/) | 已完成 |
+| [Students — 学生](/zh/student-services/) | 已完成 |
 | [Reports & Audits — 报表与核对](/zh/reports-audits/) | 已完成 |
-| [Faculty & Teaching — 教师与教学](/zh/faculty-teaching/) | 已完成 |
-| [Finance Office — 财务处](/zh/finance-office/) | 已完成 |
-| [Forms & Quality — 表单与问卷](/zh/forms-quality/) | 已完成 |
-| [Campus Operations — 教室、活动、社团](/zh/campus-operations/) | 已完成 |
+| [Finance — 财务处](/zh/finance-office/) | 已完成 |
+| [Store & Clubs — 商店与社团](/zh/store-clubs/) | 已完成 |
+| [Campus — 校园](/zh/campus/) | 已完成 |
+| [Forms & Surveys — 表单与问卷](/zh/forms-quality/) | 已完成 |
 | [Communications — 邮件、通知](/zh/communications/) | 已完成 |
 | [Administration — 用户、权限](/zh/administration/) | 已完成 |
 

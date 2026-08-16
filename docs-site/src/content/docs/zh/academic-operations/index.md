@@ -5,18 +5,22 @@ source:
   - resources/js/constants/menu-sidebar.ts
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- Attendance & Completion renamed to Attendance; Course Statistics moved to Course Delivery; Faculty and Scholarship Adjustments folded in, plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
 **Academic Operations** 是开展学务工作的区域：搭建培养方案框架、开班、管理选课登记、跟踪考勤、确定 GPA、识别有学业风险的学生。
 
-四个页面分组按学期推进顺序排列：
+共六个页面分组，前四个按学期推进顺序排列：
 
 1. **Curriculum Setup** — 框架：学期、培养方案、课程。
-2. **Course Delivery** — 开班、排课、选课登记、重修、补考。
-3. **Attendance & Completion** — 考勤跟踪与不及格学生筛查。
-4. **Grades & Performance** — 成绩确定、GPA、学业警示。
+2. **Course Delivery** — 开班、排课、选课登记、重修、补考、课程统计、Canvas 关联。
+3. **Attendance** — 考勤跟踪与不及格学生筛查。
+4. **Grades & Performance** — 成绩确定、GPA、学业警示、因不及格产生的奖学金调整。
 
-顺序错乱会卡住流程：没有学期就无法开班，没有开班就无法登记选课学生。
+另有一个分组独立于学期顺序：
+
+- **Faculty** — 教师档案、授课工时、所授班级的成绩。
+
+前四个分组顺序错乱会卡住流程：没有学期就无法开班，没有开班就无法登记选课学生。
 
 ## 使用对象
 
@@ -32,9 +36,10 @@ source:
 | 分组 | 在以下情况从此开始 |
 | --- | --- |
 | [Curriculum Setup](/zh/academic-operations/curriculum-setup/) | 新学期前准备基础数据，或更新培养方案 |
-| [Course Delivery](/zh/academic-operations/course-delivery/) | 开班、排课、登记选课学生、处理重修和补考 |
-| [Attendance & Completion](/zh/academic-operations/attendance-completion/) | 检查考勤、不及格学生、班级统计 |
-| [Grades & Performance](/zh/academic-operations/grades-performance/) | 确定 GPA、查询历史成绩、审阅警示 |
+| [Course Delivery](/zh/academic-operations/course-delivery/) | 开班、排课、登记选课学生、处理重修和补考、查看课程统计 |
+| [Attendance](/zh/academic-operations/attendance-completion/) | 检查考勤、不及格学生 |
+| [Grades & Performance](/zh/academic-operations/grades-performance/) | 确定 GPA、查询历史成绩、审阅警示、审核奖学金调整 |
+| [Faculty](/zh/academic-operations/faculty/) | 查询教师档案、授课工时或班级成绩 |
 
 不熟悉系统？先阅读 [页面流程图](/zh/academic-operations/flow-map/) 了解各页面如何衔接。
 
@@ -55,12 +60,17 @@ source:
 | Course Delivery | Thi lại（补考） | 建立并跟踪补考名单 |
 | Course Delivery | Lịch thi lại（补考安排） | 考试时段、考场、监考安排 |
 | Course Delivery | Canvas Courses | 将开班与其在线课程关联 |
-| Attendance & Completion | Course Statistics | 本学期各课程的进展情况 |
-| Attendance & Completion | Attendance Summary | 按学生、按课次查询考勤记录 |
-| Attendance & Completion | Failed Students | 不及格学生及其原因 |
+| Course Delivery | Course Statistics | 本学期各课程的进展情况 |
+| Course Delivery | Canvas Settings | 配置与 Canvas 系统的连接 |
+| Attendance | Attendance Summary | 按学生、按课次查询考勤记录 |
+| Attendance | Failed Students | 不及格学生及其原因 |
 | Grades & Performance | GPA Management | 确定某学期的 GPA |
 | Grades & Performance | GPA History | 查询以往学期已确定的 GPA |
 | Grades & Performance | Warning Center | 处于学业或考勤警示中的学生 |
+| Grades & Performance | Scholarship Adjustments | 审核因不及格产生的奖学金调整 |
+| Faculty | Lecturer List | 教师名单与档案 |
+| Faculty | Lecturer Hours | 按学期统计的授课工时 |
+| Faculty | Lecturer GPA | 教师所授班级的平均成绩 |
 
 全校范围的报表——Performance Dashboard、Academic Report、Course Ranking——位于独立的 **Reports & Audits** 菜单分组中。
 

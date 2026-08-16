@@ -12,7 +12,7 @@ source:
   - resources/js/pages/Admin/EmailMonitoring/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- Canvas Integrations moved out of Administration > Integrations to Academic Operations > Course Delivery (retitled Canvas Settings), plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
 **Administration**은 관리자를 위한 영역입니다. 이곳의 변경은 본인뿐 아니라 **모든 사용자**에게 영향을 줍니다.
 
@@ -80,14 +80,12 @@ source:
 
 | 화면 | 용도 |
 | --- | --- |
-| Canvas Integrations | 온라인 학습 시스템 Canvas와의 연결 설정 |
 | Staff Copilot | 교직원용 AI 도우미 현황 확인 |
 | AI Provider Settings | AI 서비스 제공자 설정 |
 
-**유의 사항**
+**유의 사항.** AI 관련 화면은 별도 권한이 필요합니다. 이곳의 변경은 시스템 전체의 AI 기능에 영향을 줍니다.
 
-- **Canvas Courses** 화면에서 연결 오류가 표시되면 **Canvas Integrations**에서 수정합니다.
-- AI 관련 화면은 별도 권한이 필요합니다. 이곳의 변경은 시스템 전체의 AI 기능에 영향을 줍니다.
+Canvas 연결 설정(**Canvas Settings**)은 **Academic Operations → Course Delivery**로 이동했습니다. 이 설정이 지원하는 **Canvas Courses** 화면 바로 옆이며, 두 화면 모두 같은 권한을 쓰고 학사팀이 사용합니다.
 
 ## System Operations — 시스템 운영
 
@@ -126,7 +124,7 @@ source:
 | 신규 직원 입사 | Users(계정 추가, 역할과 캠퍼스 지정) |
 | "X 메뉴가 보이지 않습니다" | Users(역할 확인) → Roles & Permissions |
 | 직원 퇴직 | Users(사용 중지, 삭제 금지) |
-| Canvas 연결 오류 | Canvas Integrations |
+| Canvas 연결 오류 | Canvas Settings(Academic Operations → Course Delivery) |
 | 로고나 표시 이름 변경 | System Configuration |
 | 예상치 못한 변경 조사 | Activity Logs |
 | 전교 메일 장애 | Email Monitoring → Email Configuration |

@@ -1,32 +1,15 @@
 ---
-title: Attendance & Completion
-description: Tracking attendance, unit statistics, and the list of students who failed.
+title: Attendance
+description: Tracking attendance and the list of students who failed.
 source:
   - resources/js/constants/menu-sidebar.ts
-  - resources/js/pages/CourseStatistics/Index.vue
   - resources/js/pages/Attendance/Index.vue
   - resources/js/pages/FailedStudents/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Attendance & Completion" renamed to "Attendance"; Course Statistics moved to Course Delivery, plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
-**Attendance & Completion** is where you check how students are attending, how classes finished, and which cases need follow-up.
-
-## Course Statistics
-
-**What it is for.** Seeing how each unit is doing in a term: enrolment, attendance rate, overall results.
-
-**Who can open it.** Anyone with permission to view attendance.
-
-**Steps**
-
-1. Go to **Academic Operations → Attendance & Completion → Course Statistics**.
-2. Choose the term in **Select semester**.
-3. Find the unit using **Unit code or name...**.
-
-**Note.** You must choose a term first, otherwise the screen shows nothing.
-
-**Next.** Failed Students.
+**Attendance** is where you check how students are attending and which cases need follow-up. Per-unit statistics (**Course Statistics**) moved to the **Course Delivery** group.
 
 ## Attendance Summary
 
@@ -36,7 +19,7 @@ source:
 
 **Steps**
 
-1. Go to **Academic Operations → Attendance & Completion → Attendance Summary**.
+1. Go to **Academic Operations → Attendance → Attendance Summary**.
 2. Type in **Search students or sessions...** to find a student or a session.
 3. Narrow further by status (**All Statuses**) or by how attendance was taken (**All Methods**).
 
@@ -55,7 +38,7 @@ source:
 
 **Steps**
 
-1. Go to **Academic Operations → Attendance & Completion → Failed Students**.
+1. Go to **Academic Operations → Attendance → Failed Students**.
 2. Use **Filters** to narrow by term, program, or unit.
 3. Check the list, then move to **Retake Registration** to open retakes.
 4. Click **Clear Filters** to see the whole list again.
@@ -77,7 +60,7 @@ source:
 
 | Question | Page to use |
 | --- | --- |
-| How many students completed this class? | Course Statistics |
+| How many students completed this class? | Course Statistics (**Course Delivery** group) |
 | Who is missing too many classes? | Attendance Summary |
 | Which students need to retake? | Failed Students |
 | Should we send a warning? | Warning Center |
@@ -86,4 +69,4 @@ source:
 
 - **Attendance Summary** suits early tracking while the class is still running.
 - **Failed Students** suits the point where end-of-term results exist.
-- **Course Statistics** is the best entry point when investigating one specific unit.
+- Investigating one specific unit? Use **Course Statistics** in the **Course Delivery** group.

@@ -16,11 +16,11 @@ source:
   - resources/js/pages/Academic/Report/StudentUnits/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Student Services" renamed to "Students", plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
 **Reports & Audits**는 관리자용 영역입니다. 전교 단위 수치를 보고, 자료가 빠진 곳을 찾아냅니다.
 
-학생 한 명씩 처리하는 **Student Services**와 다릅니다. 이곳에서는 보고서의 각 행이 해당 학생 기록으로 **한 방향으로만** 연결됩니다. 학생 기록에서 보고서로 되돌아오는 경로는 없습니다.
+학생 한 명씩 처리하는 **Students**와 다릅니다. 이곳에서는 보고서의 각 행이 해당 학생 기록으로 **한 방향으로만** 연결됩니다. 학생 기록에서 보고서로 되돌아오는 경로는 없습니다.
 
 두 그룹으로 나뉩니다. **Lifecycle & Decisions**와 **Academic Performance**입니다.
 

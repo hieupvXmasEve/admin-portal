@@ -14,7 +14,7 @@ source:
   - resources/js/pages/Admin/Notifications/Ops/Deliveries.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Finance Office" renamed to "Finance", plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
 **Communications** sends mail and notifications outward, and gives you the tools to check whether they arrived.
 
@@ -118,4 +118,4 @@ Three screens for checking that notifications actually go out.
 | A student did not receive an email | Email History → check their spam folder |
 | A notification did not arrive | Messages → Outbox → Deliveries |
 | University-wide mail suddenly fails | Email Configuration (check Success Rate) |
-| Fee due reminders | Bulk Email, or DNG Due Reminders in the Finance Office area |
+| Fee due reminders | Bulk Email, or DNG Due Reminders in the Finance area |

@@ -12,7 +12,7 @@ source:
   - resources/js/pages/Admin/EmailMonitoring/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- Canvas Integrations moved out of Administration > Integrations to Academic Operations > Course Delivery (retitled Canvas Settings), plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
 **Administration** is for administrators. Changes here affect **every user**, not just you.
 
@@ -80,14 +80,12 @@ General rule: change one thing at a time, record why, and verify with a real acc
 
 | Page | What it is for |
 | --- | --- |
-| Canvas Integrations | Configuring the connection to Canvas, the online learning system |
 | Staff Copilot | Monitoring the AI assistant available to staff |
 | AI Provider Settings | Configuring the AI service provider |
 
-**Notes**
+**Note.** The AI pages require their own permissions. Changes here affect AI features across the whole system.
 
-- **Canvas Integrations** is where you fix things when the **Canvas Courses** screen reports a broken connection.
-- The AI pages require their own permissions. Changes here affect AI features across the whole system.
+Canvas connection settings (**Canvas Settings**) moved to **Academic Operations → Course Delivery**, next to the **Canvas Courses** screen it serves — both share the same permission and both serve the academic team.
 
 ## System Operations
 
@@ -126,7 +124,7 @@ General rule: change one thing at a time, record why, and verify with a real acc
 | A new staff member joins | Users (add account, assign role and campuses) |
 | "I cannot see menu X" | Users (check their role) → Roles & Permissions |
 | A staff member leaves | Users (disable, do not delete) |
-| Canvas reports a connection error | Canvas Integrations |
+| Canvas reports a connection error | Canvas Settings (Academic Operations → Course Delivery) |
 | Changing the logo or display name | System Configuration |
 | Investigating an unexpected change | Activity Logs |
 | University-wide mail failure | Email Monitoring → Email Configuration |

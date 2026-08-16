@@ -14,7 +14,7 @@ source:
   - resources/js/pages/Admin/Notifications/Ops/Deliveries.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Finance Office" renamed to "Finance", plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
 **Communications** là nơi gửi thư và thông báo ra ngoài, cùng công cụ kiểm tra thư đã tới nơi chưa.
 
@@ -118,4 +118,4 @@ Ba màn hình để kiểm tra thông báo có đi được không.
 | Sinh viên báo không nhận được thư | Email History → kiểm tra hộp thư rác của họ |
 | Thông báo không tới nơi | Messages → Outbox → Deliveries |
 | Thư của cả trường đột nhiên không gửi được | Email Configuration (xem Success Rate) |
-| Nhắc hạn đóng học phí | Bulk Email, hoặc DNG Due Reminders ở khu vực Finance Office |
+| Nhắc hạn đóng học phí | Bulk Email, hoặc DNG Due Reminders ở khu vực Finance |

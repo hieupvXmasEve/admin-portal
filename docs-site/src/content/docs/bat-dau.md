@@ -9,7 +9,7 @@ source:
   - resources/js/constants/menu-sidebar.ts
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- group table rewritten for the new 10-group tree, plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
 Chương này giúp bạn vào được hệ thống và hiểu bố cục màn hình. Đọc một lần là đủ dùng cho mọi chương sau.
 
@@ -59,14 +59,13 @@ Các nhóm menu chính:
 | Nhóm menu | Công việc |
 | --- | --- |
 | Overview | Màn hình tổng quan |
-| Academic Operations | Học vụ: chương trình, kỳ học, lớp môn, điểm danh, điểm |
-| Student Services | Hồ sơ sinh viên, nhập học, quyết định |
+| Academic Operations | Học vụ: chương trình, kỳ học, lớp môn, điểm danh, điểm, giảng viên |
+| Students | Hồ sơ sinh viên, nhập học, quyết định |
 | Reports & Audits | Báo cáo và đối chiếu số liệu |
-| Faculty & Teaching | Giảng viên, giờ dạy |
-| Finance Office | Học phí: sinh phí, thu tiền, đối soát |
-| Discounts & Funding | Học bổng, gói học phí, voucher |
-| Forms & Quality | Biểu mẫu, khảo sát |
-| Campus Operations | Phòng học, đặt phòng, sự kiện, câu lạc bộ |
+| Finance | Học phí: sinh phí, thu tiền, đối soát, học bổng, gói học phí, voucher |
+| Store & Clubs | Cửa hàng đổi Gold, câu lạc bộ |
+| Campus | Phòng học, đặt phòng, sự kiện |
+| Forms & Surveys | Biểu mẫu, khảo sát |
 | Communications | Email và thông báo |
 | Administration | Người dùng, phân quyền, cấu hình hệ thống |
 

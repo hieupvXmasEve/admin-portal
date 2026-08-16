@@ -14,7 +14,7 @@ source:
   - resources/js/pages/Admin/Notifications/Ops/Deliveries.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (new "Doanh thu" revenue nav item under Finance Office) -- no update needed here. -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Finance Office" renamed to "Finance", plans/260816-2125-sidebar-menu-ia-restructure/). -->
 
 **Communications** 用于向外发送邮件和通知，并提供检查是否送达的工具。
 
@@ -118,4 +118,4 @@ source:
 | 学生反馈未收到邮件 | Email History → 检查其垃圾邮件箱 |
 | 通知未送达 | Messages → Outbox → Deliveries |
 | 全校邮件突然发不出去 | Email Configuration（查看 Success Rate） |
-| 学费缴纳到期提醒 | Bulk Email，或 Finance Office 区域的 DNG Due Reminders |
+| 学费缴纳到期提醒 | Bulk Email，或 Finance 区域的 DNG Due Reminders |
