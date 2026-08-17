@@ -22,6 +22,7 @@ const props = defineProps<{
     blockCounts?: Record<string, number>;
     majorDetails?: boolean;
     majorContext?: BatchPreviewMajorContext | null;
+    creditOffsetColumn?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -266,7 +267,7 @@ function sortIcon(key: SortKey) {
                                 <TableHead class="w-36 px-4">Phân loại</TableHead>
                                 <TableHead v-if="blockCountControls" class="w-32 px-4">Số block</TableHead>
                                 <TableHead class="w-36 cursor-pointer px-4 text-right" @click="toggleSort('net')"> Số tiền <component :is="sortIcon('net')" class="inline h-3 w-3" /> </TableHead>
-                                <TableHead v-if="majorDetails" class="w-44 cursor-pointer px-4 text-right" @click="toggleSort('unapplied_credit')">
+                                <TableHead v-if="creditOffsetColumn" class="w-44 cursor-pointer px-4 text-right" @click="toggleSort('unapplied_credit')">
                                     Số dư / Dự kiến trừ <component :is="sortIcon('unapplied_credit')" class="inline h-3 w-3" />
                                 </TableHead>
                                 <TableHead class="min-w-[12rem] px-4">Lý do</TableHead>
@@ -324,7 +325,7 @@ function sortIcon(key: SortKey) {
                                     </template>
                                     <template v-else>{{ formatCurrency(displayAmount(l)) }}</template>
                                 </TableCell>
-                                <TableCell v-if="majorDetails" class="px-4 py-3 text-right align-middle font-mono text-sm tabular-nums">
+                                <TableCell v-if="creditOffsetColumn" class="px-4 py-3 text-right align-middle font-mono text-sm tabular-nums">
                                     <template v-if="hasUnappliedCredit(l)">
                                         <div class="text-muted-foreground text-xs">Dư: {{ formatCurrency(l.display.unapplied_credit ?? 0) }}</div>
                                         <div v-if="hasProjectedOffset(l)" class="font-medium text-amber-600">Dự kiến trừ: -{{ formatCurrency(l.display.credit_offset_projected ?? 0) }}</div>
@@ -337,7 +338,7 @@ function sortIcon(key: SortKey) {
                                 </TableCell>
                             </TableRow>
                             <TableRow v-if="rows.length === 0">
-                                <TableCell :colspan="(blockCountControls ? 6 : 5) + (majorDetails ? 3 : 0)" class="text-muted-foreground px-4 py-10 text-center"> Không có dòng nào khớp bộ lọc. </TableCell>
+                                <TableCell :colspan="(blockCountControls ? 6 : 5) + (majorDetails ? 2 : 0) + (creditOffsetColumn ? 1 : 0)" class="text-muted-foreground px-4 py-10 text-center"> Không có dòng nào khớp bộ lọc. </TableCell>
                             </TableRow>
                         </TableBody>
                     </Table>

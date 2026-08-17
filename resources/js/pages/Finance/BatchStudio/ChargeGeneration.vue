@@ -273,6 +273,7 @@ function prepareNonAcademicScope(): boolean {
                     :block-counts="blockOverrides"
                     :major-details="wizard.setup.fee_category === 'major'"
                     :major-context="wizard.summary.value.major_context"
+                    :credit-offset-column="wizard.setup.fee_category === 'major' || isEgc"
                     exportable
                     @toggle="wizard.toggle"
                     @select-all="(keys) => wizard.setSelection(keys, true)"
