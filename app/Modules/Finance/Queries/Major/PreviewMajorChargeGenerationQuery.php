@@ -13,10 +13,10 @@ use App\Modules\Finance\Models\FinanceSetting;
 use App\Modules\Finance\Queries\GetActiveScholarshipAdjustmentQuery;
 use App\Modules\Finance\Queries\GetUnresolvedPriorAdjustmentQuery;
 use App\Modules\Finance\Services\DeferChargeResolver;
+use App\Modules\Finance\Support\CreditOffsetProjector;
 use App\Modules\Finance\Support\PendingScholarshipRestorationReader;
 use App\Modules\Finance\Support\ScholarshipDiscountResolver;
 use App\Modules\Finance\Support\StudentChargeTimingResolver;
-use App\Modules\Finance\Support\StudentFinanceSettlementPositionReader;
 use App\Modules\Finance\Support\VoucherDiscountAmountResolver;
 use App\Shared\Contracts\Academic\DTO\ProgramEnrollmentSummary;
 use App\Shared\Contracts\Academic\PendingScholarshipAdjustmentReader;
@@ -33,7 +33,7 @@ class PreviewMajorChargeGenerationQuery
         private readonly StudentChargeTimingResolver $timingResolver,
         private readonly VoucherDiscountAmountResolver $voucherDiscountAmountResolver,
         private readonly DeferChargeResolver $deferChargeResolver,
-        private readonly StudentFinanceSettlementPositionReader $settlementPositionReader,
+        private readonly CreditOffsetProjector $creditOffsetProjector,
     ) {}
 
     /**
@@ -135,7 +135,7 @@ class PreviewMajorChargeGenerationQuery
             ->whereIn('student_id', array_keys($references))
             ->get()
             ->groupBy('student_id');
-        $unappliedCashByStudent = $this->settlementPositionReader
+        $unappliedCashByStudent = $this->creditOffsetProjector
             ->unappliedCashForStudents(array_values(array_keys($references)));
         $creditOffsetSettings = FinanceSetting::current();
 
@@ -272,22 +272,9 @@ class PreviewMajorChargeGenerationQuery
         $voucher = $this->resolveVoucher($student->id, $voucherApplications, $semesterId);
         $netAmount = max(0.0, (float) $amount - $scholarship['amount'] - $voucher['amount']);
 
-        // Approximates CreateFinanceChargeAction::applyUnappliedCreditToCharge():
-        // capped at the charge's own outstanding (net_amount here, since
-        // scholarship/voucher land before the real offset would run) and
-        // only projected when the config gate + threshold are both met.
-        // Known divergence: the real offset sums each Payment's
-        // unapplied_amount (amount minus applications only), while this
-        // preview's $unappliedCash also subtracts PaymentSurplusDisposition
-        // rows (refund/forfeit) — a student with a disposed surplus can see
-        // a real deduction larger than what this preview projects.
-        $creditOffsetProjected = 0.0;
-        if ($creditOffsetSettings->credit_offset_enabled
-            && $unappliedCash > 0
-            && $unappliedCash >= (float) $creditOffsetSettings->credit_offset_min_balance
-        ) {
-            $creditOffsetProjected = min($unappliedCash, $netAmount);
-        }
+        // Approximates CreateFinanceChargeAction::applyUnappliedCreditToCharge();
+        // see CreditOffsetProjector docblock for the known divergence.
+        $creditOffset = $this->creditOffsetProjector->project($unappliedCash, $netAmount, $creditOffsetSettings);
 
         return array_merge($base, [
             'eligibility_status' => 'eligible',
@@ -304,8 +291,8 @@ class PreviewMajorChargeGenerationQuery
             'voucher_codes' => $voucher['codes'],
             'voucher_amount' => $voucher['amount'],
             'net_amount' => $netAmount,
-            'unapplied_credit' => $unappliedCash,
-            'credit_offset_projected' => $creditOffsetProjected,
+            'unapplied_credit' => $creditOffset['unapplied_credit'],
+            'credit_offset_projected' => $creditOffset['credit_offset_projected'],
         ]);
     }
 

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Queries\Egc;
 
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceSetting;
+use App\Modules\Finance\Support\CreditOffsetProjector;
 use App\Modules\Finance\Support\EgcBlockFinanceResolver;
 use App\Modules\Finance\Support\EgcBlockGenerationClassifier;
 use App\Modules\Finance\Support\EgcLevelFeeResolver;
@@ -25,6 +27,8 @@ class PreviewEgcChargeGenerationQuery
     private ?EgcBlockGenerationClassifier $blockClassifier = null;
 
     private ?AcademicFinanceChargeSourceGateway $academicSources = null;
+
+    private ?CreditOffsetProjector $creditOffsetProjector = null;
 
     public function handle(int $semesterId, array $filters = [], ?int $campusId = null): array
     {
@@ -103,6 +107,9 @@ class PreviewEgcChargeGenerationQuery
 
         $references = app(StudentReferenceReader::class)->findMany($eligibleStudentIds);
         $enrollments = app(ProgramEnrollmentReader::class)->forStudentIds(array_keys($references));
+        $unappliedCashByStudent = $this->creditOffsetProjector()
+            ->unappliedCashForStudents(array_values(array_keys($references)));
+        $creditOffsetSettings = FinanceSetting::current();
 
         return collect($references)
             ->filter(fn (StudentReference $reference): bool => ! in_array($reference->studentCode, $ignoredStudentIds, true))
@@ -111,11 +118,18 @@ class PreviewEgcChargeGenerationQuery
                 $reference,
                 $enrollments[$reference->id] ?? app(ProgramEnrollmentReader::class)->forStudentId($reference->id),
                 $semesterId,
+                (float) ($unappliedCashByStudent[$reference->id] ?? 0.0),
+                $creditOffsetSettings,
             ));
     }
 
-    private function classify(StudentReference $student, ProgramEnrollmentSummary $enrollment, int $semesterId): array
-    {
+    private function classify(
+        StudentReference $student,
+        ProgramEnrollmentSummary $enrollment,
+        int $semesterId,
+        float $unappliedCash,
+        FinanceSetting $creditOffsetSettings,
+    ): array {
         $base = $this->baseRow($student);
 
         if ($enrollment->egcCurrentLevel === null) {
@@ -209,6 +223,9 @@ class PreviewEgcChargeGenerationQuery
                 ]);
             }
 
+            $reissueNetAmount = collect($chargeableLevels)->sum('amount');
+            $reissueCreditOffset = $this->creditOffsetProjector()->project($unappliedCash, (float) $reissueNetAmount, $creditOffsetSettings);
+
             return array_merge($base, [
                 'eligibility_status' => 'eligible',
                 'eligibility_reason' => $blockState->reason,
@@ -222,6 +239,8 @@ class PreviewEgcChargeGenerationQuery
                 'max_chargeable_blocks' => count($chargeableLevels),
                 'existing_egc_blocks' => $this->egcBlockRows($blockState->blocks),
                 'chargeable_levels' => $chargeableLevels,
+                'unapplied_credit' => $reissueCreditOffset['unapplied_credit'],
+                'credit_offset_projected' => $reissueCreditOffset['credit_offset_projected'],
             ]);
         }
 
@@ -259,6 +278,17 @@ class PreviewEgcChargeGenerationQuery
             ]);
         }
 
+        $chargeableLevels = $this->resolveChargeableLevels($student->id, $effectiveStartLevel, $maxChargeableBlocks);
+
+        // GenerateEgcChargesAction charges every deferred block unconditionally
+        // (not capped by maxChargeableBlocks) — the projected net amount must
+        // include them too, or a deferred-only row understates to zero.
+        $deferredNetAmount = $deferredBlocks->sum(
+            fn (AcademicEgcBlockData $block): float => $this->egcFeeResolver()->resolve((int) $block->level_number)
+        );
+        $netAmount = (float) collect($chargeableLevels)->sum('amount') + $deferredNetAmount;
+        $creditOffset = $this->creditOffsetProjector()->project($unappliedCash, $netAmount, $creditOffsetSettings);
+
         return array_merge($base, [
             'eligibility_status' => 'eligible',
             'eligibility_reason' => null,
@@ -273,7 +303,9 @@ class PreviewEgcChargeGenerationQuery
                 'block_number' => $b->block_number,
                 'level_number' => $b->level_number,
             ])->all(),
-            'chargeable_levels' => $this->resolveChargeableLevels($student->id, $effectiveStartLevel, $maxChargeableBlocks),
+            'chargeable_levels' => $chargeableLevels,
+            'unapplied_credit' => $creditOffset['unapplied_credit'],
+            'credit_offset_projected' => $creditOffset['credit_offset_projected'],
         ]);
     }
 
@@ -345,6 +377,11 @@ class PreviewEgcChargeGenerationQuery
     private function blockClassifier(): EgcBlockGenerationClassifier
     {
         return $this->blockClassifier ??= app(EgcBlockGenerationClassifier::class);
+    }
+
+    private function creditOffsetProjector(): CreditOffsetProjector
+    {
+        return $this->creditOffsetProjector ??= app(CreditOffsetProjector::class);
     }
 
     private function isRetakeEligible(int $studentId, int $levelNumber): bool
