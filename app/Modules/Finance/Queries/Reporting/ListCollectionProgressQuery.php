@@ -20,6 +20,7 @@ use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
 use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
+use App\Shared\Support\Academic\StudentLifecycleStatusPresenter;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -53,9 +54,8 @@ final class ListCollectionProgressQuery
     public function handle(int $semesterId, array $filters = [], ?CarbonImmutable $asOf = null): array
     {
         $rows = $this->collectRows($semesterId, $filters, $asOf);
-        $perPage = in_array((int) ($filters['per_page'] ?? 20), [20, 50, 100], true)
-            ? (int) $filters['per_page']
-            : 20;
+        $requestedPerPage = (int) ($filters['per_page'] ?? 20);
+        $perPage = in_array($requestedPerPage, [20, 50, 100], true) ? $requestedPerPage : 20;
         $page = max(1, (int) ($filters['page'] ?? 1));
 
         return [
@@ -293,7 +293,7 @@ final class ListCollectionProgressQuery
                 'student_code' => $student->studentCode,
                 'full_name' => $student->fullName,
                 'status' => $liveStatus,
-                'status_label' => $student->statusLabel,
+                'status_label' => StudentLifecycleStatusPresenter::label($liveStatus),
             ],
             'program_code' => $student->programCode,
             'intake_semester_id' => $student->intakeSemesterId,
@@ -490,13 +490,10 @@ final class ListCollectionProgressQuery
             'balance_states' => collect(Catalog::balanceStates())->map(fn (string $label, string $value) => ['value' => $value, 'label' => $label])->values()->all(),
             'aging_buckets' => collect(Catalog::agingBuckets())->map(fn (array $meta, string $value) => ['value' => $value, 'label' => $meta['label']])->values()->all(),
             'student_statuses' => $students
-                ->map(fn (StudentReference $student): array => [
-                    'status' => $enrollments[$student->id]?->legacyCompatibleStatus() ?? $student->status,
-                    'label' => $student->statusLabel,
-                ])
-                ->filter(fn (array $entry): bool => $entry['status'] !== null)
-                ->unique(fn (array $entry): string => $entry['status'])
-                ->map(fn (array $entry): array => ['value' => $entry['status'], 'label' => $entry['label']])
+                ->map(fn (StudentReference $student): ?string => $enrollments[$student->id]?->legacyCompatibleStatus() ?? $student->status)
+                ->filter(fn (?string $status): bool => $status !== null)
+                ->unique()
+                ->map(fn (string $status): array => ['value' => $status, 'label' => StudentLifecycleStatusPresenter::label($status)])
                 ->values()
                 ->all(),
             'semester_id' => $semesterId,

@@ -52,7 +52,10 @@ it('paginates due items in the database instead of loading all rows into php', f
     $page1 = app(ListDueItemsQuery::class)->handle($semester->id, null, null);
     $queries = DB::getQueryLog();
 
+    // Budget covers the paginated page plus the two per-page lifecycle-status
+    // lookups (primary enrollment, then the legacy fallback for students that
+    // were never materialized). It stays well below a per-row lookup for 20 rows.
     expect($page1->total())->toBe(25)
         ->and($page1->count())->toBe(20)
-        ->and(count($queries))->toBeLessThan(6);
+        ->and(count($queries))->toBeLessThan(7);
 });

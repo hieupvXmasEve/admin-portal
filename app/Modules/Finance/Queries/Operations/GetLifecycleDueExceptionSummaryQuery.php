@@ -7,6 +7,7 @@ namespace App\Modules\Finance\Queries\Operations;
 use App\Models\Student;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Support\LifecycleDueItemPredicate;
+use App\Shared\Support\Academic\StudentLifecycleProjection;
 use Illuminate\Database\Eloquent\Builder;
 
 class GetLifecycleDueExceptionSummaryQuery
@@ -34,19 +35,22 @@ class GetLifecycleDueExceptionSummaryQuery
         LifecycleDueItemPredicate::applyLifecycleExceptionScope($exceptionQuery);
         $this->applySharedFilters($exceptionQuery, $filters);
 
-        $deferredCount = (clone $exceptionQuery)->whereHas('student', fn ($q) => $q->where('status', 'deferred'))->count();
-        $dropoutCount = (clone $exceptionQuery)->whereHas('student', fn ($q) => $q->where('status', 'dropout'))->count();
-        $transferCount = (clone $exceptionQuery)->whereHas('student', fn ($q) => $q->where('status', 'dropout_transfer'))->count();
+        // The projection collapses `withdrawn` -> `dropout` and never emits
+        // `dropout_transfer`; on fully materialized data transfer_count is 0
+        // outright, not "mostly 0". Not a bug — see plan 260817-0017 phase 2.
+        $deferredCount = (clone $exceptionQuery)->whereHas('student', fn (Builder $q) => StudentLifecycleProjection::whereStatusIn($q, ['deferred']))->count();
+        $dropoutCount = (clone $exceptionQuery)->whereHas('student', fn (Builder $q) => StudentLifecycleProjection::whereStatusIn($q, ['dropout']))->count();
+        $transferCount = (clone $exceptionQuery)->whereHas('student', fn (Builder $q) => StudentLifecycleProjection::whereStatusIn($q, ['dropout_transfer']))->count();
         $otherCount = (clone $exceptionQuery)->where(function ($otherQuery): void {
             $otherQuery
                 ->whereNull('student_id')
                 ->orWhereDoesntHave('student')
-                ->orWhereHas('student', fn ($studentQuery) => $studentQuery->whereNotIn('status', [
+                ->orWhereHas('student', fn (Builder $studentQuery) => StudentLifecycleProjection::whereStatusIn($studentQuery, [
                     'deferred',
                     'dropout',
                     'dropout_transfer',
                     ...Student::FINANCIAL_STATUSES,
-                ]));
+                ], not: true));
         })->count();
 
         return [

@@ -6,13 +6,28 @@ namespace App\Modules\Finance\Support;
 
 use App\Models\Student;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Shared\Contracts\Academic\StudentLifecycleStatusReader;
 use Illuminate\Database\Eloquent\Builder;
 
 final class LifecycleDueItemPredicate
 {
+    /**
+     * Resolves through the live enrollment projection rather than the
+     * write-dead `students.status` column. {@see LifecycleDueExceptionReasonResolver::resolve()}
+     * must migrate the same way, in the same commit — it is called
+     * immediately after this gate and the persisted reason must agree with it.
+     */
     public static function isLifecycleException(?Student $student): bool
     {
-        return self::isLifecycleExceptionStatus($student?->status);
+        // An unpersisted model (no id) cannot have a program_enrollments row;
+        // its in-memory `status` attribute is all there is to go on.
+        if ($student === null || $student->id === null) {
+            return self::isLifecycleExceptionStatus($student?->status);
+        }
+
+        $status = app(StudentLifecycleStatusReader::class)->statusesFor([(int) $student->id])[(int) $student->id] ?? null;
+
+        return self::isLifecycleExceptionStatus($status);
     }
 
     public static function isLifecycleExceptionStatus(?string $status): bool

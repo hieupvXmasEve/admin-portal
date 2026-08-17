@@ -8,12 +8,17 @@ use App\Enums\StudentActionType;
 use App\Models\Student;
 use App\Models\StudentActionLog;
 use App\Models\StudentDecision;
+use App\Shared\Contracts\Academic\StudentLifecycleStatusReader;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 class PreviewStudentDecisionBulkLinkQuery
 {
+    public function __construct(
+        private readonly StudentLifecycleStatusReader $lifecycleStatuses,
+    ) {}
+
     /**
      * @param  list<string>  $studentCodes
      */
@@ -26,6 +31,10 @@ class PreviewStudentDecisionBulkLinkQuery
             ->when($campusId, fn ($query) => $query->where('campus_id', $campusId))
             ->get()
             ->keyBy(fn (Student $student): string => Str::upper((string) $student->student_id));
+
+        $lifecycleStatuses = $students->isEmpty()
+            ? []
+            : $this->lifecycleStatuses->statusesFor($students->pluck('id')->map(static fn (int|string $id): int => (int) $id)->all());
 
         $actionLogs = $this->actionLogsFor($students, $actionType);
 
@@ -55,7 +64,7 @@ class PreviewStudentDecisionBulkLinkQuery
                     'id' => $student->id,
                     'student_id' => $student->student_id,
                     'full_name' => $student->full_name,
-                    'status' => $student->status,
+                    'status' => $lifecycleStatuses[(int) $student->id] ?? $student->status,
                     'campus' => $student->campus ? [
                         'id' => $student->campus->id,
                         'name' => $student->campus->name,

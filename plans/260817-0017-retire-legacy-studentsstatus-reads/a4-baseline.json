@@ -1,0 +1,66 @@
+{
+    "total": 235,
+    "drift_count": 15,
+    "drift": {
+        "AUH16175": {
+            "column": "intake_pre_uni_gc",
+            "projected": "intake_course"
+        },
+        "AUH15060": {
+            "column": "intake_pre_uni_gc",
+            "projected": "dropout"
+        },
+        "AUH15041": {
+            "column": "intake_pre_uni_gc",
+            "projected": "deferred"
+        },
+        "AUS15106": {
+            "column": "intake_pre_uni_gc",
+            "projected": "intake_course"
+        },
+        "AUS118115": {
+            "column": "intake_pre_uni_gc",
+            "projected": "deferred"
+        },
+        "AUS121787": {
+            "column": "intake_pre_uni_gc",
+            "projected": "intake_course"
+        },
+        "AUH16610": {
+            "column": "deferred",
+            "projected": "intake_course"
+        },
+        "AUS17847": {
+            "column": "deferred",
+            "projected": "intake_course"
+        },
+        "AUS15437": {
+            "column": "deferred",
+            "projected": "intake_course"
+        },
+        "AUH111555": {
+            "column": "deferred",
+            "projected": "intake_course"
+        },
+        "AUH15022": {
+            "column": "deferred",
+            "projected": "intake_course"
+        },
+        "AUS115249": {
+            "column": "deferred",
+            "projected": "intake_course"
+        },
+        "AUS115416": {
+            "column": "deferred",
+            "projected": "intake_course"
+        },
+        "AUS18578": {
+            "column": "deferred",
+            "projected": "intake_course"
+        },
+        "AUH18676": {
+            "column": "pending_course_opening",
+            "projected": "dropout"
+        }
+    }
+}

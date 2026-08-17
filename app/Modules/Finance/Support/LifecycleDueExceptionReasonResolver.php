@@ -6,12 +6,27 @@ namespace App\Modules\Finance\Support;
 
 use App\Models\Student;
 use App\Modules\Finance\Enums\LifecycleDueExceptionReason;
+use App\Shared\Contracts\Academic\StudentLifecycleStatusReader;
 
 final class LifecycleDueExceptionReasonResolver
 {
+    /**
+     * Resolves through the live enrollment projection, matching
+     * {@see LifecycleDueItemPredicate::isLifecycleException()} — the gate and
+     * the persisted reason must derive from the same status, or a row is
+     * admitted as an exception for one reason and recorded with another.
+     */
     public static function resolve(?Student $student): LifecycleDueExceptionReason
     {
-        return self::forStatus($student?->status);
+        // An unpersisted model (no id) cannot have a program_enrollments row;
+        // its in-memory `status` attribute is all there is to go on.
+        if ($student === null || $student->id === null) {
+            return self::forStatus($student?->status);
+        }
+
+        $status = app(StudentLifecycleStatusReader::class)->statusesFor([(int) $student->id])[(int) $student->id] ?? null;
+
+        return self::forStatus($status);
     }
 
     public static function forStatus(?string $status): LifecycleDueExceptionReason

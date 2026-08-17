@@ -11,6 +11,7 @@ use App\Modules\Finance\Models\FinanceLifecycleDueExceptionReview;
 use App\Modules\Finance\Support\LifecycleDueExceptionRowMapper;
 use App\Modules\Finance\Support\LifecycleDueItemPredicate;
 use App\Shared\Contracts\Academic\StudentLifecycleActionReader;
+use App\Shared\Support\Academic\StudentLifecycleProjection;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
@@ -149,16 +150,16 @@ class ListLifecycleDueExceptionsQuery
             LifecycleDueExceptionReason::Dropout,
             LifecycleDueExceptionReason::DropoutTransfer => $query->whereHas(
                 'student',
-                fn ($studentQuery) => $studentQuery->where('status', $reason->value)
+                fn (Builder $studentQuery) => StudentLifecycleProjection::whereStatusIn($studentQuery, [$reason->value])
             ),
             LifecycleDueExceptionReason::InactiveOrNonFinancial => $query->whereHas(
                 'student',
-                fn ($studentQuery) => $studentQuery->whereNotIn('status', [
+                fn (Builder $studentQuery) => StudentLifecycleProjection::whereStatusIn($studentQuery, [
                     'deferred',
                     'dropout',
                     'dropout_transfer',
                     ...Student::FINANCIAL_STATUSES,
-                ])
+                ], not: true)
             ),
         };
     }

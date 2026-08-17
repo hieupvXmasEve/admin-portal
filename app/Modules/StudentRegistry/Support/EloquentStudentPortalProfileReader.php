@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\StudentRegistry\Support;
 
 use App\Models\Student;
+use App\Shared\Contracts\Academic\StudentLifecycleStatusReader;
 use App\Shared\Contracts\StudentRegistry\DTO\StudentPortalProfile;
 use App\Shared\Contracts\StudentRegistry\DTO\StudentProfile;
 use App\Shared\Contracts\StudentRegistry\StudentPortalProfileReader;
@@ -16,7 +17,10 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
  */
 final class EloquentStudentPortalProfileReader implements StudentPortalProfileReader
 {
-    public function __construct(private readonly StudentProfileReader $profiles) {}
+    public function __construct(
+        private readonly StudentProfileReader $profiles,
+        private readonly StudentLifecycleStatusReader $lifecycleStatuses,
+    ) {}
 
     public function forStudent(int $studentId): StudentPortalProfile
     {
@@ -28,16 +32,17 @@ final class EloquentStudentPortalProfileReader implements StudentPortalProfileRe
         $student = Student::query()
             ->with(['program', 'curriculumVersion', 'campus'])
             ->findOrFail($studentId);
+        $status = $this->lifecycleStatuses->statusesFor([$studentId])[$studentId] ?? $student->status;
 
         return new StudentPortalProfile([
-            'info' => $this->personalInfo($profile, $student),
+            'info' => $this->personalInfo($profile, $student, $status),
             'preferences' => $this->preferences($student),
             'profile_completion' => $this->completion($profile),
         ]);
     }
 
     /** @return array<string, mixed> */
-    private function personalInfo(StudentProfile $profile, Student $student): array
+    private function personalInfo(StudentProfile $profile, Student $student, ?string $status): array
     {
         $nameParts = explode(' ', $profile->fullName, 2);
 
@@ -96,7 +101,7 @@ final class EloquentStudentPortalProfileReader implements StudentPortalProfileRe
             'enrollment_date' => $student->admission_date?->toDateString(),
             'expected_graduation_date' => $student->expected_graduation_date?->toDateString(),
             'study_mode' => (string) ($student->study_mode ?? ''),
-            'status' => (string) ($student->status ?? ''),
+            'status' => (string) ($status ?? ''),
         ];
     }
 

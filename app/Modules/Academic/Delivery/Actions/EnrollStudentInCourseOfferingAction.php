@@ -8,6 +8,7 @@ use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
 use App\Services\V1\Student\PrerequisiteValidationService;
 use App\Shared\Contracts\Academic\CourseOfferingCatalogReader;
+use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -29,10 +30,14 @@ final class EnrollStudentInCourseOfferingAction
      *   retake_fee?: float|int|null,
      *   is_retake_paid?: bool,
      * }  $data
+     *
+     * A bulk caller that already resolved the student (e.g. batched by
+     * student code) passes it via `$resolvedStudent` to avoid a redundant
+     * per-row lifecycle-status query; single-call sites leave it null.
      */
-    public static function run(array $data): CourseRegistration
+    public static function run(array $data, ?StudentReference $resolvedStudent = null): CourseRegistration
     {
-        $student = app(StudentReferenceReader::class)->find($data['student_id']);
+        $student = $resolvedStudent ?? app(StudentReferenceReader::class)->find($data['student_id']);
         if ($student === null) {
             throw ValidationException::withMessages([
                 'student_id' => 'The selected student does not exist.',

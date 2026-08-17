@@ -5,16 +5,24 @@ declare(strict_types=1);
 namespace App\Modules\StudentRegistry\Support;
 
 use App\Models\Student;
+use App\Shared\Contracts\Academic\StudentLifecycleStatusReader;
 use App\Shared\Contracts\StudentRegistry\DTO\StudentProfile;
 use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
 use App\Shared\Contracts\StudentRegistry\StudentProfilePersistenceWriter;
 use App\Shared\Contracts\StudentRegistry\StudentProfileReader;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use App\Shared\Contracts\StudentRegistry\StudentSerializedReferenceReader;
+use App\Shared\Support\Academic\StudentLifecycleProjection;
+use App\Shared\Support\Academic\StudentLifecycleStatusPresenter;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 
 final class EloquentStudentRegistryStore implements StudentProfilePersistenceWriter, StudentProfileReader, StudentReferenceReader, StudentSerializedReferenceReader
 {
+    public function __construct(
+        private readonly StudentLifecycleStatusReader $lifecycleStatuses,
+    ) {}
+
     public function update(int $studentId, array $attributes): bool
     {
         return Student::query()->findOrFail($studentId)->update($attributes);
@@ -27,20 +35,41 @@ final class EloquentStudentRegistryStore implements StudentProfilePersistenceWri
             ->select($this->referenceColumns())
             ->find($studentId);
 
-        return $student !== null ? $this->reference($student) : null;
+        if ($student === null) {
+            return null;
+        }
+
+        return $this->reference($student, $this->resolveOne((int) $student->id));
     }
 
     public function findSerialized(int $studentId): ?array
     {
-        return Student::query()->find($studentId)?->toArray();
+        $student = Student::query()->find($studentId);
+        if ($student === null) {
+            return null;
+        }
+
+        $data = $student->toArray();
+        $data['status'] = $this->resolveOne((int) $student->id) ?? $student->status;
+
+        return $data;
     }
 
     public function findManySerialized(array $studentIds): array
     {
-        return Student::query()
+        $students = Student::query()
             ->whereIn('id', array_values(array_unique($studentIds)))
-            ->get()
-            ->mapWithKeys(static fn (Student $student): array => [(int) $student->id => $student->toArray()])
+            ->get();
+
+        $statuses = $this->resolveMany($students);
+
+        return $students
+            ->mapWithKeys(fn (Student $student): array => [
+                (int) $student->id => [
+                    ...$student->toArray(),
+                    'status' => $statuses[(int) $student->id] ?? $student->status,
+                ],
+            ])
             ->all();
     }
 
@@ -145,7 +174,7 @@ final class EloquentStudentRegistryStore implements StudentProfilePersistenceWri
             return [];
         }
 
-        return Student::query()
+        $students = Student::query()
             ->leftJoin('programs as registry_programs', 'registry_programs.id', '=', 'students.program_id')
             ->leftJoin('specializations as registry_specializations', 'registry_specializations.id', '=', 'students.specialization_id')
             ->select(array_map(static fn (string $column): string => 'students.'.$column, $this->referenceColumns()))
@@ -156,9 +185,13 @@ final class EloquentStudentRegistryStore implements StudentProfilePersistenceWri
                 'registry_specializations.name as registry_specialization_name',
             ])
             ->whereIn('students.id', $studentIds)
-            ->get()
+            ->get();
+
+        $statuses = $this->resolveMany($students);
+
+        return $students
             ->mapWithKeys(fn (Student $student): array => [
-                (int) $student->id => $this->joinedReference($student),
+                (int) $student->id => $this->joinedReference($student, $statuses[(int) $student->id] ?? null),
             ])
             ->all();
     }
@@ -172,7 +205,11 @@ final class EloquentStudentRegistryStore implements StudentProfilePersistenceWri
             ->where('campus_id', $campusId)
             ->first();
 
-        return $student !== null ? $this->reference($student) : null;
+        if ($student === null) {
+            return null;
+        }
+
+        return $this->reference($student, $this->resolveOne((int) $student->id));
     }
 
     public function findByStudentCodeAnywhere(string $studentCode): ?StudentReference
@@ -183,7 +220,41 @@ final class EloquentStudentRegistryStore implements StudentProfilePersistenceWri
             ->where('student_id', $studentCode)
             ->first();
 
-        return $student !== null ? $this->reference($student) : null;
+        if ($student === null) {
+            return null;
+        }
+
+        return $this->reference($student, $this->resolveOne((int) $student->id));
+    }
+
+    /**
+     * Batch resolution for callers that would otherwise call
+     * `findByStudentCode()` once per code inside a loop (H7).
+     *
+     * @param  list<string>  $studentCodes
+     * @return array<string, StudentReference>
+     */
+    public function findManyByStudentCode(array $studentCodes, int $campusId): array
+    {
+        $codes = array_values(array_unique($studentCodes));
+        if ($codes === []) {
+            return [];
+        }
+
+        $students = Student::query()
+            ->with(['program:id,code,name', 'specialization:id,code,name'])
+            ->select($this->referenceColumns())
+            ->where('campus_id', $campusId)
+            ->whereIn('student_id', $codes)
+            ->get();
+
+        $statuses = $this->resolveMany($students);
+
+        return $students
+            ->mapWithKeys(fn (Student $student): array => [
+                (string) $student->student_id => $this->reference($student, $statuses[(int) $student->id] ?? null),
+            ])
+            ->all();
     }
 
     /** @return list<int> */
@@ -214,8 +285,14 @@ final class EloquentStudentRegistryStore implements StudentProfilePersistenceWri
             ->orderBy('students.id')
             ->lazy(500);
 
-        foreach ($students as $student) {
-            yield $this->joinedReference($student);
+        // Resolve per 500-row chunk (matching the underlying `lazy(500)`
+        // cursor size) instead of per row, so streaming the whole registry
+        // does not issue one `program_enrollments` query per student.
+        foreach ($students->chunk(500) as $chunk) {
+            $statuses = $this->resolveMany($chunk);
+            foreach ($chunk as $student) {
+                yield $this->joinedReference($student, $statuses[(int) $student->id] ?? null);
+            }
         }
     }
 
@@ -224,8 +301,10 @@ final class EloquentStudentRegistryStore implements StudentProfilePersistenceWri
      */
     public function activeIdsForCampus(?int $campusId = null): array
     {
-        return Student::query()
-            ->whereIn('status', ['intake_pre_uni_gc', 'intake_course'])
+        $query = Student::query();
+        StudentLifecycleProjection::whereStatusIn($query, ['intake_pre_uni_gc', 'intake_course']);
+
+        return $query
             ->when($campusId !== null, fn (Builder $students) => $students->where('campus_id', $campusId))
             ->pluck('id')
             ->map(static fn (int|string $studentId): int => (int) $studentId)
@@ -250,7 +329,7 @@ final class EloquentStudentRegistryStore implements StudentProfilePersistenceWri
     /** @return list<StudentReference> */
     public function search(string $query, int $campusId, int $limit = 10): array
     {
-        return Student::query()
+        $students = Student::query()
             ->with(['program:id,code,name', 'specialization:id,code,name'])
             ->select($this->referenceColumns())
             ->where('campus_id', $campusId)
@@ -261,13 +340,25 @@ final class EloquentStudentRegistryStore implements StudentProfilePersistenceWri
             })
             ->orderBy('full_name')
             ->limit($limit)
-            ->get()
-            ->map(fn (Student $student): StudentReference => $this->reference($student))
+            ->get();
+
+        $statuses = $this->resolveMany($students);
+
+        return $students
+            ->map(fn (Student $student): StudentReference => $this->reference($student, $statuses[(int) $student->id] ?? null))
             ->all();
     }
 
-    private function reference(Student $student): StudentReference
+    /**
+     * `students.status` is write-dead; the resolved status is the
+     * Progression-owned projection (falling back to the column for a student
+     * with no primary enrollment), always supplied by the caller via
+     * `resolveOne()`/`resolveMany()` — never re-derived here.
+     */
+    private function reference(Student $student, ?string $resolvedStatus = null): StudentReference
     {
+        $status = $resolvedStatus ?? $student->status;
+
         return new StudentReference(
             id: (int) $student->id,
             studentCode: (string) $student->student_id,
@@ -283,18 +374,20 @@ final class EloquentStudentRegistryStore implements StudentProfilePersistenceWri
             specializationId: $student->specialization_id === null ? null : (int) $student->specialization_id,
             specializationCode: $student->specialization?->code,
             specializationName: $student->specialization?->name,
-            status: $student->status,
+            status: $status,
             academicStatus: $student->academic_status,
             gcCurrentLevel: $student->gc_current_level === null ? null : (int) $student->gc_current_level,
-            statusLabel: $student->status_label,
+            statusLabel: StudentLifecycleStatusPresenter::label($status),
             intakeSemesterId: $student->intake_semester_id === null ? null : (int) $student->intake_semester_id,
             cohort: $student->intake === null ? null : (int) $student->intake,
             curriculumVersionId: $student->curriculum_version_id === null ? null : (int) $student->curriculum_version_id,
         );
     }
 
-    private function joinedReference(Student $student): StudentReference
+    private function joinedReference(Student $student, ?string $resolvedStatus = null): StudentReference
     {
+        $status = $resolvedStatus ?? $student->status;
+
         return new StudentReference(
             id: (int) $student->id,
             studentCode: (string) $student->student_id,
@@ -310,14 +403,37 @@ final class EloquentStudentRegistryStore implements StudentProfilePersistenceWri
             specializationId: $student->specialization_id === null ? null : (int) $student->specialization_id,
             specializationCode: $student->registry_specialization_code,
             specializationName: $student->registry_specialization_name,
-            status: $student->status,
+            status: $status,
             academicStatus: $student->academic_status,
             gcCurrentLevel: $student->gc_current_level === null ? null : (int) $student->gc_current_level,
-            statusLabel: $student->status_label,
+            statusLabel: StudentLifecycleStatusPresenter::label($status),
             intakeSemesterId: $student->intake_semester_id === null ? null : (int) $student->intake_semester_id,
             cohort: $student->intake === null ? null : (int) $student->intake,
             curriculumVersionId: $student->curriculum_version_id === null ? null : (int) $student->curriculum_version_id,
         );
+    }
+
+    private function resolveOne(int $studentId): ?string
+    {
+        return $this->lifecycleStatuses->statusesFor([$studentId])[$studentId] ?? null;
+    }
+
+    /**
+     * @param  iterable<int, Student>  $students
+     * @return array<int, string>
+     */
+    private function resolveMany(iterable $students): array
+    {
+        $ids = (new Collection($students))
+            ->pluck('id')
+            ->map(static fn (int|string $id): int => (int) $id)
+            ->all();
+
+        if ($ids === []) {
+            return [];
+        }
+
+        return $this->lifecycleStatuses->statusesFor($ids);
     }
 
     /** @return list<string> */

@@ -27,6 +27,15 @@ interface StudentReferenceReader
     public function findByStudentCodeAnywhere(string $studentCode): ?StudentReference;
 
     /**
+     * Batch resolution for callers that would otherwise call
+     * `findByStudentCode()` once per code inside a loop.
+     *
+     * @param  list<string>  $studentCodes
+     * @return array<string, StudentReference>
+     */
+    public function findManyByStudentCode(array $studentCodes, int $campusId): array;
+
+    /**
      * @return list<int>
      */
     public function idsForCampus(?int $campusId): array;

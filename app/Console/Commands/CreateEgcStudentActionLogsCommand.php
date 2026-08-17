@@ -10,10 +10,11 @@ use App\Models\Student;
 use App\Models\StudentActionLog;
 use App\Models\StudentDecision;
 use App\Models\User;
+use App\Shared\Contracts\Academic\StudentLifecycleStatusReader;
 use Illuminate\Console\Command;
 use Illuminate\Database\QueryException;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class CreateEgcStudentActionLogsCommand extends Command
 {
@@ -102,6 +103,10 @@ class CreateEgcStudentActionLogsCommand extends Command
             ->values();
 
         $eligibleStudents = $students->values();
+        $lifecycleStatuses = $eligibleStudents->isEmpty()
+            ? []
+            : app(StudentLifecycleStatusReader::class)
+                ->statusesFor($eligibleStudents->pluck('id')->map(static fn (int|string $id): int => (int) $id)->all());
 
         $plannedOrCreated = collect();
         $skipErrors = collect();
@@ -163,7 +168,7 @@ class CreateEgcStudentActionLogsCommand extends Command
                         ]);
                     }
                 } else {
-                    $currentStatus = (string) ($student->status ?? '');
+                    $currentStatus = (string) ($lifecycleStatuses[(int) $student->id] ?? $student->status ?? '');
                     if ($currentStatus !== 'intake_course') {
                         $skipErrors->push([
                             'student_id' => (string) $student->student_id,

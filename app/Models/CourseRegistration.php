@@ -151,7 +151,7 @@ class CourseRegistration extends AuditableModel
             return $this->registration_status ?? 'inactive';
         }
 
-        $studentStatus = (string) $this->student?->status;
+        $studentStatus = (string) $this->student?->lifecycleStatus();
         if (in_array($studentStatus, Student::CLASS_ROSTER_INACTIVE_STATUSES, true)) {
             return $studentStatus;
         }

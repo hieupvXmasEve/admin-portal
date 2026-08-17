@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Responses\ApiResponse;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\StudentService;
-use App\Http\Responses\ApiResponse;
+use App\Shared\Contracts\Academic\StudentLifecycleStatusReader;
 use App\Shared\Support\Enums\UserType;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,9 +19,7 @@ use Illuminate\Support\Facades\Validator;
 
 class AuthController extends Controller
 {
-    public function __construct(protected StudentService $studentService)
-    {
-    }
+    public function __construct(protected StudentService $studentService) {}
 
     /**
      * Student login
@@ -44,7 +43,7 @@ class AuthController extends Controller
         }
 
         // Check if student account is active
-        if (!$user->isActive()) {
+        if (! $user->isActive()) {
             return ApiResponse::authorizationError('Account is not active');
         }
 
@@ -90,6 +89,8 @@ class AuthController extends Controller
     public function me(Request $request): JsonResponse
     {
         $student = $request->user()->load(['campus', 'program', 'specialization']);
+        $status = app(StudentLifecycleStatusReader::class)
+            ->statusesFor([(int) $student->id])[(int) $student->id] ?? $student->status;
 
         return ApiResponse::success(
             data: [
@@ -104,7 +105,7 @@ class AuthController extends Controller
                     'nationality' => $student->nationality,
                     'address' => $student->address,
                     'avatar_url' => $student->avatar_url,
-                    'status' => $student->status,
+                    'status' => $status,
                     'admission_date' => $student->admission_date?->format('Y-m-d'),
                     'expected_graduation_date' => $student->expected_graduation_date?->format('Y-m-d'),
                     'campus' => $student->campus ? [
@@ -214,7 +215,8 @@ class AuthController extends Controller
                         'id' => $student->id,
                         'full_name' => $student->full_name,
                         'email' => $student->email,
-                        'status' => $student->status,
+                        'status' => app(StudentLifecycleStatusReader::class)
+                            ->statusesFor([(int) $student->id])[(int) $student->id] ?? $student->status,
                     ],
                 ],
                 message: 'Registration successful. Please wait for admin approval.',

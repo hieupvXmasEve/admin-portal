@@ -11,6 +11,7 @@ use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceLifecycleDueExceptionReview;
 use App\Shared\Contracts\Academic\DTO\StudentLifecycleActionSummary;
 use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
+use App\Shared\Support\Academic\StudentLifecycleStatusPresenter;
 use Carbon\CarbonInterface;
 
 final class LifecycleDueExceptionRowMapper
@@ -76,6 +77,12 @@ final class LifecycleDueExceptionRowMapper
     ): array {
         $student = $request->student;
         // students.status is legacy; prefer the live program_enrollments projection.
+        // H7 (plan 260817-0017 phase 2): this is a per-row lookup driven from
+        // ListLifecycleDueExceptionsQuery's per-item ->map(). Pre-existing N+1
+        // (DeferCase::query() below has the same shape) — declared out of scope
+        // for this phase: bounded by pagination (max 100/page), and batching it
+        // means threading a resolved-status map through map()'s signature and the
+        // query's pagination flow, a larger change than this phase's file ownership.
         $liveStatus = $student === null
             ? null
             : app(ProgramEnrollmentReader::class)->forStudentId((int) $student->id)->legacyCompatibleStatus();
@@ -114,8 +121,8 @@ final class LifecycleDueExceptionRowMapper
                 'student_code' => $student->student_id,
                 'full_name' => $student->full_name,
                 'status' => $liveStatus,
-                'status_label' => $student->status_label,
-                'status_color' => $student->status_color,
+                'status_label' => StudentLifecycleStatusPresenter::label($liveStatus),
+                'status_color' => StudentLifecycleStatusPresenter::color($liveStatus),
             ] : null,
             'linked_charges' => $linkedCharges,
             'payment_id' => $request->payment_id,

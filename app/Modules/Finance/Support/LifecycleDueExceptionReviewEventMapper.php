@@ -11,6 +11,7 @@ use App\Modules\Finance\Enums\LifecycleDueExceptionReviewEventType;
 use App\Modules\Finance\Models\FinanceLifecycleDueExceptionReview;
 use App\Modules\Finance\Models\FinanceLifecycleDueExceptionReviewEvent;
 use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
+use App\Shared\Support\Academic\StudentLifecycleStatusPresenter;
 
 final class LifecycleDueExceptionReviewEventMapper
 {
@@ -95,14 +96,18 @@ final class LifecycleDueExceptionReviewEventMapper
             return null;
         }
 
+        $liveStatus = app(ProgramEnrollmentReader::class)
+            ->forStudentId((int) $student->id)
+            ->legacyCompatibleStatus();
+
         return [
             'id' => $student->id,
             'student_code' => $student->student_id,
             'full_name' => $student->full_name,
             // students.status is legacy; prefer the live enrollment projection.
-            'status' => app(ProgramEnrollmentReader::class)->forStudentId((int) $student->id)->legacyCompatibleStatus(),
-            'status_label' => $student->status_label,
-            'status_color' => $student->status_color,
+            'status' => $liveStatus,
+            'status_label' => StudentLifecycleStatusPresenter::label($liveStatus),
+            'status_color' => StudentLifecycleStatusPresenter::color($liveStatus),
         ];
     }
 

@@ -1,0 +1,34 @@
+{
+    "total_students": 235,
+    "active_symmetric_diff": [],
+    "class_roster_active_symmetric_diff": [],
+    "financial_symmetric_diff": [],
+    "dashboard_tally": {
+        "active": 1,
+        "pending_course_opening": 5,
+        "dropout": 6,
+        "intake_pre_uni_gc": 18,
+        "deferred": 43,
+        "intake_course": 162
+    },
+    "dashboard_tally_sum": 235,
+    "drift_count": 15,
+    "drift_codes": [
+        "AUH16175",
+        "AUH15060",
+        "AUH15041",
+        "AUS15106",
+        "AUS118115",
+        "AUS121787",
+        "AUH16610",
+        "AUS17847",
+        "AUS15437",
+        "AUH111555",
+        "AUH15022",
+        "AUS115249",
+        "AUS115416",
+        "AUS18578",
+        "AUH18676"
+    ],
+    "note": "SQL-vs-PHP agreement checks (active, class_roster_active, financial) all empty symmetric differences. dashboard_tally_sum equals total (235), not 229 (H5 fixed). drift_codes matches the phase-0 a4-baseline.json 15 students exactly — zero unexplained drift."
+}

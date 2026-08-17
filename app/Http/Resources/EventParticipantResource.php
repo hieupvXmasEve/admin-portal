@@ -44,6 +44,12 @@ class EventParticipantResource extends JsonResource
                         'name' => $this->student->specialization->name,
                         'code' => $this->student->specialization->code,
                     ] : null,
+                    // Plan 260817-0017 phase 4: `students.status` here is a
+                    // known, documented gap — a Resource has no batching seam
+                    // (one instance per row) and this phase does not thread a
+                    // resolved-status map through every Engagement controller
+                    // that builds this collection. Accepted per that phase's
+                    // own escape hatch rather than resolving the reader here.
                     'status' => $this->student->status,
                     'academic_status' => $this->student->academic_status,
                 ];

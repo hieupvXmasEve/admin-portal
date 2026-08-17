@@ -11,6 +11,7 @@ use App\Models\CourseRegistration;
 use App\Models\GraduationRequirement;
 use App\Models\Student;
 use App\Services\StudentService;
+use App\Shared\Contracts\Academic\StudentLifecycleStatusReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -115,6 +116,8 @@ class StudentController extends Controller
             'specialization',
             'curriculumVersion',
         ]);
+        $status = app(StudentLifecycleStatusReader::class)
+            ->statusesFor([(int) $student->id])[(int) $student->id] ?? $student->status;
 
         return response()->json([
             'success' => true,
@@ -130,7 +133,7 @@ class StudentController extends Controller
                     'nationality' => $student->nationality,
                     'address' => $student->address,
                     'avatar_url' => $student->avatar_url,
-                    'status' => $student->status,
+                    'status' => $status,
                     'admission_date' => $student->admission_date?->format('Y-m-d'),
                     'expected_graduation_date' => $student->expected_graduation_date?->format('Y-m-d'),
                     'campus' => $student->campus ? [

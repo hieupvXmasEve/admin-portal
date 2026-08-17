@@ -418,6 +418,8 @@ it('uses one canonical batch read for multiple student rows', function () {
     // Budget includes one extra batched ProgramEnrollmentReader::forStudentIds()
     // call (a few fixed queries, not per-row) so student_status resolves from the
     // live program_enrollments projection instead of the stale students.status column.
+    // +2 more (still fixed, not per-row) from plan 260817-0017 phase 1: StudentReferenceReader::findMany()
+    // now batch-resolves the same live projection for the StudentReference DTOs it builds.
     expect($rows)->toHaveCount(4)
-        ->and($queryCount)->toBeLessThanOrEqual(17);
+        ->and($queryCount)->toBeLessThanOrEqual(19);
 });

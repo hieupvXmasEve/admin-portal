@@ -228,60 +228,26 @@ class CourseOffering extends AuditableModel
         return $this->max_capacity ?? 0;
     }
 
+    /**
+     * H4 (plan 260817-0017 phase 3): previously had 3 branches selected by
+     * whichever relation happened to be loaded, chosen by different Student
+     * chokepoints (`scopeClassRosterActive()` SQL vs `isClassRosterActive()`
+     * PHP) — the same offering could return different counts on the same
+     * page load once those chokepoints started resolving from different
+     * sources. SQL-only now: one source of truth, no eager-load coupling.
+     */
     public function activeClassRosterEnrollmentCount(): int
     {
-        if ($this->relationLoaded('activeClassRosterRegistrations')) {
-            return $this->activeClassRosterRegistrations->count();
-        }
-
-        if (
-            $this->relationLoaded('classRosterRegistrations') &&
-            $this->classRosterRegistrations->every(fn ($registration) => $registration->relationLoaded('student'))
-        ) {
-            return $this->classRosterRegistrations
-                ->filter(fn ($registration) => $registration->isClassRosterActive())
-                ->count();
-        }
-
-        if (
-            $this->relationLoaded('courseRegistrations') &&
-            $this->courseRegistrations->every(fn ($registration) => $registration->relationLoaded('student'))
-        ) {
-            return $this->courseRegistrations
-                ->filter(fn ($registration) => $registration->isClassRosterActive())
-                ->count();
-        }
-
-        return $this->activeClassRosterRegistrations()->count();
+        return $this->relationLoaded('activeClassRosterRegistrations')
+            ? $this->activeClassRosterRegistrations->count()
+            : $this->activeClassRosterRegistrations()->count();
     }
 
     public function activeClassRosterStudentIds(): \Illuminate\Support\Collection
     {
-        if ($this->relationLoaded('activeClassRosterRegistrations')) {
-            return $this->activeClassRosterRegistrations->pluck('student_id')->values();
-        }
-
-        if (
-            $this->relationLoaded('classRosterRegistrations') &&
-            $this->classRosterRegistrations->every(fn ($registration) => $registration->relationLoaded('student'))
-        ) {
-            return $this->classRosterRegistrations
-                ->filter(fn ($registration) => $registration->isClassRosterActive())
-                ->pluck('student_id')
-                ->values();
-        }
-
-        if (
-            $this->relationLoaded('courseRegistrations') &&
-            $this->courseRegistrations->every(fn ($registration) => $registration->relationLoaded('student'))
-        ) {
-            return $this->courseRegistrations
-                ->filter(fn ($registration) => $registration->isClassRosterActive())
-                ->pluck('student_id')
-                ->values();
-        }
-
-        return $this->activeClassRosterRegistrations()->pluck('student_id');
+        return $this->relationLoaded('activeClassRosterRegistrations')
+            ? $this->activeClassRosterRegistrations->pluck('student_id')->values()
+            : $this->activeClassRosterRegistrations()->pluck('student_id');
     }
 
     // Helper methods

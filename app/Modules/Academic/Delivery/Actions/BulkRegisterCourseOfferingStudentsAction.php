@@ -18,14 +18,14 @@ final class BulkRegisterCourseOfferingStudentsAction
         }
 
         $unit = app(CourseOfferingCatalogReader::class)->offeringUnit((int) $courseOffering->unit_id);
-        $students = app(StudentReferenceReader::class);
+        $students = app(StudentReferenceReader::class)->findManyByStudentCode($studentCodes, $campusId);
         $results = [];
         $success = 0;
 
-        DB::transaction(function () use (&$results, &$success, $courseOffering, $studentCodes, $campusId, $unit, $students): void {
+        DB::transaction(function () use (&$results, &$success, $courseOffering, $studentCodes, $unit, $students): void {
             foreach (array_values(array_unique($studentCodes)) as $studentCode) {
                 $result = ['student_id' => $studentCode, 'success' => false, 'message' => ''];
-                $student = $students->findByStudentCode($studentCode, $campusId);
+                $student = $students[$studentCode] ?? null;
                 if ($student === null) {
                     $result['message'] = 'Student not found';
                 } elseif ($unit === null) {
@@ -41,7 +41,7 @@ final class BulkRegisterCourseOfferingStudentsAction
                             'course_offering_id' => (int) $courseOffering->id,
                             'registration_status' => 'confirmed',
                             'registration_method' => 'admin_override',
-                        ]);
+                        ], $student);
                         $result['success'] = true;
                         $result['message'] = 'Student registered successfully';
                         $success++;

@@ -60,10 +60,14 @@ it('paginates billing exceptions in the database without loading all rows into p
         ->handle($semester->id, 'missing_charge', 'http://localhost/exceptions');
     $queries = DB::getQueryLog();
 
+    // Plan 260817-0017 phase 1: StudentReferenceReader::findMany() (called by
+    // BillingExceptionCollector) now batch-resolves the live program_enrollments
+    // projection for the StudentReference DTOs it builds — 2 more fixed queries,
+    // not per-row, so the budget still scales O(1) with the page, not O(n).
     expect($counts['missing_charge'])->toBe(25)
         ->and($page1->total())->toBe(25)
         ->and($page1->count())->toBe(20)
-        ->and(count($queries))->toBeLessThan(10);
+        ->and(count($queries))->toBeLessThan(14);
 });
 
 it('scopes active retake lookups to the current registration chunk', function () {

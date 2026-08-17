@@ -17,9 +17,11 @@ use App\Shared\Contracts\Academic\DTO\AcademicChargeHandoffResult;
 use App\Shared\Contracts\Academic\DTO\AcademicChargeSourceData;
 use App\Shared\Contracts\Academic\DTO\AcademicEgcBlockData;
 use App\Shared\Contracts\Academic\DTO\AcademicExamResitDueData;
+use App\Shared\Contracts\Academic\StudentLifecycleStatusReader;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
 use App\Shared\Contracts\Finance\Enums\FinancialEffect;
 use App\Shared\Contracts\Finance\FinanceIntakeContract;
+use App\Shared\Support\Academic\StudentLifecycleStatusPresenter;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
@@ -31,6 +33,7 @@ final class AcademicFinanceChargeSourceGateway implements AcademicFinanceChargeS
 {
     public function __construct(
         private readonly FinanceIntakeContract $intake,
+        private readonly StudentLifecycleStatusReader $lifecycleStatusReader,
     ) {}
 
     public function billingExceptionRegistrations(?int $semesterId = null): array
@@ -381,12 +384,18 @@ final class AcademicFinanceChargeSourceGateway implements AcademicFinanceChargeS
             return [];
         }
 
-        return ExamResitAttempt::query()
+        $attempts = ExamResitAttempt::query()
             ->with($this->examResitDueRelations())
             ->whereIn('id', $attemptIds)
-            ->get()
+            ->get();
+        $lifecycleStatuses = $this->lifecycleStatuses($attempts);
+
+        return $attempts
             ->mapWithKeys(fn (ExamResitAttempt $attempt): array => [
-                (int) $attempt->id => $this->examResitDueData($attempt),
+                (int) $attempt->id => $this->examResitDueData(
+                    $attempt,
+                    $lifecycleStatuses[(int) $attempt->student_id] ?? null,
+                ),
             ])
             ->all();
     }
@@ -396,7 +405,7 @@ final class AcademicFinanceChargeSourceGateway implements AcademicFinanceChargeS
         $today = now()->startOfDay();
         $now = now();
 
-        return ExamResitAttempt::query()
+        $attempts = ExamResitAttempt::query()
             ->with($this->examResitDueRelations())
             ->when($campusId !== null, fn (Builder $query) => $query->where('campus_id', $campusId))
             ->when($semesterId !== null, fn (Builder $query) => $query->where('operation_semester_id', $semesterId))
@@ -421,8 +430,14 @@ final class AcademicFinanceChargeSourceGateway implements AcademicFinanceChargeS
                 });
             })
             ->orderBy('id')
-            ->get()
-            ->map(fn (ExamResitAttempt $attempt): AcademicExamResitDueData => $this->examResitDueData($attempt))
+            ->get();
+        $lifecycleStatuses = $this->lifecycleStatuses($attempts);
+
+        return $attempts
+            ->map(fn (ExamResitAttempt $attempt): AcademicExamResitDueData => $this->examResitDueData(
+                $attempt,
+                $lifecycleStatuses[(int) $attempt->student_id] ?? null,
+            ))
             ->values()
             ->all();
     }
@@ -914,9 +929,36 @@ final class AcademicFinanceChargeSourceGateway implements AcademicFinanceChargeS
         ];
     }
 
-    private function examResitDueData(ExamResitAttempt $attempt): AcademicExamResitDueData
+    /**
+     * `students.status` is legacy and is not written back on program-enrollment
+     * transitions, so the student lifecycle exposed to Finance is read from the
+     * Progression-owned projection, falling back to the column only for
+     * students that were never materialized.
+     *
+     * @param  Collection<int, ExamResitAttempt>  $attempts
+     * @return array<int, string>
+     */
+    private function lifecycleStatuses(Collection $attempts): array
+    {
+        $studentIds = $attempts
+            ->filter(static fn (ExamResitAttempt $attempt): bool => $attempt->student !== null)
+            ->pluck('student_id')
+            ->map(static fn (mixed $id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($studentIds === []) {
+            return [];
+        }
+
+        return $this->lifecycleStatusReader->statusesFor($studentIds);
+    }
+
+    private function examResitDueData(ExamResitAttempt $attempt, ?string $lifecycleStatus = null): AcademicExamResitDueData
     {
         $student = $attempt->student;
+        $status = $lifecycleStatus ?? $student?->status;
         $slot = $attempt->session?->roomSlot;
         $room = $slot?->room;
         $unit = $attempt->unit;
@@ -936,9 +978,9 @@ final class AcademicFinanceChargeSourceGateway implements AcademicFinanceChargeS
             student_code: $student?->student_id,
             student_name: $student?->full_name,
             student_email: $student?->email,
-            student_status: $student?->status,
-            student_status_label: $student?->status_label,
-            student_status_color: $student?->status_color,
+            student_status: $status,
+            student_status_label: $student === null ? null : StudentLifecycleStatusPresenter::label($status),
+            student_status_color: $student === null ? null : StudentLifecycleStatusPresenter::color($status),
             unit_code: $unit?->code,
             unit_name: $unit?->name,
             exam_date: $slot?->exam_date?->toDateString(),

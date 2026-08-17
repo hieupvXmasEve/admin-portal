@@ -14,6 +14,7 @@ use App\Shared\Contracts\Academic\DTO\ProgramEnrollmentSummary;
 use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
+use App\Shared\Support\Academic\StudentLifecycleStatusPresenter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -65,9 +66,8 @@ class ListDngLifecycleQuery
 
         $rows = $this->collectRows($selectedSemesterId, $filters);
 
-        $perPage = in_array((int) ($filters['per_page'] ?? 20), [20, 50, 100], true)
-            ? (int) $filters['per_page']
-            : 20;
+        $requestedPerPage = (int) ($filters['per_page'] ?? 20);
+        $perPage = in_array($requestedPerPage, [20, 50, 100], true) ? $requestedPerPage : 20;
         $page = max(1, (int) ($filters['page'] ?? 1));
         $pageRows = $rows->forPage($page, $perPage)->values();
 
@@ -327,6 +327,7 @@ class ListDngLifecycleQuery
         $flowState = Catalog::deriveFlowState($status, filled($request->error_message), $this->isRetrying($request->webhookEvents, $now));
 
         $buckets = Catalog::attentionBucketsFor($status, $request->created_at, $request->due_date, $webhookState, $now);
+        $liveStatus = $enrollment?->legacyCompatibleStatus() ?? $student->status;
 
         return [
             'row_key' => 'dng-'.$request->id,
@@ -339,8 +340,8 @@ class ListDngLifecycleQuery
                 'student_code' => $student->studentCode,
                 'full_name' => $student->fullName,
                 // students.status is legacy; prefer the live enrollment projection.
-                'status' => $enrollment?->legacyCompatibleStatus() ?? $student->status,
-                'status_label' => $student->statusLabel,
+                'status' => $liveStatus,
+                'status_label' => StudentLifecycleStatusPresenter::label($liveStatus),
             ],
             'fee_type' => $request->fee_type,
             'amount' => round((float) $request->amount, 2),

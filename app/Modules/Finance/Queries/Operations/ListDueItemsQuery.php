@@ -11,8 +11,11 @@ use App\Modules\Finance\Support\ExamResitDueClassifier;
 use App\Modules\Finance\Support\ExamResitDueRowPresenter;
 use App\Modules\Finance\Support\LifecycleDueItemPredicate;
 use App\Shared\Contracts\Academic\DTO\AcademicExamResitDueData;
+use App\Shared\Contracts\Academic\StudentLifecycleStatusReader;
+use App\Shared\Support\Academic\StudentLifecycleStatusPresenter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 
 class ListDueItemsQuery
 {
@@ -21,6 +24,7 @@ class ListDueItemsQuery
     public const SOURCE_EXAM_RESIT = 'exam_resit';
 
     public function __construct(
+        private readonly StudentLifecycleStatusReader $lifecycleStatusReader,
         private readonly ExamResitDngLinkResolver $linkResolver = new ExamResitDngLinkResolver,
         private readonly ExamResitDueClassifier $classifier = new ExamResitDueClassifier,
     ) {}
@@ -81,10 +85,41 @@ class ListDueItemsQuery
         // Resolve exam-resit (PTL) linkage for just this page, batched.
         $paginator->getCollection()->loadMissing(['chargeLinks']);
         $attemptsByRequest = $this->linkResolver->attemptsByDngRequest($paginator->getCollection());
+        $lifecycleStatuses = $this->lifecycleStatuses($paginator->getCollection());
 
         return $paginator->through(
-            fn (DngPaymentRequest $request) => $this->toRow($request, $today, $attemptsByRequest[$request->id] ?? null),
+            fn (DngPaymentRequest $request) => $this->toRow(
+                $request,
+                $today,
+                $attemptsByRequest[$request->id] ?? null,
+                $lifecycleStatuses[(int) $request->student_id] ?? null,
+            ),
         );
+    }
+
+    /**
+     * `students.status` is legacy and is not written back on program-enrollment
+     * transitions, so the displayed lifecycle badge is read from the
+     * Progression-owned projection instead.
+     *
+     * @param  Collection<int, DngPaymentRequest>  $requests
+     * @return array<int, string>
+     */
+    private function lifecycleStatuses($requests): array
+    {
+        $studentIds = $requests
+            ->filter(fn (DngPaymentRequest $request): bool => $request->student !== null)
+            ->pluck('student_id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($studentIds === []) {
+            return [];
+        }
+
+        return $this->lifecycleStatusReader->statusesFor($studentIds);
     }
 
     /**
@@ -102,7 +137,7 @@ class ListDueItemsQuery
     /**
      * @return array<string, mixed>
      */
-    private function toRow(DngPaymentRequest $request, $today, ?AcademicExamResitDueData $attempt): array
+    private function toRow(DngPaymentRequest $request, $today, ?AcademicExamResitDueData $attempt, ?string $lifecycleStatus = null): array
     {
         $dueDate = $request->due_date;
         $daysUntilDue = $today->diffInDays($dueDate, false);
@@ -134,8 +169,8 @@ class ListDueItemsQuery
             // Plain DNG rows scoped here are active pushed requests for active
             // students, so they remain remindable as before.
             'reminder_state' => ExamResitDueClassification::REMINDER_STATE_REMINDABLE,
-            'student_status_label' => $request->student?->status_label,
-            'student_status_color' => $request->student?->status_color,
+            'student_status_label' => $request->student === null ? null : StudentLifecycleStatusPresenter::label($lifecycleStatus ?? $request->student->status),
+            'student_status_color' => $request->student === null ? null : StudentLifecycleStatusPresenter::color($lifecycleStatus ?? $request->student->status),
             'last_reminder_at' => $request->last_reminder_at,
         ];
 

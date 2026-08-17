@@ -14,11 +14,11 @@ final class SearchCourseOfferingStudentsAction
     public static function run(object $courseOffering, array $studentCodes, int $campusId): array
     {
         $unit = app(CourseOfferingCatalogReader::class)->offeringUnit((int) $courseOffering->unit_id);
-        $students = app(StudentReferenceReader::class);
+        $students = app(StudentReferenceReader::class)->findManyByStudentCode($studentCodes, $campusId);
         $results = [];
 
         foreach ($studentCodes as $studentCode) {
-            $student = $students->findByStudentCode($studentCode, $campusId);
+            $student = $students[$studentCode] ?? null;
             $result = [
                 'student_id' => $studentCode,
                 'exists' => $student !== null,

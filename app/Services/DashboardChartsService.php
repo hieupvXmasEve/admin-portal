@@ -10,6 +10,7 @@ use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Shared\Contracts\Platform\StaffDashboardChartReader;
+use App\Shared\Support\Academic\StudentLifecycleProjection;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -43,6 +44,15 @@ class DashboardChartsService implements StaffDashboardChartReader
         $cacheKey = "dashboard_student_distribution_campus_{$campusId}";
 
         return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($campusId) {
+            // `active_count` response key is frozen (StudentDistribution.vue
+            // sums it non-optionally). The projection never emits a literal
+            // 'active' as a *typical* value (only one dev student ever does,
+            // via a NULL study_stage edge case), so its meaning is redefined
+            // to "currently enrolled with a financial status" — the same
+            // vocabulary Finance already uses for collection scope.
+            $projection = StudentLifecycleProjection::caseExpression();
+            $financialStatuses = "'".implode("','", Student::FINANCIAL_STATUSES)."'";
+
             // Get student distribution by program
             $programData = Student::query()
                 ->when($campusId, fn ($q) => $q->where('campus_id', $campusId))
@@ -55,8 +65,8 @@ class DashboardChartsService implements StaffDashboardChartReader
                     'specializations.id as specialization_id',
                     'specializations.name as specialization_name',
                     DB::raw('COUNT(students.id) as student_count'),
-                    DB::raw('COUNT(CASE WHEN students.status = "active" THEN 1 END) as active_count'),
-                    DB::raw('COUNT(CASE WHEN students.status = "graduated" THEN 1 END) as graduated_count'),
+                    DB::raw("COUNT(CASE WHEN ({$projection}) IN ({$financialStatuses}) THEN 1 END) as active_count"),
+                    DB::raw("COUNT(CASE WHEN ({$projection}) = 'graduated' THEN 1 END) as graduated_count"),
                 ])
                 ->groupBy('programs.id', 'programs.name', 'programs.code', 'specializations.id', 'specializations.name')
                 ->orderBy('student_count', 'desc')
@@ -256,6 +266,7 @@ class DashboardChartsService implements StaffDashboardChartReader
                 ->get();
 
             // Get program-specific graduation rates
+            $graduationProjection = StudentLifecycleProjection::caseExpression();
             $programGraduationData = Student::query()
                 ->when($campusId, fn ($q) => $q->where('campus_id', $campusId))
                 ->join('programs', 'students.program_id', '=', 'programs.id')
@@ -264,8 +275,8 @@ class DashboardChartsService implements StaffDashboardChartReader
                     'programs.name as program_name',
                     'programs.code as program_code',
                     DB::raw('COUNT(*) as total_students'),
-                    DB::raw('COUNT(CASE WHEN students.status = "graduated" THEN 1 END) as graduated_students'),
-                    DB::raw('ROUND((COUNT(CASE WHEN students.status = "graduated" THEN 1 END) / COUNT(*)) * 100, 2) as graduation_rate'),
+                    DB::raw("COUNT(CASE WHEN ({$graduationProjection}) = 'graduated' THEN 1 END) as graduated_students"),
+                    DB::raw("ROUND((COUNT(CASE WHEN ({$graduationProjection}) = 'graduated' THEN 1 END) / COUNT(*)) * 100, 2) as graduation_rate"),
                 ])
                 ->where('admission_date', '<=', now()->subYears(4)) // Only consider students who had time to graduate
                 ->groupBy('programs.id', 'programs.name', 'programs.code')

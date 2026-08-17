@@ -8,6 +8,7 @@ use App\Models\Attendance;
 use App\Models\ClassSession;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
+use App\Shared\Contracts\Academic\StudentLifecycleStatusReader;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +16,10 @@ use Illuminate\Support\Facades\Log;
 
 class LecturerAttendanceService
 {
+    public function __construct(
+        private readonly StudentLifecycleStatusReader $lifecycleStatuses,
+    ) {}
+
     /**
      * Get attendance sessions for lecturer with filtering
      */
@@ -62,10 +67,16 @@ class LecturerAttendanceService
 
         $attendanceRecords = $session->attendances->keyBy('student_id');
 
-        $students = $session->courseOffering->classRosterRegistrations
-            ->filter(fn (CourseRegistration $registration) => $registration->student !== null)
-            ->map(function (CourseRegistration $registration) use ($attendanceRecords) {
+        $rosterRegistrations = $session->courseOffering->classRosterRegistrations
+            ->filter(fn (CourseRegistration $registration) => $registration->student !== null);
+        $lifecycleStatuses = $this->lifecycleStatuses->statusesFor(
+            $rosterRegistrations->map(fn (CourseRegistration $registration): int => (int) $registration->student->id)->all(),
+        );
+
+        $students = $rosterRegistrations
+            ->map(function (CourseRegistration $registration) use ($attendanceRecords, $lifecycleStatuses) {
                 $student = $registration->student;
+                $status = $lifecycleStatuses[(int) $student->id] ?? $student->status;
                 $isRosterActive = $registration->isClassRosterActive();
                 $rosterStatus = $registration->classRosterStatus();
                 $rosterStatusLabel = $registration->classRosterStatusLabel();
@@ -107,7 +118,7 @@ class LecturerAttendanceService
                         'program' => $student->program?->program_name,
                         'specialization' => $student->specialization?->specialization_name,
                         'academic_status' => $student->academic_status,
-                        'status' => $student->status,
+                        'status' => $status,
                         'campus' => $student->campus?->name,
                         'admission_date' => $student->admission_date?->format('Y-m-d'),
                         'expected_graduation_date' => $student->expected_graduation_date?->format('Y-m-d'),

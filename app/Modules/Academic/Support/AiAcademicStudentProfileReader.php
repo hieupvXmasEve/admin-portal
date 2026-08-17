@@ -14,6 +14,7 @@ use App\Modules\Academic\Delivery\Queries\GetStudentAcademicAttendanceSummaryQue
 use App\Modules\Academic\Progression\Queries\GetStudentActionHistoryQuery;
 use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use App\Shared\Contracts\Academic\AiAcademicStudentProfileReader as AiAcademicStudentProfileReaderContract;
+use App\Shared\Contracts\Academic\StudentLifecycleStatusReader;
 use Illuminate\Database\Eloquent\Collection;
 
 class AiAcademicStudentProfileReader implements AiAcademicStudentProfileReaderContract
@@ -22,6 +23,7 @@ class AiAcademicStudentProfileReader implements AiAcademicStudentProfileReaderCo
         private readonly GetStudentAcademicAttendanceSummaryQuery $attendanceQuery,
         private readonly GetStudentActionHistoryQuery $actionHistoryQuery,
         private readonly AcademicPeriodReader $academicPeriods,
+        private readonly StudentLifecycleStatusReader $lifecycleStatuses,
     ) {}
 
     public function identity(int $studentId): ?array
@@ -61,6 +63,8 @@ class AiAcademicStudentProfileReader implements AiAcademicStudentProfileReaderCo
             return null;
         }
 
+        $status = $this->lifecycleStatuses->statusesFor([(int) $student->id])[(int) $student->id] ?? $student->status;
+
         return [
             'student_code' => (string) $student->student_id,
             'display_name' => (string) $student->full_name,
@@ -76,7 +80,7 @@ class AiAcademicStudentProfileReader implements AiAcademicStudentProfileReaderCo
             'intake_major_semester_code' => $student->intakeMajorSemester?->code,
             'admission_date' => $student->admission_date?->toDateString(),
             'expected_graduation_date' => $student->expected_graduation_date?->toDateString(),
-            'status' => $student->status,
+            'status' => $status,
             'academic_status' => $student->academic_status,
             'gc_level_snapshot' => [
                 'starting_level' => $student->gc_starting_level,

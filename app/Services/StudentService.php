@@ -541,22 +541,6 @@ class StudentService
     }
 
     /**
-     * Update student status
-     */
-    public function updateStudentStatus(Student $student, string $status): Student
-    {
-        $validStatuses = ['active', 'inactive', 'suspended', 'graduated'];
-
-        if (! in_array($status, $validStatuses)) {
-            throw new Exception('Invalid student status');
-        }
-
-        $student->update(['status' => $status]);
-
-        return $student;
-    }
-
-    /**
      * Delete a student and permanently remove all related data from database
      */
     public function deleteStudent(Student $student): void

@@ -9,11 +9,12 @@ use App\Models\CurriculumVersion;
 use App\Models\Lecture;
 use App\Models\Program;
 use App\Models\ProgramChangeRequest;
-use App\Modules\Facilities\Models\Room;
 use App\Models\Semester;
 use App\Models\Specialization;
 use App\Models\Student;
+use App\Modules\Facilities\Models\Room;
 use App\Shared\Contracts\Platform\StaffDashboardStatsReader;
+use App\Shared\Support\Academic\StudentLifecycleProjection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
@@ -64,20 +65,31 @@ class DashboardStatsService implements StaffDashboardStatsReader
             $baseQuery->where('campus_id', $campusId);
         }
 
-        // Use single query with aggregation for better performance
+        // Use single query with aggregation for better performance. Grouped
+        // by the live Progression projection, not the write-dead `status`
+        // column (plan 260817-0017 phase 3, H5).
+        $projection = StudentLifecycleProjection::caseExpression();
         $statusCounts = (clone $baseQuery)
-            ->select('status', DB::raw('COUNT(*) as count'))
-            ->groupBy('status')
-            ->pluck('count', 'status')
+            ->select(DB::raw("({$projection}) as lifecycle_status"), DB::raw('COUNT(*) as count'))
+            ->groupBy('lifecycle_status')
+            ->pluck('count', 'lifecycle_status')
             ->toArray();
 
         $total = array_sum($statusCounts);
 
-        // Ensure all expected statuses are present
-        $expectedStatuses = ['suspended', 'graduated', 'intake_pre_uni_gc', 'intake_course', 'deferred', 'dropout', 'dropout_transfer'];
+        // Known statuses always present as a stable key set, plus any status
+        // this dev/environment actually has that isn't in the known list —
+        // H5's root cause was a hardcoded list silently dropping counts
+        // instead of the sum ever being allowed to disagree with the total.
+        $expectedStatuses = ['suspended', 'graduated', 'intake_pre_uni_gc', 'intake_course', 'intake_major', 'deferred', 'dropout', 'dropout_transfer', 'pending', 'pending_course_opening', 'active'];
         $byStatus = [];
         foreach ($expectedStatuses as $status) {
             $byStatus[$status] = $statusCounts[$status] ?? 0;
+        }
+        foreach ($statusCounts as $status => $count) {
+            if (! array_key_exists($status, $byStatus)) {
+                $byStatus[$status] = $count;
+            }
         }
 
         return [

@@ -1130,7 +1130,7 @@ class StudentAcademicSummaryService
                 'program' => $student->program?->name,
                 'specialization' => $student->specialization?->name,
                 'campus' => $student->campus?->name,
-                'status' => $student->status,
+                'status' => $this->programEnrollmentReader->forStudentId((int) $student->id)->legacyCompatibleStatus(),
                 'intake' => $student->intake,
             ],
             'graduation' => $this->getGraduationData($student),

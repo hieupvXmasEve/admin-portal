@@ -21,6 +21,7 @@ use App\Shared\Contracts\Finance\SettlementPositionReader;
 use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
 use App\Shared\Contracts\StudentRegistry\StudentCollectionEligibilityReader;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
+use App\Shared\Support\Academic\StudentLifecycleStatusPresenter;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 
@@ -171,7 +172,7 @@ class ListFeeMonitorQuery
                 ->reject(fn (string $status) => $status === 'intake_major')
                 ->map(fn (string $status) => [
                     'value' => $status,
-                    'label' => self::statusLabelFor($status),
+                    'label' => StudentLifecycleStatusPresenter::label($status),
                 ])
                 ->values()
                 ->all(),
@@ -488,6 +489,7 @@ class ListFeeMonitorQuery
     ): array {
         $generationState ??= $this->resolveGenerationStateFromCharge($charge);
         $amount = $charge !== null ? (float) $charge->amount : null;
+        $liveStatus = $this->liveStatus($student);
 
         return [
             'row_key' => $student->id.'-'.$source.'-'.$semesterId,
@@ -495,8 +497,8 @@ class ListFeeMonitorQuery
                 'id' => $student->id,
                 'student_code' => $student->studentCode,
                 'full_name' => $student->fullName,
-                'status' => $this->liveStatus($student),
-                'status_label' => $student->statusLabel,
+                'status' => $liveStatus,
+                'status_label' => StudentLifecycleStatusPresenter::label($liveStatus),
             ],
             'program_code' => $this->enrollmentIndex[$student->id]->programCode ?? null,
             'intake_semester_id' => $this->enrollmentIndex[$student->id]->intakeSemesterId ?? null,
@@ -934,15 +936,5 @@ class ListFeeMonitorQuery
     private function chargePrecedence(FinanceCharge $charge): int
     {
         return $charge->status === FinanceCharge::STATUS_ACTIVE ? 0 : 1;
-    }
-
-    private static function statusLabelFor(string $status): string
-    {
-        return match ($status) {
-            'intake_pre_uni_gc' => 'Intake Pre-Uni GC',
-            'intake_course' => 'Intake Course',
-            'intake_major' => 'Intake Major',
-            default => 'Unknown',
-        };
     }
 }

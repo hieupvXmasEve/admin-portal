@@ -8,6 +8,7 @@ use App\Models\Student;
 use App\Shared\Contracts\StudentRegistry\DTO\SemesterEnrollmentCandidate;
 use App\Shared\Contracts\StudentRegistry\DTO\SemesterEnrollmentEligibilityCounts;
 use App\Shared\Contracts\StudentRegistry\SemesterEnrollmentEligibilityReader;
+use App\Shared\Support\Academic\StudentLifecycleProjection;
 use Illuminate\Database\Eloquent\Builder;
 
 final class EloquentSemesterEnrollmentEligibilityReader implements SemesterEnrollmentEligibilityReader
@@ -45,8 +46,10 @@ final class EloquentSemesterEnrollmentEligibilityReader implements SemesterEnrol
 
     private function baseQuery(int $campusId): Builder
     {
-        return Student::query()
-            ->whereIn('status', self::ELIGIBLE_INTAKE_STATUSES)
+        $query = Student::query();
+        StudentLifecycleProjection::whereStatusIn($query, self::ELIGIBLE_INTAKE_STATUSES);
+
+        return $query
             ->where('academic_status', 'active')
             ->where('campus_id', $campusId)
             ->whereNotNull('curriculum_version_id');

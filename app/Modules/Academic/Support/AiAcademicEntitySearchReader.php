@@ -10,12 +10,14 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use App\Shared\Contracts\Academic\AiAcademicEntitySearchReader as AiAcademicEntitySearchReaderContract;
+use App\Shared\Contracts\Academic\StudentLifecycleStatusReader;
 use Illuminate\Database\Eloquent\Builder;
 
 class AiAcademicEntitySearchReader implements AiAcademicEntitySearchReaderContract
 {
     public function __construct(
         private readonly AcademicPeriodReader $academicPeriods,
+        private readonly StudentLifecycleStatusReader $lifecycleStatuses,
     ) {}
 
     public function searchStudents(string $query, ?int $campusId, array $filters, int $limit): array
@@ -23,7 +25,7 @@ class AiAcademicEntitySearchReader implements AiAcademicEntitySearchReaderContra
         $normalized = $this->normalize($query);
         $semesterId = $this->semesterIdFromFilters($filters);
 
-        return Student::query()
+        $students = Student::query()
             ->select(['id', 'student_id', 'full_name', 'program_id', 'intake_semester_id', 'status', 'campus_id'])
             ->with([
                 'program:id,code,name',
@@ -43,7 +45,13 @@ class AiAcademicEntitySearchReader implements AiAcademicEntitySearchReaderContra
             ])
             ->orderBy('student_id')
             ->limit($limit)
-            ->get()
+            ->get();
+
+        $statuses = $students->isEmpty()
+            ? []
+            : $this->lifecycleStatuses->statusesFor($students->pluck('id')->map(static fn (int|string $id): int => (int) $id)->all());
+
+        return $students
             ->map(fn (Student $student): array => [
                 'source_id' => (int) $student->id,
                 'entity_type' => 'student',
@@ -52,7 +60,7 @@ class AiAcademicEntitySearchReader implements AiAcademicEntitySearchReaderContra
                     'student_code' => (string) $student->student_id,
                     'program_code' => $student->program?->code,
                     'intake_semester_code' => $student->intakeSemester?->code,
-                    'status' => $student->status,
+                    'status' => $statuses[(int) $student->id] ?? $student->status,
                 ],
                 'match_reason' => $this->studentMatchReason($query, (string) $student->student_id),
             ])
