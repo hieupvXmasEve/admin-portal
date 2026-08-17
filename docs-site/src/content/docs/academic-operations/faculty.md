@@ -8,7 +8,7 @@ source:
   - resources/js/pages/Lectures/LecturerGpa.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure — Faculty & Teaching folded into Academic Operations as "Faculty"; page moved from faculty-teaching/index.md, plans/260816-2125-sidebar-menu-ia-restructure/). -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (Placement Worklist entry added to Students group, plans/260817-1123-student-placement-worklist/). -->
 
 **Faculty** (trong **Academic Operations**) quản lý đội ngũ giảng dạy: ai đang dạy, dạy bao nhiêu giờ, lớp do họ phụ trách có kết quả thế nào.
 

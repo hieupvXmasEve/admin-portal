@@ -14,7 +14,7 @@ source:
   - resources/js/pages/Admin/Notifications/Ops/Deliveries.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Finance Office" renamed to "Finance", plans/260816-2125-sidebar-menu-ia-restructure/). -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (Placement Worklist entry added to Students group, plans/260817-1123-student-placement-worklist/). -->
 
 **Communications**는 메일과 알림을 외부로 보내고, 제대로 도착했는지 확인하는 도구를 제공합니다.
 

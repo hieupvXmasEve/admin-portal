@@ -8,7 +8,7 @@ source:
   - resources/js/pages/Lectures/LecturerGpa.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- Faculty & Teaching folded into Academic Operations as "Faculty"; page moved from faculty-teaching/index.md, plans/260816-2125-sidebar-menu-ia-restructure/). -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (Placement Worklist entry added to Students group, plans/260817-1123-student-placement-worklist/). -->
 
 **Academic Operations**의 **Faculty**는 강의 인력을 관리합니다. 누가 강의하는지, 시수는 얼마인지, 담당 강좌의 성적은 어떠한지를 다룹니다.
 

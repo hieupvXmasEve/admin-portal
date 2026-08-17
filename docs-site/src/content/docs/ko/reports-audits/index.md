@@ -16,7 +16,7 @@ source:
   - resources/js/pages/Academic/Report/StudentUnits/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Student Services" renamed to "Students", plans/260816-2125-sidebar-menu-ia-restructure/). -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (Placement Worklist entry added to Students group, plans/260817-1123-student-placement-worklist/). -->
 
 **Reports & Audits**는 관리자용 영역입니다. 전교 단위 수치를 보고, 자료가 빠진 곳을 찾아냅니다.
 

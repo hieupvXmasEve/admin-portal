@@ -17,7 +17,7 @@ source:
   - resources/js/pages/Vouchers/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Finance Office (New UI)" renamed to "Finance"; Discounts & Funding folded in as a subgroup; Scholarship Adjustments moved out to Academic Operations > Grades & Performance (ADR-0026 makes it a Progression Action, not a Finance screen), plans/260816-2125-sidebar-menu-ia-restructure/). -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (Placement Worklist entry added to Students group, plans/260817-1123-student-placement-worklist/). -->
 
 **Finance**는 부과금의 처리 흐름과, 그 안의 **Discounts & Funding** 하위 그룹(등록금 요금제, 장학금, 할인 쿠폰)으로 구성됩니다.
 

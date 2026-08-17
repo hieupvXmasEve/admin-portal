@@ -7,7 +7,7 @@ source:
   - resources/js/pages/FailedStudents/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Attendance & Completion" renamed to "Attendance"; Course Statistics moved to Course Delivery, plans/260816-2125-sidebar-menu-ia-restructure/). -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (Placement Worklist entry added to Students group, plans/260817-1123-student-placement-worklist/). -->
 
 **Attendance** is where you check how students are attending and which cases need follow-up. Per-unit statistics (**Course Statistics**) moved to the **Course Delivery** group.
 

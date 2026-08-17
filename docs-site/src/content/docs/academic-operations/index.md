@@ -5,7 +5,7 @@ source:
   - resources/js/constants/menu-sidebar.ts
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- Attendance & Completion renamed to Attendance; Course Statistics moved to Course Delivery; Faculty and Scholarship Adjustments folded in, plans/260816-2125-sidebar-menu-ia-restructure/). -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (Placement Worklist entry added to Students group, plans/260817-1123-student-placement-worklist/). -->
 
 **Academic Operations** là khu vực vận hành học vụ: dựng khung chương trình, mở lớp, quản lý đăng ký môn, theo dõi điểm danh, chốt GPA và phát hiện sinh viên có rủi ro học tập.
 

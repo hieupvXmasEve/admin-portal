@@ -9,7 +9,7 @@ source:
   - resources/js/constants/menu-sidebar.ts
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- group table rewritten for the new 10-group tree, plans/260816-2125-sidebar-menu-ia-restructure/). -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (Placement Worklist entry added to Students group, plans/260817-1123-student-placement-worklist/). -->
 
 Chương này giúp bạn vào được hệ thống và hiểu bố cục màn hình. Đọc một lần là đủ dùng cho mọi chương sau.
 

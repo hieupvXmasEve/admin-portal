@@ -5,7 +5,7 @@ source:
   - resources/js/constants/menu-sidebar.ts
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- Attendance & Completion renamed to Attendance; Course Statistics moved to Course Delivery; Faculty and Scholarship Adjustments folded in, plans/260816-2125-sidebar-menu-ia-restructure/). -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (Placement Worklist entry added to Students group, plans/260817-1123-student-placement-worklist/). -->
 
 **Academic Operations**는 학사 업무를 수행하는 영역입니다. 교육과정 구성, 강좌 개설, 수강신청 관리, 출석 확인, 평점 확정, 학업 위험 학생 파악을 다룹니다.
 

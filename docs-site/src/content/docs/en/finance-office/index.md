@@ -17,7 +17,7 @@ source:
   - resources/js/pages/Vouchers/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Finance Office (New UI)" renamed to "Finance"; Discounts & Funding folded in as a subgroup (Tuition Plans, Scholarships, Student Scholarships, Vouchers); Scholarship Adjustments moved out to Academic Operations > Grades & Performance (ADR-0026 makes it a Progression Action, not a Finance screen), plans/260816-2125-sidebar-menu-ia-restructure/). -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (Placement Worklist entry added to Students group, plans/260817-1123-student-placement-worklist/). -->
 
 **Finance** covers the life of a charge, plus a **Discounts & Funding** subgroup (tuition plans, scholarships, vouchers).
 

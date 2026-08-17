@@ -11,7 +11,7 @@ source:
   - resources/js/pages/Syllabus/TemplatesIndex.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Finance Office" renamed to "Finance", plans/260816-2125-sidebar-menu-ia-restructure/). -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (Placement Worklist entry added to Students group, plans/260817-1123-student-placement-worklist/). -->
 
 **Curriculum Setup** là nhóm trang chuẩn bị dữ liệu nền. Làm **một lần rồi dùng lại nhiều kỳ**, không phải việc hằng ngày.
 

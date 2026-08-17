@@ -9,7 +9,7 @@ source:
   - resources/js/constants/menu-sidebar.ts
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- group table rewritten for the new 10-group tree, plans/260816-2125-sidebar-menu-ia-restructure/). -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (Placement Worklist entry added to Students group, plans/260817-1123-student-placement-worklist/). -->
 
 이 장은 시스템에 접속하고 화면 구성을 이해하기 위한 것입니다. 한 번만 읽으면 이후 모든 장을 따라갈 수 있습니다.
 

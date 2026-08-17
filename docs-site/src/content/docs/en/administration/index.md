@@ -12,7 +12,7 @@ source:
   - resources/js/pages/Admin/EmailMonitoring/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- Canvas Integrations moved out of Administration > Integrations to Academic Operations > Course Delivery (retitled Canvas Settings), plans/260816-2125-sidebar-menu-ia-restructure/). -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (Placement Worklist entry added to Students group, plans/260817-1123-student-placement-worklist/). -->
 
 **Administration** is for administrators. Changes here affect **every user**, not just you.
 

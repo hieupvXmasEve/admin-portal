@@ -9,7 +9,7 @@ source:
   - resources/js/pages/Forms/Queries/Inbox.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Forms & Quality" renamed to "Forms & Surveys"; Queries wrapper flattened, Staff Inbox promoted, plans/260816-2125-sidebar-menu-ia-restructure/). -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (Placement Worklist entry added to Students group, plans/260817-1123-student-placement-worklist/). -->
 
 **Forms & Surveys** dùng để thu thập thông tin từ sinh viên: khảo sát chất lượng giảng dạy, phiếu đăng ký, đơn từ.
 

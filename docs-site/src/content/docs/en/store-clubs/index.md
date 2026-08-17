@@ -13,7 +13,7 @@ source:
   - app/Modules/Merchandise/routes/web.php
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- Campus Operations split into "Campus" (Rooms + Events) and "Store & Clubs" (Clubs + Merchandise); page moved from campus-operations/index.md, plans/260816-2125-sidebar-menu-ia-restructure/). -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (Placement Worklist entry added to Students group, plans/260817-1123-student-placement-worklist/). -->
 
 **Store & Clubs** manages student clubs and the Gold redemption store — two HQ-only screens, split out from the rooms/events in **Campus**.
 

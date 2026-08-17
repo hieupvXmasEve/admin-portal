@@ -16,7 +16,7 @@ source:
   - resources/js/pages/Academic/Report/StudentUnits/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Student Services" renamed to "Students", plans/260816-2125-sidebar-menu-ia-restructure/). -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (Placement Worklist entry added to Students group, plans/260817-1123-student-placement-worklist/). -->
 
 **Reports & Audits** is the management area: university-wide figures, and the gaps where data is missing.
 

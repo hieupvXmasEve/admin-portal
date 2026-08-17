@@ -7,7 +7,7 @@ source:
   - resources/js/pages/FailedStudents/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Attendance & Completion" renamed to "Attendance"; Course Statistics moved to Course Delivery, plans/260816-2125-sidebar-menu-ia-restructure/). -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (Placement Worklist entry added to Students group, plans/260817-1123-student-placement-worklist/). -->
 
 **Attendance** 用于检查学生出勤情况，以及需要跟进处理的情况。各课程统计（**Course Statistics**）已移至 **Course Delivery** 分组。
 

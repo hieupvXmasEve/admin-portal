@@ -5,7 +5,7 @@ source:
   - resources/js/constants/menu-sidebar.ts
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- group renames and moves: Attendance & Completion -> Attendance, Student Services -> Students, Campus Operations -> Campus, Faculty & Teaching folded into Academic Operations, Finance Office -> Finance, plans/260816-2125-sidebar-menu-ia-restructure/). -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (Placement Worklist entry added to Students group, plans/260817-1123-student-placement-worklist/). -->
 
 이 문서는 담당자가 화면 사이를 이동하는 경로를 설명합니다. 할 일은 알지만 어디서 시작할지 모를 때 사용하십시오.
 

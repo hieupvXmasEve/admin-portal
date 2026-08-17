@@ -13,7 +13,7 @@ source:
   - resources/js/pages/Admin/Canvas/Courses/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- Course Statistics moved here from Attendance & Completion; Canvas Integrations moved here from Administration, retitled Canvas Settings, plans/260816-2125-sidebar-menu-ia-restructure/). -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (Placement Worklist entry added to Students group, plans/260817-1123-student-placement-worklist/). -->
 
 **Course Delivery** 是每学期开始时的核心工作：开班、排课、登记学生选课、处理重修和补考。
 

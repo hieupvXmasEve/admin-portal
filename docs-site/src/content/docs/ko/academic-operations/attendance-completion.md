@@ -7,7 +7,7 @@ source:
   - resources/js/pages/FailedStudents/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Attendance & Completion" renamed to "Attendance"; Course Statistics moved to Course Delivery, plans/260816-2125-sidebar-menu-ia-restructure/). -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (Placement Worklist entry added to Students group, plans/260817-1123-student-placement-worklist/). -->
 
 **Attendance**에서는 학생의 수업 참여 상황과 후속 조치가 필요한 사례를 확인합니다. 교과목별 통계(**Course Statistics**)는 **Course Delivery** 그룹으로 이동했습니다.
 

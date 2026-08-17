@@ -5,10 +5,11 @@ source:
   - resources/js/constants/menu-sidebar.ts
   - resources/js/pages/Students/Index.vue
   - resources/js/pages/Students/enrollments/Index.vue
+  - resources/js/pages/Academic/PlacementWorklist/Index.vue
   - resources/js/pages/StudentApplications/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Student Services" renamed to "Students", plans/260816-2125-sidebar-menu-ia-restructure/). -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (Placement Worklist entry added to Students group, plans/260817-1123-student-placement-worklist/). -->
 
 **Students** 是处理 **每一名具体学生** 的地方：档案、入学登记状态，以及入学申请。
 
@@ -62,6 +63,27 @@ source:
 
 **接下来。** Finance Office、Course Registration。
 
+## Placement Worklist — 入学分流
+
+**用途。** 已录取但教务部门尚未分流的学生名单：进入 EGC 课程（指定英语级别），或直接进入专业（IELTS 达到门槛分数）。
+
+**谁能打开。** 拥有变更学生状态（分流）权限的人。
+
+**步骤**
+
+1. 进入 **Students → Placement Worklist**。列表只显示所选校区尚未分流的学生。
+2. 用搜索框（学号 / 姓名）或 **Program** 筛选查找学生。
+3. 点击该行的 **Classify** 打开分流对话框。
+4. 选择 **Semester**。学生有 IELTS 则打开开关并填写分数，达到门槛即直接进入专业；没有 IELTS（或未达门槛）则按分级考试结果选择 **English Level**。
+5. 确认。已分流的学生会从列表中消失。
+
+**注意**
+
+- 这里的分流与学生档案 Lifecycle 标签页中的 "Initialize placement" 是同一个流程，只是入口不同。
+- 每名学生只能分流一次。之后的修改请使用 Lifecycle 标签页中的更新操作。
+
+**下一步。** Students（完整档案）、Course Registration。
+
 ## Student Applications — 入学申请
 
 **用途。** 处理入学申请：查看材料、批准或拒绝。
@@ -95,4 +117,5 @@ source:
 | 学生反馈无法选课 | Enrollments & Holds → Finance Office → Academic Terms |
 | 需要查看某学生的完整情况 | Students → 打开详细档案 |
 | 审批新一批招生申请 | Student Applications（按 Intake 筛选） |
+| 为新录取学生分流（EGC / 直入专业） | Placement Worklist → Classify |
 | 导出学生名单用于报表 | Students → 选择格式和范围 |

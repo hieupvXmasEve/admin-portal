@@ -10,7 +10,7 @@ source:
   - resources/js/pages/ScholarshipAdjustments/Show.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- Scholarship Adjustments moved here from Discounts & Funding, ADR-0026 makes it a Progression Action, not a money screen, plans/260816-2125-sidebar-menu-ia-restructure/). -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (Placement Worklist entry added to Students group, plans/260817-1123-student-placement-worklist/). -->
 
 **Grades & Performance** 是结算结果的阶段：计算 GPA、查询历史成绩、识别有学业风险的学生，并审核因不及格产生的奖学金调整。
 

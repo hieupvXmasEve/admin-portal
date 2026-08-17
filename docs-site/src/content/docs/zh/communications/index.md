@@ -14,7 +14,7 @@ source:
   - resources/js/pages/Admin/Notifications/Ops/Deliveries.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Finance Office" renamed to "Finance", plans/260816-2125-sidebar-menu-ia-restructure/). -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (Placement Worklist entry added to Students group, plans/260817-1123-student-placement-worklist/). -->
 
 **Communications** 用于向外发送邮件和通知，并提供检查是否送达的工具。
 

@@ -5,7 +5,7 @@ source:
   - resources/js/constants/menu-sidebar.ts
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- group renames and moves: Attendance & Completion -> Attendance, Student Services -> Students, Campus Operations -> Campus, Faculty & Teaching folded into Academic Operations, Finance Office -> Finance, plans/260816-2125-sidebar-menu-ia-restructure/). -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (Placement Worklist entry added to Students group, plans/260817-1123-student-placement-worklist/). -->
 
 This page describes how staff move between screens. Use it when you know what you need to do but not where to begin.
 

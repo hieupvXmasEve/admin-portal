@@ -7,7 +7,7 @@ source:
   - resources/js/pages/FailedStudents/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Attendance & Completion" renamed to "Attendance"; Course Statistics moved to Course Delivery, plans/260816-2125-sidebar-menu-ia-restructure/). -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (Placement Worklist entry added to Students group, plans/260817-1123-student-placement-worklist/). -->
 
 **Attendance** giúp kiểm tra tình hình đi học và các trường hợp cần xử lý tiếp. Thống kê từng môn (**Course Statistics**) đã chuyển sang nhóm **Course Delivery**.
 

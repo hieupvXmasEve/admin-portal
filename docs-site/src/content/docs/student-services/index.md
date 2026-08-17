@@ -5,10 +5,11 @@ source:
   - resources/js/constants/menu-sidebar.ts
   - resources/js/pages/Students/Index.vue
   - resources/js/pages/Students/enrollments/Index.vue
+  - resources/js/pages/Academic/PlacementWorklist/Index.vue
   - resources/js/pages/StudentApplications/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Student Services" renamed to "Students", plans/260816-2125-sidebar-menu-ia-restructure/). -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (Placement Worklist entry added to Students group, plans/260817-1123-student-placement-worklist/). -->
 
 **Students** là nơi làm việc với **từng sinh viên**: hồ sơ, tình trạng ghi danh, và hồ sơ ứng tuyển đầu vào.
 
@@ -62,6 +63,27 @@ Phân biệt với nhóm **Reports & Audits**: bên đó là số liệu tổng 
 
 **Đi tiếp.** Finance Office, Course Registration.
 
+## Placement Worklist — Phân loại đầu vào
+
+**Dùng để làm gì.** Danh sách sinh viên đã trúng tuyển nhưng phòng Đào tạo chưa phân loại: học EGC (kèm level tiếng Anh) hay vào thẳng chuyên ngành (có IELTS đạt ngưỡng).
+
+**Ai vào được.** Người có quyền đổi trạng thái sinh viên (phân loại).
+
+**Các bước**
+
+1. Vào **Students → Placement Worklist**. Danh sách chỉ gồm sinh viên của cơ sở đang chọn, chưa được phân loại.
+2. Tìm bằng ô tìm kiếm (mã / tên) hoặc lọc theo **Program**.
+3. Bấm **Classify** ở dòng sinh viên để mở hộp thoại phân loại.
+4. Chọn kỳ (**Semester**). Nếu sinh viên có IELTS, bật công tắc và nhập điểm; đạt ngưỡng thì vào thẳng chuyên ngành. Không có IELTS (hoặc dưới ngưỡng) thì chọn **English Level** theo kết quả xếp lớp.
+5. Xác nhận. Sinh viên được phân loại sẽ biến mất khỏi danh sách.
+
+**Lưu ý**
+
+- Phân loại ở đây giống hệt thao tác "Initialize placement" trong tab Lifecycle của hồ sơ sinh viên — cùng một quy trình, chỉ khác chỗ thao tác.
+- Mỗi sinh viên chỉ phân loại được một lần. Sửa sau đó dùng các thao tác cập nhật trong tab Lifecycle.
+
+**Đi tiếp.** Students (hồ sơ chi tiết), Course Registration.
+
 ## Student Applications — Hồ sơ nhập học
 
 **Dùng để làm gì.** Xử lý hồ sơ ứng tuyển: xem giấy tờ, duyệt hoặc từ chối.
@@ -95,4 +117,5 @@ Phân biệt với nhóm **Reports & Audits**: bên đó là số liệu tổng 
 | Sinh viên báo không đăng ký được môn | Enrollments & Holds → Finance Office → Academic Terms |
 | Cần xem toàn bộ tình hình một sinh viên | Students → mở hồ sơ chi tiết |
 | Duyệt hồ sơ đợt tuyển sinh mới | Student Applications (lọc theo Intake) |
+| Phân loại sinh viên mới trúng tuyển (EGC / vào thẳng chuyên ngành) | Placement Worklist → Classify |
 | Xuất danh sách sinh viên cho báo cáo | Students → chọn định dạng và phạm vi |

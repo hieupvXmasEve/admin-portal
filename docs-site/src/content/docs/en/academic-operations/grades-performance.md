@@ -10,7 +10,7 @@ source:
   - resources/js/pages/ScholarshipAdjustments/Show.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- Scholarship Adjustments moved here from Discounts & Funding, ADR-0026 makes it a Progression Action, not a money screen, plans/260816-2125-sidebar-menu-ia-restructure/). -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (Placement Worklist entry added to Students group, plans/260817-1123-student-placement-worklist/). -->
 
 **Grades & Performance** is where results are closed out: calculating GPA, looking up past results, spotting students at academic risk, and reviewing scholarship adjustments for students who failed a unit.
 

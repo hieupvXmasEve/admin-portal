@@ -17,7 +17,7 @@ source:
   - resources/js/pages/Vouchers/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Finance Office (New UI)" renamed to "Finance"; Discounts & Funding folded in as a subgroup; Scholarship Adjustments moved out to Academic Operations > Grades & Performance (ADR-0026 makes it a Progression Action, not a Finance screen), plans/260816-2125-sidebar-menu-ia-restructure/). -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (Placement Worklist entry added to Students group, plans/260817-1123-student-placement-worklist/). -->
 
 **Finance** 涵盖收费项的生命周期，以及其中的 **Discounts & Funding** 子分组（学费套餐、奖学金、优惠券）。
 

@@ -5,7 +5,7 @@ source:
   - resources/js/constants/menu-sidebar.ts
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- Faculty & Teaching folded into Academic Operations; Campus Operations split into Campus and Store & Clubs; Student Services -> Students, Finance Office -> Finance, Forms & Quality -> Forms & Surveys, plans/260816-2125-sidebar-menu-ia-restructure/). -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (Placement Worklist entry added to Students group, plans/260817-1123-student-placement-worklist/). -->
 
 本指南面向在浏览器中使用 Portal 管理系统的 **教职员工**。无需技术知识。
 

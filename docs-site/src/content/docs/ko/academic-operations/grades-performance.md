@@ -10,7 +10,7 @@ source:
   - resources/js/pages/ScholarshipAdjustments/Show.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- Scholarship Adjustments moved here from Discounts & Funding, ADR-0026 makes it a Progression Action, not a money screen, plans/260816-2125-sidebar-menu-ia-restructure/). -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (Placement Worklist entry added to Students group, plans/260817-1123-student-placement-worklist/). -->
 
 **Grades & Performance**는 결과를 마감하는 단계입니다. 평점을 산출하고, 과거 결과를 조회하며, 학업 위험 학생을 찾아내고, 미이수로 인한 장학금 조정을 검토합니다.
 

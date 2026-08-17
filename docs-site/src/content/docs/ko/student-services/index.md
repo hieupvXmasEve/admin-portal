@@ -5,10 +5,11 @@ source:
   - resources/js/constants/menu-sidebar.ts
   - resources/js/pages/Students/Index.vue
   - resources/js/pages/Students/enrollments/Index.vue
+  - resources/js/pages/Academic/PlacementWorklist/Index.vue
   - resources/js/pages/StudentApplications/Index.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Student Services" renamed to "Students", plans/260816-2125-sidebar-menu-ia-restructure/). -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (Placement Worklist entry added to Students group, plans/260817-1123-student-placement-worklist/). -->
 
 **Students**는 **학생 한 명 단위**로 일하는 영역입니다. 학생 기록, 등록 상태, 입학 지원서를 다룹니다.
 
@@ -62,6 +63,27 @@ source:
 
 **다음 화면.** Finance Office, Course Registration.
 
+## Placement Worklist — 입학 분류
+
+**용도.** 합격했지만 교무 부서가 아직 분류하지 않은 학생 목록입니다. EGC 과정(영어 레벨 지정) 또는 전공 직행(IELTS 기준 점수 이상)으로 분류합니다.
+
+**접근 권한.** 학생 상태 변경(분류) 권한이 있는 사람.
+
+**단계**
+
+1. **Students → Placement Worklist**로 이동합니다. 선택한 캠퍼스의 미분류 학생만 표시됩니다.
+2. 검색창(학번 / 이름)이나 **Program** 필터로 학생을 찾습니다.
+3. 해당 행의 **Classify**를 눌러 분류 대화 상자를 엽니다.
+4. **Semester**를 선택합니다. IELTS가 있으면 스위치를 켜고 점수를 입력합니다. 기준 점수 이상이면 전공으로 직행합니다. IELTS가 없거나 기준 미달이면 배치고사 결과에 따라 **English Level**을 선택합니다.
+5. 확인합니다. 분류된 학생은 목록에서 사라집니다.
+
+**참고**
+
+- 이 분류는 학생 기록 Lifecycle 탭의 "Initialize placement"와 완전히 같은 처리입니다. 진입 위치만 다릅니다.
+- 학생당 분류는 한 번만 가능합니다. 이후 수정은 Lifecycle 탭의 갱신 기능을 사용하십시오.
+
+**다음.** Students(상세 기록), Course Registration.
+
 ## Student Applications — 입학 지원서
 
 **용도.** 입학 지원서를 처리합니다. 제출 서류를 확인하고 승인하거나 반려합니다.
@@ -95,4 +117,5 @@ source:
 | 학생이 수강신청을 못 한다고 문의 | Enrollments & Holds → Finance Office → Academic Terms |
 | 한 학생의 전체 현황 확인 | Students → 상세 기록 열기 |
 | 새 모집 회차 지원서 심사 | Student Applications, Intake로 필터 |
+| 신입 합격생 분류 (EGC / 전공 직행) | Placement Worklist → Classify |
 | 보고용 학생 명단 내보내기 | Students → 형식과 범위 선택 |

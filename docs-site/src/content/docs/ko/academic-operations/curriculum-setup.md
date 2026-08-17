@@ -11,7 +11,7 @@ source:
   - resources/js/pages/Syllabus/TemplatesIndex.vue
 ---
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (sidebar IA restructure -- "Finance Office" renamed to "Finance", plans/260816-2125-sidebar-menu-ia-restructure/). -->
+<!-- docs-freshness: reviewed against menu-sidebar.ts change (Placement Worklist entry added to Students group, plans/260817-1123-student-placement-worklist/). -->
 
 **Curriculum Setup**은 바탕이 되는 자료를 준비하는 그룹입니다. **한 번 만들어 여러 학기에 재사용**하며, 매일 하는 업무가 아닙니다.
 
