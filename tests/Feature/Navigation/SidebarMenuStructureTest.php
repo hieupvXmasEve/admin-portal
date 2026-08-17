@@ -188,6 +188,7 @@ it('has a stable href multiset with no duplicates', function () {
         'studentRoutes.academicProgressionMissingDocuments()',
         'studentRoutes.enrollments()',
         'studentRoutes.list()',
+        'studentRoutes.placementWorklist()',
         'studentRoutes.scholarshipRestorationWatchlist()',
         'studentRoutes.studentDecisionsIndex()',
         'studentRoutes.studentLifecycleYearlyAnalysis()',

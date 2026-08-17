@@ -266,6 +266,14 @@ export const mainNavGroups: NavGroup[] = [
                 requiredPermissions: ['view_student'],
             },
             {
+                // Academic-department worklist: gated by the classify permission
+                // itself (change_student_status), not the broad view_student read.
+                title: 'Placement Worklist',
+                href: studentRoutes.placementWorklist(),
+                icon: GraduationCap,
+                requiredPermissions: ['change_student_status'],
+            },
+            {
                 title: 'Student Applications',
                 href: '/student-applications',
                 icon: ClipboardCheck,

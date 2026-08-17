@@ -208,6 +208,7 @@ export const studentRoutes = {
     repeatCourses: () => route('course-retakes.index'),
     academicStanding: () => route('academic-standings.index'),
     enrollments: () => route('student-enrollments.index'),
+    placementWorklist: () => route('students.placement-worklist.index'),
     statusTracking: () => route('students.status.index'),
 
     // Student Academic Summary Routes

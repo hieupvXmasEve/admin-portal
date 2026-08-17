@@ -55,6 +55,7 @@ use App\Modules\Academic\Progression\Http\Web\StudentActionAuditController;
 use App\Modules\Academic\Progression\Http\Web\StudentActionController;
 use App\Modules\Academic\Progression\Http\Web\StudentDecisionController;
 use App\Modules\Academic\Progression\Http\Web\StudentLifecycleYearlyAnalysisController;
+use App\Modules\Academic\Progression\Http\Web\StudentPlacementWorklistController;
 use App\Modules\Academic\Progression\Http\Web\StudentStatusController;
 use App\Modules\Academic\Progression\Http\Web\WarningCenterController;
 use Illuminate\Support\Facades\Route;
@@ -397,6 +398,12 @@ Route::middleware(['auth', 'verified', 'campus.selected'])->group(function () {
     // ==========================================================
     // Academic Placement & Progression
     // ==========================================================
+    // Dept-specific operational page: gated by the classify permission itself,
+    // not the broader view_student read permission.
+    Route::get('students-placement-worklist', [StudentPlacementWorklistController::class, 'index'])
+        ->middleware('can:change_student_status')
+        ->name('students.placement-worklist.index');
+
     Route::prefix('students/{student}/placement')->name('students.placement.')->group(function () {
         Route::get('/', [AcademicPlacementController::class, 'show'])
             ->middleware('can:view_student')

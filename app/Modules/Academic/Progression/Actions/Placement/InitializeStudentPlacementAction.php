@@ -7,8 +7,10 @@ namespace App\Modules\Academic\Progression\Actions\Placement;
 use App\Enums\AcademicProgressionEventType;
 use App\Enums\ProgressionTriggerSource;
 use App\Models\AcademicProgressionEvent;
+use App\Enums\StudentActionType;
 use App\Models\IeltsCertificate;
 use App\Models\Student;
+use App\Models\StudentActionLog;
 use App\Modules\Academic\Progression\Actions\MaterializeProgramEnrollmentAction;
 use App\Modules\Academic\Progression\Exceptions\InvalidProgressionState;
 use App\Modules\Academic\Progression\Models\ProgramEnrollment;
@@ -28,9 +30,12 @@ final class InitializeStudentPlacementAction
 
         return DB::transaction(function () use ($data, $student, $userId): Student {
             MaterializeProgramEnrollmentAction::run(['student_id' => (int) $student->id]);
+            // Highest id wins among multiple is_primary rows (binding
+            // tie-break convention, see StudentLifecycleProjection).
             $enrollment = ProgramEnrollment::query()
                 ->where('student_id', $student->id)
                 ->where('is_primary', true)
+                ->orderByDesc('id')
                 ->lockForUpdate()
                 ->firstOrFail();
 
@@ -83,6 +88,23 @@ final class InitializeStudentPlacementAction
                 'egc_starting_level' => $stage === 'intake_pre_uni_gc' ? $level : null,
                 'egc_current_level' => $stage === 'intake_pre_uni_gc' ? $level : null,
                 'egc_total_levels' => $stage === 'intake_pre_uni_gc' ? ($enrollment->egc_total_levels ?? 6) : null,
+            ]);
+
+            // previous_status 'pending' is the reporting convention used by the
+            // historical backfill (students:create-egc-action-logs), not the live
+            // students.status value — kept identical so reporting stays uniform.
+            StudentActionLog::query()->create([
+                'student_id' => $student->id,
+                'action_type' => StudentActionType::STUDENT_ENROLLMENT_NE->value,
+                'reason' => $stage === 'intake_pre_uni_gc'
+                    ? 'Student completes NE enrollment.'
+                    : 'Student completes enrollment and directly enters course stage.',
+                'notes' => $data['notes'] ?? null,
+                'changed_by_user_id' => $userId,
+                'from_semester_id' => $data['semester_id'],
+                'previous_status' => 'pending',
+                'new_status' => $stage,
+                'missing_documents' => false,
             ]);
 
             AcademicProgressionEvent::query()->create([

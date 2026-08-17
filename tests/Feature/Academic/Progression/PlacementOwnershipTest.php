@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Enums\StudentActionType;
 use App\Models\Campus;
 use App\Models\IeltsCertificate;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Models\StudentActionLog;
 use App\Models\User;
 use App\Modules\Academic\Progression\Actions\Placement\InitializeStudentPlacementAction;
 use App\Modules\Academic\Progression\Actions\Placement\TransitionToIntakeCourseAction;
@@ -19,6 +21,7 @@ uses(RefreshDatabase::class);
 
 it('records placement and English-level changes on Program Enrollment without rewriting Student Identity state', function (): void {
     $semester = Semester::factory()->create();
+    $user = User::factory()->create();
     $student = Student::factory()
         ->for(Campus::factory())
         ->for(Program::factory())
@@ -36,6 +39,7 @@ it('records placement and English-level changes on Program Enrollment without re
         'semester_id' => $semester->id,
         'has_ielts' => false,
         'english_level' => 2,
+        'created_by_user_id' => $user->id,
     ]);
 
     UpdateStudentEnglishLevelAction::run([
@@ -53,6 +57,76 @@ it('records placement and English-level changes on Program Enrollment without re
         ->and($student->fresh()->status)->toBe('pending')
         ->and($student->fresh()->gc_starting_level)->toBeNull()
         ->and($student->fresh()->gc_current_level)->toBeNull();
+
+    $log = StudentActionLog::query()->sole();
+    expect($log->action_type)->toBe(StudentActionType::STUDENT_ENROLLMENT_NE)
+        ->and($log->previous_status)->toBe('pending')
+        ->and($log->new_status)->toBe('intake_pre_uni_gc')
+        ->and($log->from_semester_id)->toBe($semester->id)
+        ->and($log->reason)->toBe('Student completes NE enrollment.');
+});
+
+it('writes an intake_course action log when IELTS meets the course threshold at placement', function (): void {
+    $semester = Semester::factory()->create();
+    $user = User::factory()->create();
+    $student = Student::factory()
+        ->for(Campus::factory())
+        ->for(Program::factory())
+        ->create([
+            'status' => 'pending',
+            'intake_semester_id' => $semester->id,
+            'intake' => 1,
+            'intake_mode' => 'sequential',
+        ]);
+
+    InitializeStudentPlacementAction::run([
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'has_ielts' => true,
+        'ielts_score' => 6.5,
+        'notes' => 'direct entry',
+        'created_by_user_id' => $user->id,
+    ]);
+
+    expect(ProgramEnrollment::query()->sole()->study_stage)->toBe('intake_course');
+
+    $log = StudentActionLog::query()->sole();
+    expect($log->action_type)->toBe(StudentActionType::STUDENT_ENROLLMENT_NE)
+        ->and($log->previous_status)->toBe('pending')
+        ->and($log->new_status)->toBe('intake_course')
+        ->and($log->from_semester_id)->toBe($semester->id)
+        ->and($log->changed_by_user_id)->toBe($user->id)
+        ->and($log->notes)->toBe('direct entry')
+        ->and($log->reason)->toBe('Student completes enrollment and directly enters course stage.');
+});
+
+it('does not duplicate the placement action log when initialize is attempted twice', function (): void {
+    $semester = Semester::factory()->create();
+    $user = User::factory()->create();
+    $student = Student::factory()
+        ->for(Campus::factory())
+        ->for(Program::factory())
+        ->create([
+            'status' => 'pending',
+            'intake_semester_id' => $semester->id,
+            'intake' => 1,
+            'intake_mode' => 'sequential',
+        ]);
+
+    $payload = [
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'has_ielts' => false,
+        'english_level' => 1,
+        'created_by_user_id' => $user->id,
+    ];
+
+    InitializeStudentPlacementAction::run($payload);
+
+    expect(fn (): mixed => InitializeStudentPlacementAction::run($payload))
+        ->toThrow(InvalidProgressionState::class);
+
+    expect(StudentActionLog::query()->count())->toBe(1);
 });
 
 it('moves the course-stage transition onto Program Enrollment while preserving its decision evidence', function (): void {
