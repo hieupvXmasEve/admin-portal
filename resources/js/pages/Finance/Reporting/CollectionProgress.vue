@@ -30,7 +30,6 @@ interface CollectionProgressRow {
     student: CollectionProgressStudent;
     program_code: string | null;
     intake_semester_id: number | null;
-    cohort: number | null;
     semester_id: number;
     invoice_count: number;
     fee_types: string[];
@@ -92,7 +91,6 @@ interface FilterOption {
 interface CollectionProgressFilters {
     program_id: string | number;
     intake_semester_id: string | number;
-    cohort: string | number;
     fee_type: string;
     balance_state: string;
     aging_bucket: string;
@@ -110,7 +108,6 @@ interface CollectionProgressPayload {
         by_fee_type: BreakdownItem[];
         by_program: BreakdownItem[];
         by_intake: BreakdownItem[];
-        by_cohort: BreakdownItem[];
         by_balance_state: BreakdownItem[];
         by_aging_bucket: BreakdownItem[];
         by_lifecycle_exception: BreakdownItem[];
@@ -119,7 +116,6 @@ interface CollectionProgressPayload {
     filter_options: {
         programs: FilterOption[];
         intakes: FilterOption[];
-        cohorts: FilterOption[];
         fee_types: FilterOption[];
         balance_states: FilterOption[];
         aging_buckets: FilterOption[];
@@ -146,6 +142,12 @@ const isHistorical = reportView === 'historical-as-of';
 const asOfTimestamp = props.collection_progress.meta.as_of_timestamp ?? '';
 
 const filterProps = props.collection_progress.filters ?? {};
+
+// Semester-name lookup shared by the per-row intake sub-line and the
+// by-intake breakdown (backend keys the breakdown by semester id).
+const intakeLabelById = computed<Record<number, string>>(() =>
+    Object.fromEntries(props.collection_progress.filter_options.intakes.map((option) => [Number(option.value), option.label])),
+);
 const stringFilter = (value: unknown, fallback = 'all'): string => (typeof value === 'string' && value !== '' ? value : fallback);
 const numberFilter = (value: unknown, fallback = 20): number => {
     if (typeof value === 'number') return value;
@@ -169,7 +171,6 @@ const {
         view: reportView,
         program_id: filterProps.program_id ?? 'all',
         intake_semester_id: filterProps.intake_semester_id ?? 'all',
-        cohort: filterProps.cohort ?? 'all',
         fee_type: stringFilter(filterProps.fee_type),
         balance_state: stringFilter(filterProps.balance_state),
         aging_bucket: stringFilter(filterProps.aging_bucket),
@@ -183,7 +184,6 @@ const {
         view: reportView,
         program_id: 'all',
         intake_semester_id: 'all',
-        cohort: 'all',
         fee_type: 'all',
         balance_state: 'all',
         aging_bucket: 'all',
@@ -194,7 +194,7 @@ const {
         as_of: asOfTimestamp,
     },
     only: ['collection_progress', 'computed_at', 'active_view'],
-    immediateFields: ['program_id', 'intake_semester_id', 'cohort', 'fee_type', 'balance_state', 'aging_bucket', 'student_status'],
+    immediateFields: ['program_id', 'intake_semester_id', 'fee_type', 'balance_state', 'aging_bucket', 'student_status'],
 });
 
 const summary = computed(() => props.collection_progress.summary);
@@ -231,7 +231,6 @@ const breakdownDimensions = [
     { key: 'by_fee_type', label: 'Loại phí' },
     { key: 'by_program', label: 'Chương trình' },
     { key: 'by_intake', label: 'Intake' },
-    { key: 'by_cohort', label: 'Cohort' },
     { key: 'by_lifecycle_exception', label: 'Ngoại lệ vòng đời' },
 ] as const;
 
@@ -239,7 +238,14 @@ type BreakdownKey = (typeof breakdownDimensions)[number]['key'];
 
 const activeBreakdown = ref<BreakdownKey>('by_balance_state');
 
-const breakdownRows = computed<BreakdownItem[]>(() => props.collection_progress.breakdowns[activeBreakdown.value] ?? []);
+const breakdownRows = computed<BreakdownItem[]>(() => {
+    const rows = props.collection_progress.breakdowns[activeBreakdown.value] ?? [];
+    if (activeBreakdown.value !== 'by_intake') return rows;
+
+    // Backend labels this dimension "Intake <semester id>" — swap in the
+    // semester name so the breakdown reads as a real term, not a raw id.
+    return rows.map((item) => ({ ...item, label: intakeLabelById.value[Number(item.key)] ?? item.label }));
+});
 
 const breakdownHasMoney = computed(() => breakdownRows.value.some((item) => item.billed !== undefined));
 
@@ -364,13 +370,6 @@ const lookupInvoiceUrl = (row: CollectionProgressRow): string | undefined => {
                             <SelectItem v-for="option in collection_progress.filter_options.intakes" :key="option.value" :value="String(option.value)">{{ option.label }}</SelectItem>
                         </SelectContent>
                     </Select>
-                    <Select :model-value="String(tableFilters.cohort)" @update:model-value="(value) => setFilter('cohort', value)">
-                        <SelectTrigger><SelectValue placeholder="Cohort" /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Tất cả cohort</SelectItem>
-                            <SelectItem v-for="option in collection_progress.filter_options.cohorts" :key="option.value" :value="String(option.value)">{{ option.label }}</SelectItem>
-                        </SelectContent>
-                    </Select>
                     <Select :model-value="tableFilters.fee_type" @update:model-value="(value) => setFilter('fee_type', value)">
                         <SelectTrigger><SelectValue placeholder="Loại phí" /></SelectTrigger>
                         <SelectContent>
@@ -431,7 +430,7 @@ const lookupInvoiceUrl = (row: CollectionProgressRow): string | undefined => {
                                 </TableCell>
                                 <TableCell>
                                     <div>{{ row.program_code ?? '—' }}</div>
-                                    <div v-if="row.cohort" class="text-muted-foreground text-xs">Cohort {{ row.cohort }}</div>
+                                    <div v-if="intakeLabelById[row.intake_semester_id ?? -1]" class="text-muted-foreground text-xs">{{ intakeLabelById[row.intake_semester_id ?? -1] }}</div>
                                 </TableCell>
                                 <TableCell>
                                     <Badge :variant="balanceStateVariant(row.balance_state)">{{ row.balance_state_label }}</Badge>

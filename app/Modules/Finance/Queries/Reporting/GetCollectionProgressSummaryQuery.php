@@ -65,7 +65,6 @@ class GetCollectionProgressSummaryQuery
             'by_fee_type' => $this->byFeeType($rows),
             'by_program' => $this->byStudentDimension($rows, 'program_code', fn (array $row) => $row['program_code'] ?? '—'),
             'by_intake' => $this->byStudentDimension($rows, 'intake_semester_id', fn (array $row) => $row['intake_semester_id'] !== null ? 'Intake '.$row['intake_semester_id'] : '—'),
-            'by_cohort' => $this->byStudentDimension($rows, 'cohort', fn (array $row) => $row['cohort'] !== null ? 'Cohort '.$row['cohort'] : '—'),
             'by_balance_state' => $this->byBalanceState($rows),
             'by_aging_bucket' => $this->byAgingBucket($rows),
             'by_lifecycle_exception' => $this->byLifecycleException($rows),

@@ -26,7 +26,6 @@ class ListFeeMonitorRequest extends FormRequest
             'view' => 'nullable|string|max:64',
             'program_id' => 'nullable',
             'intake_semester_id' => 'nullable',
-            'cohort' => 'nullable',
             'expected_fee_type' => ['nullable', Rule::in(array_merge(['all'], $expectedSources))],
             'generation_state' => 'nullable|string|in:missing,generated,skipped,voided,blocked,all',
             'payment_state' => 'nullable|string|in:paid,partially_paid,outstanding,invalid,all',

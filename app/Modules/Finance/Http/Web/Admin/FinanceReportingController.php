@@ -181,7 +181,6 @@ class FinanceReportingController extends Controller
         $filters = array_replace([
             'program_id' => 'all',
             'intake_semester_id' => 'all',
-            'cohort' => 'all',
             'fee_type' => 'all',
             'balance_state' => 'all',
             'aging_bucket' => 'all',
@@ -280,7 +279,6 @@ class FinanceReportingController extends Controller
             'by_fee_type' => [],
             'by_program' => [],
             'by_intake' => [],
-            'by_cohort' => [],
             'by_balance_state' => [],
             'by_aging_bucket' => [],
             'by_lifecycle_exception' => [],
@@ -295,7 +293,6 @@ class FinanceReportingController extends Controller
         return [
             'programs' => [],
             'intakes' => [],
-            'cohorts' => [],
             'fee_types' => [],
             'balance_states' => [],
             'aging_buckets' => [],
@@ -315,7 +312,6 @@ class FinanceReportingController extends Controller
         $validated = array_replace([
             'program_id' => 'all',
             'intake_semester_id' => 'all',
-            'cohort' => 'all',
             'expected_fee_type' => 'all',
             'generation_state' => 'all',
             'payment_state' => 'all',
@@ -365,7 +361,6 @@ class FinanceReportingController extends Controller
                 'filter_options' => $semesterId ? $listQuery->filterOptions($semesterId) : [
                     'programs' => [],
                     'intakes' => [],
-                    'cohorts' => [],
                     'expected_fee_types' => [],
                     'generation_states' => [],
                     'student_statuses' => [],

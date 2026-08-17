@@ -28,7 +28,6 @@ interface FeeMonitorRow {
     student: FeeMonitorStudent;
     program_code: string | null;
     intake_semester_id: number | null;
-    cohort: number | null;
     expected_source: string;
     expected_fee_type: string;
     expected_fee_type_label: string;
@@ -72,7 +71,6 @@ interface FilterOption {
 interface FeeMonitorFilters {
     program_id: string | number;
     intake_semester_id: string | number;
-    cohort: string | number;
     expected_fee_type: string;
     generation_state: string;
     payment_state: string;
@@ -89,7 +87,6 @@ interface FeeMonitorPayload {
     filter_options: {
         programs: FilterOption[];
         intakes: FilterOption[];
-        cohorts: FilterOption[];
         expected_fee_types: FilterOption[];
         generation_states: FilterOption[];
         student_statuses: FilterOption[];
@@ -113,6 +110,12 @@ const props = defineProps<{
 }>();
 
 const filterProps = props.fee_monitor.filters ?? {};
+
+// Semester-name lookup for the per-row intake sub-line (replaces the retired
+// cohort display — the semester says which round the student joined).
+const intakeLabelById = computed<Record<number, string>>(() =>
+    Object.fromEntries(props.fee_monitor.filter_options.intakes.map((option) => [Number(option.value), option.label])),
+);
 const stringFilter = (value: unknown, fallback = 'all'): string => (typeof value === 'string' && value !== '' ? value : fallback);
 const numberFilter = (value: unknown, fallback = 20): number => {
     if (typeof value === 'number') return value;
@@ -136,7 +139,6 @@ const {
         view: 'fee-monitor',
         program_id: filterProps.program_id ?? 'all',
         intake_semester_id: filterProps.intake_semester_id ?? 'all',
-        cohort: filterProps.cohort ?? 'all',
         expected_fee_type: stringFilter(filterProps.expected_fee_type),
         generation_state: stringFilter(filterProps.generation_state),
         payment_state: stringFilter(filterProps.payment_state),
@@ -149,7 +151,6 @@ const {
         view: 'fee-monitor',
         program_id: 'all',
         intake_semester_id: 'all',
-        cohort: 'all',
         expected_fee_type: 'all',
         generation_state: 'all',
         payment_state: 'all',
@@ -159,7 +160,7 @@ const {
         page: 1,
     },
     only: ['fee_monitor', 'computed_at', 'active_view'],
-    immediateFields: ['program_id', 'intake_semester_id', 'cohort', 'expected_fee_type', 'generation_state', 'payment_state', 'student_status'],
+    immediateFields: ['program_id', 'intake_semester_id', 'expected_fee_type', 'generation_state', 'payment_state', 'student_status'],
 });
 
 const generationStateVariant = (state: FeeMonitorRow['generation_state']) => {
@@ -287,15 +288,6 @@ const acadRetGateActive = computed(() => !props.fee_monitor.meta.acad_ret_gate.m
                             </SelectItem>
                         </SelectContent>
                     </Select>
-                    <Select :model-value="String(tableFilters.cohort)" @update:model-value="(value) => setFilter('cohort', value)">
-                        <SelectTrigger><SelectValue placeholder="Cohort" /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Tất cả cohort</SelectItem>
-                            <SelectItem v-for="option in fee_monitor.filter_options.cohorts" :key="option.value" :value="String(option.value)">
-                                {{ option.label }}
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
                     <Select :model-value="tableFilters.expected_fee_type" @update:model-value="(value) => setFilter('expected_fee_type', value)">
                         <SelectTrigger><SelectValue placeholder="Loại phí dự kiến" /></SelectTrigger>
                         <SelectContent>
@@ -355,7 +347,7 @@ const acadRetGateActive = computed(() => !props.fee_monitor.meta.acad_ret_gate.m
                                 </TableCell>
                                 <TableCell>
                                     <div>{{ row.program_code ?? '—' }}</div>
-                                    <div v-if="row.cohort" class="text-muted-foreground text-xs">Cohort {{ row.cohort }}</div>
+                                    <div v-if="intakeLabelById[row.intake_semester_id ?? -1]" class="text-muted-foreground text-xs">{{ intakeLabelById[row.intake_semester_id ?? -1] }}</div>
                                 </TableCell>
                                 <TableCell>
                                     <div>{{ row.expected_fee_type_label }}</div>

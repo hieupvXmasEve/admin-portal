@@ -24,7 +24,6 @@ class ListCollectionProgressRequest extends FormRequest
             'view' => 'nullable|string|max:64',
             'program_id' => 'nullable',
             'intake_semester_id' => 'nullable',
-            'cohort' => 'nullable',
             'fee_type' => 'nullable|string|max:64',
             'balance_state' => ['nullable', 'string', Rule::in(array_merge(['all'], CollectionProgressCatalog::balanceStateKeys()))],
             'aging_bucket' => ['nullable', 'string', Rule::in(array_merge(['all'], CollectionProgressCatalog::agingBucketKeys()))],

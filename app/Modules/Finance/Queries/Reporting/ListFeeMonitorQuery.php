@@ -135,22 +135,9 @@ class ListFeeMonitorQuery
             ->values()
             ->all();
 
-        $cohorts = $students
-            ->pluck('cohort')
-            ->filter(fn ($intake) => $intake !== null)
-            ->unique()
-            ->sort()
-            ->map(fn (int $intake) => [
-                'value' => $intake,
-                'label' => 'Intake '.$intake,
-            ])
-            ->values()
-            ->all();
-
         return [
             'programs' => $programs,
             'intakes' => $intakeSemesters,
-            'cohorts' => $cohorts,
             'expected_fee_types' => collect(FeeMonitorExpectedFeeCatalog::sources())
                 ->map(fn (array $meta, string $source) => [
                     'value' => $source,
@@ -502,7 +489,6 @@ class ListFeeMonitorQuery
             ],
             'program_code' => $this->enrollmentIndex[$student->id]->programCode ?? null,
             'intake_semester_id' => $this->enrollmentIndex[$student->id]->intakeSemesterId ?? null,
-            'cohort' => $student->cohort,
             'expected_source' => $source,
             'expected_fee_type' => $chargeType,
             'expected_fee_type_label' => FeeMonitorExpectedFeeCatalog::sources()[$source]['label'] ?? $chargeType,
@@ -876,12 +862,6 @@ class ListFeeMonitorQuery
             }
         }
 
-        if (! empty($filters['cohort']) && $filters['cohort'] !== 'all') {
-            if ((int) ($row['cohort'] ?? 0) !== (int) $filters['cohort']) {
-                return false;
-            }
-        }
-
         if (! empty($filters['student_status']) && $filters['student_status'] !== 'all') {
             if (($row['student']['status'] ?? null) !== $filters['student_status']) {
                 return false;
@@ -909,10 +889,6 @@ class ListFeeMonitorQuery
         }
         if (! empty($filters['intake_semester_id']) && $filters['intake_semester_id'] !== 'all'
             && $enrollment?->intakeSemesterId !== (int) $filters['intake_semester_id']) {
-            return false;
-        }
-        if (! empty($filters['cohort']) && $filters['cohort'] !== 'all'
-            && $student->cohort !== (int) $filters['cohort']) {
             return false;
         }
         if (! empty($filters['student_status']) && $filters['student_status'] !== 'all'

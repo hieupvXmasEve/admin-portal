@@ -297,7 +297,6 @@ final class ListCollectionProgressQuery
             ],
             'program_code' => $student->programCode,
             'intake_semester_id' => $student->intakeSemesterId,
-            'cohort' => $student->cohort,
             'semester_id' => $semesterId,
             'invoice_count' => $studentInvoices->count(),
             'fee_types' => array_keys($feeTypes),
@@ -485,7 +484,6 @@ final class ListCollectionProgressQuery
                 ->map(fn ($period): array => ['value' => $period->id, 'label' => $period->name])
                 ->values()
                 ->all(),
-            'cohorts' => $students->pluck('cohort')->filter()->unique()->sort()->values()->map(fn (int $intake) => ['value' => $intake, 'label' => 'Intake '.$intake])->all(),
             'fee_types' => $this->scopedFeeTypes($semesterId, $campusId)->map(fn (string $type) => ['value' => $type, 'label' => $type])->all(),
             'balance_states' => collect(Catalog::balanceStates())->map(fn (string $label, string $value) => ['value' => $value, 'label' => $label])->values()->all(),
             'aging_buckets' => collect(Catalog::agingBuckets())->map(fn (array $meta, string $value) => ['value' => $value, 'label' => $meta['label']])->values()->all(),
@@ -529,10 +527,6 @@ final class ListCollectionProgressQuery
         }
         if (! empty($filters['intake_semester_id']) && $filters['intake_semester_id'] !== 'all'
             && $student->intakeSemesterId !== (int) $filters['intake_semester_id']) {
-            return false;
-        }
-        if (! empty($filters['cohort']) && $filters['cohort'] !== 'all'
-            && $student->cohort !== (int) $filters['cohort']) {
             return false;
         }
         if (! empty($filters['student_status']) && $filters['student_status'] !== 'all'
