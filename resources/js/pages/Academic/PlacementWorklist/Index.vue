@@ -13,6 +13,7 @@ import { GraduationCap, RefreshCw, Search, Upload } from 'lucide-vue-next';
 import { ref } from 'vue';
 import { route } from 'ziggy-js';
 import BulkImportEgcPlacementDialog from './BulkImportEgcPlacementDialog.vue';
+import BulkImportMajorPlacementDialog from './BulkImportMajorPlacementDialog.vue';
 import ClassifyStudentDialog from './ClassifyStudentDialog.vue';
 import type { PlacementOptions, WorklistProgram, WorklistStudent } from './worklist-types';
 
@@ -41,6 +42,7 @@ const setProgram = (value: string) => updateField('program_id', value === 'all' 
 
 const classifyTarget = ref<WorklistStudent | null>(null);
 const bulkImportOpen = ref(false);
+const bulkImportMajorOpen = ref(false);
 
 const formatDate = (value: string | null): string => (value ? new Date(value).toLocaleDateString('vi-VN') : '—');
 </script>
@@ -58,6 +60,10 @@ const formatDate = (value: string | null): string => (value ? new Date(value).to
                 <Button variant="outline" @click="bulkImportOpen = true">
                     <Upload class="mr-2 h-4 w-4" />
                     Bulk Import
+                </Button>
+                <Button variant="outline" @click="bulkImportMajorOpen = true">
+                    <Upload class="mr-2 h-4 w-4" />
+                    Bulk Import Major
                 </Button>
                 <Badge variant="secondary" class="text-lg">{{ students.total }} students</Badge>
             </div>
@@ -150,5 +156,6 @@ const formatDate = (value: string | null): string => (value ? new Date(value).to
 
         <ClassifyStudentDialog :student="classifyTarget" :placement-options="placementOptions" @close="classifyTarget = null" />
         <BulkImportEgcPlacementDialog v-if="bulkImportOpen" @close="bulkImportOpen = false" />
+        <BulkImportMajorPlacementDialog v-if="bulkImportMajorOpen" @close="bulkImportMajorOpen = false" />
     </div>
 </template>

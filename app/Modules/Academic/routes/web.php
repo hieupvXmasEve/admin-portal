@@ -46,6 +46,7 @@ use App\Modules\Academic\Http\Web\StudentCompletedUnitsController;
 use App\Modules\Academic\Progression\Http\Web\AcademicPlacementController;
 use App\Modules\Academic\Progression\Http\Web\AcademicProgressionAuditController;
 use App\Modules\Academic\Progression\Http\Web\BulkEgcPlacementImportController;
+use App\Modules\Academic\Progression\Http\Web\BulkMajorPlacementImportController;
 use App\Modules\Academic\Progression\Http\Web\GpaHistoryController;
 use App\Modules\Academic\Progression\Http\Web\PerformanceDashboardController;
 use App\Modules\Academic\Progression\Http\Web\ScholarshipAdjustmentDossierController;
@@ -412,6 +413,17 @@ Route::middleware(['auth', 'verified', 'campus.selected'])->group(function () {
                 ->middleware('can:change_student_status')
                 ->name('preview');
             Route::post('/execute', [BulkEgcPlacementImportController::class, 'executeImport'])
+                ->middleware('can:change_student_status')
+                ->name('execute');
+        });
+
+    Route::prefix('students-placement-worklist/bulk-import-major')
+        ->name('students.placement-worklist.bulk-import-major.')
+        ->group(function () {
+            Route::post('/preview', [BulkMajorPlacementImportController::class, 'previewImport'])
+                ->middleware('can:change_student_status')
+                ->name('preview');
+            Route::post('/execute', [BulkMajorPlacementImportController::class, 'executeImport'])
                 ->middleware('can:change_student_status')
                 ->name('execute');
         });
