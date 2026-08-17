@@ -9,9 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useTableFilters } from '@/composables/useFilters';
 import type { PaginatedResponse } from '@/types';
 import { Head } from '@inertiajs/vue3';
-import { GraduationCap, RefreshCw, Search } from 'lucide-vue-next';
+import { GraduationCap, RefreshCw, Search, Upload } from 'lucide-vue-next';
 import { ref } from 'vue';
 import { route } from 'ziggy-js';
+import BulkImportEgcPlacementDialog from './BulkImportEgcPlacementDialog.vue';
 import ClassifyStudentDialog from './ClassifyStudentDialog.vue';
 import type { PlacementOptions, WorklistProgram, WorklistStudent } from './worklist-types';
 
@@ -39,6 +40,7 @@ const { filters, clearFilters, handlePaginationNavigate, handlePageSizeChange, u
 const setProgram = (value: string) => updateField('program_id', value === 'all' ? null : value);
 
 const classifyTarget = ref<WorklistStudent | null>(null);
+const bulkImportOpen = ref(false);
 
 const formatDate = (value: string | null): string => (value ? new Date(value).toLocaleDateString('vi-VN') : '—');
 </script>
@@ -52,7 +54,13 @@ const formatDate = (value: string | null): string => (value ? new Date(value).to
                 <h1 class="text-3xl font-bold tracking-tight">Placement Worklist</h1>
                 <p class="text-muted-foreground">Approved students waiting for EGC / major classification</p>
             </div>
-            <Badge variant="secondary" class="text-lg">{{ students.total }} students</Badge>
+            <div class="flex items-center gap-3">
+                <Button variant="outline" @click="bulkImportOpen = true">
+                    <Upload class="mr-2 h-4 w-4" />
+                    Bulk Import
+                </Button>
+                <Badge variant="secondary" class="text-lg">{{ students.total }} students</Badge>
+            </div>
         </div>
 
         <Card>
@@ -141,5 +149,6 @@ const formatDate = (value: string | null): string => (value ? new Date(value).to
         </Card>
 
         <ClassifyStudentDialog :student="classifyTarget" :placement-options="placementOptions" @close="classifyTarget = null" />
+        <BulkImportEgcPlacementDialog v-if="bulkImportOpen" @close="bulkImportOpen = false" />
     </div>
 </template>

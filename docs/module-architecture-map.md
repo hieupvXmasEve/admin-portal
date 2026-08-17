@@ -85,6 +85,7 @@ Enforce: `DomainBoundaryArchitectureTest` cấm import concrete inter-module; ch
 | StudentRegistry | Finance | Domain event `StudentRegistered` | `Finance/Listeners/ProvisionBillingAccountForRegisteredStudent.php`, đăng ký tại `FinanceServiceProvider` |
 | Finance | StudentRegistry | Implement contract của StudentRegistry | `app/Shared/Contracts/` |
 | Academic | Finance | Handoff model + charge (retake/resit debit) | `academic_finance_cancellation_handoffs`, ADR-0026 |
+| Academic | Admissions | Đọc CRM intake semester qua contract (bulk EGC placement) | `App\Shared\Contracts\Admissions\IntakeSemesterReader`, `EloquentIntakeSemesterReader` |
 | Finance | Academic | Đọc scope (students, semesters, programs, units) qua FK + contract | FK trong migrations |
 | Academic | Identity | Contract 2 chiều (faculty eligibility ↔ access grants) | `faculty_access_eligibility_outbox`, `lecturer_access_eligibility_handoffs`, ADR-0038/0039 |
 | Academic, Finance, … | Notification | Durable intent → outbox | `notification_event_outbox` |
@@ -176,6 +177,7 @@ graph TB
     StudentRegistry -.->|event: StudentRegistered| Finance
     Academic -->|handoff + retake charges| Finance
     Finance -->|reads scope via FK/contract| Academic
+    Academic -->|reads CRM intake semester| Admissions
     Academic <-->|eligibility/access contracts| Identity
     Academic -->|intent| Notification
     Finance -->|intent| Notification

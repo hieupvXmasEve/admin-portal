@@ -45,6 +45,7 @@ use App\Modules\Academic\Http\Web\GpaManagementController;
 use App\Modules\Academic\Http\Web\StudentCompletedUnitsController;
 use App\Modules\Academic\Progression\Http\Web\AcademicPlacementController;
 use App\Modules\Academic\Progression\Http\Web\AcademicProgressionAuditController;
+use App\Modules\Academic\Progression\Http\Web\BulkEgcPlacementImportController;
 use App\Modules\Academic\Progression\Http\Web\GpaHistoryController;
 use App\Modules\Academic\Progression\Http\Web\PerformanceDashboardController;
 use App\Modules\Academic\Progression\Http\Web\ScholarshipAdjustmentDossierController;
@@ -403,6 +404,17 @@ Route::middleware(['auth', 'verified', 'campus.selected'])->group(function () {
     Route::get('students-placement-worklist', [StudentPlacementWorklistController::class, 'index'])
         ->middleware('can:change_student_status')
         ->name('students.placement-worklist.index');
+
+    Route::prefix('students-placement-worklist/bulk-import')
+        ->name('students.placement-worklist.bulk-import.')
+        ->group(function () {
+            Route::post('/preview', [BulkEgcPlacementImportController::class, 'previewImport'])
+                ->middleware('can:change_student_status')
+                ->name('preview');
+            Route::post('/execute', [BulkEgcPlacementImportController::class, 'executeImport'])
+                ->middleware('can:change_student_status')
+                ->name('execute');
+        });
 
     Route::prefix('students/{student}/placement')->name('students.placement.')->group(function () {
         Route::get('/', [AcademicPlacementController::class, 'show'])
