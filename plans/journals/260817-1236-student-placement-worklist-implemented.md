@@ -50,3 +50,14 @@ Root cause of the join bug: `is_primary` is not a unique constraint at the DB le
 ## AgentWiki Publish
 
 `agentwiki whoami` returned `command not found` — no AgentWiki CLI installed in this environment, and no AgentWiki MCP tools were exposed in this session. AgentWiki publish skipped; local journal file at the path above is the source of truth.
+
+## Addendum — same-day UX iteration (commit 7cef2a2d3)
+
+User feedback right after shipping: the classify dialog's IELTS switch framed the
+decision backwards. Reworked (frontend only, `has_ielts` contract untouched):
+semester now defaults to the student's intake semester; an EGC/Major radio
+(default EGC) drives the field branches — Major shows IELTS fields with the
+missing-scan exception and no EGC level, EGC shows only the English Level; a
+below-threshold Major score gets an inline warning that the server will still
+place into EGC (level 0). User-guide step updated in vi/en/ko/zh. Committed as
+7cef2a2d3.

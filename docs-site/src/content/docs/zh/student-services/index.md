@@ -74,7 +74,7 @@ source:
 1. 进入 **Students → Placement Worklist**。列表只显示所选校区尚未分流的学生。
 2. 用搜索框（学号 / 姓名）或 **Program** 筛选查找学生。
 3. 点击该行的 **Classify** 打开分流对话框。
-4. 选择 **Semester**。学生有 IELTS 则打开开关并填写分数，达到门槛即直接进入专业；没有 IELTS（或未达门槛）则按分级考试结果选择 **English Level**。
+4. **Semester** 默认为学生的入学学期，可修改。选择分流方式：**EGC (placement test)** — 选择 **English Level**；或 **Major (IELTS)** — 填写 IELTS 分数（可标记缺少扫描件，之后补交）。分数未达门槛会提示该生仍将进入 EGC。
 5. 确认。已分流的学生会从列表中消失。
 
 **注意**

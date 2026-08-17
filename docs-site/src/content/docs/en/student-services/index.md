@@ -74,7 +74,7 @@ Contrast with **Reports & Audits**: that area shows university-wide figures; thi
 1. Go to **Students → Placement Worklist**. The list only shows unclassified students of the selected campus.
 2. Find a student with the search box (code / name) or the **Program** filter.
 3. Click **Classify** on a row to open the classification dialog.
-4. Pick the **Semester**. If the student has IELTS, switch it on and enter the score; at or above the threshold they enter their major directly. Without IELTS (or below the threshold), pick the **English Level** from the placement test.
+4. The **Semester** defaults to the student's intake semester and can be changed. Pick the classification: **EGC (placement test)** — choose the **English Level**; or **Major (IELTS)** — enter the IELTS score (a missing file scan can be flagged and supplied later). A below-threshold score shows a warning that the student will still enter EGC.
 5. Confirm. A classified student disappears from the list.
 
 **Notes**

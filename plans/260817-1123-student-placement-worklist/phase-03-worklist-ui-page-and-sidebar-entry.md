@@ -77,6 +77,14 @@ pagination idioms from `Students/Index.vue`.
       (check-docs-freshness all current, pnpm build success)
 - [x] eslint clean on touched files
 
+**Post-completion UX iteration (2026-08-17, user request):** dialog reworked —
+semester defaults to the student's intake semester; `has_ielts` switch replaced
+by an EGC/Major radio (default EGC): Major shows IELTS fields (missing-scan
+flag allowed, no EGC level), EGC shows only English Level; below-threshold
+Major score shows an inline warning that the server will still place into EGC.
+Backend contract unchanged (radio maps to `has_ielts`). Docs step 4 updated in
+all four locales.
+
 **Verification note:** step 5's manual browser smoke on the dev DB was not
 run this session; DB side effects are covered by the HTTP feature tests
 above. Recommend one click-through (EGC + IELTS classify) on dev before

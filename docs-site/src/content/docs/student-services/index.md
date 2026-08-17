@@ -74,7 +74,7 @@ Phân biệt với nhóm **Reports & Audits**: bên đó là số liệu tổng 
 1. Vào **Students → Placement Worklist**. Danh sách chỉ gồm sinh viên của cơ sở đang chọn, chưa được phân loại.
 2. Tìm bằng ô tìm kiếm (mã / tên) hoặc lọc theo **Program**.
 3. Bấm **Classify** ở dòng sinh viên để mở hộp thoại phân loại.
-4. Chọn kỳ (**Semester**). Nếu sinh viên có IELTS, bật công tắc và nhập điểm; đạt ngưỡng thì vào thẳng chuyên ngành. Không có IELTS (hoặc dưới ngưỡng) thì chọn **English Level** theo kết quả xếp lớp.
+4. Kỳ (**Semester**) mặc định là kỳ nhập học của sinh viên, có thể đổi. Chọn hướng phân loại: **EGC (placement test)** — chọn **English Level**; hoặc **Major (IELTS)** — nhập điểm IELTS (có thể đánh dấu thiếu bản scan, bổ sung sau). Điểm dưới ngưỡng sẽ được cảnh báo là vẫn vào EGC.
 5. Xác nhận. Sinh viên được phân loại sẽ biến mất khỏi danh sách.
 
 **Lưu ý**
