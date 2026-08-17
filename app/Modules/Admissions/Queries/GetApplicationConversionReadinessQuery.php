@@ -7,6 +7,7 @@ namespace App\Modules\Admissions\Queries;
 use App\Models\StudentApplication;
 use App\Models\User;
 use App\Modules\Admissions\Models\CrmValueMapping;
+use App\Modules\Admissions\Support\Crm\CrmMappingSettings;
 use App\Shared\Contracts\Admissions\ApplicationProgramMappingReader;
 
 /**
@@ -34,7 +35,13 @@ final class GetApplicationConversionReadinessQuery
      */
     private array $resolveCache = [];
 
-    public function __construct(private readonly ApplicationProgramMappingReader $programMappingReader) {}
+    /** Memoized "is a cohort configured" — one settings query per instance, not per row. */
+    private ?bool $cohortConfigured = null;
+
+    public function __construct(
+        private readonly ApplicationProgramMappingReader $programMappingReader,
+        private readonly CrmMappingSettings $mappingSettings,
+    ) {}
 
     /**
      * @return array{
@@ -64,6 +71,14 @@ final class GetApplicationConversionReadinessQuery
         }
         if (($resolved['intake_semester_id'] ?? null) === null) {
             $missing[] = ['field' => 'intake', 'crm_value' => null, 'kind' => CrmValueMapping::KIND_INTAKE, 'reason' => 'unset'];
+        }
+
+        // Conversion stamps the configured cohort (khóa) onto the student;
+        // blocking here is what keeps "K0 = not declared" from ever being
+        // written for a newly approved student.
+        $this->cohortConfigured ??= $this->mappingSettings->getIntakeCohort() !== null;
+        if (! $this->cohortConfigured) {
+            $missing[] = ['field' => 'intake_cohort', 'crm_value' => null, 'kind' => CrmValueMapping::KIND_INTAKE_COHORT, 'reason' => 'unset'];
         }
 
         // Approval provisions a User with a UNIQUE email (EloquentStudentAccessWriter::provision).

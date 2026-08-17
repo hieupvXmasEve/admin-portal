@@ -32,7 +32,7 @@ final class CrmMappingController extends Controller
         return Inertia::render('StudentApplications/CrmMappings', [
             'unmapped' => $unmapped->handle(),
             'mapped' => $mapped->handle(),
-            'intake' => ['crm_value' => CrmValueMapping::INTAKE_DEFAULT_KEY, 'local_code' => $settings->getIntakeCode()],
+            'intake' => ['crm_value' => CrmValueMapping::INTAKE_DEFAULT_KEY, 'local_code' => $settings->getIntakeCode(), 'cohort' => $settings->getIntakeCohort()],
             'semesters' => Semester::query()->orderByDesc('id')->get(['code', 'name']),
             'integration' => $integrationSettings->forDisplay(),
             // Catalog-backed kinds get a Select instead of a free-text Input on
@@ -57,6 +57,7 @@ final class CrmMappingController extends Controller
 
         if ($data['kind'] === CrmValueMapping::KIND_INTAKE) {
             $settings->setIntakeCode($data['local_code']);
+            $settings->setIntakeCohort((int) $data['cohort']);
         } else {
             CrmValueMapping::query()->updateOrCreate(
                 ['kind' => $data['kind'], 'crm_value' => $data['crm_value']],

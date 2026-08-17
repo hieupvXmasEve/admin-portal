@@ -19,6 +19,7 @@ use App\Shared\Contracts\Academic\ProgramEnrollmentWriter;
 use App\Shared\Contracts\Identity\CampusPermissionReader;
 use App\Shared\Contracts\Identity\GuardianAccessGrantWriter;
 use App\Shared\Contracts\Identity\StudentAccessWriter;
+use App\Modules\Admissions\Support\Crm\CrmMappingSettings;
 use App\Shared\Support\Enums\UserType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -65,6 +66,8 @@ beforeEach(function () {
         '_token' => SA_CSRF,
         'current_campus_id' => $campus->id,
     ]);
+
+    app(CrmMappingSettings::class)->setIntakeCohort(1);
 });
 
 function makeStaff(): User
@@ -134,6 +137,8 @@ it('approves a pending application, atomically creating user, student, role, and
     expect($student)->not->toBeNull();
     expect($student->student_id)->toBe('S7654321');
     expect($student->email)->toBe('applicant@example.com');
+    // Cohort (khóa) stamped from the CRM mapping screen's intake config.
+    expect($student->intake)->toBe(1);
 
     // User created with a secure password — never the old hardcoded default.
     $user = User::where('email', 'applicant@example.com')->first();

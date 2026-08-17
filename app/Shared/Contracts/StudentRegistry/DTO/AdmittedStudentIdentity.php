@@ -29,5 +29,8 @@ final readonly class AdmittedStudentIdentity
         public ?string $emergencyContactRelationship,
         public ?string $highSchoolName,
         public ?string $admissionNotes,
+        // Cohort number (khóa — K1, K2, …) from the CRM mapping screen's
+        // intake config; null when the admission round has not declared one.
+        public ?int $cohort = null,
     ) {}
 }

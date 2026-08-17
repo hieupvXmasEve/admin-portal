@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import {
@@ -80,7 +81,7 @@ interface SyncSummary {
 interface Props {
     unmapped: UnmappedRow[];
     mapped: MappedRow[];
-    intake: { crm_value: string; local_code: string | null };
+    intake: { crm_value: string; local_code: string | null; cohort: number | null };
     semesters: Semester[];
     integration: IntegrationSettings;
     campuses: CatalogOption[];
@@ -235,13 +236,14 @@ const intakeForm = useForm({
     kind: 'intake',
     crm_value: props.intake.crm_value,
     local_code: props.intake.local_code ?? '',
+    cohort: props.intake.cohort ?? ('' as number | ''),
 });
 
 function saveIntake(): void {
     intakeForm.post(route('student-applications.crm-mappings.store'), {
         preserveScroll: true,
         onSuccess: () => toastFromFlash('Target intake saved.'),
-        onError: () => toast.error(intakeForm.errors.local_code ?? 'Could not save the target intake.'),
+        onError: () => toast.error(intakeForm.errors.local_code ?? intakeForm.errors.cohort ?? 'Could not save the target intake.'),
     });
 }
 
@@ -453,10 +455,14 @@ function syncNow(): void {
                     <CalendarClock class="text-muted-foreground h-4 w-4" />
                     <CardTitle>3. Target intake</CardTitle>
                 </div>
-                <CardDescription>The single intake applied to every pending application on sync and on mapping save.</CardDescription>
+                <CardDescription>
+                    The single intake applied to every pending application on sync and on mapping save. The cohort number (khóa) is stamped onto
+                    every student converted in this round — configured here so it is never guessed from semester ids.
+                </CardDescription>
             </CardHeader>
             <CardContent class="flex flex-wrap items-end gap-3">
                 <div class="w-64 space-y-1.5">
+                    <Label class="text-muted-foreground text-xs">Intake semester</Label>
                     <Select v-model="intakeForm.local_code">
                         <SelectTrigger>
                             <SelectValue placeholder="Select intake" />
@@ -469,7 +475,12 @@ function syncNow(): void {
                     </Select>
                     <p v-if="intakeForm.errors.local_code" class="text-destructive text-xs">{{ intakeForm.errors.local_code }}</p>
                 </div>
-                <Button :disabled="!intakeForm.local_code || intakeForm.processing" @click="saveIntake">Save intake</Button>
+                <div class="w-32 space-y-1.5">
+                    <Label class="text-muted-foreground text-xs">Cohort (khóa)</Label>
+                    <Input v-model="intakeForm.cohort" type="number" min="1" max="999" placeholder="e.g., 2" />
+                    <p v-if="intakeForm.errors.cohort" class="text-destructive text-xs">{{ intakeForm.errors.cohort }}</p>
+                </div>
+                <Button :disabled="!intakeForm.local_code || !intakeForm.cohort || intakeForm.processing" @click="saveIntake">Save intake</Button>
             </CardContent>
         </Card>
 

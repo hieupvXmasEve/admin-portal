@@ -39,7 +39,9 @@ final class RegisterAdmittedStudentAction
             'admission_notes' => $identity->admissionNotes,
             'status' => 'active',
             'academic_status' => 'active',
-            'intake' => 0,
+            // 0 = "cohort not declared" sentinel; real cohorts come from the
+            // CRM mapping screen's intake config and start at 1.
+            'intake' => $identity->cohort ?? 0,
         ]);
 
         return new StudentReference(

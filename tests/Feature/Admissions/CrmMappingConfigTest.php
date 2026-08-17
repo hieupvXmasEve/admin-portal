@@ -217,6 +217,43 @@ it('target intake is read/written through CrmMappingSettings alone', function ()
         ->and(CrmValueMapping::query()->where('kind', 'intake')->where('crm_value', '__default__')->value('local_code'))->toBe('FA25');
 });
 
+it('store rejects an intake save without a cohort and persists both when provided', function () {
+    $staff = User::factory()->create(['type' => UserType::STAFF]);
+    $campus = Campus::factory()->create();
+    crmMappingGrantPermission($staff, $campus, 'manage_crm_value_mapping');
+    session(['current_campus_id' => $campus->id]);
+    Semester::factory()->create(['code' => 'FA25']);
+
+    $this->actingAs($staff)
+        ->withHeader('X-CSRF-TOKEN', CRM_MAPPING_CSRF)
+        ->post(route('student-applications.crm-mappings.store'), ['kind' => 'intake', 'crm_value' => '__default__', 'local_code' => 'FA25'])
+        ->assertSessionHasErrors('cohort');
+
+    expect(app(CrmMappingSettings::class)->getIntakeCohort())->toBeNull();
+
+    $this->actingAs($staff)
+        ->withHeader('X-CSRF-TOKEN', CRM_MAPPING_CSRF)
+        ->post(route('student-applications.crm-mappings.store'), ['kind' => 'intake', 'crm_value' => '__default__', 'local_code' => 'FA25', 'cohort' => '2'])
+        ->assertSessionHasNoErrors();
+
+    expect(app(CrmMappingSettings::class)->getIntakeCode())->toBe('FA25')
+        ->and(app(CrmMappingSettings::class)->getIntakeCohort())->toBe(2);
+});
+
+it('treats a non-numeric intake_cohort row as not configured', function () {
+    CrmValueMapping::query()->create(['kind' => 'intake_cohort', 'crm_value' => '__default__', 'local_code' => 'abc']);
+
+    expect(app(CrmMappingSettings::class)->getIntakeCohort())->toBeNull();
+});
+
+it('intake cohort is read/written through CrmMappingSettings and hidden from the mapped list', function () {
+    app(CrmMappingSettings::class)->setIntakeCohort(2);
+
+    expect(app(CrmMappingSettings::class)->getIntakeCohort())->toBe(2)
+        ->and(CrmValueMapping::query()->where('kind', 'intake_cohort')->where('crm_value', '__default__')->value('local_code'))->toBe('2')
+        ->and(collect(app(App\Modules\Admissions\Queries\ListMappedCrmValuesQuery::class)->handle())->pluck('kind'))->not->toContain('intake_cohort');
+});
+
 it('backfill fills intake from the target-intake setting', function () {
     Semester::factory()->create(['code' => 'FA25']);
     app(CrmMappingSettings::class)->setIntakeCode('FA25');

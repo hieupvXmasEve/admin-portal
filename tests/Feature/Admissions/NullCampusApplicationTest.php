@@ -14,6 +14,7 @@ use App\Modules\Admissions\Models\ApplicationAcademicScore;
 use App\Modules\Admissions\Models\CrmValueMapping;
 use App\Modules\Admissions\Queries\ListApplicationsQuery;
 use App\Services\Admissions\IntendedProgramNormalizer;
+use App\Modules\Admissions\Support\Crm\CrmMappingSettings;
 use App\Shared\Support\Enums\UserType;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -28,6 +29,7 @@ const NULL_CAMPUS_CSRF = 'null-campus-application-csrf';
 beforeEach(function () {
     Cache::flush();
     session(['_token' => NULL_CAMPUS_CSRF]);
+    app(CrmMappingSettings::class)->setIntakeCohort(1);
 });
 
 function grantPermission(User $user, ?Campus $campus, string $permissionCode): void

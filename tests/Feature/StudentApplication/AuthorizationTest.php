@@ -12,6 +12,7 @@ use App\Models\RolePermission;
 use App\Models\Semester;
 use App\Models\StudentApplication;
 use App\Models\User;
+use App\Modules\Admissions\Support\Crm\CrmMappingSettings;
 use App\Shared\Support\Enums\UserType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -31,6 +32,8 @@ beforeEach(function () {
     session([
         '_token' => AUTHZ_CSRF,
     ]);
+
+    app(CrmMappingSettings::class)->setIntakeCohort(1);
 });
 
 function authzStaff(): User

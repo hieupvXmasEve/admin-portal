@@ -13,6 +13,7 @@ use App\Models\Student;
 use App\Models\StudentApplication;
 use App\Models\User;
 use App\Shared\Contracts\Identity\CampusPermissionReader;
+use App\Modules\Admissions\Support\Crm\CrmMappingSettings;
 use App\Shared\Support\Enums\UserType;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -50,6 +51,8 @@ beforeEach(function () {
     ]);
 
     $this->staff = User::factory()->create(['type' => UserType::STAFF]);
+
+    app(CrmMappingSettings::class)->setIntakeCohort(1);
 });
 
 function guardianApplication(Campus $campus, array $overrides = []): StudentApplication

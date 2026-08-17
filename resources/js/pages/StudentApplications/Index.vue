@@ -45,10 +45,11 @@ interface ConversionReadiness {
 
 const CURRICULUM_REASONS = ['no_curriculum', 'ambiguous_curriculum'];
 
-// A curriculum-version block never mixes with unmapped/unset CRM fields (the
-// backend only runs that check once campus/program/intake all resolve), so
-// checking the first entry is enough. The CRM mapping screen has zero
-// curriculum-version concept — sending staff there for this reason is a dead end.
+// A curriculum-version block only appears once campus/program/intake all
+// resolve, but it can share the list with an unset intake-cohort entry (that
+// gate is independent of mapping resolution). First-entry routing still
+// works: every non-curriculum reason — cohort included — is fixed on the CRM
+// mapping screen, which has zero curriculum-version concept.
 const readinessLink = (readiness: ConversionReadiness): string => {
     const first = readiness.missing[0];
     if (first && CURRICULUM_REASONS.includes(first.reason) && first.program_id) {

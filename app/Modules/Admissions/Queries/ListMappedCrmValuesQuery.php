@@ -18,7 +18,7 @@ final class ListMappedCrmValuesQuery
     public function handle(): array
     {
         return CrmValueMapping::query()
-            ->where('kind', '!=', CrmValueMapping::KIND_INTAKE)
+            ->whereNotIn('kind', [CrmValueMapping::KIND_INTAKE, CrmValueMapping::KIND_INTAKE_COHORT])
             ->whereNotNull('local_code')
             ->orderBy('kind')
             ->orderBy('crm_value')

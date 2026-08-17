@@ -8,6 +8,7 @@ use App\Models\ApplicationGuardian;
 use App\Models\StudentApplication;
 use App\Modules\Admissions\Exceptions\ApplicationLifecycleException;
 use App\Modules\Admissions\Queries\GetApplicationConversionReadinessQuery;
+use App\Modules\Admissions\Support\Crm\CrmMappingSettings;
 use App\Shared\Contracts\Academic\ProgramEnrollmentWriter;
 use App\Shared\Contracts\Admissions\ApplicationProgramMappingReader;
 use App\Shared\Contracts\Identity\GuardianAccessGrantWriter;
@@ -30,6 +31,7 @@ final class ApproveApplicationAction
         private readonly GuardianAccessGrantWriter $guardianAccessGrantWriter,
         private readonly ProgramEnrollmentWriter $programEnrollmentWriter,
         private readonly GetApplicationConversionReadinessQuery $readinessQuery,
+        private readonly CrmMappingSettings $mappingSettings,
     ) {}
 
     /** @param array{application: StudentApplication, actor_id: int, options?: array{admission_date?: string, expected_graduation_date?: string|null}} $data */
@@ -129,7 +131,9 @@ final class ApproveApplicationAction
             'unmapped' => $missing['crm_value'] !== null
                 ? "CRM value \"{$missing['crm_value']}\" for {$missing['field']} is not mapped to a local code yet. Map it before approving."
                 : "This application's {$missing['field']} could not be resolved. Check the CRM mapping.",
-            'unset' => 'The target intake has not been configured yet in the CRM mapping screen.',
+            'unset' => $missing['field'] === 'intake_cohort'
+                ? 'The intake cohort (khóa) has not been configured yet in the CRM mapping screen.'
+                : 'The target intake has not been configured yet in the CRM mapping screen.',
             'no_curriculum' => 'No curriculum version exists for this program and intake. Set one up before approving.',
             'ambiguous_curriculum' => 'The curriculum version could not be uniquely determined for this program and intake (multiple specializations match). Resolve the ambiguity before approving.',
             'blank_email' => 'This application has no email on file. Add one before approving — it is required to provision the student account.',
@@ -178,6 +182,7 @@ final class ApproveApplicationAction
             emergencyContactRelationship: $primaryGuardian?->relationship ?? 'Parent',
             highSchoolName: null,
             admissionNotes: $this->admissionNotes($application),
+            cohort: $this->mappingSettings->getIntakeCohort(),
         );
     }
 

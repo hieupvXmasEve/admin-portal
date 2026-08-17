@@ -43,6 +43,10 @@ final class SaveCrmValueMappingRequest extends FormRequest
             ])],
             'crm_value' => ['required', 'string', 'max:255'],
             'local_code' => ['required', 'string', 'max:255'],
+            // Cohort number (khóa) rides along with the intake save so a new
+            // admission round can never set a target intake without declaring
+            // which cohort its converted students belong to.
+            'cohort' => ['required_if:kind,'.CrmValueMapping::KIND_INTAKE, 'nullable', 'integer', 'min:1', 'max:999'],
         ];
     }
 

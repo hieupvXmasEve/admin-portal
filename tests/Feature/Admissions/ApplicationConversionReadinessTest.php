@@ -14,6 +14,7 @@ use App\Models\Specialization;
 use App\Models\StudentApplication;
 use App\Models\User;
 use App\Modules\Admissions\Queries\GetApplicationConversionReadinessQuery;
+use App\Modules\Admissions\Support\Crm\CrmMappingSettings;
 use App\Shared\Support\Enums\UserType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -26,6 +27,9 @@ const READINESS_CSRF = 'readiness-test-csrf';
 beforeEach(function () {
     Cache::flush();
     session(['_token' => READINESS_CSRF]);
+    // Conversion readiness requires a declared cohort (khóa) since the CRM
+    // mapping screen gained the intake-cohort config.
+    app(CrmMappingSettings::class)->setIntakeCohort(1);
 });
 
 function readinessGrantPermission(User $user, Campus $campus, string $permissionCode): void
@@ -45,6 +49,19 @@ function readinessFullMapping(): array
 
     return ['campus' => $campus, 'program' => $program, 'semester' => $semester];
 }
+
+it('blocks conversion while no intake cohort is configured', function () {
+    readinessFullMapping();
+    // Wipe the cohort seeded in beforeEach — simulates a new admission round
+    // whose khóa was never declared on the CRM mapping screen.
+    App\Modules\Admissions\Models\CrmValueMapping::query()->where('kind', 'intake_cohort')->delete();
+
+    $application = StudentApplication::factory()->pending()->create(['campus_code' => 'HCM', 'intended_program' => 'IT', 'intake' => 'FA25']);
+    $readiness = app(GetApplicationConversionReadinessQuery::class)->handle($application);
+
+    expect($readiness['ready'])->toBeFalse()
+        ->and(collect($readiness['missing'])->firstWhere('field', 'intake_cohort'))->not->toBeNull();
+});
 
 it('reports ready when campus, program, and intake are all resolved with a unique curriculum', function () {
     readinessFullMapping();

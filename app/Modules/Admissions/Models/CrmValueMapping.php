@@ -24,6 +24,8 @@ class CrmValueMapping extends Model
 
     public const KIND_INTAKE = 'intake';
 
+    public const KIND_INTAKE_COHORT = 'intake_cohort';
+
     public const KIND_SCHOLARSHIP = 'scholarship';
 
     public const KIND_PATHWAY_GATEWAY = 'pathway_gateway';

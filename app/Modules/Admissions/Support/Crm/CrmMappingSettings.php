@@ -31,4 +31,30 @@ final class CrmMappingSettings
             ['local_code' => $semesterCode],
         );
     }
+
+    /**
+     * The cohort number (khóa — K1, K2, …) stamped onto students converted
+     * during the current admission round. Configured explicitly next to the
+     * target intake so it is never inferred from semester ids.
+     */
+    public function getIntakeCohort(): ?int
+    {
+        $value = CrmValueMapping::query()
+            ->where('kind', CrmValueMapping::KIND_INTAKE_COHORT)
+            ->where('crm_value', CrmValueMapping::INTAKE_DEFAULT_KEY)
+            ->value('local_code');
+
+        // local_code is a shared free-text varchar — treat anything that is
+        // not a positive integer as "not configured" so garbage can never
+        // satisfy the conversion readiness gate as cohort 0.
+        return is_numeric($value) && (int) $value > 0 ? (int) $value : null;
+    }
+
+    public function setIntakeCohort(int $cohort): void
+    {
+        CrmValueMapping::query()->updateOrCreate(
+            ['kind' => CrmValueMapping::KIND_INTAKE_COHORT, 'crm_value' => CrmValueMapping::INTAKE_DEFAULT_KEY],
+            ['local_code' => (string) $cohort],
+        );
+    }
 }
