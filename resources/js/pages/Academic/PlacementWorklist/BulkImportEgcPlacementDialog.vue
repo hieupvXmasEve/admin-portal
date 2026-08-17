@@ -141,7 +141,7 @@ const close = (): void => {
 
 <template>
     <Dialog v-model:open="isOpen" @update:open="(open) => !open && close()">
-        <DialogContent class="max-h-[90vh] max-w-3xl overflow-y-auto">
+        <DialogContent class="max-h-[90vh] !max-w-4xl overflow-y-auto">
             <DialogHeader>
                 <DialogTitle>Bulk Import EGC Placement</DialogTitle>
                 <DialogDescription> Upload a CSV with `Student ID` and `Level` columns. Preview before placing students. </DialogDescription>
