@@ -119,7 +119,7 @@ if truthy "$run_migrations"; then
     log "Running database migrations"
     "$php_bin" artisan migrate --force
 else
-    log "Skipping database migrations; set run_migrations=true on manual workflow dispatch to run them"
+    log "Skipping database migrations; set run_migrations=true (or DEPLOY_RUN_MIGRATIONS=true) to run them"
 fi
 
 log "Syncing permissions and super_admin grants"

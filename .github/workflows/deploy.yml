@@ -126,7 +126,7 @@ jobs:
             TARGET_PATH="${{ matrix.path }}"
             DEPLOY_BRANCH="main"
             DEPLOY_SHA="${{ github.event_name == 'push' && github.sha || '' }}"
-            RUN_MIGRATIONS="${{ github.event_name == 'workflow_dispatch' && inputs.run_migrations || 'false' }}"
+            RUN_MIGRATIONS="${{ github.event_name == 'workflow_dispatch' && inputs.run_migrations || 'true' }}"
 
             echo "Deploying main branch to ${TARGET_PATH}"
             cd "${TARGET_PATH}"
@@ -208,7 +208,7 @@ jobs:
             TARGET_PATH="${{ matrix.path }}"
             DEPLOY_BRANCH="main"
             DEPLOY_SHA="${{ github.event_name == 'push' && github.sha || '' }}"
-            RUN_MIGRATIONS="${{ github.event_name == 'workflow_dispatch' && inputs.run_migrations || 'false' }}"
+            RUN_MIGRATIONS="${{ github.event_name == 'workflow_dispatch' && inputs.run_migrations || 'true' }}"
             PROJECT_NAME="${{ matrix.project }}"
             COMPOSE_FILE="docker/docker-compose.production.yml"
 
