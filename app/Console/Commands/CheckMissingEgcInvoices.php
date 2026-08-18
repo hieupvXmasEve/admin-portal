@@ -68,6 +68,7 @@ class CheckMissingEgcInvoices extends Command
             })
             ->where('s.campus_id', $campusId)
             ->where('s.status', 'intake_pre_uni_gc')
+            ->whereNull('s.deleted_at')
             ->where('u.unit_type', 'egc')
             ->where('co.course_status', 'in_progress')
             ->whereIn('cr.registration_status', ['pending', 'registered', 'confirmed']) // Exclude completed

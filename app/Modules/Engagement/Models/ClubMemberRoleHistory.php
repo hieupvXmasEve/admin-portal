@@ -48,7 +48,7 @@ class ClubMemberRoleHistory extends Model
      */
     public function changedBy(): BelongsTo
     {
-        return $this->belongsTo(Student::class, 'changed_by');
+        return $this->belongsTo(Student::class, 'changed_by')->withTrashed();
     }
 
     /**

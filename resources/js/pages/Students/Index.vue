@@ -16,6 +16,7 @@ import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetT
 import { TagsInput, TagsInputInput, TagsInputItem, TagsInputItemDelete, TagsInputItemText } from '@/components/ui/tags-input';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useDataTable } from '@/composables/useDataTable';
+import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
 import { usePermission } from '@/composables/usePermission';
 import { useStudentImpersonation } from '@/composables/useStudentImpersonation';
 import type { Program, Semester, Specialization, Student } from '@/types/models';
@@ -23,7 +24,7 @@ import { getStudentStatusBadgeClass, getStudentStatusDescription, getStudentStat
 import { studentRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { CircleHelp, ClipboardCheck, Download, Edit, Eye, FileSpreadsheet, Filter, LogIn, RefreshCw, RotateCw, X } from 'lucide-vue-next';
+import { CircleHelp, ClipboardCheck, Download, Edit, Eye, FileSpreadsheet, Filter, LogIn, RefreshCw, RotateCw, Trash2, X } from 'lucide-vue-next';
 import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -89,6 +90,7 @@ const props = defineProps<Props>();
 // Composables
 const { loginAsStudent } = useStudentImpersonation();
 const { can } = usePermission();
+const confirmDialog = useGlobalConfirmDialog();
 
 // Export state
 const showExportDialog = ref(false);
@@ -400,6 +402,17 @@ const editStudent = (student: Student) => {
     router.visit(studentRoutes.edit(student.id));
 };
 
+const deleteStudent = (student: Student) => {
+    confirmDialog.confirmDelete(student.full_name, 'student', () => {
+        router.delete(studentRoutes.destroy(student.id), {
+            preserveState: true,
+            preserveScroll: true,
+            onSuccess: () => toast.success('Student deleted successfully'),
+            onError: (errors) => toast.error(errors.error || 'Failed to delete student'),
+        });
+    });
+};
+
 // Go to student actions page
 const goToStudentActions = (student: Student) => {
     router.visit(studentRoutes.studentStatusActionIndex(student.id));
@@ -679,6 +692,14 @@ const exportStudents = async () => {
                                             </Button>
                                         </TooltipTrigger>
                                         <TooltipContent> Login as Student </TooltipContent>
+                                    </Tooltip>
+                                    <Tooltip v-if="can('delete_student')">
+                                        <TooltipTrigger as-child>
+                                            <Button variant="ghost" size="icon" @click="deleteStudent(row.original)">
+                                                <Trash2 class="h-4 w-4" />
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent> Delete Student </TooltipContent>
                                     </Tooltip>
                                 </TooltipProvider>
                             </div>

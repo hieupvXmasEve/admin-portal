@@ -116,6 +116,7 @@ class ExportStudentAttendanceReportQuery
             ->leftJoin('syllabus_templates as st', 'co.syllabus_template_id', '=', 'st.id')
             ->leftJoin('lectures as l', 'co.lecture_id', '=', 'l.id')
             ->whereNull('ar.deleted_at')
+            ->whereNull('s.deleted_at')
             ->select([
                 's.student_id as student_code',
                 's.full_name as student_name',

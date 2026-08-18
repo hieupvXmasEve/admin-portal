@@ -82,6 +82,7 @@ class FailedStudentsService
 
         $query->leftJoin('students', 'academic_records.student_id', '=', 'students.id')
             ->leftJoin('units', 'academic_records.unit_id', '=', 'units.id')
+            ->whereNull('students.deleted_at')
             ->select('academic_records.*')
             ->orderBy($sortColumn, $direction);
 

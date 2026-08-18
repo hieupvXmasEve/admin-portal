@@ -42,6 +42,7 @@ final class BillingExceptionTuitionWaivedMatcher
             ->whereColumn('waiver_students.id', 'course_registrations.student_id')
             ->whereColumn('waiver_target_sem.start_date', '>=', 'waiver_intake_sem.start_date')
             ->whereColumn('waiver_target_sem.start_date', '>=', 'waiver_intake_major_sem.start_date')
+            ->whereNull('waiver_students.deleted_at')
             ->where('waiver_terms.amount', 0);
     }
 }

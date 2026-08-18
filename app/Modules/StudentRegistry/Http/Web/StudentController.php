@@ -12,6 +12,8 @@ use App\Http\Requests\Student\UpdateStudentRequest;
 use App\Http\Resources\Student\StudentResource;
 use App\Http\Responses\ApiResponse;
 use App\Models\Student;
+use App\Modules\StudentRegistry\Actions\SoftDeleteStudentAction;
+use App\Modules\StudentRegistry\Exceptions\StudentDeletionBlockedException;
 use App\Modules\StudentRegistry\Http\Requests\Student\ExportStudentsRequest;
 use App\Modules\StudentRegistry\Http\Requests\Student\GetStudentsByCodesRequest;
 use App\Modules\StudentRegistry\Http\Requests\Student\ListStudentsRequest;
@@ -35,6 +37,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 class StudentController extends Controller
 {
@@ -178,6 +181,25 @@ class StudentController extends Controller
                 ->withInput()
                 ->withErrors(['error' => $e->getMessage()]);
         }
+    }
+
+    public function destroy(Student $student): RedirectResponse
+    {
+        try {
+            SoftDeleteStudentAction::run($student, (int) session('current_campus_id'));
+        } catch (StudentDeletionBlockedException $e) {
+            return back()->withErrors(['error' => $e->getMessage()]);
+        } catch (HttpExceptionInterface $e) {
+            // Cross-campus abort(404) and similar deliberate HTTP signals
+            // must propagate, not be flattened into a generic error flash.
+            throw $e;
+        } catch (\Throwable $e) {
+            Log::error('Failed to delete student', ['student_id' => $student->id, 'error' => $e->getMessage()]);
+
+            return back()->withErrors(['error' => 'Unable to delete this student. Please try again or contact support.']);
+        }
+
+        return back()->with('success', 'Student deleted successfully');
     }
 
     /**

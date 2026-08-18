@@ -196,6 +196,7 @@ export const studentRoutes = {
     edit: (id: number) => route(STUDENT_ROUTE_NAMES.EDIT, { student: id }),
     show: (id: number) => route(STUDENT_ROUTE_NAMES.SHOW, { student: id }),
     store: () => route(STUDENT_ROUTE_NAMES.STORE),
+    destroy: (id: number) => route('students.destroy', { student: id }),
 
     // API routes
     index: () => route('api.admin.students.index'),

@@ -47,7 +47,7 @@ class ProgramEnrollment extends Model
 
     public function student(): BelongsTo
     {
-        return $this->belongsTo(Student::class);
+        return $this->belongsTo(Student::class)->withTrashed();
     }
 
     public function program(): BelongsTo

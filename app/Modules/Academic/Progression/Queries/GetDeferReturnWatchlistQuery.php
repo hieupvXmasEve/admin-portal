@@ -134,6 +134,7 @@ class GetDeferReturnWatchlistQuery
             ->leftJoin('semesters as sem', 'sem.id', '=', 'sal.return_semester_id')
             ->where('sal.action_type', StudentActionType::ACADEMIC_DEFER->value)
             ->where('s.status', $deferStatus)
+            ->whereNull('s.deleted_at')
             ->whereRaw('sal.id = (select max(id) from student_action_logs where student_id = sal.student_id and action_type = ?)', [StudentActionType::ACADEMIC_DEFER->value])
             ->select([
                 DB::raw("case when sem.start_date is null then 'upcoming' when sem.start_date <= curdate() then 'overdue' else 'upcoming' end as bucket"),
@@ -162,6 +163,7 @@ class GetDeferReturnWatchlistQuery
             ->leftJoin('semesters as sem', 'sem.id', '=', 'sal.from_semester_id')
             ->where('sal.action_type', StudentActionType::WAITING_COURSE_OPENING->value)
             ->where('s.status', $waitingStatus)
+            ->whereNull('s.deleted_at')
             ->whereRaw('sal.id = (select max(id) from student_action_logs where student_id = sal.student_id and action_type = ?)', [StudentActionType::WAITING_COURSE_OPENING->value])
             ->select([
                 DB::raw("'waiting' as bucket"),

@@ -43,6 +43,10 @@ Route::middleware(['auth', 'verified', 'campus.selected'])->group(function () {
         Route::put('{student}', [StudentController::class, 'update'])
             ->middleware('can:edit_student')
             ->name(StudentRoutes::UPDATE);
+
+        Route::delete('{student}', [StudentController::class, 'destroy'])
+            ->middleware('can:delete_student')
+            ->name(StudentRoutes::DESTROY);
     });
 
     Route::get('students/{student}/photo-capture', [StudentController::class, 'photoCapture'])

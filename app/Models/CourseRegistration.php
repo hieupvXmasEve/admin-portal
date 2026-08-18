@@ -99,7 +99,7 @@ class CourseRegistration extends AuditableModel
     // Relationships
     public function student(): BelongsTo
     {
-        return $this->belongsTo(Student::class);
+        return $this->belongsTo(Student::class)->withTrashed();
     }
 
     public function courseOffering(): BelongsTo

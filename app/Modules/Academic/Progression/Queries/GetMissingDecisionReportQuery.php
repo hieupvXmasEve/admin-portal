@@ -86,6 +86,7 @@ class GetMissingDecisionReportQuery
             ->join('students as s', 's.id', '=', 'sal.student_id')
             ->whereIn('sal.action_type', StudentActionType::requiresDecisionValues())
             ->whereNull('sal.decision_id')
+            ->whereNull('s.deleted_at')
             ->select([
                 DB::raw("'action' as source"),
                 'sal.id as source_id',
@@ -102,6 +103,7 @@ class GetMissingDecisionReportQuery
             ->join('students as s', 's.id', '=', 'ape.student_id')
             ->whereIn('ape.event_type', AcademicProgressionEventType::requiresDecisionValues())
             ->whereNull('ape.decision_id')
+            ->whereNull('s.deleted_at')
             ->select([
                 DB::raw("'progression' as source"),
                 'ape.id as source_id',

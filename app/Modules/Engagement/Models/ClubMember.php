@@ -51,7 +51,7 @@ class ClubMember extends AuditableModel
      */
     public function student(): BelongsTo
     {
-        return $this->belongsTo(Student::class);
+        return $this->belongsTo(Student::class)->withTrashed();
     }
 
     /**
@@ -59,7 +59,7 @@ class ClubMember extends AuditableModel
      */
     public function approver(): BelongsTo
     {
-        return $this->belongsTo(Student::class, 'approved_by');
+        return $this->belongsTo(Student::class, 'approved_by')->withTrashed();
     }
 
     /**

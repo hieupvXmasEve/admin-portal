@@ -514,7 +514,7 @@ final class GetAcademicProgressionReconciliationQuery
             ->when(isset($scope['semester_id']), fn ($query) => $query->where('semester_id', $scope['semester_id']))
             ->distinct()
             ->pluck('student_id');
-        $expectedDates = DB::table('students')->whereIn('id', $studentIds)->pluck('expected_graduation_date', 'id');
+        $expectedDates = DB::table('students')->whereIn('id', $studentIds)->whereNull('deleted_at')->pluck('expected_graduation_date', 'id');
         $evaluated = 0;
         $exceptions = [];
         $attemptComparison = $this->compareGraduationAttempts($studentIds->all());
@@ -655,6 +655,7 @@ final class GetAcademicProgressionReconciliationQuery
             })
             ->when(isset($scope['student_id']), fn ($query) => $query->where('block.student_id', $scope['student_id']))
             ->when(isset($scope['semester_id']), fn ($query) => $query->where('block.semester_id', $scope['semester_id']))
+            ->whereNull('student.deleted_at')
             ->get([
                 'block.id', 'block.student_id', 'block.semester_id', 'block.block_number', 'block.level_number', 'block.result', 'block.attendance_rate', 'block.is_retake',
                 'student.gc_starting_level', 'student.gc_current_level', 'student.gc_total_levels',

@@ -54,6 +54,7 @@ final class LifecycleDueItemPredicate
         }
 
         self::whereFinancial($query)
+            ->whereNull('students.deleted_at')
             ->when($campusId, fn (Builder $campusQuery) => $campusQuery->where('students.campus_id', $campusId))
             ->select('dng_payment_requests.*');
     }

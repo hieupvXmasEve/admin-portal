@@ -11,6 +11,6 @@ final class RevokeStudentIdentityAction
     /** @param array{student_id: int} $data */
     public static function run(array $data): void
     {
-        Student::query()->find($data['student_id'])?->delete();
+        Student::query()->find($data['student_id'])?->forceDelete();
     }
 }

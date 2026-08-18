@@ -46,7 +46,7 @@ class GetSurveyProgramStatsQuery
                 COUNT(DISTINCT sfa.response_id) AS submissions,
                 SUM(CASE WHEN per_resp.avg_score >= 4 THEN 1 ELSE 0 END) AS high_rated_count
             FROM student_form_assignments sfa
-            JOIN students s   ON sfa.student_id = s.id
+            JOIN students s   ON sfa.student_id = s.id AND s.deleted_at IS NULL
             JOIN programs p   ON s.program_id = p.id
             JOIN form_targets ft ON sfa.form_target_id = ft.id
                 AND ft.scope_type = 'course'

@@ -48,7 +48,7 @@ class QueryReply extends Model
      */
     public function authorStudent(): BelongsTo
     {
-        return $this->belongsTo(Student::class, 'author_student_id');
+        return $this->belongsTo(Student::class, 'author_student_id')->withTrashed();
     }
 
     /**

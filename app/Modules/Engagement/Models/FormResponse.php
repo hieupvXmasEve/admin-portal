@@ -82,7 +82,7 @@ class FormResponse extends Model
      */
     public function student(): BelongsTo
     {
-        return $this->belongsTo(Student::class, 'submitted_by_student_id');
+        return $this->belongsTo(Student::class, 'submitted_by_student_id')->withTrashed();
     }
 
     public function reviewer(): BelongsTo

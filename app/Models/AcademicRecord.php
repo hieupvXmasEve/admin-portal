@@ -194,7 +194,7 @@ class AcademicRecord extends AuditableModel
     // Relationships
     public function student(): BelongsTo
     {
-        return $this->belongsTo(Student::class, 'student_id', 'id');
+        return $this->belongsTo(Student::class, 'student_id', 'id')->withTrashed();
     }
 
     public function courseOffering(): BelongsTo
