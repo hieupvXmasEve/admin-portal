@@ -5,7 +5,9 @@ import DebouncedInput from '@/components/DebouncedInput.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useDataTable } from '@/composables/useDataTable';
 import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
@@ -137,30 +139,51 @@ const deleteCourseOffering = (courseOffering: CourseOffering) => {
     });
 };
 
-const duplicateCourseOffering = (courseOffering: CourseOffering) => {
-    confirmDialog.showConfirmDialog(
+const SECTION_CODE_MAX_LENGTH = 30;
+
+const duplicateDialog = ref({
+    open: false,
+    courseOffering: null as CourseOffering | null,
+    sectionCode: '',
+    error: '',
+    isSubmitting: false,
+});
+
+const openDuplicateDialog = (courseOffering: CourseOffering) => {
+    duplicateDialog.value = {
+        open: true,
+        courseOffering,
+        sectionCode: `${courseOffering.section_code ?? ''}_copy`.slice(0, SECTION_CODE_MAX_LENGTH),
+        error: '',
+        isSubmitting: false,
+    };
+};
+
+const closeDuplicateDialog = () => {
+    duplicateDialog.value.open = false;
+};
+
+const submitDuplicateCourseOffering = () => {
+    const courseOffering = duplicateDialog.value.courseOffering;
+    if (!courseOffering) {
+        return;
+    }
+
+    duplicateDialog.value.error = '';
+    duplicateDialog.value.isSubmitting = true;
+
+    router.post(
+        route('course-offerings.duplicate', courseOffering.id),
+        { section_code: duplicateDialog.value.sectionCode },
         {
-            title: 'Confirm Course Offering Duplication',
-            message: 'Are you sure you want to duplicate this course offering? Note: Lecturers will not be duplicated.',
-            confirmText: 'Duplicate',
-        },
-        {
-            onConfirm: () => {
-                return new Promise((resolve, reject) => {
-                    router.post(
-                        route('course-offerings.duplicate', courseOffering.id),
-                        {},
-                        {
-                            onSuccess: () => {
-                                resolve();
-                            },
-                            onError: () => {
-                                toast.error('Failed to duplicate course offering');
-                                reject(new Error('Failed to duplicate course offering'));
-                            },
-                        },
-                    );
-                });
+            onSuccess: () => {
+                // Backend flashes via Inertia::flash(); AppLayout's global useFlashToast() shows the toast.
+                duplicateDialog.value.isSubmitting = false;
+                closeDuplicateDialog();
+            },
+            onError: (errors) => {
+                duplicateDialog.value.isSubmitting = false;
+                duplicateDialog.value.error = errors.section_code || 'Failed to duplicate course offering';
             },
         },
     );
@@ -374,7 +397,7 @@ const columns: ColumnDef<CourseOffering>[] = [
             const canModify = !isCompleted && !isCancelled;
 
             // Mutation-only dropdown items
-            const menuItems: any[] = [h(DropdownMenuItem, { onClick: () => duplicateCourseOffering(course) }, () => [h(Copy, { class: 'mr-2 h-4 w-4' }), 'Duplicate'])];
+            const menuItems: any[] = [h(DropdownMenuItem, { onClick: () => openDuplicateDialog(course) }, () => [h(Copy, { class: 'mr-2 h-4 w-4' }), 'Duplicate'])];
 
             if (canModify) {
                 menuItems.push(
@@ -568,4 +591,31 @@ const columns: ColumnDef<CourseOffering>[] = [
 
     <!-- Pagination -->
     <DataPagination :pagination-data="courseOfferings" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
+
+    <!-- Duplicate Confirmation Dialog -->
+    <Dialog :open="duplicateDialog.open" @update:open="(open) => !open && closeDuplicateDialog()">
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Duplicate Course Offering</DialogTitle>
+                <DialogDescription>Note: Lecturers will not be duplicated. Choose a unique section code for the new offering.</DialogDescription>
+            </DialogHeader>
+            <div class="space-y-2">
+                <label for="duplicate-section-code" class="text-sm font-medium">Section Code</label>
+                <Input
+                    id="duplicate-section-code"
+                    v-model="duplicateDialog.sectionCode"
+                    :maxlength="SECTION_CODE_MAX_LENGTH"
+                    placeholder="e.g. AU003.2"
+                    @keyup.enter="submitDuplicateCourseOffering"
+                />
+                <p v-if="duplicateDialog.error" class="text-destructive text-sm">{{ duplicateDialog.error }}</p>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" :disabled="duplicateDialog.isSubmitting" @click="closeDuplicateDialog">Cancel</Button>
+                <Button :disabled="duplicateDialog.isSubmitting || !duplicateDialog.sectionCode" @click="submitDuplicateCourseOffering">
+                    {{ duplicateDialog.isSubmitting ? 'Duplicating...' : 'Duplicate' }}
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
 </template>

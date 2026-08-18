@@ -116,7 +116,7 @@ it('preserves the course-offering duplication redirect and flash response', func
     ]);
     app()->instance('campus', $campus);
 
-    $this->post(route('course-offerings.duplicate', $offering))
+    $this->post(route('course-offerings.duplicate', $offering), ['section_code' => 'A_copy'])
         ->assertRedirect(route('course-offerings.index'))
         ->assertSessionHas('inertia.flash_data.success', 'Course offering duplicated successfully. Please assign an instructor.');
 
@@ -142,7 +142,7 @@ it('does not expose course-offering duplication across campuses', function (): v
     ]);
     app()->instance('campus', $currentCampus);
 
-    $this->post(route('course-offerings.duplicate', $offering))->assertNotFound();
+    $this->post(route('course-offerings.duplicate', $offering), ['section_code' => 'A_copy'])->assertNotFound();
 
     expect(CourseOffering::query()->where('section_code', 'A_copy')->exists())->toBeFalse();
 });
