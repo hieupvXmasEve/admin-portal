@@ -6,6 +6,7 @@ namespace App\Modules\Finance\Actions;
 
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Services\DngClient;
+use App\Modules\Finance\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Support\BillingAccountProvisioner;
 use App\Modules\Finance\Support\SettlementMutationGuard;
 use Closure;
@@ -13,7 +14,8 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Cancels collection only. It never voids the underlying obligation, charge,
- * installment, or source workflow.
+ * installment, or source workflow — an installment it had reserved is returned
+ * to pending so the obligation stays collectible through a new request.
  */
 class CancelDngPaymentRequestAction
 {
@@ -39,6 +41,7 @@ class CancelDngPaymentRequestAction
                 function ($_billingAccount, Closure $markChanged) use ($request): void {
                     $locked = DngPaymentRequest::query()->lockForUpdate()->findOrFail($request->id);
                     $locked->transitionTo(DngPaymentRequest::STATUS_CANCELLED);
+                    $this->releaseInstallments($locked);
                     $markChanged();
                 },
             );
@@ -90,9 +93,32 @@ class CancelDngPaymentRequestAction
                 }
 
                 $locked->transitionTo(DngPaymentRequest::STATUS_CANCELLED);
+                $this->releaseInstallments($locked);
                 $markChanged();
             },
         );
+    }
+
+    /**
+     * A cancelled collection no longer holds its installments. Returning them to
+     * pending is what makes the charge pushable again — PushNextInstallmentAction
+     * only accepts a pending next installment and otherwise returns null with no
+     * error, silently stranding the plan. Paid rows are settled facts; the
+     * request pointer is kept for audit and is overwritten by the next push.
+     */
+    private function releaseInstallments(DngPaymentRequest $request): void
+    {
+        FinanceChargeInstallment::query()
+            ->where('dng_payment_request_id', $request->id)
+            ->where('status', FinanceChargeInstallment::STATUS_AWAITING_PAYMENT)
+            ->lockForUpdate()
+            ->get()
+            ->each(function (FinanceChargeInstallment $installment) use ($request): void {
+                $installment->update([
+                    'status' => FinanceChargeInstallment::STATUS_PENDING,
+                    'last_push_error' => "DNG collection #{$request->id} was cancelled ({$request->status}); installment returned to pending.",
+                ]);
+            });
     }
 
     private function cancelPushedRequest(DngPaymentRequest $request): void
@@ -128,6 +154,7 @@ class CancelDngPaymentRequestAction
 
                 if ($locked->status === DngPaymentRequest::STATUS_PUSHED_TO_DNG) {
                     $locked->transitionTo(DngPaymentRequest::STATUS_CANCEL_PUSHED_TO_DNG);
+                    $this->releaseInstallments($locked);
 
                     RegisterDngReceiptExceptionAction::run([
                         'exception_type' => 'cancel_confirmed',
@@ -153,7 +180,15 @@ class CancelDngPaymentRequestAction
         );
     }
 
-    /** @return array<string, string|null> */
+    /**
+     * Payer fields are echoed back from the stored push payload. Two payload
+     * shapes exist: guarded reservations store the pre-wire snake_case array
+     * (DngReservationLifecycle), while requests pushed before that store the
+     * PascalCase wire payload. Read both — a miss sends empty payer fields and
+     * DNG rejects the cancellation with "Email không để trống".
+     *
+     * @return array<string, string|null>
+     */
     private function originalData(DngPaymentRequest $request): array
     {
         $pushPayload = $request->push_payload ?? [];
@@ -163,11 +198,11 @@ class CancelDngPaymentRequestAction
             'campus_code' => $request->campus_code,
             'type' => $request->fee_type,
             'item_id' => $request->item_id,
-            'student_name' => $pushPayload['StudentName'] ?? '',
-            'email' => $pushPayload['Email'] ?? '',
-            'estimate_time' => $pushPayload['EstimateTime'] ?? '',
-            'student_address' => $pushPayload['StudentAddress'] ?? '',
-            'cccd' => $pushPayload['CCCD'] ?? null,
+            'student_name' => $pushPayload['student_name'] ?? $pushPayload['StudentName'] ?? '',
+            'email' => $pushPayload['email'] ?? $pushPayload['Email'] ?? '',
+            'estimate_time' => $pushPayload['estimate_time'] ?? $pushPayload['EstimateTime'] ?? '',
+            'student_address' => $pushPayload['student_address'] ?? $pushPayload['StudentAddress'] ?? '',
+            'cccd' => $pushPayload['cccd'] ?? $pushPayload['CCCD'] ?? null,
         ];
     }
 

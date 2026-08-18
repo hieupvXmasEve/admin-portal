@@ -17,6 +17,7 @@ use App\Modules\Finance\Dng\Services\DngClient;
 use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\DngReceiptException;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\Payment;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -102,9 +103,52 @@ function makeRetakeChargeLinked(array $context, string $regStatus = CourseRetake
 }
 
 /**
- * Create a DNG payment request with given status, optionally linked to a charge.
+ * Legacy wire-shaped push payload (requests pushed before guarded reservations).
+ *
+ * @return array<string, string>
  */
-function makeDngRequest(array $context, string $status, ?FinanceCharge $charge = null): DngPaymentRequest
+function legacyPascalCasePushPayload(): array
+{
+    return [
+        'StudentName' => 'Test Student',
+        'Email' => 'test@example.com',
+        'EstimateTime' => '2026-05-01T00:00:00',
+        'StudentAddress' => '123 Main St',
+        'CCCD' => '000000000001',
+    ];
+}
+
+/**
+ * Payload shape DngReservationLifecycle::providerPayload() actually stores.
+ *
+ * @return array<string, string>
+ */
+function guardedReservationPushPayload(): array
+{
+    return [
+        'campus_code' => 'HCM',
+        'student_code' => 'STU001',
+        'fee_type' => 'HL',
+        'type' => 'HL',
+        'description' => 'Học lại',
+        'semester_id' => '1',
+        'due_date' => '2026-05-01',
+        'item_id' => 'ITEM-TEST-001',
+        'amount' => '5000000',
+        'student_name' => 'Test Student',
+        'email' => 'test@example.com',
+        'estimate_time' => '05/26',
+        'student_address' => '123 Main St',
+        'cccd' => '000000000001',
+    ];
+}
+
+/**
+ * Create a DNG payment request with given status, optionally linked to a charge.
+ *
+ * @param  array<string, string>|null  $pushPayload  defaults to the legacy wire shape
+ */
+function makeDngRequest(array $context, string $status, ?FinanceCharge $charge = null, ?array $pushPayload = null): DngPaymentRequest
 {
     ['student' => $student] = $context;
     $billingAccount = BillingAccount::query()->firstOrCreate(['student_id' => $student->id]);
@@ -118,13 +162,7 @@ function makeDngRequest(array $context, string $status, ?FinanceCharge $charge =
         'item_id' => 'ITEM-TEST-001',
         'amount' => 5000000,
         'status' => $status,
-        'push_payload' => [
-            'StudentName' => 'Test Student',
-            'Email' => 'test@example.com',
-            'EstimateTime' => '2026-05-01T00:00:00',
-            'StudentAddress' => '123 Main St',
-            'CCCD' => '000000000001',
-        ],
+        'push_payload' => $pushPayload ?? legacyPascalCasePushPayload(),
     ]);
 
     if ($charge !== null) {
@@ -373,4 +411,103 @@ it('cancels a pushed_to_dng request when the linked charge is already voided', f
     app(CancelDngPaymentRequestAction::class)->run($request);
 
     expect($request->fresh()->status)->toBe(DngPaymentRequest::STATUS_CANCEL_PUSHED_TO_DNG);
+});
+
+// ─── Payer echo-back + installment release ────────────────────────────────────
+
+it('echoes payer fields to DNG from a guarded-reservation push payload', function (array $pushPayload) {
+    $captured = null;
+    $mock = Mockery::mock(DngClient::class);
+    $mock->shouldReceive('buildInsertNewRecordPayload')->andReturn(['mock' => 'payload']);
+    $mock->shouldReceive('cancelRecord')->once()->andReturnUsing(function (array $originalData) use (&$captured): array {
+        $captured = $originalData;
+
+        return ['ResponseCode' => '00', 'Message' => 'OK'];
+    });
+    app()->instance(DngClient::class, $mock);
+
+    $request = makeDngRequest($this->ctx, DngPaymentRequest::STATUS_PUSHED_TO_DNG, null, $pushPayload);
+
+    app(CancelDngPaymentRequestAction::class)->run($request);
+
+    // Empty payer fields make DNG reject the cancellation with a 403
+    // "Email không để trống", stranding the request in needs_review.
+    expect($captured['email'])->toBe('test@example.com')
+        ->and($captured['student_name'])->toBe('Test Student')
+        ->and($captured['estimate_time'])->not->toBe('')
+        ->and($captured['student_address'])->toBe('123 Main St')
+        ->and($captured['cccd'])->toBe('000000000001');
+})->with([
+    'guarded reservation (snake_case)' => [guardedReservationPushPayload()],
+    'legacy wire payload (PascalCase)' => [legacyPascalCasePushPayload()],
+]);
+
+it('returns an awaiting installment to pending when its collection is cancelled', function (string $mode) {
+    mockDngClientSuccess();
+
+    ['charge' => $charge] = makeRetakeChargeLinked($this->ctx);
+    $status = $mode === 'lifecycle'
+        ? DngPaymentRequest::STATUS_PUSHED_TO_DNG
+        : DngPaymentRequest::STATUS_PENDING;
+    $request = makeDngRequest($this->ctx, $status, $charge);
+
+    $installment = FinanceChargeInstallment::create([
+        'finance_charge_id' => $charge->id,
+        'installment_no' => 1,
+        'amount' => $charge->amount,
+        'due_date' => now()->addMonth()->toDateString(),
+        'status' => FinanceChargeInstallment::STATUS_AWAITING_PAYMENT,
+        'dng_payment_request_id' => $request->id,
+    ]);
+
+    $mode === 'lifecycle'
+        ? app(CancelDngPaymentRequestAction::class)->runLocallyForLifecycle($request)
+        : app(CancelDngPaymentRequestAction::class)->run($request);
+
+    // PushNextInstallmentAction only accepts a pending next installment; an
+    // installment left awaiting_payment behind a dead request cannot be re-pushed
+    // and fails silently (returns null, no error).
+    expect($installment->fresh()->status)->toBe(FinanceChargeInstallment::STATUS_PENDING)
+        ->and($installment->fresh()->last_push_error)->toContain('cancelled');
+})->with(['pending', 'lifecycle']);
+
+it('releases the awaiting installment after a provider-confirmed cancellation', function () {
+    mockDngClientSuccess();
+
+    ['charge' => $charge] = makeRetakeChargeLinked($this->ctx);
+    $request = makeDngRequest($this->ctx, DngPaymentRequest::STATUS_PUSHED_TO_DNG, $charge);
+
+    $installment = FinanceChargeInstallment::create([
+        'finance_charge_id' => $charge->id,
+        'installment_no' => 1,
+        'amount' => $charge->amount,
+        'due_date' => now()->addMonth()->toDateString(),
+        'status' => FinanceChargeInstallment::STATUS_AWAITING_PAYMENT,
+        'dng_payment_request_id' => $request->id,
+    ]);
+
+    app(CancelDngPaymentRequestAction::class)->run($request);
+
+    expect($request->fresh()->status)->toBe(DngPaymentRequest::STATUS_CANCEL_PUSHED_TO_DNG)
+        ->and($installment->fresh()->status)->toBe(FinanceChargeInstallment::STATUS_PENDING);
+});
+
+it('leaves a paid installment settled when its collection is cancelled', function () {
+    mockDngClientSuccess();
+
+    ['charge' => $charge] = makeRetakeChargeLinked($this->ctx);
+    $request = makeDngRequest($this->ctx, DngPaymentRequest::STATUS_PENDING, $charge);
+
+    $installment = FinanceChargeInstallment::create([
+        'finance_charge_id' => $charge->id,
+        'installment_no' => 1,
+        'amount' => $charge->amount,
+        'due_date' => now()->addMonth()->toDateString(),
+        'status' => FinanceChargeInstallment::STATUS_PAID,
+        'dng_payment_request_id' => $request->id,
+    ]);
+
+    app(CancelDngPaymentRequestAction::class)->run($request);
+
+    expect($installment->fresh()->status)->toBe(FinanceChargeInstallment::STATUS_PAID);
 });
