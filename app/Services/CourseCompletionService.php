@@ -204,7 +204,9 @@ class CourseCompletionService
         // drives the explicit failure_reason routing. Attendance only fails a
         // student when there is recorded evidence below this threshold; courses
         // with no recorded attendance stay grade-only.
-        $attendanceThreshold = (float) ($courseOffering->syllabusTemplate?->min_attendance_threshold ?? 80.00);
+        $attendanceThreshold = config('academic.finalize.attendance_gate_enabled', false)
+            ? (float) ($courseOffering->syllabusTemplate?->min_attendance_threshold ?? 80.00)
+            : 0.0;
 
         // Get all registered student IDs to filter academic records
         $registeredStudentIds = CourseRegistration::where('course_offering_id', $courseOffering->id)
