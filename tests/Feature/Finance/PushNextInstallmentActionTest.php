@@ -521,6 +521,142 @@ it('does not provision a billing account when the charge has no installments', f
 });
 
 // =========================================================================
+// Phase 1: automatic cancel-then-push replacement reached through the
+// installment-retry path, where reserve() runs nested inside this action's
+// own guarded transaction (see DngReservationReplacementRequired).
+// =========================================================================
+
+/**
+ * Two single-installment exam-resit charges for the same student/semester —
+ * the AUH15442 shape: pushing the second charge's installment finds the
+ * first charge's live collection still holding the slot.
+ *
+ * @return array{chargeOne: FinanceCharge, chargeTwo: FinanceCharge}
+ */
+function createConflictingExamResitCharges(): array
+{
+    $campus = Campus::factory()->withDngMapping('TEST')->create();
+    $semester = Semester::factory()->create();
+    $student = Student::factory()->create([
+        'campus_id' => $campus->id,
+        'intake' => 2024,
+        'intake_semester_id' => $semester->id,
+    ]);
+    $invoice = StudentInvoice::query()->create([
+        'invoice_number' => 'INV-CONFLICT-'.uniqid(),
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'status' => 'pending',
+        'due_date' => now()->addDays(30),
+    ]);
+
+    $billingAccount = BillingAccount::query()->firstOrCreate(['student_id' => $student->id]);
+
+    $charges = [];
+    foreach (['Exam resit #1', 'Exam resit #2'] as $description) {
+        $charge = FinanceCharge::create([
+            'student_id' => $student->id,
+            'semester_id' => $semester->id,
+            'charge_type' => FinanceCharge::TYPE_EXAM_RESIT_FEE,
+            'amount' => 3_000_000,
+            'description' => $description,
+            'effective_at' => now(),
+            'status' => FinanceCharge::STATUS_ACTIVE,
+        ]);
+        $obligation = FinanceObligation::query()->create([
+            'billing_account_id' => $billingAccount->id,
+            'source_system' => 'finance-test',
+            'source_kind' => 'installment_push_conflict',
+            'source_ref' => uniqid('conflict:', true),
+            'obligation_type' => FinanceCharge::TYPE_EXAM_RESIT_FEE,
+            'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+            'amount' => 3_000_000,
+            'currency' => 'VND',
+            'pricing_rule_version' => 'test',
+            'pricing_snapshot' => [],
+            'accepted_at' => now(),
+        ]);
+        $charge->update(['finance_obligation_id' => $obligation->id]);
+        InvoiceLine::query()->create([
+            'invoice_id' => $invoice->id,
+            'charge_id' => $charge->id,
+            'amount_snapshot' => 3_000_000,
+            'description_snapshot' => $description,
+            'status' => 'active',
+        ]);
+        FinanceChargeInstallment::factory()->create([
+            'finance_charge_id' => $charge->id,
+            'installment_no' => 1,
+            'amount' => 3_000_000,
+            'due_date' => now()->addDays(30)->toDateString(),
+        ]);
+        $charges[] = $charge->fresh(['student']);
+    }
+
+    return ['chargeOne' => $charges[0], 'chargeTwo' => $charges[1]];
+}
+
+it('does not cancel an unrelated charge\'s live collection through the installment-retry path even when the flag is on', function (): void {
+    // The installment-retry path always targets a single invoice line at its
+    // exact installment amount (see the call to reserve() below). Under the
+    // corrected eligibility rule (new targets must be a superset of the
+    // existing request's targets — see DngReservationLifecycle's
+    // eligibleForAutomaticReplacement), a second charge's single-line request
+    // can never legitimately replace a first charge's live collection: doing
+    // so would drop coverage of the first charge entirely. This proves the
+    // flag being on does not change that — no destructive cancel occurs, and
+    // the outcome matches today's (flag-off) behaviour exactly.
+    config(['finance.dng.auto_replace_stale_collection' => true]);
+    ['chargeOne' => $chargeOne, 'chargeTwo' => $chargeTwo] = createConflictingExamResitCharges();
+
+    mockDngClientPushSuccess();
+    $installmentOne = freshPushAction()->handle($chargeOne->id);
+    $staleRequest = DngPaymentRequest::query()->findOrFail($installmentOne->dng_payment_request_id);
+
+    $mock = Mockery::mock(DngClient::class);
+    $mock->shouldNotReceive('cancelRecord');
+    $mock->shouldReceive('buildInsertNewRecordPayload')->andReturnUsing(fn (array $payload): array => $payload);
+    $mock->shouldReceive('insertNewRecord')->never();
+    app()->instance(DngClient::class, $mock);
+    app()->forgetInstance(DngPaymentService::class);
+
+    expect(fn () => freshPushAction()->handle($chargeTwo->id))
+        ->toThrow(RuntimeException::class, 'does not own installment');
+
+    expect($staleRequest->fresh()->status)->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG)
+        ->and(DngPaymentRequest::query()->count())->toBe(1);
+});
+
+it('leaves the installment-retry path unchanged when the auto-replace flag is off', function (): void {
+    config(['finance.dng.auto_replace_stale_collection' => false]);
+    ['chargeOne' => $chargeOne, 'chargeTwo' => $chargeTwo] = createConflictingExamResitCharges();
+
+    mockDngClientPushSuccess();
+    $installmentOne = freshPushAction()->handle($chargeOne->id);
+    $staleRequest = DngPaymentRequest::query()->findOrFail($installmentOne->dng_payment_request_id);
+
+    $mock = Mockery::mock(DngClient::class);
+    $mock->shouldNotReceive('cancelRecord');
+    $mock->shouldReceive('buildInsertNewRecordPayload')->andReturnUsing(fn (array $payload): array => $payload);
+    $mock->shouldReceive('insertNewRecord')->never();
+    app()->instance(DngClient::class, $mock);
+    app()->forgetInstance(DngPaymentService::class);
+
+    // Pre-existing behaviour (unrelated to Phase 1, and exactly the bug this
+    // plan exists to fix): reserve() marks the stale request needs_review,
+    // then the caller finds it does not own the newly requested installment
+    // and throws — rolling back the whole transaction, including the
+    // needs_review marking. The student silently stays stuck on the original
+    // pushed_to_dng request with the payable gap invisible. Unchanged by the
+    // auto-replace flag being off.
+    expect(fn () => freshPushAction()->handle($chargeTwo->id))
+        ->toThrow(RuntimeException::class, 'does not own installment');
+
+    expect($staleRequest->fresh()->status)->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG)
+        ->and(DngPaymentRequest::query()->count())->toBe(1);
+});
+
+// =========================================================================
 // Case 13: explicit later installment must not bypass sequence order
 // =========================================================================
 it('rejects an explicit later installment while an earlier one remains pending', function () {

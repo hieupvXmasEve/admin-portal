@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Dng\Services;
 
+use App\Modules\Finance\Actions\CancelDngPaymentRequestAction;
+use App\Modules\Finance\Dng\Exceptions\DngReservationReplacementRequired;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestReservationTarget;
@@ -19,6 +21,7 @@ use App\Shared\Contracts\Finance\SettlementPositionReader;
 use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Closure;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /** Coordinates the durable DNG reservation lifecycle around an external provider call. */
@@ -32,6 +35,7 @@ final class DngReservationLifecycle
         private readonly DngPaymentService $dngPaymentService,
         private readonly ?SettlementMutationGuard $settlementMutationGuard = null,
         private readonly ?StudentReferenceReader $studentReferences = null,
+        private readonly ?CancelDngPaymentRequestAction $cancelDngPaymentRequestAction = null,
     ) {}
 
     /** @param array{description: string, semester_id: int, due_date: string, estimate_time: string} $details */
@@ -43,6 +47,12 @@ final class DngReservationLifecycle
     /** @param array{description: string, semester_id: int, due_date: string, estimate_time: string} $details */
     public function reserve(int $studentId, string $feeType, array $details, ?array $requestedLineIds = null, array $targetAmounts = [], array $installmentIdsByLine = []): DngPaymentRequest
     {
+        return $this->attemptReserve($studentId, $feeType, $details, $requestedLineIds, $targetAmounts, $installmentIdsByLine, false);
+    }
+
+    /** @param array{description: string, semester_id: int, due_date: string, estimate_time: string} $details */
+    private function attemptReserve(int $studentId, string $feeType, array $details, ?array $requestedLineIds, array $targetAmounts, array $installmentIdsByLine, bool $isReplacementRetry): DngPaymentRequest
+    {
         $chargeTypes = ListDngWorklistQuery::mapFeeTypeToChargeTypes($feeType);
         if ($chargeTypes === []) {
             throw new \InvalidArgumentException("DNG fee type {$feeType} has no supported Finance charge types.");
@@ -52,133 +62,224 @@ final class DngReservationLifecycle
         $this->assertRequiredPayerProfile($student);
         $billingAccountId = (int) BillingAccount::query()->where('student_id', $studentId)->sole()->id;
 
-        return $this->guard()->handleIfChanged($billingAccountId, function (BillingAccount $billingAccount, Closure $markChanged) use ($student, $studentId, $feeType, $chargeTypes, $details, $requestedLineIds, $targetAmounts, $installmentIdsByLine): DngPaymentRequest {
-            $campusCode = $this->campusCodeResolver->requireForCampusId($student->campusId);
-            $slotKey = $this->slotKey((int) $billingAccount->id, $campusCode, $feeType);
-            $existing = DngPaymentRequest::query()
-                ->holdingCollection()
-                ->where('billing_account_id', $billingAccount->id)
-                ->where('provider_rail', self::PROVIDER_RAIL)
-                ->where('fee_type', $feeType)
-                ->lockForUpdate()
-                ->first();
-            if ($existing !== null) {
-                if ($existing->campus_code !== $campusCode) {
+        // Captured before entering the guard: tells us, once a replacement
+        // signal unwinds it, whether *this* call opened the transaction
+        // (safe to cancel now) or merely reused an ambient one owned by a
+        // caller further up the stack (must propagate for that caller to
+        // cancel once its own transaction has actually closed).
+        $wasAlreadyGuarded = $this->guard()->isActive($billingAccountId);
+        $transactionLevelBeforeGuard = DB::transactionLevel();
+
+        try {
+            return $this->guard()->handleIfChanged($billingAccountId, function (BillingAccount $billingAccount, Closure $markChanged) use ($student, $studentId, $feeType, $chargeTypes, $details, $requestedLineIds, $targetAmounts, $installmentIdsByLine): DngPaymentRequest {
+                $campusCode = $this->campusCodeResolver->requireForCampusId($student->campusId);
+                $slotKey = $this->slotKey((int) $billingAccount->id, $campusCode, $feeType);
+                $existing = DngPaymentRequest::query()
+                    ->holdingCollection()
+                    ->where('billing_account_id', $billingAccount->id)
+                    ->where('provider_rail', self::PROVIDER_RAIL)
+                    ->where('fee_type', $feeType)
+                    ->lockForUpdate()
+                    ->first();
+                if ($existing !== null && $existing->campus_code !== $campusCode) {
                     throw new \RuntimeException('An unresolved DNG request exists on another campus and must be reconciled before creating a replacement.');
                 }
 
-            }
-
-            $targetLineIds = InvoiceLine::query()
-                ->where('status', 'active')
-                ->whereHas('charge', function ($query) use ($studentId, $chargeTypes, $details): void {
-                    $query->where('student_id', $studentId)
-                        ->whereIn('charge_type', $chargeTypes)
-                        ->where('semester_id', $details['semester_id'])
-                        ->where('status', FinanceCharge::STATUS_ACTIVE);
-                })
-                ->when($requestedLineIds !== null, fn ($query) => $query->whereIn('id', $requestedLineIds))
-                ->orderBy('id')
-                ->pluck('id')
-                ->map(fn ($id): int => (int) $id)
-                ->all();
-            if ($targetLineIds === []) {
-                throw new \RuntimeException('Settlement Position has no supported payable lines for this DNG fee type.');
-            }
-
-            $position = $this->settlementPositionReader->forPayableLines($targetLineIds);
-            if (! $position->isValid() || $position->amounts === null || ! $position->amounts->remaining->isPositive()) {
-                throw new \RuntimeException('Settlement Position is invalid, held, or has no collectible amount.');
-            }
-
-            $targets = $this->collectibleTargets($position, $targetAmounts);
-            if ($targets === []) {
-                throw new \RuntimeException('Settlement Position has no exact collectible targets.');
-            }
-
-            $targetLineIds = array_column($targets, 'invoice_line_id');
-            InvoiceLine::query()->whereIn('id', $targetLineIds)->lockForUpdate()->get();
-            $position = $this->settlementPositionReader->forPayableLines($targetLineIds);
-            if (! $position->isValid() || $position->amounts === null || ! $position->amounts->remaining->isPositive()) {
-                throw new \RuntimeException('Settlement Position changed while reserving DNG targets.');
-            }
-            $targets = $this->collectibleTargets($position, $targetAmounts);
-            $targetFingerprint = $this->fingerprint($targets);
-            $amount = array_reduce($targets, fn (Money $total, array $target): Money => $total->add(Money::vnd($target['collectible'])), Money::zero());
-            $sequence = DngPaymentRequest::query()
-                ->where('billing_account_id', $billingAccount->id)
-                ->where('provider_rail', self::PROVIDER_RAIL)
-                ->where('campus_code', $campusCode)
-                ->where('fee_type', $feeType)
-                ->lockForUpdate()
-                ->count() + 1;
-            if ($existing !== null) {
-                if (! $this->isExactRetry(
-                    $existing,
-                    $student,
-                    $billingAccount,
-                    $campusCode,
-                    $feeType,
-                    $details,
-                    $slotKey,
-                    $targets,
-                    $amount,
-                    $targetFingerprint,
-                    $installmentIdsByLine,
-                    $sequence - 1,
-                    ! in_array($existing->status, [
-                        DngPaymentRequest::STATUS_UNKNOWN_OUTCOME,
-                        DngPaymentRequest::STATUS_NEEDS_REVIEW,
-                    ], true),
-                )) {
-                    $this->holdForReview(
-                        $existing,
-                        $targetFingerprint,
-                        'An active DNG reservation no longer matches the requested payer, settlement targets, amount, version, or provider identity.',
-                    );
-
-                    return $existing->fresh();
+                $targetLineIds = InvoiceLine::query()
+                    ->where('status', 'active')
+                    ->whereHas('charge', function ($query) use ($studentId, $chargeTypes, $details): void {
+                        $query->where('student_id', $studentId)
+                            ->whereIn('charge_type', $chargeTypes)
+                            ->where('semester_id', $details['semester_id'])
+                            ->where('status', FinanceCharge::STATUS_ACTIVE);
+                    })
+                    ->when($requestedLineIds !== null, fn ($query) => $query->whereIn('id', $requestedLineIds))
+                    ->orderBy('id')
+                    ->pluck('id')
+                    ->map(fn ($id): int => (int) $id)
+                    ->all();
+                if ($targetLineIds === []) {
+                    throw new \RuntimeException('Settlement Position has no supported payable lines for this DNG fee type.');
                 }
 
-                return $existing;
-            }
-            $reservation = DngPaymentRequest::query()->create([
-                'student_id' => $student->id,
-                'billing_account_id' => $billingAccount->id,
-                'campus_code' => $campusCode,
-                'provider_rail' => self::PROVIDER_RAIL,
-                'student_code' => $student->studentCode,
-                'fee_type' => $feeType,
-                'description' => $details['description'],
-                'semester_id' => $details['semester_id'],
-                'due_date' => $details['due_date'],
-                'item_id' => $this->itemId((int) $billingAccount->id, $campusCode, $feeType, $sequence),
-                'active_slot_key' => $slotKey,
-                'amount' => $amount->amount,
-                'status' => DngPaymentRequest::STATUS_PENDING,
-                'captured_settlement_version' => (int) $billingAccount->settlement_version,
-                'target_fingerprint' => $targetFingerprint,
-                'reserved_at' => now(),
-            ]);
-            foreach ($targets as $target) {
-                DngPaymentRequestReservationTarget::query()->create([
-                    'dng_payment_request_id' => $reservation->id,
-                    'invoice_line_id' => $target['invoice_line_id'],
-                    'captured_collectible' => $target['collectible'],
-                    'target_identity' => $target['identity'],
-                    'finance_charge_installment_id' => $installmentIdsByLine[$target['invoice_line_id']] ?? null,
-                ]);
-                DngPaymentRequestCharge::query()->create([
-                    'dng_payment_request_id' => $reservation->id,
-                    'finance_charge_id' => $target['finance_charge_id'],
-                    'amount' => $target['collectible'],
-                    'finance_charge_installment_id' => $installmentIdsByLine[$target['invoice_line_id']] ?? null,
-                ]);
-            }
-            $markChanged();
+                $position = $this->settlementPositionReader->forPayableLines($targetLineIds);
+                if (! $position->isValid() || $position->amounts === null || ! $position->amounts->remaining->isPositive()) {
+                    throw new \RuntimeException('Settlement Position is invalid, held, or has no collectible amount.');
+                }
 
-            return $reservation;
-        });
+                $targets = $this->collectibleTargets($position, $targetAmounts);
+                if ($targets === []) {
+                    throw new \RuntimeException('Settlement Position has no exact collectible targets.');
+                }
+
+                $targetLineIds = array_column($targets, 'invoice_line_id');
+                InvoiceLine::query()->whereIn('id', $targetLineIds)->lockForUpdate()->get();
+                $position = $this->settlementPositionReader->forPayableLines($targetLineIds);
+                if (! $position->isValid() || $position->amounts === null || ! $position->amounts->remaining->isPositive()) {
+                    throw new \RuntimeException('Settlement Position changed while reserving DNG targets.');
+                }
+                $targets = $this->collectibleTargets($position, $targetAmounts);
+                $targetFingerprint = $this->fingerprint($targets);
+                $amount = array_reduce($targets, fn (Money $total, array $target): Money => $total->add(Money::vnd($target['collectible'])), Money::zero());
+                $sequence = DngPaymentRequest::query()
+                    ->where('billing_account_id', $billingAccount->id)
+                    ->where('provider_rail', self::PROVIDER_RAIL)
+                    ->where('campus_code', $campusCode)
+                    ->where('fee_type', $feeType)
+                    ->lockForUpdate()
+                    ->count() + 1;
+                if ($existing !== null) {
+                    if (! $this->isExactRetry(
+                        $existing,
+                        $student,
+                        $billingAccount,
+                        $campusCode,
+                        $feeType,
+                        $details,
+                        $slotKey,
+                        $targets,
+                        $amount,
+                        $targetFingerprint,
+                        $installmentIdsByLine,
+                        $sequence - 1,
+                        ! in_array($existing->status, [
+                            DngPaymentRequest::STATUS_UNKNOWN_OUTCOME,
+                            DngPaymentRequest::STATUS_NEEDS_REVIEW,
+                        ], true),
+                    )) {
+                        if ($this->eligibleForAutomaticReplacement($existing, $targets, $amount)) {
+                            throw new DngReservationReplacementRequired((int) $existing->id);
+                        }
+
+                        $this->holdForReview(
+                            $existing,
+                            $targetFingerprint,
+                            'An active DNG reservation no longer matches the requested payer, settlement targets, amount, version, or provider identity.',
+                        );
+
+                        return $existing->fresh();
+                    }
+
+                    return $existing;
+                }
+                $reservation = DngPaymentRequest::query()->create([
+                    'student_id' => $student->id,
+                    'billing_account_id' => $billingAccount->id,
+                    'campus_code' => $campusCode,
+                    'provider_rail' => self::PROVIDER_RAIL,
+                    'student_code' => $student->studentCode,
+                    'fee_type' => $feeType,
+                    'description' => $details['description'],
+                    'semester_id' => $details['semester_id'],
+                    'due_date' => $details['due_date'],
+                    'item_id' => $this->itemId((int) $billingAccount->id, $campusCode, $feeType, $sequence),
+                    'active_slot_key' => $slotKey,
+                    'amount' => $amount->amount,
+                    'status' => DngPaymentRequest::STATUS_PENDING,
+                    'captured_settlement_version' => (int) $billingAccount->settlement_version,
+                    'target_fingerprint' => $targetFingerprint,
+                    'reserved_at' => now(),
+                ]);
+                foreach ($targets as $target) {
+                    DngPaymentRequestReservationTarget::query()->create([
+                        'dng_payment_request_id' => $reservation->id,
+                        'invoice_line_id' => $target['invoice_line_id'],
+                        'captured_collectible' => $target['collectible'],
+                        'target_identity' => $target['identity'],
+                        'finance_charge_installment_id' => $installmentIdsByLine[$target['invoice_line_id']] ?? null,
+                    ]);
+                    DngPaymentRequestCharge::query()->create([
+                        'dng_payment_request_id' => $reservation->id,
+                        'finance_charge_id' => $target['finance_charge_id'],
+                        'amount' => $target['collectible'],
+                        'finance_charge_installment_id' => $installmentIdsByLine[$target['invoice_line_id']] ?? null,
+                    ]);
+                }
+                $markChanged();
+
+                return $reservation;
+            });
+        } catch (DngReservationReplacementRequired $signal) {
+            if ($wasAlreadyGuarded) {
+                // Not our transaction to close. Propagate so the caller that
+                // actually owns the outermost guard scope for this billing
+                // account can cancel once it has unwound.
+                throw $signal;
+            }
+
+            if ($isReplacementRetry) {
+                throw new \RuntimeException(
+                    "DNG reservation replacement did not converge after cancelling request #{$signal->existingRequestId}; a second conflicting collection remains and needs manual reconciliation.",
+                );
+            }
+
+            // The guard's transaction has already rolled back (nothing was
+            // persisted) and unregistered itself by the time an exception
+            // reaches here, so the provider cancel below must run with no
+            // transaction or row lock held. Fail loud instead of silently
+            // cancelling under a lock if that invariant somehow does not hold.
+            if (DB::transactionLevel() !== $transactionLevelBeforeGuard) {
+                throw new \RuntimeException('Refusing an automatic DNG cancellation while a database transaction is open.');
+            }
+
+            $existing = DngPaymentRequest::query()->findOrFail($signal->existingRequestId);
+            $this->cancelAction()->run($existing, ['trigger' => 'automatic_replacement', 'actor_user_id' => auth()->id()]);
+
+            return $this->attemptReserve($studentId, $feeType, $details, $requestedLineIds, $targetAmounts, $installmentIdsByLine, true);
+        }
+    }
+
+    /**
+     * Replace automatically only when every safety condition holds; see
+     * plans/260818-2139-dng-push-over-collection-replacement/phase-01-start.md.
+     *
+     * The new targets must be a superset of the existing request's stored
+     * targets (every invoice line it already covers, at no less than its
+     * captured amount) with a strictly larger total. A same-total or
+     * different-but-not-strictly-larger retry — including one whose only
+     * "difference" from the stored row is settlement-version drift from the
+     * push itself — must fall through to holdForReview instead, or an
+     * unrelated live collection could be cancelled with nothing covering the
+     * charge it protected.
+     *
+     * @param  list<array{invoice_line_id: int, finance_charge_id: int, collectible: string, identity: string}>  $newTargets
+     */
+    private function eligibleForAutomaticReplacement(DngPaymentRequest $existing, array $newTargets, Money $newAmount): bool
+    {
+        if (! config('finance.dng.auto_replace_stale_collection', false)) {
+            return false;
+        }
+
+        if (! in_array($existing->status, [
+            DngPaymentRequest::STATUS_PENDING,
+            DngPaymentRequest::STATUS_PUSHED_TO_DNG,
+        ], true)) {
+            return false;
+        }
+
+        $existingTargets = $existing->reservationTargets()->get();
+        if ($existingTargets->isEmpty()) {
+            return false;
+        }
+
+        $newByLine = collect($newTargets)->keyBy('invoice_line_id');
+        foreach ($existingTargets as $existingTarget) {
+            $current = $newByLine->get((int) $existingTarget->invoice_line_id);
+            if ($current === null) {
+                return false;
+            }
+
+            if (Money::vnd((string) $existingTarget->captured_collectible)->isGreaterThan(Money::vnd($current['collectible']))) {
+                return false;
+            }
+        }
+
+        return $newAmount->isGreaterThan(Money::vnd((string) $existing->amount));
+    }
+
+    private function cancelAction(): CancelDngPaymentRequestAction
+    {
+        return $this->cancelDngPaymentRequestAction ?? app(CancelDngPaymentRequestAction::class);
     }
 
     /**

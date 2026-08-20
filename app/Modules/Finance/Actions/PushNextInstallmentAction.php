@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Actions;
 
+use App\Modules\Finance\Dng\Exceptions\DngReservationReplacementRequired;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Services\DngReservationLifecycle;
 use App\Modules\Finance\Events\InstallmentPushed;
@@ -13,6 +14,7 @@ use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Support\BillingAccountProvisioner;
 use App\Modules\Finance\Support\SettlementMutationGuard;
 use Closure;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -42,9 +44,15 @@ class PushNextInstallmentAction
         private readonly BillingAccountProvisioner $billingAccountProvisioner,
         private readonly SettlementMutationGuard $settlementMutationGuard,
         private readonly DngReservationLifecycle $dngReservationLifecycle,
+        private readonly CancelDngPaymentRequestAction $cancelDngPaymentRequestAction,
     ) {}
 
     public function handle(int $chargeId, ?int $explicitInstallmentId = null): ?FinanceChargeInstallment
+    {
+        return $this->attemptHandle($chargeId, $explicitInstallmentId, false);
+    }
+
+    private function attemptHandle(int $chargeId, ?int $explicitInstallmentId, bool $isReplacementRetry): ?FinanceChargeInstallment
     {
         $charge = FinanceCharge::query()->findOrFail($chargeId);
         $hasUnsettledInstallment = FinanceChargeInstallment::query()
@@ -61,76 +69,98 @@ class PushNextInstallmentAction
         $billingAccountId = (int) $this->billingAccountProvisioner
             ->forStudent((int) $charge->student_id)
             ->id;
+        $transactionLevelBeforeGuard = DB::transactionLevel();
 
-        $selection = $this->settlementMutationGuard->handleIfChanged(
-            $billingAccountId,
-            function ($_billingAccount, Closure $markChanged) use ($chargeId, $explicitInstallmentId): ?array {
-                $lockedCharge = FinanceCharge::query()
-                    ->with('student')
-                    ->lockForUpdate()
-                    ->findOrFail($chargeId);
-                $installment = $this->resolveTarget($lockedCharge, $explicitInstallmentId);
+        try {
+            $selection = $this->settlementMutationGuard->handleIfChanged(
+                $billingAccountId,
+                function ($_billingAccount, Closure $markChanged) use ($chargeId, $explicitInstallmentId): ?array {
+                    $lockedCharge = FinanceCharge::query()
+                        ->with('student')
+                        ->lockForUpdate()
+                        ->findOrFail($chargeId);
+                    $installment = $this->resolveTarget($lockedCharge, $explicitInstallmentId);
 
-                if ($installment === null) {
-                    return null;
-                }
+                    if ($installment === null) {
+                        return null;
+                    }
 
-                $student = $lockedCharge->student;
-                if ($student === null) {
-                    throw new \RuntimeException(
-                        "FinanceCharge #{$lockedCharge->id} has no student attached. Cannot push installment."
+                    $student = $lockedCharge->student;
+                    if ($student === null) {
+                        throw new \RuntimeException(
+                            "FinanceCharge #{$lockedCharge->id} has no student attached. Cannot push installment."
+                        );
+                    }
+
+                    $line = InvoiceLine::query()
+                        ->where('charge_id', $lockedCharge->id)
+                        ->where('status', 'active')
+                        ->orderBy('id')
+                        ->lockForUpdate()
+                        ->firstOrFail();
+                    $reservation = $this->dngReservationLifecycle->reserve(
+                        $student->id,
+                        $this->mapFeeType($lockedCharge->charge_type),
+                        [
+                            'description' => $lockedCharge->description.' (Đợt '.$installment->installment_no.')',
+                            'semester_id' => $lockedCharge->semester_id,
+                            'due_date' => $installment->due_date->toDateString(),
+                            'estimate_time' => $installment->due_date->format('m/y'),
+                        ],
+                        [(int) $line->id],
+                        [(int) $line->id => (string) $installment->amount],
+                        [(int) $line->id => (int) $installment->id],
                     );
-                }
 
-                $line = InvoiceLine::query()
-                    ->where('charge_id', $lockedCharge->id)
-                    ->where('status', 'active')
-                    ->orderBy('id')
-                    ->lockForUpdate()
-                    ->firstOrFail();
-                $reservation = $this->dngReservationLifecycle->reserve(
-                    $student->id,
-                    $this->mapFeeType($lockedCharge->charge_type),
-                    [
-                        'description' => $lockedCharge->description.' (Đợt '.$installment->installment_no.')',
-                        'semester_id' => $lockedCharge->semester_id,
-                        'due_date' => $installment->due_date->toDateString(),
-                        'estimate_time' => $installment->due_date->format('m/y'),
-                    ],
-                    [(int) $line->id],
-                    [(int) $line->id => (string) $installment->amount],
-                    [(int) $line->id => (int) $installment->id],
+                    $isExactReservation = $reservation->reservationTargets()
+                        ->where('finance_charge_installment_id', $installment->id)
+                        ->exists();
+                    if (! $isExactReservation) {
+                        throw new \RuntimeException(
+                            "DNG reservation #{$reservation->id} does not own installment #{$installment->id}."
+                        );
+                    }
+
+                    $installment->update([
+                        'dng_payment_request_id' => $reservation->id,
+                        'status' => FinanceChargeInstallment::STATUS_AWAITING_PAYMENT,
+                    ]);
+                    $markChanged();
+
+                    return [
+                        'charge_id' => (int) $lockedCharge->id,
+                        'installment_id' => (int) $installment->id,
+                        'reservation_id' => (int) $reservation->id,
+                        'student_id' => (int) $student->id,
+                        'details' => [
+                            'description' => $lockedCharge->description.' (Đợt '.$installment->installment_no.')',
+                            'semester_id' => (int) $lockedCharge->semester_id,
+                            'due_date' => $installment->due_date->toDateString(),
+                            'estimate_time' => $installment->due_date->format('m/y'),
+                        ],
+                    ];
+                },
+            );
+        } catch (DngReservationReplacementRequired $signal) {
+            if ($isReplacementRetry) {
+                throw new \RuntimeException(
+                    "DNG reservation replacement did not converge after cancelling request #{$signal->existingRequestId}; a second conflicting collection remains and needs manual reconciliation.",
                 );
+            }
 
-                $isExactReservation = $reservation->reservationTargets()
-                    ->where('finance_charge_installment_id', $installment->id)
-                    ->exists();
-                if (! $isExactReservation) {
-                    throw new \RuntimeException(
-                        "DNG reservation #{$reservation->id} does not own installment #{$installment->id}."
-                    );
-                }
+            // Cancel outside every transaction/lock: the guard above has
+            // already rolled back and closed by the time this catch runs.
+            // Fail loud instead of silently cancelling under a lock if that
+            // invariant somehow does not hold.
+            if (DB::transactionLevel() !== $transactionLevelBeforeGuard) {
+                throw new \RuntimeException('Refusing an automatic DNG cancellation while a database transaction is open.');
+            }
 
-                $installment->update([
-                    'dng_payment_request_id' => $reservation->id,
-                    'status' => FinanceChargeInstallment::STATUS_AWAITING_PAYMENT,
-                ]);
-                $markChanged();
+            $existing = DngPaymentRequest::query()->findOrFail($signal->existingRequestId);
+            $this->cancelDngPaymentRequestAction->run($existing, ['trigger' => 'automatic_replacement', 'actor_user_id' => auth()->id()]);
 
-                return [
-                    'charge_id' => (int) $lockedCharge->id,
-                    'installment_id' => (int) $installment->id,
-                    'reservation_id' => (int) $reservation->id,
-                    'student_id' => (int) $student->id,
-                    'details' => [
-                        'description' => $lockedCharge->description.' (Đợt '.$installment->installment_no.')',
-                        'semester_id' => (int) $lockedCharge->semester_id,
-                        'due_date' => $installment->due_date->toDateString(),
-                        'estimate_time' => $installment->due_date->format('m/y'),
-                    ],
-                ];
-            },
-        );
+            return $this->attemptHandle($chargeId, $explicitInstallmentId, true);
+        }
 
         if ($selection === null) {
             return null;

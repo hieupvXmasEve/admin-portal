@@ -21,6 +21,17 @@ final class SettlementMutationGuard
     }
 
     /**
+     * Whether a guarded mutation for this billing account is already open on
+     * the call stack. A provider call must never run while this is true — it
+     * means the enclosing DB transaction (opened by whichever call is
+     * outermost) has not committed yet.
+     */
+    public function isActive(int $billingAccountId): bool
+    {
+        return isset(self::$activeMutations[$billingAccountId]);
+    }
+
+    /**
      * Run a guarded operation that may be a no-op without advancing the
      * settlement version. The mutation must call $markChanged after it writes.
      *

@@ -30,10 +30,13 @@ class CancelDngPaymentRequestAction
      * released after a provider-confirmed cancellation; ambiguous provider calls
      * remain held as unknown outcomes.
      *
+     *
+     * @param  array{trigger: string, actor_user_id: int|null}|null  $replacementContext  Audit marker for an automatic (non-staff) cancellation, e.g. Phase 1's cancel-then-push replacement.
+     *
      * @throws \RuntimeException if the request status cannot be cancelled.
      * @throws \Throwable if the provider cancellation outcome is unknown.
      */
-    public function run(DngPaymentRequest $request): void
+    public function run(DngPaymentRequest $request, ?array $replacementContext = null): void
     {
         if ($request->status === DngPaymentRequest::STATUS_PENDING) {
             $this->settlementMutationGuard->handleIfChanged(
@@ -55,7 +58,7 @@ class CancelDngPaymentRequestAction
             );
         }
 
-        $this->cancelPushedRequest($request);
+        $this->cancelPushedRequest($request, $replacementContext);
     }
 
     /**
@@ -121,7 +124,8 @@ class CancelDngPaymentRequestAction
             });
     }
 
-    private function cancelPushedRequest(DngPaymentRequest $request): void
+    /** @param array{trigger: string, actor_user_id: int|null}|null $replacementContext */
+    private function cancelPushedRequest(DngPaymentRequest $request, ?array $replacementContext = null): void
     {
         $originalData = $this->originalData($request);
         $cancelPayload = $this->dngClient->buildInsertNewRecordPayload([...$originalData, 'amount' => -1]);
@@ -143,7 +147,7 @@ class CancelDngPaymentRequestAction
 
         $this->settlementMutationGuard->handleIfChanged(
             $this->billingAccountId($request),
-            function ($_billingAccount, Closure $markChanged) use ($request, $cancelPayload, $response): void {
+            function ($_billingAccount, Closure $markChanged) use ($request, $cancelPayload, $response, $replacementContext): void {
                 $locked = DngPaymentRequest::query()->lockForUpdate()->findOrFail($request->id);
                 $locked->update([
                     'cancel_push_payload' => $cancelPayload,
@@ -161,7 +165,11 @@ class CancelDngPaymentRequestAction
                         'request' => $locked,
                         'hold_request' => false,
                         'mismatch_reasons' => ['Provider confirmed collection cancellation. Underlying obligations remain active.'],
-                        'raw_provider_evidence' => ['cancel_payload' => $cancelPayload, 'cancel_response' => $response],
+                        'raw_provider_evidence' => [
+                            'cancel_payload' => $cancelPayload,
+                            'cancel_response' => $response,
+                            ...($replacementContext !== null ? ['replacement' => $replacementContext] : []),
+                        ],
                     ]);
 
                     return;

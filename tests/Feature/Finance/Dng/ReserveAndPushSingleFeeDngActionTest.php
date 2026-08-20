@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Modules\Finance\Actions\ReserveAndPushSingleFeeDngAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Services\DngCampusCodeResolver;
+use App\Modules\Finance\Dng\Services\DngClient;
 use App\Modules\Finance\Dng\Services\DngPaymentService;
 use App\Modules\Finance\Dng\Services\DngReservationLifecycle;
 use App\Modules\Finance\Models\BillingAccount;
@@ -335,6 +336,43 @@ it('holds an active retry when its amount and target fingerprint change', functi
     expect($second->status)->toBe(DngPaymentRequest::STATUS_NEEDS_REVIEW);
 });
 
+it('automatically replaces when the same line grows in amount and the flag is on', function (): void {
+    config(['finance.dng.auto_replace_stale_collection' => true]);
+    $line = reservationPayableLine($this->invoice, $this->billingAccount, '1000000.00');
+    $service = Mockery::mock(DngPaymentService::class);
+    $service->shouldReceive('pushReserved')->twice()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
+    $action = guardedReservationAction($service);
+
+    $first = $action->handle(
+        $this->student->id,
+        'HL',
+        guardedReservationDetails($this->semester),
+        [$line->id],
+        [$line->id => '500000.00'],
+    );
+    expect($first->status)->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG);
+    $originalItemId = $first->item_id;
+
+    $dngClient = Mockery::mock(DngClient::class);
+    $dngClient->shouldReceive('buildInsertNewRecordPayload')->andReturnUsing(fn (array $payload): array => $payload);
+    $dngClient->shouldReceive('cancelRecord')->once()->withArgs(fn (array $data): bool => $data['item_id'] === $originalItemId)->andReturn(['ResponseCode' => '00', 'Message' => 'OK']);
+    app()->instance(DngClient::class, $dngClient);
+
+    $second = $action->handle(
+        $this->student->id,
+        'HL',
+        guardedReservationDetails($this->semester),
+        [$line->id],
+        [$line->id => '600000.00'],
+    );
+
+    expect($first->fresh()->status)->toBe(DngPaymentRequest::STATUS_CANCEL_PUSHED_TO_DNG)
+        ->and($second->id)->not->toBe($first->id)
+        ->and($second->status)->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG)
+        ->and((float) $second->amount)->toBe(600_000.0)
+        ->and(DngPaymentRequest::query()->count())->toBe(2);
+});
+
 it('holds a stale settlement-version retry for staff reconciliation', function (): void {
     reservationPayableLine($this->invoice, $this->billingAccount, '1000000.00');
     $service = Mockery::mock(DngPaymentService::class);
@@ -353,6 +391,55 @@ it('holds a stale settlement-version retry for staff reconciliation', function (
             'original_target_fingerprint' => $first->target_fingerprint,
             'current_target_fingerprint' => $first->target_fingerprint,
         ]);
+});
+
+it('still holds a stale settlement-version retry for staff reconciliation when the flag is on', function (): void {
+    // A stale settlement version is a concurrency signal, not payable growth —
+    // must hold in both modes. Nothing about the targets changed, so the
+    // strict-growth eligibility check (new total must be strictly greater
+    // than the existing request's) correctly excludes it regardless of the
+    // flag: total is unchanged, not grown.
+    config(['finance.dng.auto_replace_stale_collection' => true]);
+    reservationPayableLine($this->invoice, $this->billingAccount, '1000000.00');
+    $service = Mockery::mock(DngPaymentService::class);
+    $service->shouldReceive('pushReserved')->once()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
+    $action = guardedReservationAction($service);
+
+    $first = $action->handle($this->student->id, 'HL', guardedReservationDetails($this->semester));
+    $first->update(['status' => DngPaymentRequest::STATUS_PENDING]);
+    $this->billingAccount->increment('settlement_version');
+    $dngClient = Mockery::mock(DngClient::class);
+    $dngClient->shouldNotReceive('cancelRecord');
+    app()->instance(DngClient::class, $dngClient);
+
+    $second = $action->handle($this->student->id, 'HL', guardedReservationDetails($this->semester));
+
+    expect($second->status)->toBe(DngPaymentRequest::STATUS_NEEDS_REVIEW)
+        ->and(DngPaymentRequest::query()->count())->toBe(1);
+});
+
+it('still reuses an exact active reservation with zero provider calls when the flag is on', function (): void {
+    // Every successful push advances settlement_version twice (reserve() +
+    // finalize()), so isExactRetry()'s version check never matches a pushed
+    // request — an identical retry always falls into the non-exact-retry
+    // branch. The strict-growth eligibility check must still reject it (the
+    // total is unchanged, not grown), so it lands on the pre-existing
+    // holdForReview no-op rather than an unnecessary provider cancel.
+    config(['finance.dng.auto_replace_stale_collection' => true]);
+    reservationPayableLine($this->invoice, $this->billingAccount);
+    $service = Mockery::mock(DngPaymentService::class);
+    $service->shouldReceive('pushReserved')->once()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
+    $action = guardedReservationAction($service);
+    $dngClient = Mockery::mock(DngClient::class);
+    $dngClient->shouldNotReceive('cancelRecord');
+    app()->instance(DngClient::class, $dngClient);
+
+    $first = $action->handle($this->student->id, 'HL', guardedReservationDetails($this->semester));
+    $second = $action->handle($this->student->id, 'HL', guardedReservationDetails($this->semester));
+
+    expect($second->id)->toBe($first->id)
+        ->and($second->item_id)->toBe($first->item_id)
+        ->and(DngPaymentRequest::query()->where('active_slot_key', $first->active_slot_key)->count())->toBe(1);
 });
 
 it('releases a terminal active slot without erasing DNG provider evidence', function (string $terminalStatus): void {
@@ -477,6 +564,169 @@ it('records a deterministic current fingerprint when every target disappears bef
     expect($reservation->status)->toBe(DngPaymentRequest::STATUS_NEEDS_REVIEW)
         ->and($reservation->review_evidence['current_target_fingerprint'])->toBeString()->not->toBe('')
         ->and($reservation->review_evidence['current_target_fingerprint'])->not->toBe($reservation->target_fingerprint);
+});
+
+// =========================================================================
+// Phase 1: automatic cancel-then-push replacement (flag-gated)
+// =========================================================================
+
+it('automatically cancels a stale live collection and pushes a fresh one covering the full payable', function (): void {
+    config(['finance.dng.auto_replace_stale_collection' => true]);
+    $lineOne = reservationPayableLine($this->invoice, $this->billingAccount, '3000000.00', FinanceCharge::TYPE_EXAM_RESIT_FEE);
+    $service = Mockery::mock(DngPaymentService::class);
+    $service->shouldReceive('pushReserved')->twice()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
+    $action = guardedReservationAction($service);
+
+    $first = $action->handle($this->student->id, 'PTL', guardedReservationDetails($this->semester));
+    expect($first->status)->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG);
+    $originalItemId = $first->item_id;
+
+    $lineTwo = reservationPayableLine($this->invoice, $this->billingAccount, '3000000.00', FinanceCharge::TYPE_EXAM_RESIT_FEE);
+    $dngClient = Mockery::mock(DngClient::class);
+    $dngClient->shouldReceive('buildInsertNewRecordPayload')->andReturnUsing(fn (array $payload): array => $payload);
+    $dngClient->shouldReceive('cancelRecord')->once()->withArgs(fn (array $data): bool => $data['item_id'] === $originalItemId)->andReturn(['ResponseCode' => '00', 'Message' => 'OK']);
+    app()->instance(DngClient::class, $dngClient);
+
+    $second = $action->handle($this->student->id, 'PTL', guardedReservationDetails($this->semester));
+
+    expect($first->fresh()->status)->toBe(DngPaymentRequest::STATUS_CANCEL_PUSHED_TO_DNG)
+        ->and($second->id)->not->toBe($first->id)
+        ->and($second->status)->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG)
+        ->and((float) $second->amount)->toBe(6_000_000.0)
+        ->and($second->reservationTargets->pluck('invoice_line_id')->all())->toContain($lineOne->id, $lineTwo->id)
+        ->and(DngPaymentRequest::query()->count())->toBe(2);
+});
+
+it('leaves the flag-off behaviour unchanged when the config is off', function (): void {
+    config(['finance.dng.auto_replace_stale_collection' => false]);
+    $line = reservationPayableLine($this->invoice, $this->billingAccount, '1000000.00');
+    $service = Mockery::mock(DngPaymentService::class);
+    $service->shouldReceive('pushReserved')->once()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
+    $action = guardedReservationAction($service);
+
+    $first = $action->handle($this->student->id, 'HL', guardedReservationDetails($this->semester));
+    $first->update(['status' => DngPaymentRequest::STATUS_PENDING]);
+    reservationPayableLine($this->invoice, $this->billingAccount, '500000.00');
+
+    $second = $action->handle($this->student->id, 'HL', guardedReservationDetails($this->semester));
+
+    expect($second->status)->toBe(DngPaymentRequest::STATUS_NEEDS_REVIEW)
+        ->and(DngPaymentRequest::query()->count())->toBe(1);
+});
+
+it('aborts the whole replacement and creates no new request when the provider cancel fails', function (): void {
+    config(['finance.dng.auto_replace_stale_collection' => true]);
+    $lineOne = reservationPayableLine($this->invoice, $this->billingAccount, '3000000.00', FinanceCharge::TYPE_EXAM_RESIT_FEE);
+    $service = Mockery::mock(DngPaymentService::class);
+    $service->shouldReceive('pushReserved')->once()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
+    $action = guardedReservationAction($service);
+
+    $first = $action->handle($this->student->id, 'PTL', guardedReservationDetails($this->semester));
+    reservationPayableLine($this->invoice, $this->billingAccount, '3000000.00', FinanceCharge::TYPE_EXAM_RESIT_FEE);
+    $dngClient = Mockery::mock(DngClient::class);
+    $dngClient->shouldReceive('buildInsertNewRecordPayload')->andReturnUsing(fn (array $payload): array => $payload);
+    $dngClient->shouldReceive('cancelRecord')->once()->andThrow(new RuntimeException('DNG API error'));
+    app()->instance(DngClient::class, $dngClient);
+
+    expect(fn () => $action->handle($this->student->id, 'PTL', guardedReservationDetails($this->semester)))
+        ->toThrow(RuntimeException::class, 'DNG API error');
+
+    expect($first->fresh()->status)->toBe(DngPaymentRequest::STATUS_UNKNOWN_OUTCOME)
+        ->and(DngPaymentRequest::query()->count())->toBe(1);
+});
+
+it('does not auto-replace when the new reservation would collect less than the live request', function (): void {
+    config(['finance.dng.auto_replace_stale_collection' => true]);
+    $lineOne = reservationPayableLine($this->invoice, $this->billingAccount, '1000000.00', FinanceCharge::TYPE_EXAM_RESIT_FEE);
+    reservationPayableLine($this->invoice, $this->billingAccount, '2000000.00', FinanceCharge::TYPE_EXAM_RESIT_FEE);
+    $service = Mockery::mock(DngPaymentService::class);
+    $service->shouldReceive('pushReserved')->once()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
+    $action = guardedReservationAction($service);
+
+    $first = $action->handle($this->student->id, 'PTL', guardedReservationDetails($this->semester));
+    expect((float) $first->amount)->toBe(3_000_000.0);
+
+    $dngClient = Mockery::mock(DngClient::class);
+    $dngClient->shouldNotReceive('cancelRecord');
+    app()->instance(DngClient::class, $dngClient);
+
+    $second = $action->handle(
+        $this->student->id,
+        'PTL',
+        guardedReservationDetails($this->semester),
+        [$lineOne->id],
+        [$lineOne->id => '1000000.00'],
+    );
+
+    expect($second->status)->toBe(DngPaymentRequest::STATUS_NEEDS_REVIEW)
+        ->and(DngPaymentRequest::query()->count())->toBe(1);
+});
+
+it('does not auto-replace a needs_review or unknown_outcome request even when the flag is on', function (string $terminalHold): void {
+    config(['finance.dng.auto_replace_stale_collection' => true]);
+    $line = reservationPayableLine($this->invoice, $this->billingAccount, '1000000.00');
+    $service = Mockery::mock(DngPaymentService::class);
+    $service->shouldReceive('pushReserved')->once()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
+    $action = guardedReservationAction($service);
+
+    $first = $action->handle($this->student->id, 'HL', guardedReservationDetails($this->semester));
+    $first->update(['status' => $terminalHold]);
+    reservationPayableLine($this->invoice, $this->billingAccount, '500000.00');
+    $dngClient = Mockery::mock(DngClient::class);
+    $dngClient->shouldNotReceive('cancelRecord');
+    app()->instance(DngClient::class, $dngClient);
+
+    $second = $action->handle($this->student->id, 'HL', guardedReservationDetails($this->semester));
+
+    expect($second->status)->toBe(DngPaymentRequest::STATUS_NEEDS_REVIEW)
+        ->and(DngPaymentRequest::query()->count())->toBe(1);
+})->with([
+    'unknown outcome' => [DngPaymentRequest::STATUS_UNKNOWN_OUTCOME],
+    'already needs review' => [DngPaymentRequest::STATUS_NEEDS_REVIEW],
+]);
+
+it('does not auto-replace a cancellation-replacement row that carries no reservation targets', function (): void {
+    config(['finance.dng.auto_replace_stale_collection' => true]);
+    reservationPayableLine($this->invoice, $this->billingAccount, '1000000.00');
+    $dngClient = Mockery::mock(DngClient::class);
+    $dngClient->shouldNotReceive('cancelRecord');
+    app()->instance(DngClient::class, $dngClient);
+    $campusResolver = Mockery::mock(DngCampusCodeResolver::class);
+    $campusResolver->shouldReceive('requireForCampusId')->andReturn('FAUHN');
+    $lifecycle = new DngReservationLifecycle(
+        app(SettlementPositionReader::class),
+        $campusResolver,
+        Mockery::mock(DngPaymentService::class),
+    );
+    $replacement = $lifecycle->createCancellationReplacement(
+        DngPaymentRequest::query()->create([
+            'student_id' => $this->student->id,
+            'billing_account_id' => $this->billingAccount->id,
+            'campus_code' => 'FAUHN',
+            'provider_rail' => 'dng',
+            'student_code' => $this->student->student_id,
+            'fee_type' => 'HL',
+            'description' => 'Cancelled original',
+            'semester_id' => $this->semester->id,
+            'due_date' => now()->addDays(7),
+            'item_id' => 'cancelled-original',
+            'amount' => '1000000.00',
+            'status' => DngPaymentRequest::STATUS_CANCEL_PUSHED_TO_DNG,
+        ]),
+        operationId: 1,
+        total: '1000000.00',
+        replacementLinks: [],
+    );
+    expect($replacement->reservationTargets()->exists())->toBeFalse();
+
+    $service = Mockery::mock(DngPaymentService::class);
+    $service->shouldNotReceive('pushReserved');
+    $action = guardedReservationAction($service);
+
+    $second = $action->handle($this->student->id, 'HL', guardedReservationDetails($this->semester));
+
+    expect($second->status)->toBe(DngPaymentRequest::STATUS_NEEDS_REVIEW)
+        ->and(DngPaymentRequest::query()->count())->toBe(2);
 });
 
 it('blocks a concurrent credit application during the unlocked DNG provider call without over-collecting or losing a settlement version', function (): void {
