@@ -93,18 +93,24 @@ class ListLecturesQuery
             return;
         }
 
-        $query->whereHas('courseOfferings', function (Builder $courseOfferingQuery) use ($campusId, $hasSemesterFilter, $semesterId, $hasUnitTypeFilter, $unitType): void {
-            $courseOfferingQuery->where('course_offerings.campus_id', $campusId);
+        // A course offering can be taught by different lecturers per session
+        // (course_offerings.lecture_id is only a default/primary slot), so the
+        // "who's actually teaching this semester" answer has to come from
+        // class_sessions.lecture_id, not the course_offering-level column.
+        $query->whereHas('classSessions', function (Builder $sessionQuery) use ($campusId, $hasSemesterFilter, $semesterId, $hasUnitTypeFilter, $unitType): void {
+            $sessionQuery->whereHas('courseOffering', function (Builder $courseOfferingQuery) use ($campusId, $hasSemesterFilter, $semesterId, $hasUnitTypeFilter, $unitType): void {
+                $courseOfferingQuery->where('course_offerings.campus_id', $campusId);
 
-            if ($hasSemesterFilter) {
-                $courseOfferingQuery->where('course_offerings.semester_id', (int) $semesterId);
-            }
+                if ($hasSemesterFilter) {
+                    $courseOfferingQuery->where('course_offerings.semester_id', (int) $semesterId);
+                }
 
-            if ($hasUnitTypeFilter) {
-                $courseOfferingQuery->whereHas('unit', function (Builder $unitQuery) use ($unitType): void {
-                    $unitQuery->where('units.unit_type', $unitType);
-                });
-            }
+                if ($hasUnitTypeFilter) {
+                    $courseOfferingQuery->whereHas('unit', function (Builder $unitQuery) use ($unitType): void {
+                        $unitQuery->where('units.unit_type', $unitType);
+                    });
+                }
+            });
         });
     }
 
