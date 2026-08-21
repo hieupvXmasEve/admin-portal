@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Close the void-guard orphan hole"
-status: pending
+status: done
 priority: P1
 effort: "0.5d"
 dependencies: []
@@ -154,13 +154,12 @@ charges with live provider records.
 
 ## Success Criteria
 
-- [ ] A charge with no installments and a live pushed request cannot be voided.
-- [ ] `unknown_outcome` and `needs_review` requests block a void.
-- [ ] Terminal-status requests do not block a void.
-- [ ] The block message names the request id and the cancellation path.
-- [ ] Multi-charge requests are not cancelled wholesale by a single-charge void.
-- [ ] Backfill closure suites green, or their changed expectations are
-      deliberate and documented as a real defect found.
+- [x] A charge with no installments and a live pushed request cannot be voided.
+- [x] `unknown_outcome` and `needs_review` requests block a void.
+- [x] Terminal-status requests do not block a void.
+- [x] The block message names the request id and the cancellation path.
+- [x] Multi-charge requests are not cancelled wholesale by a single-charge void.
+- [x] Backfill closure suites green — no changed expectations, no defect found.
 
 ## Risk Assessment
 

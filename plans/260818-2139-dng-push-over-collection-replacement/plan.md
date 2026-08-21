@@ -106,7 +106,7 @@ request and builds a fresh one through the unchanged happy path.
 | # | Phase | Status |
 |---|-------|--------|
 | 1 | [Phase 1: Automatic cancel-then-push replacement](./phase-01-start.md) | Done |
-| 2 | [Phase 2: Close the void-guard orphan hole](./phase-02-close-the-obligation-cancellation-provider-gap.md) | Pending |
+| 2 | [Phase 2: Close the void-guard orphan hole](./phase-02-close-the-obligation-cancellation-provider-gap.md) | Done |
 | 3 | [Phase 3: Surface uncovered payable in worklist and batch](./phase-03-surface-uncovered-payable-in-worklist-and-batch.md) | Pending |
 
 Phase 2 is independent of Phase 1 and may run first — it is the cheapest fix
@@ -123,7 +123,7 @@ and closes a live money risk. Phase 3 depends on Phase 1.
       with provider evidence, never a silent gap.
 - [ ] `active_slot_key` stays unique with unchanged timing semantics.
 - [ ] A replacement never collects less than the request it replaced.
-- [ ] Voiding a charge with a live DNG request in **any** holding status either
+- [x] Voiding a charge with a live DNG request in **any** holding status either
       cancels at the provider or blocks.
 - [ ] The batch worklist shows a partially-covered student instead of skipping
       them, scoped to the same semester and campus the push would target.

@@ -8,6 +8,7 @@ use App\Models\Student;
 use App\Modules\Finance\Actions\SettleInstallmentFromDngAction;
 use App\Modules\Finance\Actions\VoidFinanceChargeAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Models\InvoiceLine;
@@ -182,4 +183,192 @@ it('does not resurrect a cancelled installment from a late DNG webhook', functio
 
     expect($settled)->toHaveCount(0)
         ->and($installment->fresh()->status)->toBe(FinanceChargeInstallment::STATUS_CANCELLED);
+});
+
+/**
+ * Phase 2 (dng-push-over-collection-replacement): the guard must also catch a
+ * live DNG request that has no installment link at all — reachable only
+ * through the dng_payment_request_charges pivot.
+ */
+it('blocks void when a charge with no installments has a live DNG request linked only through the charge pivot', function () {
+    [$student, , $charge] = makeVoidScenario();
+
+    $dng = DngPaymentRequest::create([
+        'student_id' => $student->id,
+        'campus_code' => 'FAUHN',
+        'student_code' => 'S1',
+        'fee_type' => 'HL',
+        'item_id' => 'ITEM-'.uniqid(),
+        'amount' => 10_000_000,
+        'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
+    ]);
+
+    DngPaymentRequestCharge::create([
+        'dng_payment_request_id' => $dng->id,
+        'finance_charge_id' => $charge->id,
+        'amount' => 10_000_000,
+    ]);
+
+    expect(fn () => app(VoidFinanceChargeAction::class)->handle($charge->id, 'Void with no installments'))
+        ->toThrow(RuntimeException::class, "#{$dng->id}");
+
+    expect($charge->fresh()->status)->toBe(FinanceCharge::STATUS_ACTIVE);
+});
+
+it('blocks void when an installment carries a live DNG link with no pivot row (pre-migration rows)', function () {
+    [$student, , $charge] = makeVoidScenario();
+
+    // CreateBatchDngFromChargesAction sets the installment to `pending`, not
+    // `awaiting_payment`, when the reservation lands in a holding-but-not-pushed
+    // status — the case the old installment-status filter missed entirely.
+    $dng = DngPaymentRequest::create([
+        'student_id' => $student->id,
+        'campus_code' => 'FAUHN',
+        'student_code' => 'S1',
+        'fee_type' => 'HL',
+        'item_id' => 'ITEM-'.uniqid(),
+        'amount' => 10_000_000,
+        'status' => DngPaymentRequest::STATUS_NEEDS_REVIEW,
+    ]);
+
+    FinanceChargeInstallment::create([
+        'finance_charge_id' => $charge->id,
+        'installment_no' => 1,
+        'amount' => 10_000_000,
+        'due_date' => now()->addDays(30)->toDateString(),
+        'status' => FinanceChargeInstallment::STATUS_PENDING,
+        'dng_payment_request_id' => $dng->id,
+    ]);
+
+    expect(fn () => app(VoidFinanceChargeAction::class)->handle($charge->id, 'Void blocked'))
+        ->toThrow(RuntimeException::class, "#{$dng->id}");
+
+    expect($charge->fresh()->status)->toBe(FinanceCharge::STATUS_ACTIVE);
+});
+
+it('does not block on a live DNG request linked to a different charge', function () {
+    [$student, $semester, $charge] = makeVoidScenario();
+
+    $otherCharge = FinanceCharge::create([
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
+        'amount' => 5_000_000,
+        'description' => 'Unrelated retake',
+        'effective_at' => now(),
+        'status' => FinanceCharge::STATUS_ACTIVE,
+    ]);
+
+    $dng = DngPaymentRequest::create([
+        'student_id' => $student->id,
+        'campus_code' => 'FAUHN',
+        'student_code' => 'S1',
+        'fee_type' => 'HL',
+        'item_id' => 'ITEM-'.uniqid(),
+        'amount' => 5_000_000,
+        'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
+    ]);
+
+    DngPaymentRequestCharge::create([
+        'dng_payment_request_id' => $dng->id,
+        'finance_charge_id' => $otherCharge->id,
+        'amount' => 5_000_000,
+    ]);
+
+    app(VoidFinanceChargeAction::class)->handle($charge->id, 'Void unrelated to the other charge');
+
+    expect($charge->fresh()->status)->toBe(FinanceCharge::STATUS_VOID)
+        ->and($dng->fresh()->status)->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG);
+});
+
+it('blocks void when the linked DNG request is unknown_outcome or needs_review', function (string $status) {
+    [$student, , $charge] = makeVoidScenario();
+
+    $dng = DngPaymentRequest::create([
+        'student_id' => $student->id,
+        'campus_code' => 'FAUHN',
+        'student_code' => 'S1',
+        'fee_type' => 'HL',
+        'item_id' => 'ITEM-'.uniqid(),
+        'amount' => 10_000_000,
+        'status' => $status,
+    ]);
+
+    DngPaymentRequestCharge::create([
+        'dng_payment_request_id' => $dng->id,
+        'finance_charge_id' => $charge->id,
+        'amount' => 10_000_000,
+    ]);
+
+    expect(fn () => app(VoidFinanceChargeAction::class)->handle($charge->id, 'Void blocked'))
+        ->toThrow(RuntimeException::class);
+
+    expect($charge->fresh()->status)->toBe(FinanceCharge::STATUS_ACTIVE);
+})->with([
+    DngPaymentRequest::STATUS_UNKNOWN_OUTCOME,
+    DngPaymentRequest::STATUS_NEEDS_REVIEW,
+]);
+
+it('allows void when the linked DNG request is already terminal', function (string $status) {
+    [$student, , $charge] = makeVoidScenario();
+
+    $dng = DngPaymentRequest::create([
+        'student_id' => $student->id,
+        'campus_code' => 'FAUHN',
+        'student_code' => 'S1',
+        'fee_type' => 'HL',
+        'item_id' => 'ITEM-'.uniqid(),
+        'amount' => 10_000_000,
+        'status' => $status,
+    ]);
+
+    DngPaymentRequestCharge::create([
+        'dng_payment_request_id' => $dng->id,
+        'finance_charge_id' => $charge->id,
+        'amount' => 10_000_000,
+    ]);
+
+    app(VoidFinanceChargeAction::class)->handle($charge->id, 'Void allowed');
+
+    expect($charge->fresh()->status)->toBe(FinanceCharge::STATUS_VOID);
+})->with([
+    DngPaymentRequest::STATUS_CANCELLED,
+    DngPaymentRequest::STATUS_CANCEL_PUSHED_TO_DNG,
+    DngPaymentRequest::STATUS_PAID_UNINVOICED,
+    DngPaymentRequest::STATUS_PAID_INVOICED,
+    DngPaymentRequest::STATUS_RECONCILED,
+    DngPaymentRequest::STATUS_FAILED,
+]);
+
+it('does not touch a sibling charge on a multi-charge DNG request when the void is blocked', function () {
+    [$student, $semester, $charge] = makeVoidScenario();
+
+    $siblingCharge = FinanceCharge::create([
+        'student_id' => $student->id,
+        'semester_id' => $semester->id,
+        'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
+        'amount' => 5_000_000,
+        'description' => 'Retake sibling',
+        'effective_at' => now(),
+        'status' => FinanceCharge::STATUS_ACTIVE,
+    ]);
+
+    $dng = DngPaymentRequest::create([
+        'student_id' => $student->id,
+        'campus_code' => 'FAUHN',
+        'student_code' => 'S1',
+        'fee_type' => 'HL',
+        'item_id' => 'ITEM-'.uniqid(),
+        'amount' => 15_000_000,
+        'status' => DngPaymentRequest::STATUS_PUSHED_TO_DNG,
+    ]);
+
+    DngPaymentRequestCharge::create(['dng_payment_request_id' => $dng->id, 'finance_charge_id' => $charge->id, 'amount' => 10_000_000]);
+    DngPaymentRequestCharge::create(['dng_payment_request_id' => $dng->id, 'finance_charge_id' => $siblingCharge->id, 'amount' => 5_000_000]);
+
+    expect(fn () => app(VoidFinanceChargeAction::class)->handle($charge->id, 'Void blocked'))
+        ->toThrow(RuntimeException::class);
+
+    expect($dng->fresh()->status)->toBe(DngPaymentRequest::STATUS_PUSHED_TO_DNG)
+        ->and($siblingCharge->fresh()->status)->toBe(FinanceCharge::STATUS_ACTIVE);
 });

@@ -11,6 +11,7 @@ use App\Modules\Finance\Jobs\DispatchFinanceCancellationCompletionJob;
 use App\Modules\Finance\Models\FinanceCancellationCompletionOutbox;
 use App\Modules\Finance\Models\FinanceCancellationOperation;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Support\SettlementMutationGuard;
@@ -392,22 +393,27 @@ class ProcessFinanceCancellationOperationAction
         $operation->refresh();
     }
 
-    /** @return Collection<int, DngPaymentRequest> */
+    /**
+     * Same "live request" union VoidFinanceChargeAction::assertNoLiveDngCollection()
+     * guards against (charge pivot + installment link) — this method is what has to
+     * clear that guard before the void call below can succeed.
+     *
+     * @return Collection<int, DngPaymentRequest>
+     */
     private function awaitingRequests(int $chargeId): Collection
     {
-        $blockingStatuses = [
-            DngPaymentRequest::STATUS_PENDING,
-            DngPaymentRequest::STATUS_PUSHED_TO_DNG,
-            DngPaymentRequest::STATUS_UNKNOWN_OUTCOME,
-            DngPaymentRequest::STATUS_NEEDS_REVIEW,
-        ];
-        $pivot = DngPaymentRequestCharge::query()
+        $pivotIds = DngPaymentRequestCharge::query()
             ->where('finance_charge_id', $chargeId)
-            ->whereHas('dngPaymentRequest', fn ($query) => $query->whereIn('status', $blockingStatuses))
+            ->pluck('dng_payment_request_id');
+
+        $installmentIds = FinanceChargeInstallment::query()
+            ->where('finance_charge_id', $chargeId)
+            ->whereNotNull('dng_payment_request_id')
             ->pluck('dng_payment_request_id');
 
         return DngPaymentRequest::query()
-            ->whereIn('id', $pivot)
+            ->holdingCollection()
+            ->whereIn('id', $pivotIds->merge($installmentIds)->unique())
             ->orderBy('id')
             ->get();
     }

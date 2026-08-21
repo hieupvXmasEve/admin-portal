@@ -55,12 +55,11 @@ class VoidFinanceChargeAction
                     throw new \RuntimeException("Charge #{$chargeId} is already voided.");
                 }
 
-                // FIN-12: do not unilaterally cancel an installment that is awaiting a
-                // LIVE DNG request — the provider still holds a collectible request.
-                // Block and steer the operator to cancel the DNG first
-                // (CancelDngPaymentRequestAction transitions the request to a terminal
-                // state and then voids the charge safely, so it never deadlocks here).
-                $this->assertNoLiveDngAwaitingInstallment($charge);
+                // FIN-12: do not unilaterally void a charge that still has a LIVE DNG
+                // request — the provider may still hold a collectible record. Block and
+                // steer the operator to the cancellation operation flow, which cancels
+                // the provider collection first and then voids the charge safely.
+                $this->assertNoLiveDngCollection($charge);
 
                 $invoiceLines = InvoiceLine::query()
                     ->where('charge_id', $charge->id)
@@ -174,29 +173,48 @@ class VoidFinanceChargeAction
     }
 
     /**
-     * Block the void when the charge has an installment awaiting a live DNG
-     * request (FIN-12). A live request (pending / pushed_to_dng) is still
-     * collectible at the provider; cancelling its installment locally without
-     * cancelling the request would diverge local state from the provider and the
-     * real payment. The operator must cancel the DNG request first.
+     * Block the void when the charge has a live DNG collection request (FIN-12).
+     * "Live" is any HOLDING_COLLECTION_STATUSES status, not just pending/pushed:
+     * unknown_outcome and needs_review mean Swinx does not yet know whether the
+     * provider cleared the record, so a void must not proceed unchecked either
+     * (CancelDngPaymentRequestAction::runLocallyForLifecycle() already accepts
+     * the same four statuses).
+     *
+     * Requests are resolved through both the charge pivot
+     * (dng_payment_request_charges — the general link, including multi-charge
+     * and no-installment requests) and the installment link
+     * (finance_charge_installments.dng_payment_request_id — for requests
+     * pushed before the pivot table existed).
+     *
+     * A multi-charge request is blocked, not cancelled inline: cancelling it
+     * here would kill the collection for sibling charges too. The error
+     * message points the operator at the staff DNG cancel screen rather than
+     * naming an internal class — cancelling there releases every linked
+     * installment back to pending, so the remaining charges' payable
+     * re-surfaces for the next reservation instead of staying silently
+     * uncollected.
      */
-    protected function assertNoLiveDngAwaitingInstallment(FinanceCharge $charge): void
+    protected function assertNoLiveDngCollection(FinanceCharge $charge): void
     {
-        $liveInstallment = FinanceChargeInstallment::query()
+        $installmentRequestIds = FinanceChargeInstallment::query()
             ->where('finance_charge_id', $charge->id)
-            ->where('status', FinanceChargeInstallment::STATUS_AWAITING_PAYMENT)
             ->whereNotNull('dng_payment_request_id')
-            ->whereHas('dngPaymentRequest', fn ($query) => $query->whereIn('status', [
-                DngPaymentRequest::STATUS_PENDING,
-                DngPaymentRequest::STATUS_PUSHED_TO_DNG,
-            ]))
+            ->pluck('dng_payment_request_id');
+
+        $liveRequest = DngPaymentRequest::query()
+            ->holdingCollection()
+            ->where(function ($query) use ($charge, $installmentRequestIds): void {
+                $query->whereHas('chargeLinks', fn ($q) => $q->where('finance_charge_id', $charge->id))
+                    ->orWhereIn('id', $installmentRequestIds);
+            })
+            ->orderBy('id')
             ->first();
 
-        if ($liveInstallment !== null) {
+        if ($liveRequest !== null) {
             throw new \RuntimeException(
-                "Charge #{$charge->id} has installment #{$liveInstallment->id} awaiting a live DNG "
-                ."request (#{$liveInstallment->dng_payment_request_id}). Cancel the DNG request first; "
-                .'that flow voids the charge safely.'
+                "Charge #{$charge->id} has a live DNG collection request (#{$liveRequest->id}, "
+                ."status: {$liveRequest->status}). Cancel the DNG request first (DNG Payment "
+                .'Requests screen → Cancel), then void the charge.'
             );
         }
     }
