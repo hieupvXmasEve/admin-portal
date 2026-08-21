@@ -76,6 +76,13 @@ jobs:
           script: |
             set -Eeuo pipefail
 
+            # A silent stretch >120s (git fetch retries, migrations, seeding,
+            # backfill) lets the VPN-path firewall drop the idle SSH TCP flow.
+            # Heartbeat keeps the channel active so the session survives.
+            ( while true; do sleep 30; printf '.'; done ) &
+            KEEPALIVE_PID=$!
+            trap 'kill "${KEEPALIVE_PID}" 2>/dev/null || true' EXIT
+
             TARGET_PATH="/www/wwwroot/dev-x.asia-vn.edu.vn/asia-admin-portal"
             DEPLOY_BRANCH="dev"
             DEPLOY_SHA="${{ github.event_name == 'push' && github.sha || '' }}"
@@ -180,6 +187,13 @@ jobs:
           port: 22
           script: |
             set -Eeuo pipefail
+
+            # A silent stretch >120s (git fetch retries, migrations, seeding,
+            # backfill) lets the VPN-path firewall drop the idle SSH TCP flow.
+            # Heartbeat keeps the channel active so the session survives.
+            ( while true; do sleep 30; printf '.'; done ) &
+            KEEPALIVE_PID=$!
+            trap 'kill "${KEEPALIVE_PID}" 2>/dev/null || true' EXIT
 
             TARGET_PATH="${{ matrix.path }}"
             DEPLOY_BRANCH="main"
