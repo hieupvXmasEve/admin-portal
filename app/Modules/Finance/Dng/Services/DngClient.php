@@ -70,6 +70,7 @@ class DngClient
      *     email: string,
      *     estimate_time: string,
      *     student_address: string,
+     *     note?: string|null,
      *     cccd?: string|null,
      * }  $data
      * @return array<string, mixed>
@@ -104,6 +105,7 @@ class DngClient
             'StudentName' => $data['student_name'],
             'Email' => $data['email'],
             'EstimateTime' => $data['estimate_time'],
+            'Note' => $data['note'] ?? '',
             'StudentAddress' => $data['student_address'],
             'CCCD' => $data['cccd'] ?? '',
         ];

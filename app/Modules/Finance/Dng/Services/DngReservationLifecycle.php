@@ -604,7 +604,7 @@ final class DngReservationLifecycle
             'student_code' => $student->studentCode,
             'fee_type' => $reservation->fee_type,
             'type' => $reservation->fee_type,
-            'description' => $reservation->description,
+            'note' => $reservation->description,
             'semester_id' => $details['semester_id'],
             'due_date' => $details['due_date'],
             'item_id' => $reservation->item_id,
