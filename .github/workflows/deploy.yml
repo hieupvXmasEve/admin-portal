@@ -292,6 +292,14 @@ jobs:
           script: |
             set -Eeuo pipefail
 
+            # docker build can stall >120s with no output while pulling image
+            # metadata/layers; the VPN-path firewall drops an idle TCP flow at
+            # ~120s and kills the SSH session. Print a heartbeat so the SSH
+            # channel is never idle that long.
+            ( while true; do sleep 30; printf '.'; done ) &
+            KEEPALIVE_PID=$!
+            trap 'kill "${KEEPALIVE_PID}" 2>/dev/null || true' EXIT
+
             TARGET_PATH="${{ matrix.path }}"
             DEPLOY_BRANCH="main"
             DEPLOY_SHA="${{ github.event_name == 'push' && github.sha || '' }}"
