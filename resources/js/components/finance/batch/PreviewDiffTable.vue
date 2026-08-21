@@ -335,6 +335,9 @@ function sortIcon(key: SortKey) {
                                 </TableCell>
                                 <TableCell class="text-muted-foreground px-4 py-3 align-middle text-sm leading-relaxed">
                                     {{ batchReasonLabel(l.display.reason) }}
+                                    <div v-if="Number(l.display.uncovered_amount ?? 0) > 0" class="font-mono text-xs">
+                                        Còn thiếu: {{ formatCurrency(l.display.uncovered_amount ?? 0) }}
+                                    </div>
                                 </TableCell>
                             </TableRow>
                             <TableRow v-if="rows.length === 0">

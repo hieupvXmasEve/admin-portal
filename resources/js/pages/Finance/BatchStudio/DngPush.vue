@@ -72,6 +72,10 @@ const wizard = useBatchStudio({
             wizard.step.value = 1;
         }
     },
+    // 'warning' rows (coverage unknown / replacement disabled) can never
+    // commit (H14 fail-closed) — never pre-select them, so the operator has
+    // to make a deliberate choice instead of tripping the block on submit.
+    defaultInclude: (line) => line.display.diff === 'create' || line.display.diff === 'update',
 });
 
 function applyEstimateTimeSelection(): void {
@@ -104,7 +108,13 @@ const ack = computed({
     },
 });
 
-const needsAck = computed(() => wizard.selected.value.size > 50);
+// H16: replacing a live DNG collection cancels a real provider record — needs
+// explicit acknowledgement of exactly how many, same as the existing
+// large-batch (>50) guard.
+const replacementCount = computed(
+    () => [...wizard.selected.value].filter((key) => wizard.lines.value.find((l) => l.key === key)?.display.diff === 'update').length,
+);
+const needsAck = computed(() => wizard.selected.value.size > 50 || replacementCount.value > 0);
 const nextDisabled = computed(() => wizard.step.value === 3 && needsAck.value && !ack.value);
 
 const fieldError = (field: 'due_date' | 'description' | 'estimate_time'): string | undefined =>
@@ -167,6 +177,9 @@ function retryFailedSubset() {
 
         <Alert v-if="wizard.driftMessage.value" variant="destructive">
             <AlertDescription>{{ wizard.driftMessage.value }}</AlertDescription>
+        </Alert>
+        <Alert v-if="wizard.summary.value.truncated">
+            <AlertDescription>Danh sách xem trước vượt quá 200 dòng — một số sinh viên có thể chưa hiển thị. Thu hẹp bộ lọc (kỳ, campus) trước khi chạy lô.</AlertDescription>
         </Alert>
 
         <BatchWizard
@@ -299,10 +312,17 @@ function retryFailedSubset() {
                                 <div><span class="text-muted-foreground">Thời hạn DNG:</span> {{ wizard.setup.estimate_time }}</div>
                             </div>
                             <Button type="button" variant="link" class="h-auto p-0" @click="wizard.excludeWarnings()"> Loại trừ tất cả dòng 🟠 cảnh báo </Button>
+                            <Alert v-if="wizard.form.errors.selected_keys" variant="destructive">
+                                <AlertDescription>{{ wizard.form.errors.selected_keys }}</AlertDescription>
+                            </Alert>
                             <label v-if="needsAck" class="flex items-start gap-3 text-sm leading-relaxed">
                                 <Checkbox v-model="ack" class="mt-0.5" />
-                                <span>Tôi đã rà soát preview trước khi chạy lô lớn.</span>
+                                <span v-if="replacementCount > 0">
+                                    Tôi xác nhận hủy {{ replacementCount }} lệnh thu DNG hiện có và đẩy lệnh mới thay thế gồm toàn bộ khoản phải thu.
+                                </span>
+                                <span v-else>Tôi đã rà soát preview trước khi chạy lô lớn.</span>
                             </label>
+                            <p v-if="wizard.form.errors.acknowledged" class="text-xs text-red-500">{{ wizard.form.errors.acknowledged }}</p>
                         </CardContent>
                     </Card>
                 </div>

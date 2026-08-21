@@ -74,9 +74,15 @@ export function useBatchStudio<TSetup extends Record<string, unknown>>(config: B
         );
     }
 
-    const form = useForm<{ preview_token: string; selected_keys: string[] } & Record<string, unknown>>({
+    // acknowledged must be a registered default: Inertia's useForm only
+    // serializes keys present in its initial data — a key merely assigned
+    // later (wizard.form.acknowledged = v) is silently dropped from the
+    // request payload, so a server-side check that depends on it (DNG
+    // replacement count) would never actually receive true.
+    const form = useForm<{ preview_token: string; selected_keys: string[]; acknowledged: boolean }>({
         preview_token: '',
         selected_keys: [],
+        acknowledged: false,
     });
 
     function commit(): void {

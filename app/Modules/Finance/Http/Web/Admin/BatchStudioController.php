@@ -199,12 +199,28 @@ class BatchStudioController extends Controller
             fn () => collect($assembler->handle($semesterId, $dngFeeType, $studentIds, $campusId)['lines'])
                 ->keyBy(fn (BatchPreviewLine $line) => $line->key)->all(),
         );
+        // 'skip' = already fully covered, nothing to do; 'warning' = coverage
+        // could not be computed (no semester scope, no DNG campus mapping, or
+        // a legacy request with no reservation targets — H14). Neither may
+        // commit; only 'create' and 'update' (replace) may.
         $blocked = collect($selectedKeys)
-            ->filter(fn (string $key): bool => ($currentByKey[$key]?->display['diff'] ?? null) === 'skip')
+            ->filter(fn (string $key): bool => in_array($currentByKey[$key]?->display['diff'] ?? null, ['skip', 'warning'], true))
             ->count();
         if ($blocked > 0) {
             throw ValidationException::withMessages([
-                'selected_keys' => 'Có '.$blocked.' sinh viên đang có DNG hoạt động. Hãy xử lý DNG hiện tại trước khi chạy lô mới.',
+                'selected_keys' => 'Có '.$blocked.' sinh viên không thể chạy (đã có lệnh thu đủ hoặc không xác định được phần đã thu). Hãy bỏ chọn hoặc xử lý trước khi chạy lô mới.',
+            ]);
+        }
+
+        // H16: cancelling a live provider record needs more ceremony than a
+        // first-time push. Require explicit acknowledgement of the exact
+        // replacement count before committing any 'update' (replace) line.
+        $replacementCount = collect($selectedKeys)
+            ->filter(fn (string $key): bool => ($currentByKey[$key]?->display['diff'] ?? null) === 'update')
+            ->count();
+        if ($replacementCount > 0 && ! $request->boolean('acknowledged')) {
+            throw ValidationException::withMessages([
+                'acknowledged' => 'Lô này sẽ hủy '.$replacementCount.' lệnh thu DNG hiện có và đẩy lệnh mới thay thế. Vui lòng xác nhận trước khi tiếp tục.',
             ]);
         }
 

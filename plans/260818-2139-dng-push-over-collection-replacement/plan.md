@@ -107,7 +107,7 @@ request and builds a fresh one through the unchanged happy path.
 |---|-------|--------|
 | 1 | [Phase 1: Automatic cancel-then-push replacement](./phase-01-start.md) | Done |
 | 2 | [Phase 2: Close the void-guard orphan hole](./phase-02-close-the-obligation-cancellation-provider-gap.md) | Done |
-| 3 | [Phase 3: Surface uncovered payable in worklist and batch](./phase-03-surface-uncovered-payable-in-worklist-and-batch.md) | Pending |
+| 3 | [Phase 3: Surface uncovered payable in worklist and batch](./phase-03-surface-uncovered-payable-in-worklist-and-batch.md) | Done |
 
 Phase 2 is independent of Phase 1 and may run first — it is the cheapest fix
 and closes a live money risk. Phase 3 depends on Phase 1.

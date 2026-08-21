@@ -459,6 +459,7 @@ export interface BatchPreviewLineDisplay {
     voucher_codes?: string[];
     voucher_amount?: number;
     installment_aware_total?: number;
+    uncovered_amount?: number | null;
     reason?: string | null;
     warning_codes?: string[];
     block_count?: number | null;
@@ -490,6 +491,7 @@ export interface BatchPreviewSummary {
     total_amount?: number;
     total_students?: number;
     major_context?: BatchPreviewMajorContext;
+    truncated?: boolean;
 }
 
 export interface BatchPreviewResponse {

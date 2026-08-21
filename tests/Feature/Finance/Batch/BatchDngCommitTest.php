@@ -94,7 +94,7 @@ it('blocks the commit when the re-resolved DNG line drifted', function () {
         ->assertSessionHasErrors('preview_token');
 });
 
-it('blocks selected DNG rows that still require active-request resolution', function () {
+it('blocks selected DNG rows that still require active-request resolution', function (string $diff) {
     grantFinance($this->user, ['create_finance_payments'], $this->campus);
 
     $token = app(BatchPreviewTokenService::class)->issue(
@@ -103,7 +103,7 @@ it('blocks selected DNG rows that still require active-request resolution', func
         ['dng_fee_type' => 'HP', 'semester_id' => $this->semester->id, 'scope' => []],
         [new BatchPreviewLine($this->key, ['net' => 500000.0], [])],
     );
-    stubDngAssembler($this->key, ['net' => 500000.0], ['diff' => 'skip']);
+    stubDngAssembler($this->key, ['net' => 500000.0], ['diff' => $diff]);
 
     $this->actingAs($this->user)
         ->withSession(financeWebSession($this->campus))
@@ -112,4 +112,71 @@ it('blocks selected DNG rows that still require active-request resolution', func
             'preview_token' => $token, 'selected_keys' => [$this->key],
         ])))
         ->assertSessionHasErrors('selected_keys');
+})->with([
+    'skip' => 'skip',
+    // Phase 3: coverage-unknown (blocked, mapped to the shared 'warning'
+    // bucket) must never commit either — H14 fail-closed.
+    'warning (coverage unknown)' => 'warning',
+]);
+
+it('blocks a replacement (update) line when the operator has not acknowledged the replacement count', function () {
+    grantFinance($this->user, ['create_finance_payments'], $this->campus);
+
+    $token = app(BatchPreviewTokenService::class)->issue(
+        (int) $this->user->id,
+        BatchJobType::DngPush,
+        ['dng_fee_type' => 'HP', 'semester_id' => $this->semester->id, 'scope' => []],
+        [new BatchPreviewLine($this->key, ['net' => 500000.0], [])],
+    );
+    stubDngAssembler($this->key, ['net' => 500000.0], ['diff' => 'update']);
+
+    $this->actingAs($this->user)
+        ->withSession(financeWebSession($this->campus))
+        ->from(route('finance.batch-studio.dng'))
+        ->post(route('finance.batch-studio.dng.commit'), financePostPayload(array_merge($this->base, [
+            'preview_token' => $token, 'selected_keys' => [$this->key],
+        ])))
+        ->assertSessionHasErrors('acknowledged');
+});
+
+it('commits a replacement (update) line once the operator acknowledges the replacement count', function () {
+    grantFinance($this->user, ['create_finance_payments'], $this->campus);
+
+    $token = app(BatchPreviewTokenService::class)->issue(
+        (int) $this->user->id,
+        BatchJobType::DngPush,
+        ['dng_fee_type' => 'HP', 'semester_id' => $this->semester->id, 'scope' => []],
+        [new BatchPreviewLine($this->key, ['net' => 500000.0], [])],
+    );
+    stubDngAssembler($this->key, ['net' => 500000.0], ['diff' => 'update']);
+    stubDngAction();
+
+    $this->actingAs($this->user)
+        ->withSession(financeWebSession($this->campus))
+        ->from(route('finance.batch-studio.dng'))
+        ->post(route('finance.batch-studio.dng.commit'), financePostPayload(array_merge($this->base, [
+            'preview_token' => $token, 'selected_keys' => [$this->key], 'acknowledged' => true,
+        ])))
+        ->assertSessionHasNoErrors();
+});
+
+it('does not require acknowledgement for a plain create line', function () {
+    grantFinance($this->user, ['create_finance_payments'], $this->campus);
+
+    $token = app(BatchPreviewTokenService::class)->issue(
+        (int) $this->user->id,
+        BatchJobType::DngPush,
+        ['dng_fee_type' => 'HP', 'semester_id' => $this->semester->id, 'scope' => []],
+        [new BatchPreviewLine($this->key, ['net' => 500000.0], [])],
+    );
+    stubDngAssembler($this->key, ['net' => 500000.0], ['diff' => 'create']);
+    stubDngAction();
+
+    $this->actingAs($this->user)
+        ->withSession(financeWebSession($this->campus))
+        ->from(route('finance.batch-studio.dng'))
+        ->post(route('finance.batch-studio.dng.commit'), financePostPayload(array_merge($this->base, [
+            'preview_token' => $token, 'selected_keys' => [$this->key],
+        ])))
+        ->assertSessionHasNoErrors();
 });

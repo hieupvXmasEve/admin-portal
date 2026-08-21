@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Surface uncovered payable in worklist and batch"
-status: pending
+status: done
 priority: P2
 effort: "0.5-1d"
 dependencies: [1]
@@ -61,10 +61,29 @@ Two concrete failures if the mismatch is not fixed first:
   `replace`, and every commit burns another provider round trip. It never
   converges.
 
-**So: scope the `active_dng` lookup to the same `semester_id`, `campus_code`,
-and `provider_rail` the push would target, and order by `id desc` (not
-`created_at`, which is second-resolution and ties non-deterministically).**
-This is a prerequisite, not a nice-to-have.
+**So: scope the coverage arithmetic to the same `semester_id` and
+`campus_code` the push would target — see the correction note directly below
+for why the *contention* lookup itself must stay unscoped — and order by
+`id desc` (not `created_at`, which is second-resolution and ties
+non-deterministically).** This is a prerequisite, not a nice-to-have.
+
+> **Implementation correction (code review, post-first-pass):** the
+> prescription above is unsafe applied to the *contention* lookup (does a
+> live request exist at all). `active_slot_key` has no semester component
+> (red-team C5) and `DngReservationLifecycle::reserve()`'s own `$existing`
+> lookup filters only by `billing_account_id` + `provider_rail` + `fee_type`
+> — **no `semester_id`, no `campus_code`**. Scoping the worklist's contention
+> query by `semester_id` therefore makes an other-semester live request
+> invisible to the worklist while it still blocks `reserve()` — first-pass
+> code shipped exactly the semester-4 "worklist computes `uncovered = 0` →
+> `skip`" failure this section warns about, inverted into "computes `create`"
+> and verified to degrade a healthy other-semester collection on commit.
+> Correct split: **the contention query stays unscoped by semester** (student
+> + `fee_type` + `provider_rail`, matching `reserve()` exactly); `semester_id`
+> (and the resolved DNG `campus_code`) scope only the *coverage arithmetic* —
+> when the found live request's own `semester_id`/`campus_code` don't match
+> the semester being previewed, coverage is not computable and the row must
+> render `blocked`, never `create` or `replace`.
 
 ## Requirements
 
@@ -122,9 +141,10 @@ count at commit. The preview-token round trip already exists to hang it on.
 
 ## Related Code Files
 
-- Modify: `app/Modules/Finance/Queries/Dng/ListDngWorklistQuery.php` — scope
-  the active-DNG lookup (semester, campus, rail; `orderByDesc('id')`); add
-  `uncovered_amount` and a `coverage_known` flag to the row.
+- Modify: `app/Modules/Finance/Queries/Dng/ListDngWorklistQuery.php` — active-
+  DNG lookup scoped to `provider_rail` (not semester/campus — see the
+  correction note above); `orderByDesc('id')`; add `uncovered_amount` and a
+  `coverage_known` flag to the row, computed with semester/campus scoping.
 - Modify: `app/Modules/Finance/Queries/Batch/AssembleBatchDngPreviewQuery.php` —
   four-way `diff`; carry `uncovered` in `hashPayload` so a coverage change
   invalidates a stale preview token.
@@ -176,18 +196,68 @@ whole-project `type-check`; it OOMs in the dev container.
 
 ## Success Criteria
 
-- [ ] A partially-covered student appears as `replace` with a correct
-      `uncovered_amount` instead of vanishing.
-- [ ] A fully-covered student stays `skip` and still blocks commit.
-- [ ] A live request with no reservation targets renders `blocked`.
-- [ ] A cross-semester live collection does not distort this semester's
-      uncovered.
-- [ ] `replace` is unavailable until `semester_id` is chosen.
-- [ ] Committing a `replace` line performs Phase 1's cancel-then-push
-      end-to-end.
-- [ ] Each replacement records its acting user; the commit shows and confirms
-      the replacement count.
-- [ ] No N+1 introduced.
+- [x] A partially-covered student appears as `replace` with a correct
+      `uncovered_amount` instead of vanishing. (`uncovered_amount` compares
+      against the installment-capped `next_push_amount`, not the raw
+      semester remaining — see code-review correction below.)
+- [x] A fully-covered student stays `skip` and still blocks commit.
+- [x] A live request with no reservation targets renders `blocked`.
+- [x] A cross-semester live collection does not distort this semester's
+      uncovered — renders `blocked`, not `create` (see "Implementation
+      correction" note above).
+- [x] `replace` is unavailable until `semester_id` is chosen. (Already true
+      structurally: `PreviewBatchDngRequest` requires `semester_id`, so the
+      batch-commit call path always supplies it.)
+- [x] Committing a `replace` line performs Phase 1's cancel-then-push
+      end-to-end, and only when `finance.dng.auto_replace_stale_collection`
+      is actually on — otherwise renders `blocked`
+      (`active_dng_replacement_disabled`), never a `replace` the commit
+      can't honor.
+- [x] Each replacement records its acting user — already true via Phase 1's
+      `DngReservationLifecycle::reserve()`, which passes
+      `actor_user_id => auth()->id()` into the replacement context; nothing
+      new needed here. The commit shows and confirms the replacement count
+      (`needsAck` widened to trigger on `replacementCount > 0`; server-side
+      `acknowledged` check in `BatchStudioController::commitDng()`).
+- [x] No N+1 introduced (single unscoped contention query + one batched
+      `DngCampusMapping` lookup, not per-student).
+
+### Code-review correction (post-first-pass)
+
+A first implementation pass computed `uncovered_amount` against the raw
+semester `remaining` balance and offered `replace` regardless of the
+`auto_replace_stale_collection` config flag. Both were CRITICAL findings in
+review, empirically reproduced against a split-installment plan (tranche 1
+live/pushed reads as "still short by tranche 2") and the flag's shipped-off
+default (a `replace` commit degrades a healthy live collection to
+`needs_review` when the flag is off). Fixed by comparing against
+`next_push_amount` (the same installment-capped total `reserve()` actually
+targets) and by gating the `replace` vs `blocked` choice on the config flag.
+See `ListDngWorklistQuery::coverage()` and
+`AssembleBatchDngPreviewQuery::handle()` docblocks/comments for the corrected
+logic. `needs_review`/`unknown_outcome` statuses also now always render
+`blocked` (never `replace` or `skip`), matching this plan's own Non-goals.
+
+A re-review pass on those fixes found two more, both closed before ship:
+`coverage()` also now requires every existing reservation target's
+`captured_collectible` to stay `<=` its own line's *current* remaining
+(mirrors `DngReservationLifecycle::eligibleForAutomaticReplacement()`'s
+per-line guard — a direct non-DNG payment on an already-claimed line was
+passing the aggregate uncovered>0 check while `reserve()` itself would
+refuse the replacement). And `acknowledged` was never reaching the server at
+all: Inertia's `useForm()` only serializes keys present in its *initial*
+data, and `wizard.form.acknowledged = v` assigns a key that was never
+registered as a default — fixed in `useBatchStudio.ts` by adding
+`acknowledged: false` to the form's initial state (this silently affected
+the pre-existing >50-row ack for Charge Generation too, but nothing there
+depended on it reaching the server until this phase added a server-side
+check). Left documented-but-not-fixed: `next_push_amount` (pre-existing,
+used elsewhere) sums only charges that have installment rows, so a
+same-semester charge with no installment plan is invisible to the coverage
+math even when a live tranche-1 request exists — conservative (can only
+produce a false `skip`, never a false `replace`), pinned by a regression
+test rather than fixed, since fixing it means changing `next_push_amount`'s
+own long-standing aggregation, out of this phase's scope.
 
 ## Risk Assessment
 
