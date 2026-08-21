@@ -48,7 +48,11 @@ jobs:
           sudo apt-get install -y -qq openvpn >/dev/null
           umask 077
           printf '%s\n' "$OVPN_CONFIG" | sudo tee /etc/openvpn/deploy.conf >/dev/null
+          # --ping/--ping-restart keep the tunnel's NAT flow alive during
+          # long, near-idle server-side steps (git fetch, docker pull/build),
+          # which otherwise let the SSH session get torn down mid-deploy.
           sudo openvpn --config /etc/openvpn/deploy.conf --daemon \
+            --ping 10 --ping-restart 120 --persist-tun --persist-key \
             --log /var/log/openvpn-deploy.log --writepid /run/openvpn-deploy.pid
           echo "Waiting for VPN tunnel and reachability to ${VPN_HOST}:${VPN_PORT}..."
           for i in $(seq 1 30); do
@@ -149,7 +153,11 @@ jobs:
           sudo apt-get install -y -qq openvpn >/dev/null
           umask 077
           printf '%s\n' "$OVPN_CONFIG" | sudo tee /etc/openvpn/deploy.conf >/dev/null
+          # --ping/--ping-restart keep the tunnel's NAT flow alive during
+          # long, near-idle server-side steps (git fetch, docker pull/build),
+          # which otherwise let the SSH session get torn down mid-deploy.
           sudo openvpn --config /etc/openvpn/deploy.conf --daemon \
+            --ping 10 --ping-restart 120 --persist-tun --persist-key \
             --log /var/log/openvpn-deploy.log --writepid /run/openvpn-deploy.pid
           echo "Waiting for VPN tunnel and reachability to ${VPN_HOST}:${VPN_PORT}..."
           for i in $(seq 1 30); do
@@ -256,7 +264,11 @@ jobs:
           sudo apt-get install -y -qq openvpn >/dev/null
           umask 077
           printf '%s\n' "$OVPN_CONFIG" | sudo tee /etc/openvpn/deploy.conf >/dev/null
+          # --ping/--ping-restart keep the tunnel's NAT flow alive during
+          # long, near-idle server-side steps (git fetch, docker pull/build),
+          # which otherwise let the SSH session get torn down mid-deploy.
           sudo openvpn --config /etc/openvpn/deploy.conf --daemon \
+            --ping 10 --ping-restart 120 --persist-tun --persist-key \
             --log /var/log/openvpn-deploy.log --writepid /run/openvpn-deploy.pid
           echo "Waiting for VPN tunnel and reachability to ${VPN_HOST}:${VPN_PORT}..."
           for i in $(seq 1 30); do
