@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { AlertTriangle, CheckCircle2, Info, Loader2, Sparkles } from 'lucide-vue-next';
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 
 interface Semester {
@@ -34,6 +34,12 @@ interface GpaPreview {
     credit_points_earned: number;
     is_eligible: boolean;
     reason: string | null;
+    // null when the student was never finalized for this semester.
+    stored_semester_gpa: number | null;
+    stored_cumulative_gpa: number | null;
+    // true when a finalized snapshot no longer matches current grades — i.e.
+    // re-finalizing would change it.
+    is_divergent: boolean;
 }
 
 interface EligibilityResult {
@@ -63,6 +69,8 @@ const selectedSemesterId = ref<string | undefined>(props.filters.semester_id ? S
 const selectedCampusId = ref<string | undefined>(props.filters.campus_id ? String(props.filters.campus_id) : props.default_campus_id ? String(props.default_campus_id) : undefined);
 const showFinalizeDialog = ref(false);
 const isLoading = ref(false);
+
+const divergentCount = computed(() => props.previewData.filter((row) => row.is_divergent).length);
 
 const updateFilters = () => {
     if (!selectedSemesterId.value) return;
@@ -176,9 +184,9 @@ const handleFinalize = () => {
                         <div class="space-y-1.5 text-sm">
                             <p class="font-semibold">📈 Cumulative GPA (GPA tích lũy):</p>
                             <ul class="ml-2 list-inside list-disc space-y-1">
-                                <li><strong>Các kỳ đã chốt:</strong> Sử dụng snapshot từ bảng GPA đã finalized (đảm bảo tính nhất quán, không bị ảnh hưởng khi điểm thay đổi sau khi chốt)</li>
-                                <li><strong>Kỳ hiện tại đang preview:</strong> Tính từ AcademicRecord (dữ liệu hiện tại chưa chốt)</li>
-                                <li>Công thức: <code class="rounded bg-blue-100 px-1 py-0.5 dark:bg-blue-900">Cumulative GPA = (Cumulative từ kỳ đã chốt + Semester GPA kỳ hiện tại × credits) / Tổng credits</code></li>
+                                <li><strong>Luôn tính lại từ bảng điểm hiện tại:</strong> Cumulative GPA hiển thị ở đây được tính lại từ toàn bộ AcademicRecord/transcript hiện tại — không đọc từ snapshot đã chốt.</li>
+                                <li><strong>Snapshot đã chốt có thể lệch:</strong> Bản GPA đã finalized là một bản chụp tại thời điểm chốt; nếu điểm thay đổi sau khi chốt, snapshot sẽ lệch so với điểm hiện tại. Cột "Snapshot" báo các sinh viên bị lệch; chốt lại (Finalize) để cập nhật snapshot về đúng giá trị hiện tại.</li>
+                                <li>Công thức: <code class="rounded bg-blue-100 px-1 py-0.5 dark:bg-blue-900">Cumulative GPA = Σ(grade_points × credit_points) / Σ(credit_points)</code> trên toàn bộ transcript tính đến hết kỳ này (không cộng dồn từ snapshot đã chốt).</li>
                             </ul>
                         </div>
                         <div class="mt-2 border-t border-blue-200 pt-2 text-xs text-blue-700 dark:border-blue-800 dark:text-blue-300">
@@ -207,6 +215,16 @@ const handleFinalize = () => {
                 <div class="mb-4 flex items-center justify-between">
                     <h3 class="text-lg font-semibold">GPA Preview ({{ previewData.length }} Students)</h3>
                 </div>
+
+                <!-- Divergence banner: finalized snapshots that no longer match current grades. -->
+                <Alert v-if="divergentCount > 0" variant="destructive" class="mb-4">
+                    <AlertTriangle class="h-4 w-4" />
+                    <AlertTitle>{{ divergentCount }} finalized snapshot(s) out of date</AlertTitle>
+                    <AlertDescription>
+                        These students were finalized before their current grades. Re-run Finalize to update their snapshots to the values shown here.
+                    </AlertDescription>
+                </Alert>
+
                 <div class="rounded-md border">
                     <Table>
                         <TableHeader>
@@ -223,6 +241,7 @@ const handleFinalize = () => {
                                 <TableHead class="text-center">Semester GPA</TableHead>
                                 <TableHead class="text-center">Cumulative GPA</TableHead>
                                 <TableHead class="text-center">Standing</TableHead>
+                                <TableHead class="text-center">Snapshot</TableHead>
                                 <TableHead class="text-right">Status</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -242,6 +261,25 @@ const handleFinalize = () => {
                                     <Badge :variant="row.academic_standing === 'normal' ? 'secondary' : 'destructive'">
                                         {{ row.academic_standing.toUpperCase() }}
                                     </Badge>
+                                </TableCell>
+                                <TableCell class="text-center">
+                                    <Badge v-if="row.stored_semester_gpa === null" variant="outline">Not finalized</Badge>
+                                    <template v-else-if="row.is_divergent">
+                                        <Badge variant="destructive">Diverged</Badge>
+                                        <p v-if="row.stored_semester_gpa !== row.semester_gpa" class="text-muted-foreground mt-1 text-[10px]">
+                                            sem {{ row.stored_semester_gpa.toFixed(3) }} → {{ row.semester_gpa.toFixed(3) }}
+                                        </p>
+                                        <p v-if="row.stored_cumulative_gpa !== null && row.stored_cumulative_gpa !== row.cumulative_gpa" class="text-muted-foreground mt-1 text-[10px]">
+                                            cum {{ row.stored_cumulative_gpa.toFixed(3) }} → {{ row.cumulative_gpa.toFixed(3) }}
+                                        </p>
+                                        <p
+                                            v-if="row.stored_semester_gpa === row.semester_gpa && row.stored_cumulative_gpa === row.cumulative_gpa"
+                                            class="text-muted-foreground mt-1 text-[10px]"
+                                        >
+                                            snapshot out of date
+                                        </p>
+                                    </template>
+                                    <Badge v-else variant="secondary">In sync</Badge>
                                 </TableCell>
                                 <TableCell class="text-right">
                                     <Badge :variant="row.is_eligible ? 'default' : 'destructive'">

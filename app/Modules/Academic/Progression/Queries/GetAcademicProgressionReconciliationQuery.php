@@ -10,6 +10,7 @@ use App\Modules\Academic\Progression\Models\TranscriptEntry;
 use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use App\Shared\Contracts\Academic\DTO\StudentHubCourseOutcomeEvidence;
 use App\Shared\Contracts\Academic\StudentHubCourseOutcomeEvidenceReader;
+use App\Shared\Support\Academic\GpaValueComparator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -899,15 +900,7 @@ final class GetAcademicProgressionReconciliationQuery
 
     private function normalize(mixed $value): string
     {
-        if (is_bool($value)) {
-            return $value ? 'true' : 'false';
-        }
-
-        if (is_int($value) || is_float($value) || (is_string($value) && is_numeric($value))) {
-            return number_format((float) $value, 3, '.', '');
-        }
-
-        return $value === null ? 'null' : (string) $value;
+        return GpaValueComparator::normalize($value);
     }
 
     private function round(float $value, int $precision): float

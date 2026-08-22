@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Actions\Academic;
 
 use App\Models\AcademicRecord;
+use App\Models\GpaCalculation;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Shared\Support\Academic\GpaValueComparator;
 
 class PreviewSemesterGpaAction
 {
@@ -40,6 +42,13 @@ class PreviewSemesterGpaAction
             $query->where('semester_id', $semesterId);
         }])->get();
 
+        // One grouped lookup of the stored snapshots for every student in view,
+        // so divergence is decided without a per-student query.
+        $storedByStudent = GpaCalculation::whereIn('student_id', $students->pluck('id'))
+            ->where('semester_id', $semesterId)
+            ->get()
+            ->keyBy('student_id');
+
         $previewData = [];
 
         foreach ($students as $student) {
@@ -59,6 +68,16 @@ class PreviewSemesterGpaAction
             $cumulativeData = $this->calculateCumulativeGpa->execute($student, $semesterId);
             $standing = $this->determineStanding->execute($cumulativeData['gpa']);
 
+            // Divergence is Phase 1's skip guard inverted: a finalized row is
+            // divergent exactly when re-running Finalize would change it. Same
+            // GpaValueComparator the finalize guard and the audit use, so the
+            // badge cannot disagree with what the button does.
+            $stored = $storedByStudent->get($student->id);
+            $recomputed = GpaValueComparator::recomputedRow($semesterData, $cumulativeData, $standing, $student->program_id);
+            $isDivergent = $stored !== null
+                && $stored->is_finalized
+                && ! GpaValueComparator::matches($stored->getAttributes(), $recomputed);
+
             $previewData[] = [
                 'id' => $student->id,
                 'student_id_code' => $student->student_id,
@@ -71,6 +90,10 @@ class PreviewSemesterGpaAction
                 'credit_points_earned' => $semesterData['credit_points_earned'],
                 'is_eligible' => !$ineligible,
                 'reason' => $ineligible ? 'Has non-final grades' : null,
+                // null when never finalized; the FE derives the three snapshot states from these.
+                'stored_semester_gpa' => $stored?->is_finalized ? (float) $stored->semester_gpa : null,
+                'stored_cumulative_gpa' => $stored?->is_finalized ? (float) $stored->cumulative_gpa : null,
+                'is_divergent' => $isDivergent,
             ];
         }
 
