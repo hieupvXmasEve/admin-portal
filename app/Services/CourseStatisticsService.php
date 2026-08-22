@@ -48,7 +48,7 @@ class CourseStatisticsService
             DB::raw('COUNT(DISTINCT academic_records.student_id) as total_students'),
             DB::raw('AVG(academic_records.attendance_percentage) as average_attendance'),
             DB::raw('AVG(academic_records.final_percentage) as average_grade'),
-            DB::raw('SUM(CASE WHEN academic_records.completion_status = "completed" AND academic_records.grade_points > 0 THEN 1 ELSE 0 END) as students_passed'),
+            DB::raw('SUM(CASE WHEN academic_records.is_passed = 1 THEN 1 ELSE 0 END) as students_passed'),
             DB::raw('COUNT(DISTINCT course_offerings.id) as offerings_count'),
             // Sum grade distribution counts
             DB::raw('COUNT(CASE WHEN academic_records.final_letter_grade = "A+" THEN 1 END) as grade_a_plus'),
@@ -132,9 +132,9 @@ class CourseStatisticsService
             return 0.0;
         }
 
-        $passed = $academicRecords->filter(function ($record) {
-            return $record->completion_status === 'completed' && $record->grade_points > 0;
-        })->count();
+        // Pass/fail is carried by is_passed; completion_status means "finished",
+        // not "passed", so it must not be the pass source here.
+        $passed = $academicRecords->filter(fn ($record): bool => (bool) $record->is_passed)->count();
 
         return round(($passed / $total) * 100, 2);
     }

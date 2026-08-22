@@ -455,39 +455,41 @@ class CurriculumService
      */
     protected function determineStudyStatus($academicRecord, Collection $registrations): array
     {
-        // If there's an academic record, check completion status
+        // If there's an academic record, check completion status. completion_status
+        // means "finished", not "passed" — pass/fail is read from is_passed, so a
+        // finished-but-failed unit takes the retake path, not "Completed".
         if ($academicRecord) {
             if ($academicRecord->completion_status === 'completed') {
-                return [
-                    'status' => 'completed',
-                    'label' => 'Completed',
-                    'description' => 'Subject has been completed',
-                ];
+                if ($academicRecord->isPassed()) {
+                    return [
+                        'status' => 'completed',
+                        'label' => 'Completed',
+                        'description' => 'Subject has been completed',
+                    ];
+                }
+
+                // Finished but not passed: offer retake status.
+                $hasRetakeRegistration = $registrations->contains(function ($registration) {
+                    return in_array($registration->registration_status, ['pending', 'registered', 'confirmed']);
+                });
+
+                return $hasRetakeRegistration
+                    ? [
+                        'status' => 'retaking',
+                        'label' => 'Retaking',
+                        'description' => 'Retaking failed subject',
+                    ]
+                    : [
+                        'status' => 'failed',
+                        'label' => 'Failed',
+                        'description' => 'Subject failed - needs retake',
+                    ];
             } elseif ($academicRecord->completion_status === 'in_progress') {
                 return [
                     'status' => 'in_progress',
                     'label' => 'In Progress',
                     'description' => 'Subject is currently being studied',
                 ];
-            } elseif ($academicRecord->completion_status === 'failed') {
-                // Check if student has registered to retake this failed subject
-                $hasRetakeRegistration = $registrations->contains(function ($registration) {
-                    return in_array($registration->registration_status, ['pending', 'registered', 'confirmed']);
-                });
-
-                if ($hasRetakeRegistration) {
-                    return [
-                        'status' => 'retaking',
-                        'label' => 'Retaking',
-                        'description' => 'Retaking failed subject',
-                    ];
-                } else {
-                    return [
-                        'status' => 'failed',
-                        'label' => 'Failed',
-                        'description' => 'Subject failed - needs retake',
-                    ];
-                }
             } elseif ($academicRecord->completion_status === 'withdrawn') {
                 return [
                     'status' => 'withdrawn',

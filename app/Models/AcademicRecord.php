@@ -282,13 +282,18 @@ class AcademicRecord extends AuditableModel
 
     public function isPassed(): bool
     {
-        // Consider override_pass flag or normal passing criteria
-        return $this->override_pass || ($this->completion_status === 'completed' && $this->grade_points > 0);
+        // Pass/fail is carried by is_passed. completion_status means "finished"
+        // (đã học xong), not "passed", so it is not a pass/fail source here.
+        // override_pass stays as the manual escape hatch.
+        return $this->override_pass || (bool) $this->is_passed;
     }
 
     public function isFailed(): bool
     {
-        return $this->completion_status === 'failed';
+        // Finished but not passed. An in-progress record is neither passed nor
+        // failed, so guard on isCompleted() rather than reading a 'failed'
+        // completion_status that nothing ever writes.
+        return $this->isCompleted() && ! $this->isPassed();
     }
 
     public function isInProgress(): bool

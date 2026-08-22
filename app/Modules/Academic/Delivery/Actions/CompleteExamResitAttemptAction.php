@@ -305,7 +305,9 @@ class CompleteExamResitAttemptAction
             'grade_points' => AcademicRecord::calculateGradePoints($chosenScore),
             'quality_points' => $chosenScore * $creditPoints,
             'is_passed' => $isPassed,
-            'completion_status' => $isPassed ? 'completed' : 'failed',
+            // completion_status means "finished", not "passed" — a recorded resit
+            // sitting is finished regardless of outcome. Pass/fail lives in is_passed.
+            'completion_status' => 'completed',
             'satisfies_prerequisite' => $isPassed,
             'credit_points_earned' => $isPassed ? $creditPoints : 0,
             'credit_hours_earned' => $isPassed ? (float) $record->credit_hours : 0,

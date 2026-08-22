@@ -177,7 +177,7 @@ it('does not lower the academic record when the resit score is lower than the or
     // Higher-score rule keeps the original score; attempt is still consumed/recorded.
     expect((float) $record->final_percentage)->toBe(48.0)
         ->and((bool) $record->is_passed)->toBeFalse()
-        ->and($record->completion_status)->toBe('failed')
+        ->and($record->completion_status)->toBe('failed') // not-applied path: original seed state is untouched
         ->and($result->status)->toBe(ExamResitAttempt::STATUS_COMPLETED)
         ->and($result->attempt_number)->toBe(1)
         ->and((float) $result->resit_score)->toBe(40.0)
@@ -198,7 +198,7 @@ it('raises a higher-but-still-failing resit score without flipping pass state', 
 
     expect((float) $record->final_percentage)->toBe(55.0)
         ->and((bool) $record->is_passed)->toBeFalse()
-        ->and($record->completion_status)->toBe('failed')
+        ->and($record->completion_status)->toBe('completed') // 'finished', not 'passed'; fail signal is is_passed=false above
         ->and($record->failure_reason)->toBe(AcademicRecord::FAILURE_GRADE_FAILED);
 });
 
@@ -223,7 +223,7 @@ it('normalizes a still-failing applied resit to grade_failed and clears a manual
     // result is, by definition, a grade failure (attendance was fine to be eligible).
     expect((float) $record->final_percentage)->toBe(55.0)
         ->and((bool) $record->is_passed)->toBeFalse()
-        ->and($record->completion_status)->toBe('failed')
+        ->and($record->completion_status)->toBe('completed') // 'finished', not 'passed'; fail signal is is_passed=false above
         ->and($record->failure_reason)->toBe(AcademicRecord::FAILURE_GRADE_FAILED)
         ->and((bool) $record->override_pass)->toBeFalse();
 });

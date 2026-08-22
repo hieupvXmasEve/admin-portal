@@ -53,7 +53,11 @@ final class TranscriptEntry extends AuditableModel
 
     public function getCompletionStatusAttribute(): string
     {
-        return $this->is_passed ? 'completed' : 'failed';
+        // A transcript entry is a finalized record, i.e. finished. Under the
+        // decided semantics completion_status means "finished", not "passed", so
+        // it is always 'completed' here; pass/fail is carried by is_passed. This
+        // is what keeps the record and the transcript from disagreeing (HUB-001).
+        return 'completed';
     }
 
     public function getGradeStatusAttribute(): string

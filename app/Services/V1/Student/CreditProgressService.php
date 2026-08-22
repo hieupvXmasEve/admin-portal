@@ -113,10 +113,13 @@ class CreditProgressService
                     'semester_code' => $semester->code,
                     'total_credits_attempted' => $totalCredits,
                     'credits_earned' => $earnedCredits,
+                    // completion_status means "finished"; pass/fail is is_passed.
+                    // "completed" here = finished; failed/success read is_passed.
                     'courses_completed' => $records->where('completion_status', 'completed')->count(),
-                    'courses_failed' => $records->where('completion_status', 'failed')->count(),
+                    'courses_failed' => $records->where('completion_status', 'completed')
+                        ->where('is_passed', false)->count(),
                     'success_rate' => $records->count() > 0
-                        ? round(($records->where('completion_status', 'completed')->count() / $records->count()) * 100, 1)
+                        ? round(($records->where('is_passed', true)->count() / $records->count()) * 100, 1)
                         : 0,
                 ];
             })

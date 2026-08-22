@@ -39,6 +39,7 @@ function calcUnitRecord(Module $module, Student $student, Campus $campus, array 
         'course_offering_id' => $offering->id,
         'semester_id' => $offering->semester_id,
         'completion_status' => $opts['status'] ?? 'completed',
+        'is_passed' => $passed,
         'grade_points' => $passed ? 3.5 : 0.0,
         'override_pass' => false,
         'final_letter_grade' => $fg === null ? 'P' : (string) (int) $fg,

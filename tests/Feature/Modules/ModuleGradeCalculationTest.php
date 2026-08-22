@@ -62,8 +62,10 @@ function attachUnitWithRecord(Module $module, Student $student, Campus $campus, 
         'course_offering_id' => $offering->id,
         'semester_id' => $offering->semester_id,
         'completion_status' => $status,
-        // Top-level column only drives isPassed(); deliberately different from the
-        // breakdown value so the test proves the module reads grade_breakdown.
+        // is_passed is the pass/fail source of truth; grade_points is deliberately
+        // different from the breakdown value so the test proves the module reads
+        // grade_breakdown rather than the top-level grade.
+        'is_passed' => $passed,
         'grade_points' => $passed ? 3.5 : 0.0,
         'override_pass' => false,
         'final_letter_grade' => $fg === null ? 'P' : (string) (int) $fg,
