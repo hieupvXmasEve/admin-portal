@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Alert when automated sync changes a finalized semester"
-status: todo
+status: done
 priority: P1
 effort: "4h"
 dependencies: []
@@ -73,9 +73,9 @@ Ruled out during investigation: `attendance:sync-to-academic-records` (every 2 h
 
 ## Todo
 
-- [ ] Tests red then green
+- [x] Tests red then green
 - [ ] A dev sync run reports a non-zero finalized-semester change count with attributable actors
-- [ ] Human Recalculate path unchanged
+- [x] Human Recalculate path unchanged (null origin → no alert; recalc consumers green)
 
 ## Success Criteria
 
@@ -88,3 +88,21 @@ Ruled out during investigation: `attendance:sync-to-academic-records` (every 2 h
 - Alert volume could be high on the first runs given 73 already-diverged pairs; the counter is per-run so it will settle once the correction campaign completes. Do not add a notification channel before observing real volume.
 - Adding properties keys changes the activity-entry payload going forward; harmless for consumers that read known keys, but confirm nothing asserts an exact properties shape. `causer_id` semantics are unchanged (still NULL for system writes), which is why this option was preferred over introducing a synthetic user.
 - This phase does not prevent premature finalize, by decision: finalizing early is a legitimate user action and will not be blocked. The compensating control is that it is now correctable (Phase 1) and visible (Phase 2).
+
+## Scope clarifications (post-review)
+
+- **Covers `academic-records:sync` writes only.** The scheduled path writes
+  `final_percentage`/`final_letter_grade` on existing records. The other five
+  gate fields (`is_passed`, `credit_points_earned`, `credit_points`,
+  `excluded_from_gpa`, `grade_status`) are future-proofing; this phase does NOT
+  attribute the unattributed 2026-06-02 `is_passed` batch — that came from a
+  different source and its data is corrected in Phase 6, not attributed here.
+- **New records are a non-goal.** `createAcademicRecordWithCanvasTotal` (a
+  student who had no record at finalize) does not emit a finalized-semester
+  alert. Such a student was never finalized, so no stored GPA of theirs went
+  stale; if they later hold a snapshot, Phase 2's badge surfaces the divergence.
+  The alert targets "a finalized student's grade changed silently", not roster
+  growth.
+- **Rollup summary math is untested by decision.** The per-semester dedup/count
+  in the command is display arithmetic; the load-bearing attribution gate has
+  four tests. Not extracted solely for testability.

@@ -40,7 +40,7 @@ No new code needed: with the status filter already gone, a normal Finalize run f
 
 ## Related Code Files
 
-None — this phase changes data through existing UI, not source. Artifacts belong in `plans/reports/`.
+None — this phase changes data through existing UI, not source. Artifacts belong in `plans/reports/`. Execution runbook: `plans/reports/gpa-correction-campaign-runbook.md`.
 
 ## Implementation Steps
 

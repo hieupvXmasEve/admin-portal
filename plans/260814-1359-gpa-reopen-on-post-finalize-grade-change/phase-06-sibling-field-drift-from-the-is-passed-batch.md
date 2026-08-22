@@ -1,7 +1,7 @@
 ---
 phase: 6
 title: "Sibling-field drift from the is_passed batch"
-status: todo
+status: done
 priority: P1
 effort: "4h"
 dependencies: []
@@ -81,16 +81,16 @@ Affected rows (verified): `ar` 3130 (student 505), 3159 (570), 3776 (425), 3783 
 
 ## Todo
 
-- [ ] Tests red
-- [ ] `isPassed()` / `isFailed()` read `is_passed`; two callers verified
-- [ ] Resit action and transcript accessor aligned to "finished" semantics
-- [ ] Correction command written with dry-run gate, tests green
-- [ ] Dry run shows exactly 9 rows; commit applied to both tables
-- [ ] Audit shows HUB-001 = 0
+- [x] Tests red then green
+- [x] `isPassed()` / `isFailed()` read `is_passed`; module callers verified (both module suites green)
+- [x] Resit action and transcript accessor aligned to "finished" semantics
+- [x] Correction command written with dry-run gate, tests green (points + hours)
+- [x] Dry run shows exactly 9 rows (ar 3130..4370); **--commit is an operator step** (not run here)
+- [ ] Audit shows HUB-001 = 0 (real-data check after deploy; reconciliation unit test green)
 
 ## Success Criteria
 
-- [ ] No production code infers pass/fail from `completion_status`
+- [x] No production code infers pass/fail from `completion_status` (incl. CourseStatisticsService, CreditProgressService, CurriculumService — beyond enumerated scope, user-approved)
 - [ ] `academic:audit-progression-reconciliation --all` reports zero `HUB-001` exceptions
 - [ ] Zero rows remain with `is_passed = false` and `credit_points_earned > 0`
 - [ ] The 212 `completion_status = 'completed'` + `is_passed = false` rows are untouched
@@ -101,3 +101,24 @@ Affected rows (verified): `ar` 3130 (student 505), 3159 (570), 3776 (425), 3783 
 - `GradeFilterRequest.php:46` advertises `failed` as a filter value that will now never match anything. Cosmetic; note it, and decide separately whether to drop it from the filter vocabulary.
 - The unused `'failed'` enum value stays in the column. Nothing writes it after this phase, but nothing prevents a future writer from reintroducing the ambiguity either. The tests added here are the guard.
 - Correcting the transcript accessor changes what `GetStudentRegistrationsQuery:99` shows students for failed units (from `failed` to `completed`). Under the decided semantics that is correct — the unit was finished — and pass/fail is carried by other fields on the same payload. Confirm the student-facing view still communicates failure clearly before shipping.
+
+## Scope additions (post-review, user-approved 2026-08-21)
+
+Grep + review found three more production readers inferring pass/credit from
+`completion_status`, beyond the four enumerated corrections. All fixed to read
+`is_passed`, satisfying success criterion #1 repo-wide:
+
+- `app/Services/CourseStatisticsService.php` — `students_passed` (SQL) + `calculatePassRate()` now read `is_passed`.
+- `app/Services/V1/Student/CreditProgressService.php` — `courses_failed` = completed + `is_passed=false`; `success_rate` = `is_passed=true` share.
+- `app/Services/V1/Student/CurriculumService.php::determineStudyStatus()` — the `completed` branch now splits on `isPassed()`; a finished-but-failed unit takes the retake/failed path (previously unreachable dead `'failed'` branch).
+
+H1 (reviewer): the correction command also zeroes `credit_hours_earned` on
+academic_records (paired with `credit_points_earned`, matching the resit
+writer's "failed => both zero" invariant); `transcript_entries` has only the
+points column. Same 9 rows. Commit logs the affected ids (mass update bypasses
+the model audit trail).
+
+Tests added: `PassFailSourceOfTruthTest`, `PassFailStudentViewsTest`,
+`FixFailedRecordEarnedCreditsCommandTest`. `['completed','failed']` "resolved"
+checks (ModuleProgressService, ModuleGradeCalculator, AcademicRecord scope) are
+finished-checks paired with `isPassed()`, not pass-inference — left as-is.

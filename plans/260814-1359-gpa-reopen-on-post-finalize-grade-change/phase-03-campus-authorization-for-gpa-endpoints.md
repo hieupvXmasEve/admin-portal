@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Campus authorization for GPA endpoints"
-status: todo
+status: done
 priority: P1
 effort: "3h"
 dependencies: []
@@ -51,14 +51,14 @@ Second, one-line hardening in the same area: `RecalculateApplyController:49` ret
 
 ## Todo
 
-- [ ] Tests red then green
-- [ ] Verified a non-member campus_id is rejected on both GET and POST
-- [ ] No raw exception text returned to clients from the recalculate endpoint
+- [x] Tests red then green
+- [x] Verified a non-member campus_id is rejected on both GET and POST
+- [x] No raw exception text returned to clients from the recalculate endpoint
 
 ## Success Criteria
 
-- [ ] Cross-campus `campus_id` cannot read preview data or finalize GPA
-- [ ] Legitimate multi-campus operator flow unchanged
+- [x] Cross-campus `campus_id` cannot read preview data or finalize GPA
+- [x] Legitimate multi-campus operator flow unchanged
 
 ## Risk Assessment
 

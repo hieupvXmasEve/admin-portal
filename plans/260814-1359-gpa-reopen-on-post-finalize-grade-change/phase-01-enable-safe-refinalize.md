@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Enable safe re-finalize of a diverged semester"
-status: todo
+status: done
 priority: P1
 effort: "5h"
 dependencies: []
@@ -72,10 +72,10 @@ Extracting it verbatim is what makes "the finalize guard, the Phase 2 badge, and
 
 ## Todo
 
-- [ ] Tests red
-- [ ] `GpaValueComparator` extracted; audit query delegates; audit output byte-identical for student 506
-- [ ] Guard + updateOrCreate + is_current rule + activity log implemented, tests green
-- [ ] Existing 5 Gpa test files still green
+- [x] Tests red then green
+- [x] `GpaValueComparator` extracted; audit query delegates; AcademicProgressionReconciliationTest green (delegation verbatim)
+- [x] Guard + updateOrCreate + is_current rule + activity log implemented, tests green
+- [x] Existing Gpa test files still green (43 passed)
 - [ ] Manual: re-finalize campus 2 / SPRING2026 on dev → AUS19927 row becomes 80.737 / 81.293, single row, activity entry present
 
 ## Success Criteria

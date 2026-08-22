@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Divergence visibility on the GPA finalize page"
-status: todo
+status: done
 priority: P1
 effort: "4h"
 dependencies: [1]
@@ -49,17 +49,27 @@ Note the page needs no `is_finalized` filtering change: `PreviewSemesterGpaActio
 
 ## Todo
 
-- [ ] Tests red then green
+- [x] Tests red then green
 - [ ] Badge + banner render; AUS19927 shows as diverged on campus 2 / SPRING2026 before phase-1 re-finalize, clean after
-- [ ] Help text corrected
-- [ ] Per-file lint clean
+- [x] Help text corrected (both stale bullet + wrong cumulative formula)
+- [x] Per-file lint clean (Index.vue eslint exit 0)
 
 ## Success Criteria
 
-- [ ] Divergent set shown on the page equals the `GPA-001` exceptions from `academic:audit-progression-reconciliation` for the same scope
-- [ ] Badge state flips to matching immediately after a successful re-finalize
+- [x] Divergent set shown on the page equals the `GPA-001` exceptions from `academic:audit-progression-reconciliation` for the same scope (asserted by cross-check test)
+- [x] Badge state flips to matching immediately after a successful re-finalize (test: clears divergence after a re-finalize)
 
 ## Risk Assessment
 
 - Page/action/audit disagreeing on "divergent" would erode trust in the badge. Mitigation: all three call the same `GpaValueComparator`, plus a test comparing page output against the reconciliation query for the same scope.
 - The corrected help text changes what operators have been told for months; word it as current behavior plus the corrective action, not as a bug notice.
+
+## Known gap (accepted)
+
+A student finalized with credits whose current recompute now yields 0 credits
+(all records later removed/excluded) is `continue`d before the divergence block
+in `PreviewSemesterGpaAction`, so it never shows on the page even though
+`academic:audit-progression-reconciliation` still reports it as `GPA-001`. Left
+to the audit surface by design — the finalize page lists only students with
+current credit-bearing records; the audit is the proactive/cross-scope surface
+for the zero-credit edge. Not fixed here.

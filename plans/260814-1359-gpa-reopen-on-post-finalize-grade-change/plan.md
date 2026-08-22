@@ -111,12 +111,12 @@ Proactive/cross-semester detection needs no new code: `academic:audit-progressio
 
 | # | Phase | Status |
 |---|-------|--------|
-| 1 | [Phase 1: Enable safe re-finalize of a diverged semester](./phase-01-enable-safe-refinalize.md) | Pending |
-| 2 | [Phase 2: Divergence visibility on the GPA finalize page](./phase-02-divergence-visibility-on-finalize-page.md) | Pending |
-| 3 | [Phase 3: Campus authorization for GPA endpoints](./phase-03-campus-authorization-for-gpa-endpoints.md) | Pending |
-| 4 | [Phase 4: Alert when automated sync changes a finalized semester](./phase-04-alert-on-sync-changing-finalized-semester.md) | Pending |
+| 1 | [Phase 1: Enable safe re-finalize of a diverged semester](./phase-01-enable-safe-refinalize.md) | Done |
+| 2 | [Phase 2: Divergence visibility on the GPA finalize page](./phase-02-divergence-visibility-on-finalize-page.md) | Done |
+| 3 | [Phase 3: Campus authorization for GPA endpoints](./phase-03-campus-authorization-for-gpa-endpoints.md) | Done |
+| 4 | [Phase 4: Alert when automated sync changes a finalized semester](./phase-04-alert-on-sync-changing-finalized-semester.md) | Done |
 | 5 | [Phase 5: Correction campaign for the diverged GPA rows](./phase-05-correction-campaign-for-73-diverged-rows.md) | Pending |
-| 6 | [Phase 6: Sibling-field drift from the is_passed batch](./phase-06-sibling-field-drift-from-the-is-passed-batch.md) | Pending |
+| 6 | [Phase 6: Sibling-field drift from the is_passed batch](./phase-06-sibling-field-drift-from-the-is-passed-batch.md) | Done |
 
 **Execution order (decided): 3 → 1 → 2 → 4 → 6 → 5.** Phase numbering follows when each phase was added, not when it runs. Phase 3 ships first because the campus hole is independent of the GPA work, is actively exposing student PII and cross-campus finalize, and Phase 2 would otherwise widen that payload before it is closed. Phase 6 runs immediately before Phase 5 because Phase 5 recomputes `credit_points_earned` from the transcript and Phase 6 is what makes those nine values correct first.
 
@@ -138,13 +138,13 @@ Layer placement (per development-rules — every layer pinned):
 
 ## Success Criteria
 
-- [ ] The finalize guard, the finalize-page badge and `academic:audit-progression-reconciliation` all decide "diverged" through the same `GpaValueComparator`, and extracting it leaves the audit's output unchanged.
-- [ ] Re-running Finalize on a diverged semester updates the existing row in place to the recomputed values, emits one activity entry carrying the prior GPA, and never attempts a duplicate `(student_id, semester_id)` insert.
-- [ ] Re-running Finalize when nothing changed writes nothing and reports students as skipped (unchanged behavior).
-- [ ] Re-finalizing an earlier semester does not pull `is_current` back from a later finalized semester; finalizing a later semester still moves it forward.
-- [ ] The finalize page flags divergent students, and that set equals the `GPA-001` exceptions reported by `academic:audit-progression-reconciliation` for the same scope.
-- [ ] `Index.vue` no longer claims finalized GPA is unaffected by later grade changes.
-- [ ] A campus-1-only operator is rejected when passing `campus_id=2` to GPA preview and GPA finalize.
+- [x] The finalize guard, the finalize-page badge and `academic:audit-progression-reconciliation` all decide "diverged" through the same `GpaValueComparator`, and extracting it leaves the audit's output unchanged.
+- [x] Re-running Finalize on a diverged semester updates the existing row in place to the recomputed values, emits one activity entry carrying the prior GPA, and never attempts a duplicate `(student_id, semester_id)` insert.
+- [x] Re-running Finalize when nothing changed writes nothing and reports students as skipped (unchanged behavior).
+- [x] Re-finalizing an earlier semester does not pull `is_current` back from a later finalized semester; finalizing a later semester still moves it forward.
+- [x] The finalize page flags divergent students, and that set equals the `GPA-001` exceptions reported by `academic:audit-progression-reconciliation` for the same scope.
+- [x] `Index.vue` no longer claims finalized GPA is unaffected by later grade changes.
+- [x] A campus-1-only operator is rejected when passing `campus_id=2` to GPA preview and GPA finalize.
 - [ ] AUS19927 SPRING2026 reads 80.737 / 81.293 after re-finalize, and its `GPA-001` exceptions are gone.
 - [ ] No production code infers pass/fail from `completion_status`; `HUB-001` drops from 213 to 0; no row has `is_passed = false` with `credit_points_earned > 0`.
 - [ ] Focused tests green: `tests/Feature/Academic/Gpa/` (5 new + existing 5 files).
