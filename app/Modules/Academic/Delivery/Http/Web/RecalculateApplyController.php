@@ -12,6 +12,7 @@ use App\Modules\Academic\Delivery\Http\Requests\RecalculateCourseOfferingRequest
 use App\Modules\Academic\Delivery\Support\CanvasGradeSyncService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
@@ -46,7 +47,12 @@ class RecalculateApplyController extends Controller
         } catch (RuntimeException $e) {
             return ApiResponse::error($e->getMessage(), [], 400);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed to recalculate course: '.$e->getMessage(), [], 500);
+            Log::error('Recalculate course failed', [
+                'course_offering_id' => $courseOffering->id,
+                'exception' => $e,
+            ]);
+
+            return ApiResponse::error('Failed to recalculate course.', [], 500);
         }
 
         return ApiResponse::success($result);
