@@ -12,6 +12,7 @@ use App\Models\AssessmentComponentDetailScore;
 use App\Models\CanvasCourseMapping;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
+use App\Models\GpaCalculation;
 use App\Modules\Academic\Delivery\Support\Canvas\CanvasApiService;
 use App\Shared\Contracts\Academic\CourseOfferingCatalogReader;
 use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
@@ -31,20 +32,53 @@ class CanvasGradeSyncService
     ) {}
 
     /**
+     * Origin metadata for an unattended run (source, command, run_at). Null on
+     * the human Recalculate path, which needs no finalized-semester alerting
+     * because the operator is already present and acting deliberately.
+     *
+     * @var array<string, mixed>|null
+     */
+    private ?array $syncOrigin = null;
+
+    /**
+     * Per-run tally of records this sync changed inside finalized semesters,
+     * keyed by semester_id. Surfaced to the command summary so operators learn
+     * which semesters now need re-finalizing.
+     *
+     * @var array<int, array{semester_id: int, changed_records: int, student_ids: array<int, bool>}>
+     */
+    private array $finalizedSemesterAlerts = [];
+
+    /** @var array<int, bool> per-run memo of "semester has finalized GPA rows" */
+    private array $finalizedSemesterCache = [];
+
+    /**
      * Sync grades for all (or a selected subset of) students in a course offering.
      * Only syncs students that match between local and Canvas (by SIS User ID or SIS Login ID).
      *
      * @param  array<int>|null  $studentIds  Restrict the write to these local student IDs; null syncs the whole roster.
+     * @param  array<string, mixed>|null  $origin  Origin metadata for an unattended run; when set, a GPA-relevant change
+     *                                             inside a finalized semester is logged as a distinct, attributable event
+     *                                             and tallied. Leave null on the human Recalculate path.
+     * @return array<string, mixed> the performSync result, plus `finalized_semester_alerts` when $origin was set
      */
-    public function syncCourseGrades(CanvasCourseMapping $mapping, ?array $studentIds = null): array
+    public function syncCourseGrades(CanvasCourseMapping $mapping, ?array $studentIds = null, ?array $origin = null): array
     {
         $originalLimit = ini_get('max_execution_time');
         set_time_limit(300); // 5 minutes for bulk grade sync
 
+        $this->syncOrigin = $origin;
+        $this->finalizedSemesterAlerts = [];
+        $this->finalizedSemesterCache = [];
+
         try {
-            return $this->performSync($mapping, $studentIds);
+            $result = $this->performSync($mapping, $studentIds);
+            $result['finalized_semester_alerts'] = array_values($this->finalizedSemesterAlerts);
+
+            return $result;
         } finally {
             set_time_limit((int) $originalLimit);
+            $this->syncOrigin = null;
         }
     }
 
@@ -554,6 +588,8 @@ class CanvasGradeSyncService
                     'final_letter_grade' => AcademicRecord::calculateLetterGrade($finalPercentage),
                 ]);
 
+                $this->flagIfFinalizedSemesterChange($existingRecord);
+
                 return;
             }
 
@@ -642,6 +678,58 @@ class CanvasGradeSyncService
      * When the syllabus has a custom grading engine, Canvas total must NOT
      * overwrite the rule-engine result — the local calculator is authoritative.
      */
+    /**
+     * On an unattended run, when this sync just changed a GPA-relevant field on
+     * a record whose semester already has finalized GPA, record it as a distinct,
+     * attributable activity event and tally it for the run summary. The finalized
+     * snapshot is not touched or blocked — the sync keeps delivering data; this
+     * only makes the change visible and names its origin (causer_id stays NULL,
+     * origin lives in properties).
+     */
+    private function flagIfFinalizedSemesterChange(AcademicRecord $record): void
+    {
+        if ($this->syncOrigin === null) {
+            return;
+        }
+
+        if (! $record->wasChanged([
+            'final_percentage', 'credit_points', 'credit_points_earned',
+            'is_passed', 'excluded_from_gpa', 'grade_status',
+        ])) {
+            return;
+        }
+
+        $semesterId = (int) $record->semester_id;
+        if (! $this->semesterHasFinalizedGpa($semesterId)) {
+            return;
+        }
+
+        activity('finalized_semester_grade_changed')
+            ->performedOn($record)
+            ->withProperties(array_merge($this->syncOrigin, [
+                'student_id' => (int) $record->student_id,
+                'semester_id' => $semesterId,
+                'academic_record_id' => (int) $record->id,
+                'changes' => $record->getChanges(),
+            ]))
+            ->log('Automated sync changed a record in a finalized semester');
+
+        $alert = $this->finalizedSemesterAlerts[$semesterId]
+            ?? ['semester_id' => $semesterId, 'changed_records' => 0, 'student_ids' => []];
+        $alert['changed_records']++;
+        $alert['student_ids'][(int) $record->student_id] = true;
+        $this->finalizedSemesterAlerts[$semesterId] = $alert;
+    }
+
+    /** Per-run memoized check that a semester has at least one finalized GPA row. */
+    private function semesterHasFinalizedGpa(int $semesterId): bool
+    {
+        return $this->finalizedSemesterCache[$semesterId] ??= GpaCalculation::query()
+            ->where('semester_id', $semesterId)
+            ->where('is_finalized', true)
+            ->exists();
+    }
+
     private function hasCustomGradingEngine(CourseOffering $courseOffering): bool
     {
         $gradingScheme = $courseOffering->syllabusTemplate?->grading_scheme;

@@ -89,7 +89,21 @@ class SyncAcademicRecordsCommand extends Command
                 'students_skipped' => 0,
                 'total_errors' => 0,
                 'integrations_deactivated' => 0,
+                'finalized_semester_changes' => 0,
             ];
+
+            // Origin recorded on every finalized-semester change this run emits.
+            // This is the scheduled/system path; causer_id stays NULL (no synthetic
+            // user), origin is answered by these properties instead.
+            $origin = [
+                'source' => 'scheduled-sync',
+                'command' => $this->getName(),
+                'run_at' => now()->toIso8601String(),
+            ];
+
+            // Per-semester roll-up of records changed inside finalized semesters,
+            // so the summary can name which semesters now need re-finalizing.
+            $finalizedSemesters = [];
 
             $progressBar = $this->output->createProgressBar($totalMappings);
             $progressBar->setFormat('verbose');
@@ -98,7 +112,7 @@ class SyncAcademicRecordsCommand extends Command
             $deactivatedIntegrationIds = [];
 
             // Process in chunks to manage memory
-            $query->chunk($chunkSize, function ($mappings) use (&$totalStats, $progressBar, $memoryLimitBytes, &$deactivatedIntegrationIds) {
+            $query->chunk($chunkSize, function ($mappings) use (&$totalStats, $progressBar, $memoryLimitBytes, &$deactivatedIntegrationIds, $origin, &$finalizedSemesters) {
                 foreach ($mappings as $mapping) {
                     $courseOfferingName = $mapping->courseOffering->course_code ?? "ID:{$mapping->course_offering_id}";
                     $progressBar->setMessage("Syncing: {$courseOfferingName}");
@@ -126,13 +140,22 @@ class SyncAcademicRecordsCommand extends Command
                     }
 
                     try {
-                        $result = $this->gradeSyncService->syncCourseGrades($mapping);
+                        $result = $this->gradeSyncService->syncCourseGrades($mapping, null, $origin);
 
                         if ($result['success']) {
                             $totalStats['courses_success']++;
                             $totalStats['students_synced'] += $result['students_synced'] ?? 0;
                             $totalStats['students_skipped'] += $result['students_skipped'] ?? 0;
                             $totalStats['total_errors'] += count($result['errors'] ?? []);
+
+                            foreach ($result['finalized_semester_alerts'] ?? [] as $alert) {
+                                $totalStats['finalized_semester_changes'] += $alert['changed_records'];
+                                $rollup = $finalizedSemesters[$alert['semester_id']]
+                                    ?? ['changed_records' => 0, 'students' => []];
+                                $rollup['changed_records'] += $alert['changed_records'];
+                                $rollup['students'] += $alert['student_ids'];
+                                $finalizedSemesters[$alert['semester_id']] = $rollup;
+                            }
                         } else {
                             $totalStats['courses_failed']++;
                         }
@@ -217,6 +240,18 @@ class SyncAcademicRecordsCommand extends Command
             }
             if ($totalStats['total_errors'] > 0) {
                 $this->error("Encountered {$totalStats['total_errors']} error(s) during sync");
+            }
+
+            if ($totalStats['finalized_semester_changes'] > 0) {
+                $this->newLine();
+                $this->warn(
+                    "Changed {$totalStats['finalized_semester_changes']} record(s) inside already-finalized semester(s). "
+                    . 'These semesters need re-finalizing to refresh their GPA snapshots:'
+                );
+                foreach ($finalizedSemesters as $semesterId => $rollup) {
+                    $studentCount = count($rollup['students']);
+                    $this->warn("  - Semester {$semesterId}: {$rollup['changed_records']} record change(s) across {$studentCount} student(s)");
+                }
             }
 
             return self::SUCCESS;
