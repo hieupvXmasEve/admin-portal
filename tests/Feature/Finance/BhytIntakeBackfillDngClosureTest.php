@@ -70,7 +70,7 @@ function makeBhytLegacyCharge(
 
 function makeBhytBatchDngAction(bool $dngFails = false): CreateBatchDngFromChargesAction
 {
-    $dngPaymentServiceMock = Mockery::mock(DngPaymentService::class);
+    $dngPaymentServiceMock = Mockery::mock(DngPaymentService::class)->shouldIgnoreMissing();
 
     if ($dngFails) {
         $dngPaymentServiceMock->shouldReceive('pushReserved')

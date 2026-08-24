@@ -354,7 +354,20 @@ final class DngReservationLifecycle
             throw $exception;
         }
 
-        return $this->finalize($reservation->id, $response, $payload);
+        $finalized = $this->finalize($reservation->id, $response, $payload);
+
+        if ($finalized->status === DngPaymentRequest::STATUS_PUSHED_TO_DNG) {
+            $this->dngPaymentService->publishPushNotification(
+                studentId: $studentId,
+                campusId: $student->campusId,
+                studentName: $student->fullName,
+                requestId: $finalized->id,
+                amount: (string) $finalized->amount,
+                description: (string) $finalized->description,
+            );
+        }
+
+        return $finalized;
     }
 
     /** @param array{Code: int, Type: string, Message: string, data: mixed} $response @param array<string, mixed> $payload */

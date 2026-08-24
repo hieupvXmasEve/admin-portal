@@ -12,6 +12,7 @@ use App\Modules\Finance\Support\SettlementMutationGuard;
 use App\Shared\Contracts\DomainEvents\DomainEvent;
 use App\Shared\Contracts\DomainEvents\DomainEventPublisher;
 use App\Shared\Contracts\Institution\DepartmentReferenceReader;
+use App\Shared\Contracts\Notification\EmailContentResolver;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
@@ -27,6 +28,7 @@ class DngPaymentService
         protected ?SettlementMutationGuard $settlementMutationGuard = null,
         protected ?StudentReferenceReader $studentReferences = null,
         protected ?DepartmentReferenceReader $departmentReferences = null,
+        protected ?EmailContentResolver $emailContentResolver = null,
     ) {}
 
     /**
@@ -77,8 +79,13 @@ class DngPaymentService
 
     /**
      * Publish a notification (realtime + email) after a DNG payment request is pushed successfully.
+     *
+     * Email content is admin-managed (see /admin/notification-templates). If no
+     * template row exists yet for this campus, the email channel is skipped
+     * (no generic fallback email) and a notice is logged for admins; realtime
+     * still fires so the student sees the in-app notice.
      */
-    private function publishPushNotification(
+    public function publishPushNotification(
         int $studentId,
         ?int $campusId,
         string $studentName,
@@ -88,6 +95,17 @@ class DngPaymentService
     ): void {
         try {
             $formattedAmount = number_format((float) $amount, 0, ',', '.').' VNĐ';
+
+            $channels = ['realtime'];
+            if ($campusId !== null && $this->emailContentResolver()->isConfiguredForCampus('dng_payment_pushed', $campusId)) {
+                $channels[] = 'email';
+            } else {
+                Log::notice('DNG push notification: email template not configured for campus, skipping email channel', [
+                    'student_id' => $studentId,
+                    'dng_payment_request_id' => $requestId,
+                    'campus_id' => $campusId,
+                ]);
+            }
 
             $event = new DomainEvent(
                 name: 'finance.dng_payment_pushed',
@@ -99,7 +117,7 @@ class DngPaymentService
                 actorUserId: null,
                 payload: [
                     'type_key' => 'dng_payment_pushed',
-                    'channels' => ['email', 'realtime'],
+                    'channels' => $channels,
                     'recipient_targets' => [
                         ['type' => 'student', 'id' => $studentId],
                     ],
@@ -317,5 +335,10 @@ class DngPaymentService
     private function departmentReferences(): DepartmentReferenceReader
     {
         return $this->departmentReferences ?? app(DepartmentReferenceReader::class);
+    }
+
+    private function emailContentResolver(): EmailContentResolver
+    {
+        return $this->emailContentResolver ?? app(EmailContentResolver::class);
     }
 }

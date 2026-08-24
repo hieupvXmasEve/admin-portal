@@ -109,7 +109,7 @@ function guardedReservationDetails(Semester $semester): array
 it('reserves exact canonical HL targets and finalizes outside the reservation transaction', function (): void {
     $lineOne = reservationPayableLine($this->invoice, $this->billingAccount, '1000000.00');
     $lineTwo = reservationPayableLine($this->invoice, $this->billingAccount, '500000.00');
-    $service = Mockery::mock(DngPaymentService::class);
+    $service = Mockery::mock(DngPaymentService::class)->shouldIgnoreMissing();
     $service->shouldReceive('pushReserved')->once()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
 
     $reservation = guardedReservationAction($service)->handle($this->student->id, 'HL', guardedReservationDetails($this->semester));
@@ -125,7 +125,7 @@ it('reserves exact canonical HL targets and finalizes outside the reservation tr
 
 it('uses the same guarded reservation for the HP fee family', function (): void {
     $line = reservationPayableLine($this->invoice, $this->billingAccount, '2000000.00', FinanceCharge::TYPE_TUITION_TERM);
-    $service = Mockery::mock(DngPaymentService::class);
+    $service = Mockery::mock(DngPaymentService::class)->shouldIgnoreMissing();
     $service->shouldReceive('pushReserved')->once()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
 
     $reservation = guardedReservationAction($service)->handle($this->student->id, 'HP', guardedReservationDetails($this->semester));
@@ -137,7 +137,7 @@ it('uses the same guarded reservation for the HP fee family', function (): void 
 
 it('uses guarded canonical targets for every remaining supported fee family', function (string $feeType, string $chargeType): void {
     $line = reservationPayableLine($this->invoice, $this->billingAccount, '2000000.00', $chargeType);
-    $service = Mockery::mock(DngPaymentService::class);
+    $service = Mockery::mock(DngPaymentService::class)->shouldIgnoreMissing();
     $service->shouldReceive('pushReserved')->once()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
 
     $reservation = guardedReservationAction($service)->handle($this->student->id, $feeType, guardedReservationDetails($this->semester));
@@ -156,7 +156,7 @@ it('rejects DNG creation when a required payer field is blank', function (string
     $this->student->update($field === 'address'
         ? ['current_address_line' => null, 'address' => $value]
         : [$field => $value]);
-    $service = Mockery::mock(DngPaymentService::class);
+    $service = Mockery::mock(DngPaymentService::class)->shouldIgnoreMissing();
     $service->shouldNotReceive('pushReserved');
 
     try {
@@ -175,7 +175,7 @@ it('rejects DNG creation when a required payer field is blank', function (string
 
 it('reuses an exact active reservation with one durable deterministic item identity', function (): void {
     reservationPayableLine($this->invoice, $this->billingAccount);
-    $service = Mockery::mock(DngPaymentService::class);
+    $service = Mockery::mock(DngPaymentService::class)->shouldIgnoreMissing();
     $service->shouldReceive('pushReserved')->once()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
     $action = guardedReservationAction($service);
 
@@ -189,7 +189,7 @@ it('reuses an exact active reservation with one durable deterministic item ident
 
 it('guards concurrent slot contenders with the database unique slot constraint', function (): void {
     reservationPayableLine($this->invoice, $this->billingAccount);
-    $service = Mockery::mock(DngPaymentService::class);
+    $service = Mockery::mock(DngPaymentService::class)->shouldIgnoreMissing();
     $service->shouldReceive('pushReserved')->once()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
 
     $reservation = guardedReservationAction($service)->handle($this->student->id, 'HL', guardedReservationDetails($this->semester));
@@ -214,7 +214,7 @@ it('guards concurrent slot contenders with the database unique slot constraint',
 
 it('holds an active retry with a different invoice-line target for reconciliation', function (): void {
     reservationPayableLine($this->invoice, $this->billingAccount, '1000000.00');
-    $service = Mockery::mock(DngPaymentService::class);
+    $service = Mockery::mock(DngPaymentService::class)->shouldIgnoreMissing();
     $service->shouldReceive('pushReserved')->once()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
     $action = guardedReservationAction($service);
 
@@ -231,7 +231,7 @@ it('holds an active retry with a different invoice-line target for reconciliatio
 
 it('promotes a target-drifted unknown outcome to staff review', function (): void {
     reservationPayableLine($this->invoice, $this->billingAccount, '1000000.00');
-    $service = Mockery::mock(DngPaymentService::class);
+    $service = Mockery::mock(DngPaymentService::class)->shouldIgnoreMissing();
     $service->shouldReceive('pushReserved')->once()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
     $action = guardedReservationAction($service);
 
@@ -247,7 +247,7 @@ it('promotes a target-drifted unknown outcome to staff review', function (): voi
 
 it('holds an active retry when its semester changes', function (): void {
     reservationPayableLine($this->invoice, $this->billingAccount, '1000000.00');
-    $service = Mockery::mock(DngPaymentService::class);
+    $service = Mockery::mock(DngPaymentService::class)->shouldIgnoreMissing();
     $service->shouldReceive('pushReserved')->once()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
     $action = guardedReservationAction($service);
 
@@ -284,7 +284,7 @@ it('holds an active retry when its exact installment target changes', function (
         'installment_no' => 2,
         'amount' => '500000.00',
     ]);
-    $service = Mockery::mock(DngPaymentService::class);
+    $service = Mockery::mock(DngPaymentService::class)->shouldIgnoreMissing();
     $service->shouldReceive('pushReserved')->once()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
     $action = guardedReservationAction($service);
 
@@ -312,7 +312,7 @@ it('holds an active retry when its exact installment target changes', function (
 
 it('holds an active retry when its amount and target fingerprint change', function (): void {
     $line = reservationPayableLine($this->invoice, $this->billingAccount, '1000000.00');
-    $service = Mockery::mock(DngPaymentService::class);
+    $service = Mockery::mock(DngPaymentService::class)->shouldIgnoreMissing();
     $service->shouldReceive('pushReserved')->once()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
     $action = guardedReservationAction($service);
 
@@ -339,7 +339,7 @@ it('holds an active retry when its amount and target fingerprint change', functi
 it('automatically replaces when the same line grows in amount and the flag is on', function (): void {
     config(['finance.dng.auto_replace_stale_collection' => true]);
     $line = reservationPayableLine($this->invoice, $this->billingAccount, '1000000.00');
-    $service = Mockery::mock(DngPaymentService::class);
+    $service = Mockery::mock(DngPaymentService::class)->shouldIgnoreMissing();
     $service->shouldReceive('pushReserved')->twice()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
     $action = guardedReservationAction($service);
 
@@ -375,7 +375,7 @@ it('automatically replaces when the same line grows in amount and the flag is on
 
 it('holds a stale settlement-version retry for staff reconciliation', function (): void {
     reservationPayableLine($this->invoice, $this->billingAccount, '1000000.00');
-    $service = Mockery::mock(DngPaymentService::class);
+    $service = Mockery::mock(DngPaymentService::class)->shouldIgnoreMissing();
     $service->shouldReceive('pushReserved')->once()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
     $action = guardedReservationAction($service);
 
@@ -401,7 +401,7 @@ it('still holds a stale settlement-version retry for staff reconciliation when t
     // flag: total is unchanged, not grown.
     config(['finance.dng.auto_replace_stale_collection' => true]);
     reservationPayableLine($this->invoice, $this->billingAccount, '1000000.00');
-    $service = Mockery::mock(DngPaymentService::class);
+    $service = Mockery::mock(DngPaymentService::class)->shouldIgnoreMissing();
     $service->shouldReceive('pushReserved')->once()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
     $action = guardedReservationAction($service);
 
@@ -427,7 +427,7 @@ it('still reuses an exact active reservation with zero provider calls when the f
     // holdForReview no-op rather than an unnecessary provider cancel.
     config(['finance.dng.auto_replace_stale_collection' => true]);
     reservationPayableLine($this->invoice, $this->billingAccount);
-    $service = Mockery::mock(DngPaymentService::class);
+    $service = Mockery::mock(DngPaymentService::class)->shouldIgnoreMissing();
     $service->shouldReceive('pushReserved')->once()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
     $action = guardedReservationAction($service);
     $dngClient = Mockery::mock(DngClient::class);
@@ -444,7 +444,7 @@ it('still reuses an exact active reservation with zero provider calls when the f
 
 it('releases a terminal active slot without erasing DNG provider evidence', function (string $terminalStatus): void {
     reservationPayableLine($this->invoice, $this->billingAccount);
-    $service = Mockery::mock(DngPaymentService::class);
+    $service = Mockery::mock(DngPaymentService::class)->shouldIgnoreMissing();
     $service->shouldReceive('pushReserved')->once()->andReturn([
         'Code' => 1,
         'Type' => 'success',
@@ -468,7 +468,7 @@ it('releases a terminal active slot without erasing DNG provider evidence', func
 
 it('allows a new request to occupy a released active slot', function (): void {
     reservationPayableLine($this->invoice, $this->billingAccount);
-    $service = Mockery::mock(DngPaymentService::class);
+    $service = Mockery::mock(DngPaymentService::class)->shouldIgnoreMissing();
     $service->shouldReceive('pushReserved')->twice()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
     $action = guardedReservationAction($service);
 
@@ -483,7 +483,7 @@ it('allows a new request to occupy a released active slot', function (): void {
 
 it('does not reactivate a failed terminal reservation after releasing its active slot', function (): void {
     reservationPayableLine($this->invoice, $this->billingAccount);
-    $service = Mockery::mock(DngPaymentService::class);
+    $service = Mockery::mock(DngPaymentService::class)->shouldIgnoreMissing();
     $service->shouldReceive('pushReserved')->once()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
 
     $request = guardedReservationAction($service)->handle($this->student->id, 'HL', guardedReservationDetails($this->semester));
@@ -495,7 +495,7 @@ it('does not reactivate a failed terminal reservation after releasing its active
 
 it('fails closed without a provider call when the canonical target is invalid', function (): void {
     reservationPayableLine($this->invoice, $this->billingAccount, '0.00');
-    $service = Mockery::mock(DngPaymentService::class);
+    $service = Mockery::mock(DngPaymentService::class)->shouldIgnoreMissing();
     $service->shouldNotReceive('pushReserved');
 
     expect(fn () => guardedReservationAction($service)->handle($this->student->id, 'HL', guardedReservationDetails($this->semester)))
@@ -516,7 +516,7 @@ it('fails before the provider call when a target drifts during local reservation
 
         return $realReader->forPayableLines($lineIds);
     });
-    $service = Mockery::mock(DngPaymentService::class);
+    $service = Mockery::mock(DngPaymentService::class)->shouldIgnoreMissing();
     $service->shouldNotReceive('pushReserved');
     $campusResolver = Mockery::mock(DngCampusCodeResolver::class);
     $campusResolver->shouldReceive('requireForCampusId')->andReturn('FAUHN');
@@ -529,7 +529,7 @@ it('fails before the provider call when a target drifts during local reservation
 
 it('holds the request for review when its exact target changes before finalization', function (): void {
     $line = reservationPayableLine($this->invoice, $this->billingAccount, '1000000.00');
-    $service = Mockery::mock(DngPaymentService::class);
+    $service = Mockery::mock(DngPaymentService::class)->shouldIgnoreMissing();
     $service->shouldReceive('pushReserved')->once()->andReturnUsing(function () use ($line): array {
         $line->update(['amount_snapshot' => '900000.00']);
 
@@ -552,7 +552,7 @@ it('holds the request for review when its exact target changes before finalizati
 
 it('records a deterministic current fingerprint when every target disappears before finalization', function (): void {
     $line = reservationPayableLine($this->invoice, $this->billingAccount, '1000000.00');
-    $service = Mockery::mock(DngPaymentService::class);
+    $service = Mockery::mock(DngPaymentService::class)->shouldIgnoreMissing();
     $service->shouldReceive('pushReserved')->once()->andReturnUsing(function () use ($line): array {
         $line->update(['amount_snapshot' => '0.00']);
 
@@ -573,7 +573,7 @@ it('records a deterministic current fingerprint when every target disappears bef
 it('automatically cancels a stale live collection and pushes a fresh one covering the full payable', function (): void {
     config(['finance.dng.auto_replace_stale_collection' => true]);
     $lineOne = reservationPayableLine($this->invoice, $this->billingAccount, '3000000.00', FinanceCharge::TYPE_EXAM_RESIT_FEE);
-    $service = Mockery::mock(DngPaymentService::class);
+    $service = Mockery::mock(DngPaymentService::class)->shouldIgnoreMissing();
     $service->shouldReceive('pushReserved')->twice()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
     $action = guardedReservationAction($service);
 
@@ -600,7 +600,7 @@ it('automatically cancels a stale live collection and pushes a fresh one coverin
 it('leaves the flag-off behaviour unchanged when the config is off', function (): void {
     config(['finance.dng.auto_replace_stale_collection' => false]);
     $line = reservationPayableLine($this->invoice, $this->billingAccount, '1000000.00');
-    $service = Mockery::mock(DngPaymentService::class);
+    $service = Mockery::mock(DngPaymentService::class)->shouldIgnoreMissing();
     $service->shouldReceive('pushReserved')->once()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
     $action = guardedReservationAction($service);
 
@@ -617,7 +617,7 @@ it('leaves the flag-off behaviour unchanged when the config is off', function ()
 it('aborts the whole replacement and creates no new request when the provider cancel fails', function (): void {
     config(['finance.dng.auto_replace_stale_collection' => true]);
     $lineOne = reservationPayableLine($this->invoice, $this->billingAccount, '3000000.00', FinanceCharge::TYPE_EXAM_RESIT_FEE);
-    $service = Mockery::mock(DngPaymentService::class);
+    $service = Mockery::mock(DngPaymentService::class)->shouldIgnoreMissing();
     $service->shouldReceive('pushReserved')->once()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
     $action = guardedReservationAction($service);
 
@@ -639,7 +639,7 @@ it('does not auto-replace when the new reservation would collect less than the l
     config(['finance.dng.auto_replace_stale_collection' => true]);
     $lineOne = reservationPayableLine($this->invoice, $this->billingAccount, '1000000.00', FinanceCharge::TYPE_EXAM_RESIT_FEE);
     reservationPayableLine($this->invoice, $this->billingAccount, '2000000.00', FinanceCharge::TYPE_EXAM_RESIT_FEE);
-    $service = Mockery::mock(DngPaymentService::class);
+    $service = Mockery::mock(DngPaymentService::class)->shouldIgnoreMissing();
     $service->shouldReceive('pushReserved')->once()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
     $action = guardedReservationAction($service);
 
@@ -665,7 +665,7 @@ it('does not auto-replace when the new reservation would collect less than the l
 it('does not auto-replace a needs_review or unknown_outcome request even when the flag is on', function (string $terminalHold): void {
     config(['finance.dng.auto_replace_stale_collection' => true]);
     $line = reservationPayableLine($this->invoice, $this->billingAccount, '1000000.00');
-    $service = Mockery::mock(DngPaymentService::class);
+    $service = Mockery::mock(DngPaymentService::class)->shouldIgnoreMissing();
     $service->shouldReceive('pushReserved')->once()->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
     $action = guardedReservationAction($service);
 
@@ -719,7 +719,7 @@ it('does not auto-replace a cancellation-replacement row that carries no reserva
     );
     expect($replacement->reservationTargets()->exists())->toBeFalse();
 
-    $service = Mockery::mock(DngPaymentService::class);
+    $service = Mockery::mock(DngPaymentService::class)->shouldIgnoreMissing();
     $service->shouldNotReceive('pushReserved');
     $action = guardedReservationAction($service);
 
@@ -732,7 +732,7 @@ it('does not auto-replace a cancellation-replacement row that carries no reserva
 it('blocks a concurrent credit application during the unlocked DNG provider call without over-collecting or losing a settlement version', function (): void {
     $line = reservationPayableLine($this->invoice, $this->billingAccount, '1500000.00');
     $credit = null;
-    $service = Mockery::mock(DngPaymentService::class);
+    $service = Mockery::mock(DngPaymentService::class)->shouldIgnoreMissing();
     $service->shouldReceive('pushReserved')->once()->andReturnUsing(function () use (&$credit, $line): array {
         $credit = app(FinanceIntakeContract::class)->requestCredit(new FinanceIntakeData(
             source_system: 'finance-test',

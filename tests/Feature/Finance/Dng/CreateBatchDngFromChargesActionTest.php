@@ -86,7 +86,7 @@ function batchDngPayload(Student $student, Semester $semester, string $feeType =
 beforeEach(function (): void {
     $this->campus = Campus::factory()->withDngMapping('FAUHN')->create();
     $this->semester = Semester::factory()->create();
-    $service = Mockery::mock(DngPaymentService::class);
+    $service = Mockery::mock(DngPaymentService::class)->shouldIgnoreMissing();
     $service->shouldReceive('pushReserved')->andReturn(['Code' => 1, 'Type' => 'success', 'Message' => 'ok', 'data' => []]);
     app()->instance(DngPaymentService::class, $service);
     $resolver = Mockery::mock(DngCampusCodeResolver::class);
@@ -135,7 +135,7 @@ it('reports target drift review instead of claiming a batch installment is await
         'amount' => 4_000_000,
         'due_date' => now()->addDays(7)->toDateString(),
     ]);
-    $service = Mockery::mock(DngPaymentService::class);
+    $service = Mockery::mock(DngPaymentService::class)->shouldIgnoreMissing();
     $service->shouldReceive('pushReserved')->once()->andReturnUsing(function () use ($line): array {
         $line->update(['amount_snapshot' => '3000000.00']);
 
@@ -166,7 +166,7 @@ it('reports an ambiguous provider outcome without retrying the batch installment
         'amount' => 4_000_000,
         'due_date' => now()->addDays(7)->toDateString(),
     ]);
-    $service = Mockery::mock(DngPaymentService::class);
+    $service = Mockery::mock(DngPaymentService::class)->shouldIgnoreMissing();
     $service->shouldReceive('pushReserved')->once()->andThrow(new RuntimeException('Connection timeout'));
     app()->instance(DngPaymentService::class, $service);
 
