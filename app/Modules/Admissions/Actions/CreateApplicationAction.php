@@ -11,6 +11,17 @@ final class CreateApplicationAction
     /** @param array<string, mixed> $data */
     public static function run(array $data): StudentApplication
     {
-        return StudentApplication::query()->create($data);
+        // High-school / national-exam subject scores live in a relation, not on
+        // the applications table — split them off before mass-assigning.
+        $scores = $data['academic_scores'] ?? [];
+        unset($data['academic_scores']);
+
+        $application = StudentApplication::query()->create($data);
+
+        if ($scores !== []) {
+            $application->academicScores()->createMany($scores);
+        }
+
+        return $application;
     }
 }

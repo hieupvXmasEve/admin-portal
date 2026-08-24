@@ -93,7 +93,7 @@ final class StudentApplicationController extends Controller
     public function store(StoreApplicationRequest $request): RedirectResponse
     {
         $application = CreateApplicationAction::run($request->validated());
-        $this->flash('success', 'Student application created successfully.');
+        $this->flash('success', 'Đã tạo hồ sơ tuyển sinh.');
 
         return redirect()->route('student-applications.show', $application);
     }
@@ -131,7 +131,7 @@ final class StudentApplicationController extends Controller
     public function update(UpdateApplicationRequest $request, StudentApplication $studentApplication): RedirectResponse
     {
         UpdateApplicationAction::run(['application' => $studentApplication, 'attributes' => $request->validated()]);
-        $this->flash('success', 'Student application updated successfully.');
+        $this->flash('success', 'Đã cập nhật hồ sơ tuyển sinh.');
 
         return redirect()->route('student-applications.show', $studentApplication);
     }

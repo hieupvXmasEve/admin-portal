@@ -170,11 +170,10 @@ const onSubmit = handleSubmit((formValues) => {
 
     router.put(route('student-applications.update', props.application.id), data, {
         preserveScroll: true,
-        onSuccess: () => {
-            toast.success('Student application updated successfully');
-        },
+        // No onSuccess toast: the controller server-flashes it, rendered once by
+        // useFlashToast (AppLayout). A second toast here would double it.
         onError: (errors) => {
-            toast.error('Failed to update student application');
+            toast.error('Vui lòng kiểm tra lại các trường được đánh dấu.');
             console.error('Validation errors:', errors);
         },
     });

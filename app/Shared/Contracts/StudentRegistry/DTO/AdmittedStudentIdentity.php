@@ -24,6 +24,13 @@ final readonly class AdmittedStudentIdentity
         public string $nationality,
         public ?string $nationalId,
         public ?string $address,
+        // Structured address copies carried onto the Student on conversion:
+        // the application's current address (line + ward + province) and its
+        // CCCD permanent address.
+        public ?string $currentAddressLine,
+        public ?string $currentWard,
+        public ?string $currentProvince,
+        public ?string $cccdAddress,
         public ?string $emergencyContactName,
         public ?string $emergencyContactPhone,
         public ?string $emergencyContactRelationship,

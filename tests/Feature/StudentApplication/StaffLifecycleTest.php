@@ -114,6 +114,11 @@ it('approves a pending application, atomically creating user, student, role, and
     $application = makePendingApplication($this->campus, [
         'email' => 'applicant@example.com',
         'student_code' => 'S7654321',
+        'address' => '12 Le Loi, Phuong Ben Thanh, TP Ho Chi Minh',
+        'new_street' => '12 Le Loi',
+        'new_ward' => 'Phuong Ben Thanh',
+        'new_province' => 'TP Ho Chi Minh',
+        'permanent_address' => '34 Tran Phu, Hue',
     ]);
 
     $response = $this->actingAs($staff)
@@ -139,6 +144,12 @@ it('approves a pending application, atomically creating user, student, role, and
     expect($student->email)->toBe('applicant@example.com');
     // Cohort (khóa) stamped from the CRM mapping screen's intake config.
     expect($student->intake)->toBe(1);
+    // Addresses carried onto the student: freeform + structured current + CCCD.
+    expect($student->address)->toBe('12 Le Loi, Phuong Ben Thanh, TP Ho Chi Minh');
+    expect($student->current_address_line)->toBe('12 Le Loi');
+    expect($student->current_ward)->toBe('Phuong Ben Thanh');
+    expect($student->current_province)->toBe('TP Ho Chi Minh');
+    expect($student->cccd_address)->toBe('34 Tran Phu, Hue');
 
     // User created with a secure password — never the old hardcoded default.
     $user = User::where('email', 'applicant@example.com')->first();
@@ -697,6 +708,61 @@ it('creates a manual application as pending with no auto-approve', function () {
     expect($application->student_id)->toBeNull();
 
     $response->assertRedirect(route('student-applications.show', $application));
+});
+
+it('persists the optional CRM sync fields on manual create', function () {
+    $staff = makeStaff();
+    $program = Program::factory()->create();
+    $semester = Semester::factory()->create();
+
+    $payload = [
+        'full_name' => 'CRM Fields Applicant',
+        'email' => 'crmfields@example.com',
+        'campus_code' => $this->campus->code,
+        'intended_program' => $program->code,
+        'intake' => $semester->code,
+        'student_code' => 'SCRM0001',
+        // Fields the CRM sync populates, now editable on the create form.
+        'crm_campus' => 'Ha Noi',
+        'crm_major' => 'Cong nghe thong tin',
+        'province' => 'Ha Noi',
+        'permanent_address' => '1 Main St',
+        'nationality' => 'Vietnamese',
+        'school' => 'THPT Chu Van An',
+        'graduation_year' => '2025',
+        'gpa' => '8.75',
+        'gpa_type' => '10',
+        'scholarship' => 'Merit',
+        'registration_form' => true,
+        'crm_paid_amount' => '1500000',
+        'academic_scores' => [
+            ['subject_code' => 'toan', 'score' => '9.5', 'source' => 'school_report'],
+            ['subject_code' => 'thithpt_toan', 'score' => '8', 'source' => 'national_exam'],
+        ],
+    ];
+
+    $this->actingAs($staff)
+        ->withHeader('X-CSRF-TOKEN', SA_CSRF)
+        ->post(route('student-applications.store'), $payload)
+        ->assertRedirect();
+
+    $application = StudentApplication::where('email', 'crmfields@example.com')->firstOrFail();
+    expect($application->crm_campus)->toBe('Ha Noi');
+    expect($application->crm_major)->toBe('Cong nghe thong tin');
+    expect($application->province)->toBe('Ha Noi');
+    expect($application->permanent_address)->toBe('1 Main St');
+    expect($application->school)->toBe('THPT Chu Van An');
+    expect($application->graduation_year)->toBe('2025');
+    expect((float) $application->gpa)->toBe(8.75);
+    expect($application->registration_form)->toBeTrue();
+    expect((float) $application->crm_paid_amount)->toBe(1500000.0);
+
+    $scores = $application->academicScores()->get()->keyBy('subject_code');
+    expect($scores)->toHaveCount(2);
+    expect((float) $scores['toan']->score)->toBe(9.5);
+    expect($scores['toan']->source)->toBe('school_report');
+    expect((float) $scores['thithpt_toan']->score)->toBe(8.0);
+    expect($scores['thithpt_toan']->source)->toBe('national_exam');
 });
 
 it('rejects a manual application with an unknown program code (ADR-0005 parity)', function () {
