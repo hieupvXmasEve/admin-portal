@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\ApplicationGuardian;
 use App\Models\StudentApplication;
 use App\Modules\Admissions\Models\ApplicationAcademicScore;
+use App\Modules\Admissions\Models\CrmValueMapping;
 use App\Modules\Admissions\Services\CrmApplicationSyncService;
 use App\Modules\Admissions\Support\Crm\CrmIntegrationSettings;
 use App\Modules\Upload\Models\ApplicationDocumentType;
@@ -316,4 +317,17 @@ it('seeds id_card_back and scholarship_certificate document types idempotently',
 
     expect(ApplicationDocumentType::query()->where('code', 'id_card_back')->count())->toBe(1)
         ->and(ApplicationDocumentType::query()->where('code', 'scholarship_certificate')->count())->toBe(1);
+});
+
+it('resolves campus_code on a newly synced application within the same run', function () {
+    // Mapping already configured; the record is inserted DURING this run.
+    CrmValueMapping::create(['kind' => CrmValueMapping::KIND_CAMPUS, 'crm_value' => 'Hà Nội', 'local_code' => 'HN']);
+    fakeNeResponse([neRecord(['student_code' => 'NEHN000001', 'campus' => 'Hà Nội'])]);
+
+    app(CrmApplicationSyncService::class)->run(false, null);
+
+    // Timing-gap fix: resolve runs AFTER the upsert, so the row just inserted
+    // is mapped this run instead of waiting for the next sync.
+    $application = StudentApplication::where('student_code', 'NEHN000001')->firstOrFail();
+    expect($application->campus_code)->toBe('HN');
 });

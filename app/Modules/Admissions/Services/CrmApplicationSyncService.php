@@ -25,7 +25,7 @@ use Throwable;
  */
 final class CrmApplicationSyncService
 {
-    /** Shared with {@see \App\Modules\Admissions\Services\CrmMappingResolver} so the two writers cannot interleave. */
+    /** Shared with {@see CrmMappingResolver} so the two writers cannot interleave. */
     public const LOCK_NAME = 'admissions:crm-ne-sync';
 
     public function __construct(
@@ -53,9 +53,17 @@ final class CrmApplicationSyncService
                     ['code' => 'id_card_back', 'name' => 'ID card (back)'],
                     ['code' => 'scholarship_certificate', 'name' => 'Scholarship certificate'],
                 ]);
+
+                $result = $this->processAll($this->fetchRecords($limit), false);
+
+                // Resolve AFTER upserting, not before: it backfills the derived
+                // campus_code/intended_program/intake columns across every null
+                // pending row, so the records just inserted this run are mapped
+                // now instead of waiting for the next sync. A single trailing
+                // pass also covers rows whose mapping was added since last run.
                 $this->mappingResolver->resolveWithoutLocking();
 
-                return $this->processAll($this->fetchRecords($limit), false);
+                return $result;
             });
 
         return [...$result, 'elapsed_seconds' => round(microtime(true) - $startedAt, 2)];
