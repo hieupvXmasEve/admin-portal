@@ -13,6 +13,7 @@ use App\Modules\Academic\Delivery\Exceptions\InstructorAssignmentException;
 use App\Modules\Academic\Delivery\Http\Requests\CourseDelivery\StoreCourseOfferingRequest;
 use App\Modules\Academic\Delivery\Http\Requests\CourseDelivery\UpdateCourseOfferingRequest;
 use App\Modules\Academic\Delivery\Queries\GetCourseOfferingCatalogFormQuery;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Validation\ValidationException;
@@ -53,6 +54,8 @@ class CourseOfferingCatalogFormController extends Controller
             throw ValidationException::withMessages([
                 $exception->field => [$exception->getMessage()],
             ]);
+        } catch (UniqueConstraintViolationException $exception) {
+            return $this->duplicateSectionRedirect($exception);
         }
 
         Inertia::flash('success', 'Course offering created successfully.');
@@ -103,11 +106,24 @@ class CourseOfferingCatalogFormController extends Controller
             throw ValidationException::withMessages([
                 $exception->field => [$exception->getMessage()],
             ]);
+        } catch (UniqueConstraintViolationException $exception) {
+            return $this->duplicateSectionRedirect($exception);
         }
 
         Inertia::flash('success', 'Course offering updated successfully.');
 
         return Redirect::route(CourseOfferingRoutes::INDEX);
+    }
+
+    private function duplicateSectionRedirect(UniqueConstraintViolationException $exception): RedirectResponse
+    {
+        if (! str_contains($exception->getMessage(), 'unique_semester_unit_section')) {
+            throw $exception;
+        }
+
+        Inertia::flash('error', 'A course offering with this section code already exists for the selected semester, unit, and campus.');
+
+        return Redirect::back()->withInput();
     }
 
     /**
