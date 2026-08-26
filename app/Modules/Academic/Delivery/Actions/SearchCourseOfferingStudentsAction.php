@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Academic\Delivery\Actions;
 
+use App\Models\CourseOffering;
+use App\Services\V1\Student\PrerequisiteValidationService;
 use App\Shared\Contracts\Academic\CourseOfferingCatalogReader;
 use App\Shared\Contracts\Academic\CourseRosterReader;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
@@ -64,6 +66,9 @@ final class SearchCourseOfferingStudentsAction
             }
             if ($student->academicStatus !== null && $student->academicStatus !== 'active') {
                 $reasons[] = "Student status is '{$student->academicStatus}' (must be 'active')";
+            }
+            if ($unit !== null && $courseOffering instanceof CourseOffering && ! app(PrerequisiteValidationService::class)->hasMetPrerequisites($student->id, $courseOffering)) {
+                $reasons[] = "Student has not met the prerequisites for {$unit->code}.";
             }
             if ($courseOffering->isFull()) {
                 $reasons[] = 'Course offering is at full capacity';

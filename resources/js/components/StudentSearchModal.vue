@@ -231,7 +231,7 @@ const getStudentStatusIcon = (student: StudentEligibilityInfo) => {
                     </div>
 
                     <div v-else class="space-y-2">
-                        <div v-for="student in searchResults" :key="student.student_id" class="hover:bg-accent/50 flex items-center justify-between rounded-lg border p-3">
+                        <div v-for="student in searchResults" :key="student.student_id" class="hover:bg-muted/50 flex items-center justify-between rounded-lg border p-3">
                             <div class="flex items-center space-x-3">
                                 <!-- Checkbox for eligible students only -->
                                 <Checkbox
