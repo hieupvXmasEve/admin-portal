@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\AcademicRecord;
 use App\Models\Campus;
 use App\Models\CourseOffering;
+use App\Models\CourseRetakeRegistration;
 use App\Models\ExamResitAttempt;
 use App\Models\Semester;
 use App\Models\Student;
@@ -108,6 +109,34 @@ it('excludes a record that already has an in-flight exam-resit attempt', functio
         'status' => ExamResitAttempt::STATUS_APPROVED,
         'request_sequence' => 1,
         'hq_fee_status' => ExamResitAttempt::HQ_FEE_PENDING,
+    ]);
+
+    expect(eligibleExamResit())->toHaveCount(0);
+});
+
+it('excludes a record that already has an active course-retake registration', function () {
+    // cross-lane guard: a record actively being handled in the retake lane must
+    // not also appear in the exam-resit lane.
+    $unit = Unit::factory()->create();
+    $record = failedGradeRecord($this->student, $this->campus, $this->semester, [
+        'unit' => $unit,
+        'failure_reason' => AcademicRecord::FAILURE_ATTENDANCE_FAILED,
+    ]);
+
+    CourseRetakeRegistration::create([
+        'student_id' => $this->student->id,
+        'unit_id' => $unit->id,
+        'original_academic_record_id' => $record->id,
+        'semester_id' => $this->semester->id,
+        'campus_id' => $this->campus->id,
+        'original_semester_id' => $this->semester->id,
+        'operation_semester_id' => $this->semester->id,
+        'charge_semester_id' => $this->semester->id,
+        'status' => CourseRetakeRegistration::STATUS_APPROVED,
+        'request_origin' => CourseRetakeRegistration::REQUEST_ORIGIN_STAFF,
+        'attempt_number' => 1,
+        'retake_fee' => 500000,
+        'hq_fee_status' => CourseRetakeRegistration::HQ_FEE_PENDING,
     ]);
 
     expect(eligibleExamResit())->toHaveCount(0);

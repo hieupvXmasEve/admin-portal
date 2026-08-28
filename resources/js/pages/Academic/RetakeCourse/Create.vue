@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DebouncedInput from '@/components/DebouncedInput.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import DatePicker from '@/components/ui/DatePicker.vue';
@@ -6,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { useDataTable } from '@/composables/useDataTable';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { ArrowLeft, Users } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
@@ -13,7 +15,7 @@ import { route } from 'ziggy-js';
 
 interface EligibleEntry {
     student: { id: number; full_name: string; student_id: string; campus_id: number };
-    failed_record: { id: number; unit_id: number; attempt_number: number };
+    failed_record: { id: number; unit_id: number; attempt_number: number; semester: { id: number; name: string } | null };
     unit: { id: number; code: string; name: string; retake_fee: string };
     available_offerings: {
         id: number;
@@ -36,6 +38,24 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+
+interface ListFilters {
+    search: string;
+    failed_semester_id: number | null;
+}
+
+const NO_LIST_SEMESTER_VALUE = '__all_semesters__';
+
+const { filters: listFilters, setFilter: setListFilter, handleSearch: handleListSearch } = useDataTable<ListFilters>({
+    baseUrl: route('academic.retake-course.create'),
+    initialFilters: {
+        search: typeof props.filters?.search === 'string' ? props.filters.search : '',
+        failed_semester_id: props.filters?.failed_semester_id ? Number(props.filters.failed_semester_id) : null,
+    },
+    defaultValues: { search: '', failed_semester_id: null },
+    only: ['eligible_students', 'total_eligible_students', 'filters'],
+    immediateFields: ['failed_semester_id'],
+});
 
 const NO_OFFERING_VALUE = '__no_offering__';
 const selectedEntry = ref<EligibleEntry | null>(null);
@@ -136,6 +156,20 @@ const submit = () => {
             <CardHeader>
                 <CardTitle>Sinh viên đủ điều kiện</CardTitle>
                 <CardDescription>Danh sách SV fail có thể tạo nguồn học lại.</CardDescription>
+                <div class="mt-3 flex gap-2">
+                    <DebouncedInput :model-value="listFilters.search" @update:model-value="handleListSearch" placeholder="Tìm SV, MSSV..." class="flex-1" />
+                    <Select :model-value="listFilters.failed_semester_id?.toString() ?? NO_LIST_SEMESTER_VALUE" @update:model-value="(v) => setListFilter('failed_semester_id', v && v !== NO_LIST_SEMESTER_VALUE ? Number(v) : null)">
+                        <SelectTrigger class="w-40">
+                            <SelectValue placeholder="Mọi học kỳ" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem :value="NO_LIST_SEMESTER_VALUE">Mọi học kỳ</SelectItem>
+                            <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id.toString()">
+                                {{ semester.name }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
             </CardHeader>
             <CardContent>
                 <div v-if="eligible_students.length === 0" class="text-muted-foreground py-8 text-center">Không tìm thấy sinh viên đủ điều kiện.</div>
@@ -160,6 +194,7 @@ const submit = () => {
                             </div>
                         </div>
                         <div class="text-muted-foreground mt-1 truncate text-xs">{{ entry.unit.name }}</div>
+                        <div v-if="entry.failed_record.semester" class="text-muted-foreground mt-1 text-xs">Trượt tại: {{ entry.failed_record.semester.name }}</div>
                     </div>
                 </div>
             </CardContent>

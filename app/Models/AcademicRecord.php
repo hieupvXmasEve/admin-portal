@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Shared\Support\Academic\CourseGradeScale;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class AcademicRecord extends AuditableModel
@@ -245,6 +246,11 @@ class AcademicRecord extends AuditableModel
     public function originalRecord(): BelongsTo
     {
         return $this->belongsTo(AcademicRecord::class, 'original_record_id');
+    }
+
+    public function examResitAttempts(): HasMany
+    {
+        return $this->hasMany(ExamResitAttempt::class);
     }
 
     // Scopes

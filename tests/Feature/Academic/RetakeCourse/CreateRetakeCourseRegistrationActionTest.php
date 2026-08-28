@@ -462,6 +462,61 @@ it('excludes grade-only failures from the retake eligibility list', function () 
     expect($results)->toHaveCount(0);
 });
 
+it('includes a grade-only failure once its exam-resit attempt is completed and still failing', function () {
+    $this->academicRecord->update(['failure_reason' => AcademicRecord::FAILURE_GRADE_FAILED]);
+
+    \App\Models\ExamResitAttempt::create([
+        'student_id' => $this->student->id,
+        'academic_record_id' => $this->academicRecord->id,
+        'unit_id' => $this->courseOffering->unit_id,
+        'campus_id' => $this->campus->id,
+        'original_semester_id' => $this->semester->id,
+        'operation_semester_id' => $this->semester->id,
+        'charge_semester_id' => $this->semester->id,
+        'request_origin' => \App\Models\ExamResitAttempt::REQUEST_ORIGIN_STAFF,
+        'status' => \App\Models\ExamResitAttempt::STATUS_COMPLETED,
+        'request_sequence' => 1,
+        'attempt_number' => 1,
+        'resit_passed' => false,
+        'hq_fee_status' => \App\Models\ExamResitAttempt::HQ_FEE_PENDING,
+    ]);
+
+    $results = app(ListRetakeCourseEligibleStudentsQuery::class)->handle([
+        'campus_id' => $this->campus->id,
+        'semester_id' => $this->semester->id,
+    ]);
+
+    expect($results)->toHaveCount(1);
+    expect($results->first()['student']->is($this->student))->toBeTrue();
+});
+
+it('excludes a record from the retake list while its exam-resit attempt is still in flight', function () {
+    // cross-lane guard: attendance failures are retake-eligible by default, but not
+    // while an exam-resit sitting is pending on the same record.
+    $this->academicRecord->update(['failure_reason' => AcademicRecord::FAILURE_ATTENDANCE_FAILED]);
+
+    \App\Models\ExamResitAttempt::create([
+        'student_id' => $this->student->id,
+        'academic_record_id' => $this->academicRecord->id,
+        'unit_id' => $this->courseOffering->unit_id,
+        'campus_id' => $this->campus->id,
+        'original_semester_id' => $this->semester->id,
+        'operation_semester_id' => $this->semester->id,
+        'charge_semester_id' => $this->semester->id,
+        'request_origin' => \App\Models\ExamResitAttempt::REQUEST_ORIGIN_STAFF,
+        'status' => \App\Models\ExamResitAttempt::STATUS_APPROVED,
+        'request_sequence' => 1,
+        'hq_fee_status' => \App\Models\ExamResitAttempt::HQ_FEE_PENDING,
+    ]);
+
+    $results = app(ListRetakeCourseEligibleStudentsQuery::class)->handle([
+        'campus_id' => $this->campus->id,
+        'semester_id' => $this->semester->id,
+    ]);
+
+    expect($results)->toHaveCount(0);
+});
+
 it('keeps attendance failures in the retake eligibility list', function () {
     $this->academicRecord->update(['failure_reason' => AcademicRecord::FAILURE_ATTENDANCE_FAILED]);
 
@@ -484,6 +539,36 @@ it('keeps legacy null-failure-reason failures in the retake eligibility list', f
 
     expect($results)->toHaveCount(1);
     expect($results->first()['student']->is($this->student))->toBeTrue();
+});
+
+it('filters the eligibility list by the semester the record failed in', function () {
+    $otherSemester = Semester::factory()->create();
+    $this->academicRecord->update(['semester_id' => $this->semester->id]);
+
+    $otherUnit = Unit::factory()->create();
+    $otherOffering = CourseOffering::factory()->create(['semester_id' => $otherSemester->id, 'unit_id' => $otherUnit->id]);
+    CurriculumUnit::factory()->create([
+        'curriculum_version_id' => $this->student->curriculum_version_id,
+        'unit_id' => $otherUnit->id,
+        'semester_id' => $otherSemester->id,
+    ]);
+    AcademicRecord::factory()->create([
+        'student_id' => $this->student->id,
+        'campus_id' => $this->campus->id,
+        'unit_id' => $otherUnit->id,
+        'course_offering_id' => $otherOffering->id,
+        'semester_id' => $otherSemester->id,
+        'completion_status' => 'failed',
+        'is_passed' => false,
+    ]);
+
+    $results = app(ListRetakeCourseEligibleStudentsQuery::class)->handle([
+        'campus_id' => $this->campus->id,
+        'failed_semester_id' => $this->semester->id,
+    ]);
+
+    expect($results)->toHaveCount(1);
+    expect($results->first()['unit']->id)->toBe($this->courseOffering->unit_id);
 });
 
 it('allows retake when student has passed prerequisite unit', function () {

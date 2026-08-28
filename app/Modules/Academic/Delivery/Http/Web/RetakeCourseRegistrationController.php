@@ -71,6 +71,7 @@ class RetakeCourseRegistrationController extends Controller
         $eligibleStudents = $this->eligibilityQuery->handle([
             'campus_id' => $validated['campus_id'] ?? session('current_campus_id'),
             'semester_id' => $validated['semester_id'] ?? null,
+            'failed_semester_id' => $validated['failed_semester_id'] ?? null,
             'search' => $validated['search'] ?? null,
             'unit_id' => $validated['unit_id'] ?? null,
         ]);
@@ -80,7 +81,7 @@ class RetakeCourseRegistrationController extends Controller
         return Inertia::render('Academic/RetakeCourse/Create', [
             'eligible_students' => $eligibleStudents,
             'total_eligible_students' => $totalEligibleStudents,
-            'filters' => $request->only(['search', 'semester_id', 'campus_id', 'unit_id']),
+            'filters' => $request->only(['search', 'semester_id', 'failed_semester_id', 'campus_id', 'unit_id']),
             'semesters' => $this->semesters->options(),
             'campuses' => array_map(
                 static fn (CampusReference $campus): array => $campus->toArray(),

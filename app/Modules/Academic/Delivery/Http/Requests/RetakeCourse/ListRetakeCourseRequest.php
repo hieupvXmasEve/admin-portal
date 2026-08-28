@@ -20,6 +20,7 @@ class ListRetakeCourseRequest extends FormRequest
             'status' => ['nullable', 'string', 'in:approved,payment_pending,paid,enrolled,cancelled'],
             'operation_state' => ['nullable', 'string', 'in:awaiting_payment,paid_waiting_class,enrolled,needs_review,cancelled'],
             'semester_id' => ['nullable', 'integer', 'exists:semesters,id'],
+            'failed_semester_id' => ['nullable', 'integer', 'exists:semesters,id'],
             'campus_id' => ['nullable', 'integer', 'exists:campuses,id'],
             'unit_id' => ['nullable', 'integer', 'exists:units,id'],
             'sort' => ['nullable', 'string', 'in:created_at,status,retake_fee,payment_deadline'],

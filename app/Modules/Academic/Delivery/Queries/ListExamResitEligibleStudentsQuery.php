@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Delivery\Queries;
 
 use App\Models\AcademicRecord;
+use App\Models\CourseRetakeRegistration;
 use App\Models\ExamResitAttempt;
 use App\Models\Student;
 use App\Modules\Academic\Delivery\Actions\CreateExamResitAttemptAction;
@@ -21,6 +22,10 @@ use Illuminate\Support\Collection;
  * exam-resit attempt (see {@see ListExamResitBlockedStudentsQuery} for that set).
  * No curriculum-membership join is needed: a finalized failed academic record
  * already proves the student took the unit.
+ *
+ * Cross-lane guard: a record with an active (non-terminal) course-retake
+ * registration is excluded too — it's already being handled in the retake lane,
+ * see {@see \App\Modules\Academic\Delivery\Queries\ListRetakeCourseEligibleStudentsQuery}.
  *
  * Mirrors the gate in {@see CreateExamResitAttemptAction}.
  */
@@ -63,11 +68,17 @@ class ListExamResitEligibleStudentsQuery
                 ->whereIn('status', ExamResitAttempt::IN_FLIGHT_OR_CONSUMED_STATUSES)
                 ->pluck('academic_record_id');
 
+            $activeRetakeUnitIds = CourseRetakeRegistration::query()
+                ->where('student_id', $student->id)
+                ->nonTerminal()
+                ->pluck('unit_id');
+
             $records = AcademicRecord::query()
                 ->where('student_id', $student->id)
                 ->where(fn (Builder $q) => $this->scopeEligibleRecords($q, $unitId, $semesterId))
                 ->whereNotIn('unit_id', $passedUnitIds)
                 ->whereNotIn('id', $blockedRecordIds)
+                ->whereNotIn('unit_id', $activeRetakeUnitIds)
                 ->with('unit')
                 ->get();
 
