@@ -16,17 +16,6 @@ use Illuminate\Support\Facades\DB;
 class ListRetakeCourseEligibleStudentsQuery
 {
     /**
-     * Exam-resit statuses meaning a sitting is still pending for a record. While one
-     * of these is open, the record's resit path has not been exhausted yet, so the
-     * record must not also show up as retake-eligible (cross-lane guard).
-     */
-    private const RESIT_IN_FLIGHT_STATUSES = [
-        ExamResitAttempt::STATUS_REQUESTED,
-        ExamResitAttempt::STATUS_APPROVED,
-        ExamResitAttempt::STATUS_SCHEDULED,
-    ];
-
-    /**
      * Return eligible students for retake course registration.
      *
      * Eligibility:
@@ -133,7 +122,7 @@ class ListRetakeCourseEligibleStudentsQuery
         // Records currently mid-resit (not yet completed) — blocked from retake lane.
         $inFlightResitRecordIds = ExamResitAttempt::query()
             ->whereIn('student_id', $studentIds)
-            ->whereIn('status', self::RESIT_IN_FLIGHT_STATUSES)
+            ->whereIn('status', ExamResitAttempt::IN_FLIGHT_STATUSES)
             ->pluck('academic_record_id');
 
         // Existing non-terminal retake registrations — one query, matched in memory.

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Delivery\Actions;
 
 use App\Models\AcademicRecord;
+use App\Models\CourseRetakeRegistration;
 use App\Models\ExamResitAttempt;
 use App\Models\SyllabusTemplate;
 use App\Modules\Academic\Support\AcademicFinanceObligationSource;
@@ -154,6 +155,19 @@ class CreateExamResitAttemptAction
         if ($hasInFlightAttempt) {
             throw ValidationException::withMessages([
                 'academic_record_id' => ['Bản ghi này đã có đăng ký thi lại đang xử lý hoặc đã hoàn tất.'],
+            ]);
+        }
+
+        // Cross-lane guard: a record already being handled in the retake lane must
+        // not also be registered for exam-resit.
+        $hasActiveRetake = CourseRetakeRegistration::query()
+            ->where('original_academic_record_id', $record->id)
+            ->nonTerminal()
+            ->exists();
+
+        if ($hasActiveRetake) {
+            throw ValidationException::withMessages([
+                'academic_record_id' => ['Bản ghi này đã có đăng ký học lại đang xử lý.'],
             ]);
         }
     }

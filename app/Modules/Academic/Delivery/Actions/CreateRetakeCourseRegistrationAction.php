@@ -7,6 +7,7 @@ namespace App\Modules\Academic\Delivery\Actions;
 use App\Models\AcademicRecord;
 use App\Models\CourseOffering;
 use App\Models\CourseRetakeRegistration;
+use App\Models\ExamResitAttempt;
 use App\Models\Unit;
 use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Services\V1\Student\PrerequisiteValidationService;
@@ -88,16 +89,39 @@ class CreateRetakeCourseRegistrationAction
                 ->where(fn ($q) => $q->where('override_pass', false)->orWhereNull('override_pass'))
                 ->firstOrFail();
 
-            // Failure-routing gate (ACAD-RET-001 Slice 2). Block only the explicit
-            // grade-only reason: attendance/both/manual stay eligible, and legacy
-            // un-backfilled records (failure_reason = null) keep their historical
-            // eligibility. NOTE: the exam-resit lane (Delivery\Actions\CreateExamResitAttemptAction)
-            // no longer excludes attendance/both/manual/null on failure_reason, so a
-            // non-grade-only failure can now be registered in both lanes — this gate
-            // does not prevent that.
+            // Failure-routing gate (ACAD-RET-001 Slice 2). Block the explicit
+            // grade-only reason UNLESS the record already sat a completed exam-resit
+            // attempt and is still failing — the resit path is exhausted, so it falls
+            // back into the retake lane (mirrors ListRetakeCourseEligibleStudentsQuery).
+            // Attendance/both/manual stay eligible, and legacy un-backfilled records
+            // (failure_reason = null) keep their historical eligibility. NOTE: the
+            // exam-resit lane (Delivery\Actions\CreateExamResitAttemptAction) no longer
+            // excludes attendance/both/manual/null on failure_reason, so a non-grade-only
+            // failure can now be registered in both lanes — the in-flight-resit guard
+            // below only blocks while a sitting is pending, not after both are used.
             if ($academicRecord->failure_reason === AcademicRecord::FAILURE_GRADE_FAILED) {
+                $hasCompletedResit = ExamResitAttempt::query()
+                    ->where('academic_record_id', $academicRecord->id)
+                    ->where('status', ExamResitAttempt::STATUS_COMPLETED)
+                    ->exists();
+
+                if (! $hasCompletedResit) {
+                    throw ValidationException::withMessages([
+                        'failure_reason' => ['Sinh viên fail do điểm phải đi luồng thi lại, không đủ điều kiện học lại.'],
+                    ]);
+                }
+            }
+
+            // Cross-lane guard: block while a resit sitting is still pending on this
+            // record — the resit path isn't exhausted yet.
+            $hasInFlightResit = ExamResitAttempt::query()
+                ->where('academic_record_id', $academicRecord->id)
+                ->whereIn('status', ExamResitAttempt::IN_FLIGHT_STATUSES)
+                ->exists();
+
+            if ($hasInFlightResit) {
                 throw ValidationException::withMessages([
-                    'failure_reason' => ['Sinh viên fail do điểm phải đi luồng thi lại, không đủ điều kiện học lại.'],
+                    'failure_reason' => ['Sinh viên đang có lượt thi lại chưa hoàn tất cho môn này, không thể đăng ký học lại.'],
                 ]);
             }
 

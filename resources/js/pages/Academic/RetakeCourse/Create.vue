@@ -11,6 +11,7 @@ import { useDataTable } from '@/composables/useDataTable';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { ArrowLeft, Users } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
+import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
 
 interface EligibleEntry {
@@ -128,6 +129,10 @@ const hasZeroRetakeFee = computed(() => {
 const submit = () => {
     form.post(route('academic.retake-course.store'), {
         preserveScroll: true,
+        onError: (errors) => {
+            const message = Object.values(errors)[0];
+            if (typeof message === 'string') toast.error(message);
+        },
     });
 };
 </script>
@@ -292,6 +297,7 @@ const submit = () => {
                     <!-- Errors -->
                     <p v-if="form.errors.student_id" class="text-destructive text-xs">{{ form.errors.student_id }}</p>
                     <p v-if="form.errors.unit_id" class="text-destructive text-xs">{{ form.errors.unit_id }}</p>
+                    <p v-if="form.errors.failure_reason" class="text-destructive text-xs">{{ form.errors.failure_reason }}</p>
 
                     <!-- Submit -->
                     <div class="flex justify-end">

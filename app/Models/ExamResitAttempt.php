@@ -70,6 +70,18 @@ class ExamResitAttempt extends AuditableModel
         self::STATUS_COMPLETED,
     ];
 
+    /**
+     * A resit sitting is pending — the record's resit path is not exhausted yet, so
+     * it must not also be retake-eligible (cross-lane guard between the retake and
+     * exam-resit lanes). Excludes `completed`: once a sitting is recorded, the
+     * retake lane may open up if the record is still failing.
+     */
+    public const IN_FLIGHT_STATUSES = [
+        self::STATUS_REQUESTED,
+        self::STATUS_APPROVED,
+        self::STATUS_SCHEDULED,
+    ];
+
     protected $fillable = [
         'student_id',
         'academic_record_id',

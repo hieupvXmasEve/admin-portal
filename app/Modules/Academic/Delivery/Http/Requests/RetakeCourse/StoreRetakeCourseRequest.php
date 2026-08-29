@@ -13,6 +13,17 @@ class StoreRetakeCourseRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        // The date picker submits '' for an unset optional date — normalize to null
+        // so the `nullable|date` rule and the date-cast column both see null instead
+        // of an empty string (which fails the DB insert, not validation).
+        $this->merge([
+            'registration_start_date' => $this->input('registration_start_date') ?: null,
+            'registration_end_date' => $this->input('registration_end_date') ?: null,
+        ]);
+    }
+
     public function rules(): array
     {
         return [

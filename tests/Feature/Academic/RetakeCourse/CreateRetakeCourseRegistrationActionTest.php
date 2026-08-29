@@ -389,6 +389,80 @@ it('rejects retake when academic record failed by grade only', function () {
     ]);
 })->throws(ValidationException::class);
 
+it('allows retake when academic record failed by grade only but its exam-resit attempt is completed and still failing', function () {
+    $this->academicRecord->update(['failure_reason' => AcademicRecord::FAILURE_GRADE_FAILED]);
+
+    \App\Models\ExamResitAttempt::create([
+        'student_id' => $this->student->id,
+        'academic_record_id' => $this->academicRecord->id,
+        'unit_id' => $this->courseOffering->unit_id,
+        'campus_id' => $this->campus->id,
+        'original_semester_id' => $this->semester->id,
+        'operation_semester_id' => $this->semester->id,
+        'charge_semester_id' => $this->semester->id,
+        'request_origin' => \App\Models\ExamResitAttempt::REQUEST_ORIGIN_STAFF,
+        'status' => \App\Models\ExamResitAttempt::STATUS_COMPLETED,
+        'request_sequence' => 1,
+        'attempt_number' => 1,
+        'resit_passed' => false,
+        'hq_fee_status' => \App\Models\ExamResitAttempt::HQ_FEE_PENDING,
+    ]);
+
+    $result = CreateRetakeCourseRegistrationAction::run([
+        'student_id' => $this->student->id,
+        'unit_id' => $this->courseOffering->unit_id,
+        'original_academic_record_id' => $this->academicRecord->id,
+        'course_offering_id' => $this->courseOffering->id,
+        'semester_id' => $this->semester->id,
+        'campus_id' => $this->campus->id,
+    ]);
+
+    expect($result)->toBeInstanceOf(CourseRetakeRegistration::class);
+});
+
+it('rejects retake while an exam-resit attempt is still in flight (cross-lane guard)', function () {
+    $this->academicRecord->update(['failure_reason' => AcademicRecord::FAILURE_ATTENDANCE_FAILED]);
+
+    \App\Models\ExamResitAttempt::create([
+        'student_id' => $this->student->id,
+        'academic_record_id' => $this->academicRecord->id,
+        'unit_id' => $this->courseOffering->unit_id,
+        'campus_id' => $this->campus->id,
+        'original_semester_id' => $this->semester->id,
+        'operation_semester_id' => $this->semester->id,
+        'charge_semester_id' => $this->semester->id,
+        'request_origin' => \App\Models\ExamResitAttempt::REQUEST_ORIGIN_STAFF,
+        'status' => \App\Models\ExamResitAttempt::STATUS_APPROVED,
+        'request_sequence' => 1,
+        'hq_fee_status' => \App\Models\ExamResitAttempt::HQ_FEE_PENDING,
+    ]);
+
+    CreateRetakeCourseRegistrationAction::run([
+        'student_id' => $this->student->id,
+        'unit_id' => $this->courseOffering->unit_id,
+        'original_academic_record_id' => $this->academicRecord->id,
+        'course_offering_id' => $this->courseOffering->id,
+        'semester_id' => $this->semester->id,
+        'campus_id' => $this->campus->id,
+    ]);
+})->throws(ValidationException::class);
+
+it('accepts a null registration date without crashing the insert (form sends "" for unset dates)', function () {
+    $created = CreateRetakeCourseRegistrationAction::run([
+        'student_id' => $this->student->id,
+        'unit_id' => $this->courseOffering->unit_id,
+        'original_academic_record_id' => $this->academicRecord->id,
+        'course_offering_id' => $this->courseOffering->id,
+        'semester_id' => $this->semester->id,
+        'campus_id' => $this->campus->id,
+        'registration_start_date' => null,
+        'registration_end_date' => null,
+        'notes' => null,
+    ]);
+
+    expect($created->registration_start_date)->toBeNull();
+});
+
 it('allows retake when academic record failed by attendance', function () {
     $this->academicRecord->update(['failure_reason' => AcademicRecord::FAILURE_ATTENDANCE_FAILED]);
 
