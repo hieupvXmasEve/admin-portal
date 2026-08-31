@@ -38,6 +38,8 @@ class ExamResitAttempt extends AuditableModel
 
     public const CANCELLATION_FEE_KEPT_PAID_NO_REFUND = 'kept_paid_no_refund';
 
+    public const CANCELLATION_FEE_PAID_RELEASE_TO_BALANCE = 'paid_release_to_balance';
+
     public const CANCELLATION_FEE_VOIDED_UNPAID_CHARGE = 'voided_unpaid_charge';
 
     public const CANCELLATION_FEE_NO_CHARGE = 'no_charge';
@@ -57,30 +59,42 @@ class ExamResitAttempt extends AuditableModel
     ];
 
     /**
-     * Statuses that mean an exam-resit source is already in flight or
-     * consumed for a record — registering another one for the same record
-     * must be blocked while any of these exist. Shared between the
-     * eligibility list (display filter) and the create action (write guard);
-     * the write guard is the one that actually prevents double-registration.
-     */
-    public const IN_FLIGHT_OR_CONSUMED_STATUSES = [
-        self::STATUS_REQUESTED,
-        self::STATUS_APPROVED,
-        self::STATUS_SCHEDULED,
-        self::STATUS_COMPLETED,
-    ];
-
-    /**
-     * A resit sitting is pending — the record's resit path is not exhausted yet, so
-     * it must not also be retake-eligible (cross-lane guard between the retake and
-     * exam-resit lanes). Excludes `completed`: once a sitting is recorded, the
-     * retake lane may open up if the record is still failing.
+     * Statuses that mean an exam-resit source is still pending for a record —
+     * registering another one for the same record must be blocked while any of
+     * these exist. Shared between the eligibility list (display filter) and the
+     * create action (write guard); the per-record attempt limit is enforced
+     * separately via `assertAttemptsRemaining` against the live syllabus policy.
      */
     public const IN_FLIGHT_STATUSES = [
         self::STATUS_REQUESTED,
         self::STATUS_APPROVED,
         self::STATUS_SCHEDULED,
     ];
+
+    /**
+     * Single definition of a consumed resit attempt: `attempt_number` is set.
+     * Never introduce a status-based parallel definition.
+     */
+    public static function consumedAttemptCount(int $academicRecordId): int
+    {
+        return (int) static::query()
+            ->where('academic_record_id', $academicRecordId)
+            ->whereNotNull('attempt_number')
+            ->count();
+    }
+
+    /**
+     * Next attempt number for a record: one past the highest consumed.
+     */
+    public static function nextAttemptNumberFor(int $academicRecordId): int
+    {
+        $maxConsumed = (int) static::query()
+            ->where('academic_record_id', $academicRecordId)
+            ->whereNotNull('attempt_number')
+            ->max('attempt_number');
+
+        return $maxConsumed + 1;
+    }
 
     protected $fillable = [
         'student_id',

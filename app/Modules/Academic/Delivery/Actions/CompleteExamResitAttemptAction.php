@@ -6,6 +6,7 @@ namespace App\Modules\Academic\Delivery\Actions;
 
 use App\Models\AcademicRecord;
 use App\Models\ExamResitAttempt;
+use App\Modules\Academic\Delivery\Queries\ListExamResitEligibleStudentsQuery;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -23,7 +24,7 @@ use Illuminate\Validation\ValidationException;
  *   clears any prior manual override (`override_pass`), and a still-failing result
  *   is normalized to `grade_failed`. Grade-only: attendance is not re-checked here.
  *   Confirmed product decision — once exam resit is allowed for a record (any
- *   original failure_reason, see {@see \App\Modules\Academic\Delivery\Queries\ListExamResitEligibleStudentsQuery}),
+ *   original failure_reason, see {@see ListExamResitEligibleStudentsQuery}),
  *   the resit score alone decides pass/fail; the original attendance shortfall is
  *   informational only and does not block passing.
  * - Attempt counting: `attempt_number` is consumed ONLY at completion (the student
@@ -80,7 +81,7 @@ class CompleteExamResitAttemptAction
             $applied = $resitScore > $originalScore;
 
             $previousSnapshot = $this->snapshotRecord($record);
-            $consumedAttemptNumber = $this->nextAttemptNumber($attempt);
+            $consumedAttemptNumber = ExamResitAttempt::nextAttemptNumberFor((int) $attempt->academic_record_id);
 
             $passFlipped = $this->applyResultToRecord(
                 $record,
@@ -230,20 +231,6 @@ class CompleteExamResitAttemptAction
         return $attempt->unit?->unit_type === 'egc'
             ? self::EGC_GRADE_THRESHOLD
             : self::DEFAULT_GRADE_THRESHOLD;
-    }
-
-    /**
-     * Consume the next attempt number for the record. Counts only previously
-     * consumed attempts (completed sittings), never request/source rows.
-     */
-    private function nextAttemptNumber(ExamResitAttempt $attempt): int
-    {
-        $maxConsumed = (int) ExamResitAttempt::query()
-            ->where('academic_record_id', $attempt->academic_record_id)
-            ->whereNotNull('attempt_number')
-            ->max('attempt_number');
-
-        return $maxConsumed + 1;
     }
 
     /**

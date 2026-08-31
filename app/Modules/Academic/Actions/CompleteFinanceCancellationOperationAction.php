@@ -97,11 +97,14 @@ class CompleteFinanceCancellationOperationAction implements FinanceCancellationC
             if ($attempt->status === ExamResitAttempt::STATUS_CANCELLED) {
                 if ($wasPaid && (
                     $attempt->hq_fee_status !== ExamResitAttempt::HQ_FEE_PAID
-                    || $attempt->cancellation_fee_disposition !== ExamResitAttempt::CANCELLATION_FEE_KEPT_PAID_NO_REFUND
+                    || ! in_array($attempt->cancellation_fee_disposition, [
+                        ExamResitAttempt::CANCELLATION_FEE_KEPT_PAID_NO_REFUND,
+                        ExamResitAttempt::CANCELLATION_FEE_PAID_RELEASE_TO_BALANCE,
+                    ], true)
                 )) {
                     $attempt->update([
                         'hq_fee_status' => ExamResitAttempt::HQ_FEE_PAID,
-                        'cancellation_fee_disposition' => ExamResitAttempt::CANCELLATION_FEE_KEPT_PAID_NO_REFUND,
+                        'cancellation_fee_disposition' => $disposition,
                     ]);
                 }
 
@@ -143,6 +146,7 @@ class CompleteFinanceCancellationOperationAction implements FinanceCancellationC
         if (is_string($explicit) && $explicit !== '') {
             return match ($explicit) {
                 FinanceCancellationFeeDisposition::KeptPaidNoRefund->value => ExamResitAttempt::CANCELLATION_FEE_KEPT_PAID_NO_REFUND,
+                FinanceCancellationFeeDisposition::PaidReleaseToBalance->value => ExamResitAttempt::CANCELLATION_FEE_PAID_RELEASE_TO_BALANCE,
                 FinanceCancellationFeeDisposition::VoidedUnpaidCharge->value => ExamResitAttempt::CANCELLATION_FEE_VOIDED_UNPAID_CHARGE,
                 FinanceCancellationFeeDisposition::NoCharge->value => ExamResitAttempt::CANCELLATION_FEE_NO_CHARGE,
                 default => $wasPaid
@@ -150,7 +154,6 @@ class CompleteFinanceCancellationOperationAction implements FinanceCancellationC
                     : ExamResitAttempt::CANCELLATION_FEE_VOIDED_UNPAID_CHARGE,
             };
         }
-
         if ($wasPaid) {
             return ExamResitAttempt::CANCELLATION_FEE_KEPT_PAID_NO_REFUND;
         }

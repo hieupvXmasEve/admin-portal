@@ -17,7 +17,7 @@ import { route } from 'ziggy-js';
 interface EligibleEntry {
     student: { id: number; full_name: string; student_id: string; campus_id: number };
     failed_record: { id: number; unit_id: number; attempt_number: number; semester: { id: number; name: string } | null };
-    unit: { id: number; code: string; name: string; retake_fee: string };
+    unit: { id: number; code: string; name: string };
     available_offerings: {
         id: number;
         section_code: string | null;
@@ -121,10 +121,6 @@ const selectedOffering = computed(() => {
 
 const selectedOfferingValue = computed(() => selectedOfferingId.value?.toString() ?? NO_OFFERING_VALUE);
 
-const hasZeroRetakeFee = computed(() => {
-    if (!selectedEntry.value) return false;
-    return !selectedEntry.value.unit.retake_fee || parseFloat(selectedEntry.value.unit.retake_fee) <= 0;
-});
 
 const submit = () => {
     form.post(route('academic.retake-course.store'), {
@@ -235,8 +231,9 @@ const submit = () => {
                     <!-- Retake Fee -->
                     <div>
                         <Label>Phí học lại (VNĐ)</Label>
-                        <Input :model-value="parseFloat(selectedEntry.unit.retake_fee || '0').toLocaleString('vi-VN')" disabled />
-                        <p v-if="hasZeroRetakeFee" class="text-destructive mt-1 text-xs">Môn {{ selectedEntry.unit.code }} chưa cấu hình phí học lại. Vui lòng cập nhật retake_fee trong quản lý Unit trước khi đăng ký.</p>
+                        <p class="text-muted-foreground text-xs">
+                            Phí học lại được tính theo bảng giá Finance (Pricing Operations) khi đăng ký. Nếu môn chưa có giá trong bảng giá, hệ thống sẽ chặn đăng ký.
+                        </p>
                     </div>
 
                     <!-- Operation Semester -->

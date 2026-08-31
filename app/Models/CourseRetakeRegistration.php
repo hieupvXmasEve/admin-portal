@@ -51,9 +51,15 @@ class CourseRetakeRegistration extends AuditableModel
         self::STATUS_PAID,
     ];
 
+    /**
+     * Owner rule #4: a paid retake may still be cancelled while it has not
+     * been linked to a class (course_registration_id). `isCancellable()`
+     * enforces that guard; paid + linked is terminal.
+     */
     public const CANCELLABLE_STATUSES = [
         self::STATUS_APPROVED,
         self::STATUS_PAYMENT_PENDING,
+        self::STATUS_PAID,
     ];
 
     protected $fillable = [
@@ -197,7 +203,7 @@ class CourseRetakeRegistration extends AuditableModel
         ]);
     }
 
-    public function markFinanceObligationCreated(int $userId): void
+    public function markFinanceObligationCreated(int $userId, float $retakeFee): void
     {
         if ($this->status !== self::STATUS_APPROVED) {
             throw new \RuntimeException(
@@ -210,6 +216,9 @@ class CourseRetakeRegistration extends AuditableModel
             'hq_fee_status' => self::HQ_FEE_CHARGE_CREATED,
             'charge_created_by_user_id' => $userId,
             'charge_created_at' => now(),
+            // Projection of the amount Finance resolved and stored for this
+            // source — display only, settlement truth lives in Finance.
+            'retake_fee' => $retakeFee,
         ]);
     }
 
@@ -256,9 +265,14 @@ class CourseRetakeRegistration extends AuditableModel
 
     public function cancel(int $userId, string $reason, ?string $hqFeeStatus = null): void
     {
-        if (! in_array($this->status, self::CANCELLABLE_STATUSES)) {
+        // Paid registrations must never be terminally cancelled directly: the
+        // captured money has to be handled by the Finance Cancellation
+        // Operation first (markFinancePendingCancellation + handoff).
+        if (! in_array($this->status, self::CANCELLABLE_STATUSES, true)
+            || $this->status === self::STATUS_PAID
+        ) {
             throw new \RuntimeException(
-                "Cannot cancel from status: {$this->status}. Only approved or payment_pending can be cancelled."
+                "Cannot cancel from status: {$this->status}. Only approved or payment_pending can be cancelled directly."
             );
         }
 
@@ -334,7 +348,15 @@ class CourseRetakeRegistration extends AuditableModel
 
     public function isCancellable(): bool
     {
-        return in_array($this->status, self::CANCELLABLE_STATUSES);
+        if (! in_array($this->status, self::CANCELLABLE_STATUSES, true)) {
+            return false;
+        }
+
+        if ($this->status === self::STATUS_PAID && $this->course_registration_id !== null) {
+            return false;
+        }
+
+        return true;
     }
 
     // =====================

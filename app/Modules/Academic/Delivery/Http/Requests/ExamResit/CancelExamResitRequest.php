@@ -25,6 +25,7 @@ class CancelExamResitRequest extends FormRequest
             'reason' => ['required', 'string', 'min:5', 'max:1000'],
             'acknowledge_no_refund' => ['nullable', 'boolean'],
             'confirmation' => ['nullable', 'string', 'max:100'],
+            'fee_outcome' => ['nullable', 'string', 'in:forfeit,keep_for_later'],
         ];
     }
 

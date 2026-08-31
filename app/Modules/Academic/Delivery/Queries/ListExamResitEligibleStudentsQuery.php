@@ -25,7 +25,7 @@ use Illuminate\Support\Collection;
  *
  * Cross-lane guard: a record with an active (non-terminal) course-retake
  * registration is excluded too — it's already being handled in the retake lane,
- * see {@see \App\Modules\Academic\Delivery\Queries\ListRetakeCourseEligibleStudentsQuery}.
+ * see {@see ListRetakeCourseEligibleStudentsQuery}.
  *
  * Mirrors the gate in {@see CreateExamResitAttemptAction}.
  */
@@ -63,10 +63,9 @@ class ListExamResitEligibleStudentsQuery
                 ->where(fn (Builder $q) => $q->where('is_passed', true)->orWhere('override_pass', true))
                 ->pluck('unit_id');
 
-            $blockedRecordIds = ExamResitAttempt::query()
+            $attemptsByRecord = ExamResitAttempt::query()
                 ->where('student_id', $student->id)
-                ->whereIn('status', ExamResitAttempt::IN_FLIGHT_OR_CONSUMED_STATUSES)
-                ->pluck('academic_record_id');
+                ->get(['academic_record_id', 'status', 'attempt_number']);
 
             $activeRetakeUnitIds = CourseRetakeRegistration::query()
                 ->where('student_id', $student->id)
@@ -77,10 +76,24 @@ class ListExamResitEligibleStudentsQuery
                 ->where('student_id', $student->id)
                 ->where(fn (Builder $q) => $this->scopeEligibleRecords($q, $unitId, $semesterId))
                 ->whereNotIn('unit_id', $passedUnitIds)
-                ->whereNotIn('id', $blockedRecordIds)
                 ->whereNotIn('unit_id', $activeRetakeUnitIds)
-                ->with('unit')
-                ->get();
+                ->with(['unit', 'courseOffering.syllabusTemplate'])
+                ->get()
+                ->reject(function (AcademicRecord $record) use ($attemptsByRecord): bool {
+                    // Single consumed definition: attempt_number IS NOT NULL.
+                    // A record is blocked while a resit source is in flight or
+                    // when consumed attempts reached the live syllabus policy.
+                    $attempts = $attemptsByRecord->where('academic_record_id', $record->id);
+                    if ($attempts->contains(fn ($a) => in_array($a->status, ExamResitAttempt::IN_FLIGHT_STATUSES, true))) {
+                        return true;
+                    }
+
+                    $consumed = $attempts->filter(fn ($a) => $a->attempt_number !== null)->count();
+
+                    return $consumed > 0
+                        && $consumed >= CreateExamResitAttemptAction::liveMaxAttemptsFor($record);
+                })
+                ->values();
 
             foreach ($records as $record) {
                 $results->push([

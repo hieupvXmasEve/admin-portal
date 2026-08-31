@@ -56,6 +56,24 @@ function createRetakeRegistration(string $status = 'approved', array $overrides 
 // State Transition Tests
 // =====================
 
+function createLinkedCourseRegistrationFor(CourseRetakeRegistration $reg): CourseRegistration
+{
+    return CourseRegistration::create([
+        'student_id' => $reg->student_id,
+        'course_offering_id' => $reg->course_offering_id,
+        'semester_id' => $reg->semester_id,
+        'registration_status' => 'confirmed',
+        'registration_date' => now(),
+        'registration_method' => 'admin_override',
+        'is_retake' => false,
+        'attempt_number' => 1,
+        'retake_fee' => 0,
+        'is_retake_paid' => 'no',
+        'credit_points' => $reg->unit->credit_points ?? 0,
+        'credit_hours' => $reg->unit->credit_hours ?? 0,
+    ]);
+}
+
 it('transitions from approved to payment_pending', function () {
     $reg = createRetakeRegistration('approved');
     $user = User::factory()->create();
@@ -144,11 +162,23 @@ it('cancels from payment_pending status', function () {
     expect($reg->status)->toBe(CourseRetakeRegistration::STATUS_CANCELLED);
 });
 
-it('throws when cancelling from non-cancellable status', function () {
+it('throws when cancelling a paid registration linked to a class', function () {
+    $user = User::factory()->create();
+    $reg = createRetakeRegistration('paid');
+    $courseReg = createLinkedCourseRegistrationFor($reg);
+    $reg->update(['course_registration_id' => $courseReg->id]);
+
+    $reg->cancel($user->id, 'Should fail');
+})->throws(RuntimeException::class, 'Cannot cancel from status: paid');
+
+it('allows starting finance cancellation from a paid unlinked registration', function () {
+    $user = User::factory()->create();
     $reg = createRetakeRegistration('paid');
 
-    $reg->cancel(1, 'Should fail');
-})->throws(RuntimeException::class, 'Cannot cancel from status: paid');
+    $reg->markFinancePendingCancellation($user->id, 'Unlinked paid cancel');
+
+    expect($reg->fresh()->status)->toBe(CourseRetakeRegistration::STATUS_FINANCE_PENDING_CANCELLATION);
+});
 
 // =====================
 // Scope Tests
@@ -160,11 +190,10 @@ it('scopes nonTerminal correctly', function () {
     createRetakeRegistration('paid');
     createRetakeRegistration('enrolled');
     createRetakeRegistration('cancelled');
-
     $nonTerminal = CourseRetakeRegistration::nonTerminal()->get();
+
+    // paid is now non-terminal (cancellable before class link).
     expect($nonTerminal)->toHaveCount(3);
-    expect($nonTerminal->pluck('status')->sort()->values()->all())
-        ->toBe(['approved', 'paid', 'payment_pending']);
 });
 
 // =====================
@@ -184,9 +213,15 @@ it('identifies terminal status correctly', function () {
 it('identifies cancellable status correctly', function () {
     $approved = createRetakeRegistration('approved');
     $pending = createRetakeRegistration('payment_pending');
-    $paid = createRetakeRegistration('paid');
+    $paidUnlinked = createRetakeRegistration('paid');
+    $paidLinked = createRetakeRegistration('paid');
+    $courseReg = createLinkedCourseRegistrationFor($paidLinked);
+    $paidLinked->update(['course_registration_id' => $courseReg->id]);
+    $enrolled = createRetakeRegistration('enrolled');
 
     expect($approved->isCancellable())->toBeTrue();
     expect($pending->isCancellable())->toBeTrue();
-    expect($paid->isCancellable())->toBeFalse();
+    expect($paidUnlinked->isCancellable())->toBeTrue();
+    expect($paidLinked->isCancellable())->toBeFalse();
+    expect($enrolled->isCancellable())->toBeFalse();
 });

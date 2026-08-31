@@ -21,6 +21,19 @@ use RuntimeException;
  */
 class CancelExamResitAttemptAction
 {
+    /**
+     * Fee outcome chosen by staff when cancelling a PAID resit attempt:
+     *  - forfeit: the paid fee is lost (charge stays as revenue);
+     *  - keep_for_later: the paid fee is released to unapplied balance.
+     */
+    public const FEE_OUTCOME_FORFEIT = 'forfeit';
+
+    public const FEE_OUTCOME_KEEP_FOR_LATER = 'keep_for_later';
+
+    public const PAID_VOID_REASON_FORFEIT = 'exam_resit_cancelled_paid_no_refund';
+
+    public const PAID_VOID_REASON_KEEP_FOR_LATER = 'exam_resit_cancelled_paid_keep_for_later';
+
     public const CONFIRM_VOID_UNPAID_EXAM_RESIT_FEE = ExamResitAttempt::CONFIRM_VOID_UNPAID_EXAM_RESIT_FEE;
 
     /**
@@ -29,6 +42,7 @@ class CancelExamResitAttemptAction
      *   reason: string,
      *   acknowledge_no_refund?: bool,
      *   confirmation?: string|null,
+     *   fee_outcome?: string,
      * }  $data
      */
     public static function run(array $data): ExamResitAttempt
@@ -42,6 +56,7 @@ class CancelExamResitAttemptAction
      *   reason: string,
      *   acknowledge_no_refund?: bool,
      *   confirmation?: string|null,
+     *   fee_outcome?: string,
      * }  $data
      */
     public function handle(array $data): ExamResitAttempt
@@ -77,11 +92,12 @@ class CancelExamResitAttemptAction
                 'source_ref' => AcademicFinanceObligationSource::examResitAttemptRef($attempt),
                 'obligation_type' => AcademicFinanceObligationSource::EXAM_RESIT_FEE,
                 'unpaid_void_reason' => 'exam_resit_cancelled',
-                'paid_void_reason' => 'exam_resit_cancelled_paid_no_refund',
+                'paid_void_reason' => $this->paidVoidReason($data),
                 'actor_user_id' => auth()->id() === null ? null : (int) auth()->id(),
                 'payload' => [
                     'reason' => $data['reason'] ?? $attempt->cancellation_reason,
                     'acknowledge_no_refund' => (bool) ($data['acknowledge_no_refund'] ?? false),
+                    'fee_outcome' => $this->feeOutcome($data),
                 ],
             ]);
 
@@ -97,10 +113,31 @@ class CancelExamResitAttemptAction
         return $attempt->fresh() ?? $attempt;
     }
 
+    private function feeOutcome(array $data): string
+    {
+        $outcome = (string) ($data['fee_outcome'] ?? self::FEE_OUTCOME_FORFEIT);
+
+        if (! in_array($outcome, [self::FEE_OUTCOME_FORFEIT, self::FEE_OUTCOME_KEEP_FOR_LATER], true)) {
+            throw new RuntimeException(
+                'fee_outcome không hợp lệ. Chỉ chấp nhận "forfeit" (mất phí) hoặc "keep_for_later" (lưu phí dùng sau).'
+            );
+        }
+
+        return $outcome;
+    }
+
+    private function paidVoidReason(array $data): string
+    {
+        return $this->feeOutcome($data) === self::FEE_OUTCOME_KEEP_FOR_LATER
+            ? self::PAID_VOID_REASON_KEEP_FOR_LATER
+            : self::PAID_VOID_REASON_FORFEIT;
+    }
+
     /**
      * @param  array{
      *   acknowledge_no_refund?: bool,
      *   confirmation?: string|null,
+     *   fee_outcome?: string,
      * }  $data
      */
     private function assertCancellationAcknowledgements(ExamResitAttempt $attempt, array $data): void
@@ -111,7 +148,9 @@ class CancelExamResitAttemptAction
 
         if ($hasPaidEvidence && ! (bool) ($data['acknowledge_no_refund'] ?? false)) {
             throw new RuntimeException(
-                'Khoản phí đã thanh toán. Vui lòng xác nhận hủy nhưng giữ nguyên phí đã thu và không tạo hoàn phí.'
+                $this->feeOutcome($data) === self::FEE_OUTCOME_KEEP_FOR_LATER
+                    ? 'Khoản phí đã thanh toán. Vui lòng xác nhận hủy và lưu phí đã thu dùng cho phí phát sinh sau.'
+                    : 'Khoản phí đã thanh toán. Vui lòng xác nhận hủy nhưng mất phí đã thu (không hoàn phí).'
             );
         }
 

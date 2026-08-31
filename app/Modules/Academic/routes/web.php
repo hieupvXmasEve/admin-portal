@@ -655,6 +655,10 @@ Route::middleware(['auth', 'verified', 'campus.selected'])->group(function () {
             ->middleware('can:complete_exam_resit')
             ->name('complete.store');
 
+        Route::post('/{examResit}/no-show', [ExamResitAttemptController::class, 'markNoShow'])
+            ->middleware('can:mark_no_show_exam_resit')
+            ->name('no-show.store');
+
         Route::post('/{examResit}/cancel', [ExamResitAttemptController::class, 'cancel'])
             ->middleware('can:cancel_exam_resit')
             ->name('cancel');

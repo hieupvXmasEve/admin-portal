@@ -17,6 +17,7 @@ use App\Shared\Contracts\Finance\FinanceIntakeContract;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 
 class CreateRetakeCourseRegistrationAction
 {
@@ -52,13 +53,6 @@ class CreateRetakeCourseRegistrationAction
             $courseOffering = isset($data['course_offering_id']) && $data['course_offering_id'] !== null
                 ? CourseOffering::findOrFail($data['course_offering_id'])
                 : null;
-
-            // Validate unit has retake_fee configured
-            if (! $unit->retake_fee || (float) $unit->retake_fee <= 0) {
-                throw ValidationException::withMessages([
-                    'unit_id' => ["Môn {$unit->code} chưa cấu hình phí học lại (retake_fee = 0). Vui lòng cập nhật phí học lại trong quản lý Unit trước khi đăng ký."],
-                ]);
-            }
 
             // Validate student is intake_course
             if ($student->status !== 'intake_course') {
@@ -100,12 +94,14 @@ class CreateRetakeCourseRegistrationAction
             // failure can now be registered in both lanes — the in-flight-resit guard
             // below only blocks while a sitting is pending, not after both are used.
             if ($academicRecord->failure_reason === AcademicRecord::FAILURE_GRADE_FAILED) {
-                $hasCompletedResit = ExamResitAttempt::query()
+                // Owner rule #8: a completed OR no-show resit sitting exhausts
+                // the resit path — the record then falls into the retake lane.
+                $hasConsumedResit = ExamResitAttempt::query()
                     ->where('academic_record_id', $academicRecord->id)
-                    ->where('status', ExamResitAttempt::STATUS_COMPLETED)
+                    ->whereIn('status', [ExamResitAttempt::STATUS_COMPLETED, ExamResitAttempt::STATUS_NO_SHOW])
                     ->exists();
 
-                if (! $hasCompletedResit) {
+                if (! $hasConsumedResit) {
                     throw ValidationException::withMessages([
                         'failure_reason' => ['Sinh viên fail do điểm phải đi luồng thi lại, không đủ điều kiện học lại.'],
                     ]);
@@ -169,9 +165,6 @@ class CreateRetakeCourseRegistrationAction
                 ->count();
             $attemptNumber = $previousAttempts + 1;
 
-            // Snapshot retake_fee from unit
-            $retakeFee = $unit->retake_fee ?? 0;
-
             $userId = (int) auth()->id();
 
             $registration = CourseRetakeRegistration::create([
@@ -192,7 +185,6 @@ class CreateRetakeCourseRegistrationAction
                 'reviewed_at' => now(),
                 'hq_fee_status' => CourseRetakeRegistration::HQ_FEE_PENDING,
                 'attempt_number' => $attemptNumber,
-                'retake_fee' => $retakeFee,
                 'registration_start_date' => $data['registration_start_date'] ?? null,
                 'registration_end_date' => $data['registration_end_date'] ?? null,
                 'notes' => $data['notes'] ?? null,
@@ -200,30 +192,45 @@ class CreateRetakeCourseRegistrationAction
                 'approved_at' => now(),
             ]);
 
-            app(FinanceIntakeContract::class)->request(new FinanceIntakeData(
-                source_system: AcademicFinanceObligationSource::SOURCE_SYSTEM,
-                source_kind: AcademicFinanceObligationSource::COURSE_RETAKE_REGISTRATION,
-                source_ref: AcademicFinanceObligationSource::courseRetakeRegistrationRef($registration),
-                financial_effect: FinancialEffect::Debit,
-                obligation_type: AcademicFinanceObligationSource::RETAKE_FEE,
-                facts: [
-                    'student_id' => $registration->student_id,
-                    'semester_id' => $registration->charge_semester_id ?? $registration->semester_id,
-                    'campus_id' => $registration->campus_id,
-                    'unit_id' => $registration->unit_id,
-                    'course_offering_id' => $registration->course_offering_id,
-                    'original_academic_record_id' => $registration->original_academic_record_id,
-                    'original_semester_id' => $registration->original_semester_id,
-                    'operation_semester_id' => $registration->operation_semester_id,
-                    'charge_semester_id' => $registration->charge_semester_id,
-                    'attempt_number' => $registration->attempt_number,
-                    'student_program_id' => $student->programId,
-                    'student_curriculum_version_id' => $student->curriculumVersionId,
-                    'description' => "Phí học lại: {$unit->code} - {$unit->name}",
-                ],
-            ));
+            // The Finance pricing catalog is the single source of the retake fee.
+            // Missing/inactive rule must stop creation with a staff-friendly
+            // message (parity with the exam-resit lane) instead of a 500.
+            try {
+                $intakeResult = app(FinanceIntakeContract::class)->request(new FinanceIntakeData(
+                    source_system: AcademicFinanceObligationSource::SOURCE_SYSTEM,
+                    source_kind: AcademicFinanceObligationSource::COURSE_RETAKE_REGISTRATION,
+                    source_ref: AcademicFinanceObligationSource::courseRetakeRegistrationRef($registration),
+                    financial_effect: FinancialEffect::Debit,
+                    obligation_type: AcademicFinanceObligationSource::RETAKE_FEE,
+                    facts: [
+                        'student_id' => $registration->student_id,
+                        'semester_id' => $registration->charge_semester_id ?? $registration->semester_id,
+                        'campus_id' => $registration->campus_id,
+                        'unit_id' => $registration->unit_id,
+                        'course_offering_id' => $registration->course_offering_id,
+                        'original_academic_record_id' => $registration->original_academic_record_id,
+                        'original_semester_id' => $registration->original_semester_id,
+                        'operation_semester_id' => $registration->operation_semester_id,
+                        'charge_semester_id' => $registration->charge_semester_id,
+                        'attempt_number' => $registration->attempt_number,
+                        'student_program_id' => $student->programId,
+                        'student_curriculum_version_id' => $student->curriculumVersionId,
+                        'description' => "Phí học lại: {$unit->code} - {$unit->name}",
+                    ],
+                ));
+            } catch (RuntimeException $e) {
+                if (! str_contains($e->getMessage(), 'No active Finance pricing catalog item')) {
+                    throw $e;
+                }
 
-            $registration->markFinanceObligationCreated($userId);
+                throw ValidationException::withMessages([
+                    'unit_id' => ['Chưa cấu hình giá học lại cho môn này. Vui lòng cấu hình tại Pricing Operations.'],
+                ]);
+            }
+
+            // Capture the amount Finance actually resolved and stored for this
+            // source — never resolve it independently from unit.retake_fee.
+            $registration->markFinanceObligationCreated($userId, $intakeResult->amount);
 
             return $registration->fresh();
         });

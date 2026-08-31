@@ -8,7 +8,6 @@ use App\Models\CourseOffering;
 use App\Models\ExamResitAttempt;
 use App\Models\ExamResitSession;
 use App\Models\ExamRoomSlot;
-use App\Modules\Facilities\Models\Room;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\SyllabusTemplate;
@@ -19,6 +18,7 @@ use App\Modules\Academic\Delivery\Actions\CancelExamResitAttemptAction;
 use App\Modules\Academic\Delivery\Actions\CreateExamResitAttemptAction;
 use App\Modules\Academic\Models\AcademicFinanceCancellationHandoff;
 use App\Modules\Academic\Support\AcademicFinanceObligationSource;
+use App\Modules\Facilities\Models\Room;
 use App\Modules\Finance\Actions\CreateExamResitChargeSimpleAction;
 use App\Modules\Finance\Actions\ProcessFinanceCancellationOperationAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
@@ -361,9 +361,9 @@ it('bridges linked paid dng evidence before cancelling a charge_created attempt'
         'dng_payment_id' => 'DNG-PTL-PAID-'.$paidDng->id,
         'paid_at' => now(),
     ]);
-
     $result = runCancelExamResit($attempt->id, overrides: [
         'acknowledge_no_refund' => true,
+        'fee_outcome' => CancelExamResitAttemptAction::FEE_OUTCOME_KEEP_FOR_LATER,
     ]);
 
     expect($result->status)->toBe(ExamResitAttempt::STATUS_FINANCE_PENDING_CANCELLATION);
@@ -376,9 +376,9 @@ it('bridges linked paid dng evidence before cancelling a charge_created attempt'
 
     expect($attempt->status)->toBe(ExamResitAttempt::STATUS_CANCELLED)
         ->and($attempt->hq_fee_status)->toBe(ExamResitAttempt::HQ_FEE_PAID)
-        ->and($attempt->cancellation_fee_disposition)->toBe(ExamResitAttempt::CANCELLATION_FEE_KEPT_PAID_NO_REFUND)
+        ->and($attempt->cancellation_fee_disposition)->toBe(ExamResitAttempt::CANCELLATION_FEE_PAID_RELEASE_TO_BALANCE)
         ->and($charge->status)->toBe(FinanceCharge::STATUS_VOID)
-        ->and($charge->void_reason)->toBe('exam_resit_cancelled_paid_no_refund')
+        ->and($charge->void_reason)->toBe(CancelExamResitAttemptAction::PAID_VOID_REASON_KEEP_FOR_LATER)
         ->and($paidDng->status)->toBe(DngPaymentRequest::STATUS_PAID_INVOICED)
         ->and($paidDng->payment_id)->not->toBeNull();
 
@@ -389,7 +389,7 @@ it('bridges linked paid dng evidence before cancelling a charge_created attempt'
         ->and((float) $payment->unapplied_amount)->toBe(750000.0);
 });
 
-it('cancels a paid scheduled attempt and releases the paid fee to unapplied credit without cancelling dng', function () {
+it('cancels a paid scheduled attempt with forfeit: the paid fee stays as revenue', function () {
     Queue::fake();
     $attempt = makeApprovedExamResitAttempt($this->student, $this->campus, $this->semester);
     app(CreateExamResitChargeSimpleAction::class)->handle(['attempt_id' => $attempt->id]);
@@ -403,11 +403,11 @@ it('cancels a paid scheduled attempt and releases the paid fee to unapplied cred
         'exam_resit_session_id' => $session->id,
         'scheduled_at' => now(),
     ]);
-
     $paidDng = makeExamResitDng($this->student, $charge, DngPaymentRequest::STATUS_PAID_INVOICED);
 
     $result = runCancelExamResit($attempt->id, overrides: [
         'acknowledge_no_refund' => true,
+        'fee_outcome' => CancelExamResitAttemptAction::FEE_OUTCOME_FORFEIT,
     ]);
 
     expect($result->status)->toBe(ExamResitAttempt::STATUS_FINANCE_PENDING_CANCELLATION);
@@ -422,21 +422,15 @@ it('cancels a paid scheduled attempt and releases the paid fee to unapplied cred
         ->and($attempt->exam_resit_session_id)->toBeNull()
         ->and($attempt->cancellation_fee_disposition)->toBe(ExamResitAttempt::CANCELLATION_FEE_KEPT_PAID_NO_REFUND)
         ->and($attempt->cancellation_notice_sent_at)->not->toBeNull()
-        ->and($charge->status)->toBe(FinanceCharge::STATUS_VOID)
-        ->and($charge->void_reason)->toBe('exam_resit_cancelled_paid_no_refund')
+        // Forfeit: the paid charge stands as revenue — not voided, no release.
+        ->and($charge->status)->toBe(FinanceCharge::STATUS_ACTIVE)
+        ->and($charge->void_reason)->toBeNull()
         ->and($paidDng->fresh()->status)->toBe(DngPaymentRequest::STATUS_PAID_INVOICED);
 
-    $payment = PaymentApplication::query()
-        ->whereIn('invoice_line_id', $charge->invoiceLines()->pluck('id'))
-        ->where('entry_type', 'application')
-        ->firstOrFail()
-        ->payment()
-        ->firstOrFail();
-
+    // Forfeit: paid applications stay on the invoice lines (revenue kept).
     expect((float) PaymentApplication::query()
         ->whereIn('invoice_line_id', $charge->invoiceLines()->pluck('id'))
-        ->sum('amount'))->toBe(0.0)
-        ->and((float) $payment->unapplied_amount)->toBe(750000.0)
+        ->sum('amount'))->toBe(750000.0)
         ->and($session->fresh()->actual_candidates)->toBe(0);
 });
 

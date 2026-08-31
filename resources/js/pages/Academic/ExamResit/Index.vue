@@ -14,7 +14,7 @@ import { useDataTable } from '@/composables/useDataTable';
 import type { PaginatedResponse } from '@/types';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { AlertTriangle, Ban, CalendarClock, CalendarDays, CheckCircle2, Clock, CreditCard, GraduationCap, Plus } from 'lucide-vue-next';
+import { AlertTriangle, Ban, CalendarClock, CalendarDays, CheckCircle2, Clock, CreditCard, GraduationCap, Plus, UserX } from 'lucide-vue-next';
 import { computed, h, ref } from 'vue';
 import { route } from 'ziggy-js';
 
@@ -175,13 +175,14 @@ const cancelForm = useForm({
     reason: '',
     acknowledge_no_refund: false,
     confirmation: null as string | null,
+    fee_outcome: 'forfeit' as 'forfeit' | 'keep_for_later',
 });
 
 const cancelRequiresAcknowledgement = computed(() => Boolean(cancelTarget.value?.cancel_context.requires_no_refund_acknowledgement || cancelTarget.value?.cancel_context.requires_unpaid_fee_confirmation));
 
 const cancelAcknowledgementLabel = computed(() => {
     if (cancelTarget.value?.cancel_context.requires_no_refund_acknowledgement) {
-        return 'Tôi xác nhận hủy lượt thi lại, giữ nguyên khoản phí đã thu và không tạo hoàn phí.';
+        return cancelForm.fee_outcome === 'keep_for_later' ? 'Tôi xác nhận hủy lượt thi lại và lưu phí đã thu làm dư nợ dùng cho phí phát sinh sau.' : 'Tôi xác nhận hủy lượt thi lại và MẤT khoản phí đã thu (không hoàn phí).';
     }
 
     if (cancelTarget.value?.cancel_context.requires_unpaid_fee_confirmation) {
@@ -205,6 +206,8 @@ const cancelWarningClass = computed(() => {
 
 const cancelSubmitDisabled = computed(() => cancelForm.processing || (cancelRequiresAcknowledgement.value && !cancelAcknowledged.value));
 
+const isPaidCancelContext = computed(() => cancelTarget.value?.cancel_context.fee_state === 'paid_no_refund');
+
 const openCancelDialog = (attempt: ExamResitRow) => {
     cancelTarget.value = attempt;
     cancelForm.reset();
@@ -219,7 +222,7 @@ const submitCancel = () => {
     const context = cancelTarget.value.cancel_context;
     cancelForm.acknowledge_no_refund = context.requires_no_refund_acknowledgement && cancelAcknowledged.value;
     cancelForm.confirmation = context.requires_unpaid_fee_confirmation && cancelAcknowledged.value ? context.confirmation_token : null;
-
+    cancelForm.fee_outcome = isPaidCancelContext.value ? cancelForm.fee_outcome : 'forfeit';
     cancelForm.post(route('academic.exam-resit.cancel', cancelTarget.value.id), {
         preserveScroll: true,
         onSuccess: () => {
@@ -227,6 +230,33 @@ const submitCancel = () => {
             cancelTarget.value = null;
             cancelForm.reset();
             cancelAcknowledged.value = false;
+        },
+    });
+};
+
+// No-show dialog state
+const noShowDialogOpen = ref(false);
+const noShowTarget = ref<ExamResitRow | null>(null);
+const noShowConfirmed = ref(false);
+const noShowForm = useForm({ reason: '' });
+
+const openNoShowDialog = (attempt: ExamResitRow) => {
+    noShowTarget.value = attempt;
+    noShowForm.reset();
+    noShowForm.clearErrors();
+    noShowConfirmed.value = false;
+    noShowDialogOpen.value = true;
+};
+
+const submitNoShow = () => {
+    if (!noShowTarget.value || !noShowConfirmed.value) return;
+    noShowForm.post(route('academic.exam-resit.no-show.store', noShowTarget.value.id), {
+        preserveScroll: true,
+        onSuccess: () => {
+            noShowDialogOpen.value = false;
+            noShowTarget.value = null;
+            noShowForm.reset();
+            noShowConfirmed.value = false;
         },
     });
 };
@@ -372,6 +402,16 @@ const columns: ColumnDef<ExamResitRow>[] = [
                             <TooltipContent><p>Nhập kết quả</p></TooltipContent>
                         </Tooltip>
                     </TooltipProvider>
+                    <TooltipProvider v-if="row.original.available_actions.includes('no_show')" :delay-duration="0">
+                        <Tooltip>
+                            <TooltipTrigger as-child>
+                                <Button variant="ghost" size="icon" class="h-8 w-8 text-amber-600 hover:text-amber-600 dark:text-amber-400" @click="openNoShowDialog(row.original)">
+                                    <UserX class="h-4 w-4" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent><p>Vắng thi</p></TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
                     <TooltipProvider v-if="row.original.available_actions.includes('cancel')" :delay-duration="0">
                         <Tooltip>
                             <TooltipTrigger as-child>
@@ -412,6 +452,17 @@ const columns: ColumnDef<ExamResitRow>[] = [
                     <Textarea v-model="cancelForm.reason" placeholder="Nhập lý do hủy (tối thiểu 5 ký tự)..." rows="3" />
                     <p v-if="cancelForm.errors.reason" class="text-destructive text-xs">{{ cancelForm.errors.reason }}</p>
                 </div>
+                <div v-if="isPaidCancelContext" class="space-y-2">
+                    <Label>Hệ quả tiền khi hủy</Label>
+                    <label class="flex items-start gap-3 rounded-md border p-3 text-sm leading-relaxed">
+                        <input v-model="cancelForm.fee_outcome" type="radio" value="forfeit" class="mt-0.5" />
+                        <span><strong>Hủy — mất phí:</strong> khoản phí đã thu được giữ làm doanh thu, sinh viên không dùng lại được.</span>
+                    </label>
+                    <label class="flex items-start gap-3 rounded-md border p-3 text-sm leading-relaxed">
+                        <input v-model="cancelForm.fee_outcome" type="radio" value="keep_for_later" class="mt-0.5" />
+                        <span><strong>Hủy — lưu phí dùng sau:</strong> phí đã thu được chuyển thành dư nợ dùng cho các phí phát sinh sau của sinh viên.</span>
+                    </label>
+                </div>
                 <label v-if="cancelRequiresAcknowledgement" class="flex items-start gap-3 rounded-md border p-3 text-sm leading-relaxed">
                     <Checkbox v-model="cancelAcknowledged" class="mt-0.5" />
                     <span>{{ cancelAcknowledgementLabel }}</span>
@@ -422,6 +473,38 @@ const columns: ColumnDef<ExamResitRow>[] = [
                     <Button type="button" variant="outline" @click="cancelDialogOpen = false">Đóng</Button>
                     <Button type="submit" variant="destructive" :disabled="cancelSubmitDisabled">
                         {{ cancelForm.processing ? 'Đang xử lý...' : 'Xác nhận hủy' }}
+                    </Button>
+                </DialogFooter>
+            </form>
+        </DialogContent>
+    </Dialog>
+
+    <!-- No-Show Dialog -->
+    <Dialog v-model:open="noShowDialogOpen">
+        <DialogContent class="sm:max-w-md">
+            <DialogHeader>
+                <DialogTitle>Ghi nhận vắng thi</DialogTitle>
+                <DialogDescription v-if="noShowTarget"> {{ noShowTarget.student.full_name }} ({{ noShowTarget.student.student_id }}) — {{ noShowTarget.unit.code }} </DialogDescription>
+            </DialogHeader>
+            <form @submit.prevent="submitNoShow" class="space-y-4">
+                <div class="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm leading-relaxed text-amber-950 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-100">
+                    <p class="font-medium">Vắng thi ≠ Hủy thi</p>
+                    <p class="mt-1">Vắng thi: đã có lịch thi, sinh viên không dự thi — lượt thi bị tiêu, phí đã thu/nợ phí bị mất (forfeit), điểm gốc giữ nguyên.</p>
+                    <p class="mt-1">Hủy thi: chưa thi, xử lý phí theo lựa chọn hủy.</p>
+                </div>
+                <div class="flex items-start gap-3 rounded-md border p-3 text-sm leading-relaxed">
+                    <Checkbox v-model="noShowConfirmed" class="mt-0.5" />
+                    <span>Tôi xác nhận sinh viên VẮNG THI kỳ thi này và lượt thi lại sẽ bị tiêu.</span>
+                </div>
+                <div class="space-y-1.5">
+                    <Label>Lý do ghi nhận</Label>
+                    <Textarea v-model="noShowForm.reason" placeholder="Nhập lý do (không bắt buộc)..." rows="2" />
+                    <p v-if="noShowForm.errors.reason" class="text-destructive text-xs">{{ noShowForm.errors.reason }}</p>
+                </div>
+                <DialogFooter>
+                    <Button type="button" variant="outline" @click="noShowDialogOpen = false">Đóng</Button>
+                    <Button type="submit" variant="destructive" :disabled="noShowForm.processing || !noShowConfirmed">
+                        {{ noShowForm.processing ? 'Đang xử lý...' : 'Xác nhận vắng thi' }}
                     </Button>
                 </DialogFooter>
             </form>

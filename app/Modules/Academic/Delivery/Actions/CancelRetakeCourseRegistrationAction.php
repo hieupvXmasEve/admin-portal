@@ -34,7 +34,7 @@ class CancelRetakeCourseRegistrationAction
             if ($registration->status !== CourseRetakeRegistration::STATUS_FINANCE_PENDING_CANCELLATION) {
                 if (! $registration->isCancellable()) {
                     throw new RuntimeException(
-                        "Không thể hủy đăng ký học lại ở trạng thái: {$registration->status}. Chỉ approved hoặc payment_pending mới được hủy."
+                        "Không thể hủy đăng ký học lại ở trạng thái: {$registration->status}. Chỉ approved, payment_pending hoặc paid (chưa gắn lớp) mới được hủy."
                     );
                 }
 
@@ -48,7 +48,9 @@ class CancelRetakeCourseRegistrationAction
                 'source_ref' => AcademicFinanceObligationSource::courseRetakeRegistrationRef($registration),
                 'obligation_type' => AcademicFinanceObligationSource::RETAKE_FEE,
                 'unpaid_void_reason' => 'retake_course_cancelled',
-                'paid_void_reason' => 'retake_course_cancelled_paid_no_refund',
+                // Owner rule #4: cancelling a paid retake (before class link)
+                // keeps the money as unapplied balance for future fees.
+                'paid_void_reason' => 'retake_course_cancelled_paid_keep_for_later',
                 'actor_user_id' => $userId === null ? null : (int) $userId,
                 'payload' => ['reason' => $data['reason']],
             ]);

@@ -150,6 +150,7 @@ return [
             'cancel_exam_resit' => 'cancel_exam_resit',
             'schedule_exam_resit' => 'schedule_exam_resit',
             'complete_exam_resit' => 'complete_exam_resit',
+            'mark_no_show_exam_resit' => 'mark_no_show_exam_resit',
             'manage_exam_schedule' => 'manage_exam_schedule',
         ],
         'gpa_management' => [

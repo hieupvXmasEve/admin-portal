@@ -13,10 +13,12 @@ use App\Modules\Academic\Delivery\Actions\BulkCreateExamResitAttemptsAction;
 use App\Modules\Academic\Delivery\Actions\CancelExamResitAttemptAction;
 use App\Modules\Academic\Delivery\Actions\CompleteExamResitAttemptAction;
 use App\Modules\Academic\Delivery\Actions\CreateExamResitAttemptAction;
+use App\Modules\Academic\Delivery\Actions\MarkExamResitAttemptNoShowAction;
 use App\Modules\Academic\Delivery\Actions\ScheduleExamResitAttemptAction;
 use App\Modules\Academic\Delivery\Http\Requests\ExamResit\CancelExamResitRequest;
 use App\Modules\Academic\Delivery\Http\Requests\ExamResit\CompleteExamResitRequest;
 use App\Modules\Academic\Delivery\Http\Requests\ExamResit\ListExamResitRequest;
+use App\Modules\Academic\Delivery\Http\Requests\ExamResit\MarkExamResitNoShowRequest;
 use App\Modules\Academic\Delivery\Http\Requests\ExamResit\ScheduleExamResitRequest;
 use App\Modules\Academic\Delivery\Http\Requests\ExamResit\StoreExamResitBulkRequest;
 use App\Modules\Academic\Delivery\Http\Requests\ExamResit\StoreExamResitRequest;
@@ -275,6 +277,25 @@ class ExamResitAttemptController extends Controller
     }
 
     /**
+     * Record a no-show (vắng thi): the sitting was scheduled and the student
+     * did not attend. Consumes one attempt and forfeits the fee (owner
+     * rule #8); the academic record is left unchanged.
+     */
+    public function markNoShow(
+        MarkExamResitNoShowRequest $request,
+        ExamResitAttempt $examResit,
+    ): RedirectResponse {
+        MarkExamResitAttemptNoShowAction::run([
+            'attempt_id' => $examResit->id,
+            'reason' => $request->validated('reason'),
+        ]);
+
+        Inertia::flash('success', 'Đã ghi nhận vắng thi.');
+
+        return redirect()->route('academic.exam-resit.index');
+    }
+
+    /**
      * Cancel an exam-resit operation before sitting. Paid sources are retained
      * without refund when staff explicitly acknowledge the no-refund outcome.
      */
@@ -289,6 +310,7 @@ class ExamResitAttemptController extends Controller
             'reason' => $validated['reason'],
             'acknowledge_no_refund' => (bool) ($validated['acknowledge_no_refund'] ?? false),
             'confirmation' => $validated['confirmation'] ?? null,
+            'fee_outcome' => $validated['fee_outcome'] ?? null,
         ]);
 
         Inertia::flash('success', 'Đã hủy thi lại.');

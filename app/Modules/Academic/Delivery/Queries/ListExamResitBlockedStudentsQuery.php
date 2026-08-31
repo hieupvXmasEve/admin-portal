@@ -7,6 +7,7 @@ namespace App\Modules\Academic\Delivery\Queries;
 use App\Models\AcademicRecord;
 use App\Models\ExamResitAttempt;
 use App\Models\Student;
+use App\Modules\Academic\Delivery\Actions\CreateExamResitAttemptAction;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
@@ -24,9 +25,12 @@ class ListExamResitBlockedStudentsQuery
 
     public const REASON_RESIT_ALREADY_IN_FLIGHT = 'resit_already_in_flight';
 
+    public const REASON_RESIT_ATTEMPTS_EXHAUSTED = 'resit_attempts_exhausted';
+
     private const REASON_LABELS = [
         self::REASON_UNIT_ALREADY_PASSED => 'Đã pass môn này ở bản ghi khác',
-        self::REASON_RESIT_ALREADY_IN_FLIGHT => 'Đã có đăng ký thi lại đang xử lý/hoàn tất cho bản ghi này',
+        self::REASON_RESIT_ALREADY_IN_FLIGHT => 'Đã có đăng ký thi lại đang xử lý cho bản ghi này',
+        self::REASON_RESIT_ATTEMPTS_EXHAUSTED => 'Đã dùng hết số lần thi lại cho bản ghi này',
     ];
 
     /**
@@ -61,22 +65,54 @@ class ListExamResitBlockedStudentsQuery
                 ->where(fn (Builder $q) => $q->where('is_passed', true)->orWhere('override_pass', true))
                 ->pluck('unit_id');
 
-            $blockedRecordIds = ExamResitAttempt::query()
+            $attemptsByRecord = ExamResitAttempt::query()
                 ->where('student_id', $student->id)
-                ->whereIn('status', ExamResitAttempt::IN_FLIGHT_OR_CONSUMED_STATUSES)
-                ->pluck('academic_record_id');
+                ->get(['academic_record_id', 'status', 'attempt_number']);
 
             $records = AcademicRecord::query()
                 ->where('student_id', $student->id)
                 ->where(fn (Builder $q) => $this->scopeFailedRecords($q, $unitId, $semesterId))
-                ->where(fn (Builder $q) => $q->whereIn('unit_id', $passedUnitIds)->orWhereIn('id', $blockedRecordIds))
+                ->whereIn('unit_id', $passedUnitIds)
                 ->with('unit')
                 ->get();
 
+            // Resit-blocked records: in-flight source, or consumed attempts
+            // reached the live syllabus policy (single consumed definition:
+            // attempt_number IS NOT NULL).
+            $resitBlocked = AcademicRecord::query()
+                ->where('student_id', $student->id)
+                ->where(fn (Builder $q) => $this->scopeFailedRecords($q, $unitId, $semesterId))
+                ->whereNotIn('unit_id', $passedUnitIds)
+                ->with(['unit', 'courseOffering.syllabusTemplate'])
+                ->get()
+                ->filter(function (AcademicRecord $record) use ($attemptsByRecord): bool {
+                    $attempts = $attemptsByRecord->where('academic_record_id', $record->id);
+                    $consumed = $attempts->filter(fn ($a) => $a->attempt_number !== null)->count();
+
+                    return $attempts->contains(fn ($a) => in_array($a->status, ExamResitAttempt::IN_FLIGHT_STATUSES, true))
+                        || ($consumed > 0 && $consumed >= CreateExamResitAttemptAction::liveMaxAttemptsFor($record));
+                });
+
+            foreach ($resitBlocked as $record) {
+                $hasInFlight = $attemptsByRecord
+                    ->where('academic_record_id', $record->id)
+                    ->contains(fn ($a) => in_array($a->status, ExamResitAttempt::IN_FLIGHT_STATUSES, true));
+
+                $results->push([
+                    'student' => $student,
+                    'failed_record' => $record,
+                    'unit' => $record->unit,
+                    'reason_code' => $hasInFlight
+                        ? self::REASON_RESIT_ALREADY_IN_FLIGHT
+                        : self::REASON_RESIT_ATTEMPTS_EXHAUSTED,
+                    'reason_label' => self::REASON_LABELS[$hasInFlight
+                        ? self::REASON_RESIT_ALREADY_IN_FLIGHT
+                        : self::REASON_RESIT_ATTEMPTS_EXHAUSTED],
+                ]);
+            }
+
             foreach ($records as $record) {
-                $reasonCode = $passedUnitIds->contains($record->unit_id)
-                    ? self::REASON_UNIT_ALREADY_PASSED
-                    : self::REASON_RESIT_ALREADY_IN_FLIGHT;
+                $reasonCode = self::REASON_UNIT_ALREADY_PASSED;
 
                 $results->push([
                     'student' => $student,

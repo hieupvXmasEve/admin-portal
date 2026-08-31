@@ -19,6 +19,7 @@ use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Services\SettlementService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -295,4 +296,39 @@ it('supports dry-run without mutating the registration', function () {
         ->and($result['synced'])->toBe(0)
         ->and($registration->status)->toBe(CourseRetakeRegistration::STATUS_PAYMENT_PENDING)
         ->and($registration->course_registration_id)->toBeNull();
+});
+
+it('regression: does not link a paid retake into a class registration from a different semester', function () {
+    ['registration' => $registration, 'student' => $student] = createPaidPendingRetakeContext();
+
+    app(SyncPaidRetakeRegistrationsAction::class)->runForStudent($student->id);
+    $registration->refresh();
+    expect($registration->status)->toBe(CourseRetakeRegistration::STATUS_PAID);
+
+    $otherSemester = Semester::factory()->create();
+    $otherSemesterCourseRegistration = CourseRegistration::create([
+        'student_id' => $student->id,
+        'course_offering_id' => CourseOffering::factory()->create([
+            'semester_id' => $otherSemester->id,
+            'campus_id' => $student->campus_id,
+            'unit_id' => $registration->unit_id,
+        ])->id,
+        'semester_id' => $otherSemester->id,
+        'registration_status' => 'confirmed',
+        'registration_date' => now(),
+        'registration_method' => 'admin_override',
+        'is_retake' => false,
+        'attempt_number' => 1,
+        'retake_fee' => 0,
+        'is_retake_paid' => 'no',
+        'credit_points' => 0,
+        'credit_hours' => 0,
+    ]);
+
+    app(SyncPaidRetakeRegistrationsAction::class)->runForStudent($student->id);
+
+    $registration->refresh();
+    expect($registration->course_registration_id)->toBeNull()
+        ->and($registration->status)->toBe(CourseRetakeRegistration::STATUS_PAID)
+        ->and((string) DB::table('course_registrations')->where('id', $otherSemesterCourseRegistration->id)->value('is_retake_paid'))->toBe('no');
 });

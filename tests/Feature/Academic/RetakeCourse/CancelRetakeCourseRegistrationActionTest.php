@@ -287,7 +287,7 @@ it('bridges linked paid dng evidence before cancelling a payment_pending registr
     expect($reg->status)->toBe(CourseRetakeRegistration::STATUS_CANCELLED)
         ->and($reg->hq_fee_status)->toBe(CourseRetakeRegistration::HQ_FEE_PAID)
         ->and($charge->status)->toBe(FinanceCharge::STATUS_VOID)
-        ->and($charge->void_reason)->toBe('retake_course_cancelled_paid_no_refund')
+        ->and($charge->void_reason)->toBe('retake_course_cancelled_paid_keep_for_later')
         ->and($paidDng->status)->toBe(DngPaymentRequest::STATUS_PAID_UNINVOICED)
         ->and($paidDng->payment_id)->not->toBeNull();
 
@@ -298,8 +298,44 @@ it('bridges linked paid dng evidence before cancelling a payment_pending registr
         ->and((float) $payment->unapplied_amount)->toBe((float) $charge->amount);
 });
 
-it('throws when cancelling a paid registration', function () {
-    $reg = createCancelTestRegistration('paid');
+it('cancels a paid unlinked registration and releases the paid fee to unapplied balance', function () {
+    Queue::fake();
+    $reg = createCancelTestRegistration('approved');
+    app(CreateRetakeCourseChargeSimpleAction::class)->handle([
+        'registration_id' => $reg->id,
+        'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
+        'amount' => 5000000,
+        'description' => 'Retake fee',
+    ]);
+    $reg->refresh();
+    $reg->update(['status' => CourseRetakeRegistration::STATUS_PAID, 'hq_fee_status' => CourseRetakeRegistration::HQ_FEE_PAID]);
+    $charge = retakeCancellationChargeForRegistration($reg);
+    $paidDng = createPaidRetakeDngForCharge($reg, $charge);
+
+    $result = CancelRetakeCourseRegistrationAction::run([
+        'registration_id' => $reg->id,
+        'reason' => 'Owner rule 4: cancel paid before class link',
+    ]);
+
+    expect($result->status)->toBe(CourseRetakeRegistration::STATUS_FINANCE_PENDING_CANCELLATION);
+
+    settleRetakeFinanceCancellation($reg);
+
+    $reg->refresh();
+    $charge->refresh();
+
+    expect($reg->status)->toBe(CourseRetakeRegistration::STATUS_CANCELLED)
+        ->and($reg->hq_fee_status)->toBe(CourseRetakeRegistration::HQ_FEE_PAID)
+        ->and($charge->status)->toBe(FinanceCharge::STATUS_VOID)
+        ->and($charge->void_reason)->toBe('retake_course_cancelled_paid_keep_for_later')
+        ->and($paidDng->fresh()->payment_id)->not->toBeNull();
+
+    $payment = $paidDng->fresh()->payment()->firstOrFail();
+    expect((float) $payment->unapplied_amount)->toBe((float) $charge->amount);
+});
+
+it('throws when cancelling a paid registration already linked to a class', function () {
+    $reg = createCancelTestRegistration('paid', ['course_registration_id' => 999]);
 
     CancelRetakeCourseRegistrationAction::run([
         'registration_id' => $reg->id,

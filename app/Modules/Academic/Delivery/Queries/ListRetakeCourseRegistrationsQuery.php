@@ -243,7 +243,7 @@ class ListRetakeCourseRegistrationsQuery
             $actions[] = 'sync';
         }
 
-        if (in_array($registration->status, CourseRetakeRegistration::CANCELLABLE_STATUSES, true)) {
+        if ($registration->isCancellable()) {
             $actions[] = 'cancel';
         }
 

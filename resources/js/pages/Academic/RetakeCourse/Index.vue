@@ -379,6 +379,10 @@ const columns: ColumnDef<RetakeRegistration>[] = [
                         <br />
                         <span class="text-destructive font-medium">Charge và invoice liên quan sẽ bị hủy.</span>
                     </template>
+                    <template v-if="cancelTarget.status === 'paid'">
+                        <br />
+                        <span class="font-medium text-amber-600 dark:text-amber-400">Đơn đã thanh toán: tiền đã thu sẽ được chuyển thành dư nợ dùng cho các phí phát sinh sau của sinh viên (không hoàn về tài khoản).</span>
+                    </template>
                 </DialogDescription>
             </DialogHeader>
             <form @submit.prevent="submitCancel" class="space-y-4">

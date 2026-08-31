@@ -149,12 +149,12 @@ class CreateExamResitAttemptAction
 
         $hasInFlightAttempt = ExamResitAttempt::query()
             ->where('academic_record_id', $record->id)
-            ->whereIn('status', ExamResitAttempt::IN_FLIGHT_OR_CONSUMED_STATUSES)
+            ->whereIn('status', ExamResitAttempt::IN_FLIGHT_STATUSES)
             ->exists();
 
         if ($hasInFlightAttempt) {
             throw ValidationException::withMessages([
-                'academic_record_id' => ['Bản ghi này đã có đăng ký thi lại đang xử lý hoặc đã hoàn tất.'],
+                'academic_record_id' => ['Bản ghi này đã có đăng ký thi lại đang xử lý.'],
             ]);
         }
 
@@ -209,15 +209,32 @@ class CreateExamResitAttemptAction
 
     private function assertAttemptsRemaining(AcademicRecord $record, int $maxAttempts): void
     {
-        $consumedAttempts = ExamResitAttempt::query()
-            ->where('academic_record_id', $record->id)
-            ->whereNotNull('attempt_number')
-            ->count();
+        $consumedAttempts = ExamResitAttempt::consumedAttemptCount($record->id);
 
         if ($consumedAttempts >= $maxAttempts) {
             throw ValidationException::withMessages([
                 'academic_record_id' => ['Sinh viên đã dùng hết số lần thi lại cho môn này.'],
             ]);
         }
+    }
+
+    /**
+     * Live attempt policy for a record: the current syllabus max, not a
+     * per-row snapshot. Raising the syllabus max re-opens the lane without
+     * code changes (owner rule #2). Lenient for display contexts: a record
+     * without any syllabus policy resolves to the default of 1 instead of
+     * throwing (the write guard still fails closed).
+     */
+    public static function liveMaxAttemptsFor(AcademicRecord $record): int
+    {
+        $syllabus = $record->courseOffering?->syllabusTemplate
+            ?? SyllabusTemplate::query()
+                ->where('unit_id', $record->unit_id)
+                ->where('is_active', true)
+                ->orderByDesc('is_default')
+                ->latest('id')
+                ->first();
+
+        return max(1, (int) ($syllabus->exam_resit_max_attempts ?? 1));
     }
 }
