@@ -6,6 +6,7 @@ source:
   - resources/js/pages/SelectCampus.vue
   - resources/js/pages/Dashboard/Dashboard.vue
   - resources/js/components/AppSidebar.vue
+  - resources/js/components/CampusSwitcher.vue
   - resources/js/constants/menu-sidebar.ts
 ---
 
@@ -38,12 +39,13 @@ source:
 1. 登录后，**Select Your Campus** 界面会列出你可访问的校区。
 2. 点击你要使用的校区卡片。被选中的卡片会显示蓝色边框。
 3. 确认进入系统。
-4. 如需重新选择，点击 **Clear Selection**（取消选择）后再选其他校区。
+4. 工作期间如需切换校区：点击左侧菜单栏**顶部的徽标**（显示系统名称和 `Campus: ...` 的那一行），然后在列表中选择校区。
 
 **注意事项**
 
-- 如果你只被授权一个校区，系统会自动为你选好。
+- 如果你只被授权一个校区，系统会自动为你选好，徽标不会显示列表。
 - 当前使用的校区名称始终显示在系统名称下方、界面左上角的 `Campus: ...` 一行。
+- 通过徽标切换校区时你会停留在当前页面，页面数据会按新校区刷新。
 - 选错校区后很难修正，因为数据已经关联到该校区。创建任何数据之前，务必先看清 `Campus:` 一行。
 
 ## 界面布局

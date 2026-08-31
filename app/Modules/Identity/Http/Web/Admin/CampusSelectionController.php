@@ -19,7 +19,7 @@ class CampusSelectionController extends Controller
             return redirect()->route('login');
         }
 
-        $campuses = $user->campuses->unique('id');
+        $campuses = $user->campuses->unique('id')->values();
 
         return Inertia::render('SelectCampus', [
             'campuses' => $campuses,
@@ -29,12 +29,16 @@ class CampusSelectionController extends Controller
     public function setCurrentCampus(SelectCampusRequest $request, IdentityContext $identity)
     {
         try {
+            $wasSwitching = Session::has('current_campus_id');
+
             SetCurrentCampusAction::run(
                 $identity->user(),
                 $request->validated('selectedCampus')
             );
 
-            return redirect()->intended(route('dashboard'));
+            // Switching campus from the sidebar keeps the current page so the
+            // user does not lose context; initial selection goes to dashboard.
+            return $wasSwitching ? back() : redirect()->intended(route('dashboard'));
         } catch (\Exception $e) {
             Log::error('Error in setCurrentCampus:', [
                 'error' => $e->getMessage(),
@@ -42,24 +46,6 @@ class CampusSelectionController extends Controller
             ]);
 
             return back()->withErrors(['error' => 'Failed to set campus']);
-        }
-    }
-
-    public function changeCampus()
-    {
-        try {
-            // Clear campus-related session data
-            Session::forget(['current_campus_id', 'permissions']);
-            Session::save();
-
-            return redirect()->route('select-campus.index');
-        } catch (\Exception $e) {
-            Log::error('Error in changeCampus:', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTrace(),
-            ]);
-
-            return back()->withErrors(['error' => 'Failed to change campus']);
         }
     }
 }

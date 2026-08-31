@@ -6,6 +6,7 @@ source:
   - resources/js/pages/SelectCampus.vue
   - resources/js/pages/Dashboard/Dashboard.vue
   - resources/js/components/AppSidebar.vue
+  - resources/js/components/CampusSwitcher.vue
   - resources/js/constants/menu-sidebar.ts
 ---
 
@@ -38,12 +39,13 @@ source:
 1. 로그인하면 **Select Your Campus** 화면에 접근 가능한 캠퍼스가 표시됩니다.
 2. 근무하는 캠퍼스 카드를 누릅니다. 선택된 카드에는 파란 테두리가 생깁니다.
 3. 확인하여 시스템으로 들어갑니다.
-4. 다시 선택하려면 **Clear Selection**(선택 해제)을 누르고 다른 캠퍼스를 고릅니다.
+4. 업무 중 캠퍼스를 바꾸려면 왼쪽 메뉴 막대 **맨 위의 로고**(시스템 이름과 `Campus: ...` 줄)를 누른 뒤 목록에서 캠퍼스를 고릅니다.
 
 **유의 사항**
 
-- 접근 가능한 캠퍼스가 하나뿐이면 시스템이 자동으로 선택합니다.
+- 접근 가능한 캠퍼스가 하나뿐이면 시스템이 자동으로 선택하며 로고에는 목록이 나타나지 않습니다.
 - 현재 캠퍼스는 화면 왼쪽 위 시스템 이름 아래 `Campus: ...` 줄에 항상 표시됩니다.
+- 로고에서 캠퍼스를 바꾸면 현재 페이지에 머물며, 페이지 자료가 새 캠퍼스 기준으로 새로 고침됩니다.
 - 잘못된 캠퍼스에 자료를 입력하면 되돌리기 어렵습니다. 자료를 새로 만들기 전에 반드시 `Campus:` 줄을 확인하십시오.
 
 ## 화면 구성

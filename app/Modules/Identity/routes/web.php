@@ -37,7 +37,6 @@ Route::middleware('web')->group(function () {
     Route::middleware('auth')->group(function () {
         Route::get('select-campus', [CampusSelectionController::class, 'index'])->name('select-campus.index');
         Route::post('select-campus/set-current', [CampusSelectionController::class, 'setCurrentCampus'])->name('select-campus.set-current');
-        Route::post('select-campus/change', [CampusSelectionController::class, 'changeCampus'])->name('select-campus.change');
 
         // User management routes
         Route::middleware('can:view_user')->group(function () {

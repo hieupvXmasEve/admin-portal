@@ -6,6 +6,7 @@ source:
   - resources/js/pages/SelectCampus.vue
   - resources/js/pages/Dashboard/Dashboard.vue
   - resources/js/components/AppSidebar.vue
+  - resources/js/components/CampusSwitcher.vue
   - resources/js/constants/menu-sidebar.ts
 ---
 
@@ -38,12 +39,12 @@ Chương này giúp bạn vào được hệ thống và hiểu bố cục màn 
 1. Sau khi đăng nhập, màn hình **Select Your Campus** hiện các cơ sở bạn được phép truy cập.
 2. Bấm vào thẻ cơ sở cần làm việc. Thẻ được chọn có viền xanh.
 3. Xác nhận để vào hệ thống.
-4. Muốn chọn lại, bấm **Clear Selection** (Bỏ chọn) rồi chọn cơ sở khác.
+4. Đang dùng hệ thống mà muốn đổi cơ sở: bấm vào logo ở **góc trên cùng cột menu bên trái** (dòng có tên hệ thống và `Campus: ...`), rồi chọn cơ sở trong danh sách hiện ra.
 
 **Lưu ý**
-
-- Nếu chỉ được cấp một cơ sở, hệ thống tự chọn sẵn cho bạn.
+- Nếu chỉ được cấp một cơ sở, hệ thống tự chọn sẵn cho bạn và logo không hiện danh sách.
 - Tên cơ sở đang dùng luôn hiển thị ngay dưới tên hệ thống, góc trên bên trái màn hình — dòng `Campus: ...`.
+- Đổi cơ sở tại logo thì bạn ở nguyên trang đang mở; dữ liệu trang sẽ làm mới theo cơ sở mới.
 - Nhập nhầm cơ sở là lỗi khó sửa vì dữ liệu đã gắn vào cơ sở đó. Luôn nhìn dòng `Campus:` trước khi tạo mới bất cứ thứ gì.
 
 ## Bố cục màn hình

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Models\Campus;
 use App\Modules\Platform\Queries\GetSystemBrandingQuery;
 use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use App\Shared\Contracts\Academic\DTO\AcademicPeriodReference;
@@ -67,6 +68,12 @@ class HandleInertiaRequests extends Middleware
                     'permissions' => $permissionReader->permissionCodesForUserId((int) $user->id, $currentCampusId),
                     'current_campus_id' => $currentCampusId,
                     'current_campus' => $currentCampusId ? app('campus') : null,
+                    'campuses' => $user->campuses->unique('id')->values()
+                        ->map(fn (Campus $campus): array => [
+                            'id' => $campus->id,
+                            'name' => $campus->name,
+                            'code' => $campus->code,
+                        ])->all(),
                 ];
             },
             'semester' => function () use ($user, $currentCampusId) {

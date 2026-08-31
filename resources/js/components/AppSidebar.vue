@@ -1,42 +1,21 @@
 <script setup lang="ts">
-import AppLogo from '@/components/AppLogo.vue';
+import CampusSwitcher from '@/components/CampusSwitcher.vue';
 import NavMain from '@/components/NavMain.vue';
-import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail } from '@/components/ui/sidebar';
+import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarRail } from '@/components/ui/sidebar';
 import { usePermissions } from '@/composables/usePermissions';
-import { useSystemConfig } from '@/composables/useSystemConfig';
 import { mainNavGroups } from '@/constants/menu-sidebar';
-import { SharedData } from '@/types';
-import { Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
-import { route } from 'ziggy-js';
 import NavUser from './NavUser.vue';
 
 const { filterMenuGroups } = usePermissions();
-const { systemConfig } = useSystemConfig();
 // Filter menu items based on user permissions
 const filteredMenuGroups = computed(() => filterMenuGroups(mainNavGroups));
-const page = usePage<SharedData>();
-const campus = page.props.auth.current_campus;
 </script>
 
 <template>
     <Sidebar collapsible="icon" variant="sidebar">
         <SidebarHeader>
-            <SidebarMenu>
-                <SidebarMenuItem>
-                    <SidebarMenuButton size="lg" as-child>
-                        <Link :href="route('dashboard')">
-                            <div class="bg-background text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-                                <AppLogo />
-                            </div>
-                            <div class="grid flex-1 text-left text-sm leading-tight">
-                                <span class="truncate font-semibold">{{ systemConfig.app_name }}</span>
-                                <span class="truncate text-xs">Campus: {{ campus.name }}</span>
-                            </div>
-                        </Link>
-                    </SidebarMenuButton>
-                </SidebarMenuItem>
-            </SidebarMenu>
+            <CampusSwitcher />
         </SidebarHeader>
 
         <SidebarContent>

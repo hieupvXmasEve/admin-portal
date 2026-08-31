@@ -9,6 +9,7 @@ export interface Auth {
     permissions: string[];
     current_campus_id: number;
     current_campus: Campus;
+    campuses: Campus[];
 }
 
 export interface BreadcrumbItem {

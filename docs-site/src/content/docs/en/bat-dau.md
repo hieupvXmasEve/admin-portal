@@ -6,6 +6,7 @@ source:
   - resources/js/pages/SelectCampus.vue
   - resources/js/pages/Dashboard/Dashboard.vue
   - resources/js/components/AppSidebar.vue
+  - resources/js/components/CampusSwitcher.vue
   - resources/js/constants/menu-sidebar.ts
 ---
 
@@ -38,12 +39,13 @@ This chapter gets you into the system and explains the layout. Read it once and 
 1. After signing in, the **Select Your Campus** screen lists the campuses you may access.
 2. Click the card for the campus you work at. The selected card gets a blue border.
 3. Confirm to enter the system.
-4. To change it, click **Clear Selection** and pick another campus.
+4. To switch campus while working: click the logo at the **top of the left menu bar** (the line with the system name and `Campus: ...`), then pick the campus from the list.
 
 **Notes**
 
-- If you have access to only one campus, the system selects it for you.
+- If you have access to only one campus, the system selects it for you and the logo shows no list.
 - The active campus is always shown under the system name in the top left corner, on the `Campus: ...` line.
+- Switching campus from the logo keeps the page you are on; the page data refreshes for the new campus.
 - Entering data under the wrong campus is hard to undo, because the records are attached to that campus. Always check the `Campus:` line before creating anything.
 
 ## Screen layout

@@ -31,11 +31,11 @@ class CheckCampusSelected
         $isSelectCampusRoute = $request->routeIs([
             'select-campus.index',
             'select-campus.set-current',
-            'select-campus.change',
         ]);
 
-        // 2. If already has campus, and trying to go to selection page, go to dashboard
-        if ($campusId && $isSelectCampusRoute && ! $request->routeIs('select-campus.change')) {
+        // Only force the index page to dashboard. The set-current POST must stay
+        // reachable so the sidebar switcher can change campus mid-session.
+        if ($campusId && $request->routeIs('select-campus.index')) {
             return redirect()->route('dashboard');
         }
 
