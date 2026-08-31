@@ -11,9 +11,8 @@ source:
   - resources/js/pages/Academic/ExamResit/Schedule/Index.vue
   - resources/js/pages/CourseStatistics/Index.vue
   - resources/js/pages/Admin/Canvas/Courses/Index.vue
----
 
-<!-- docs-freshness: reviewed against menu-sidebar.ts change (Placement Worklist entry added to Students group, plans/260817-1123-student-placement-worklist/). -->
+<!-- docs-freshness: reviewed against Retake/ExamResit pages (retake pricing from Finance catalog, paid cancel with balance release, resit no-show + two paid-cancel outcomes, plans/260831-1213-retake-resit-business-rule-alignment/). -->
 
 **Course Delivery** là phần việc chính đầu mỗi kỳ: mở lớp, xếp lịch, đăng ký sinh viên, xử lý học lại và thi lại.
 
@@ -107,19 +106,20 @@ source:
 
 1. Vào **Academic Operations → Course Delivery → Retake Registration** (Đăng ký học lại).
 2. Lọc để tìm sinh viên hoặc môn cần xử lý.
-3. Ghi nhận đăng ký học lại.
+3. Ghi nhận đăng ký học lại. Hệ thống tự tính học phí học lại theo bảng giá hiện hành; nếu môn chưa có giá trong bảng giá, hệ thống sẽ chặn và yêu cầu cấu hình trước.
 4. Bấm **Xóa bộ lọc** nếu danh sách không hiện như mong đợi.
 
 **Lưu ý**
 
 - Danh sách sinh viên đủ điều kiện học lại lấy từ màn hình **Failed Students**.
-- Học lại thường phát sinh học phí. Kiểm tra lại ở khu vực **Finance Office**.
+- Học phí học lại luôn theo bảng giá hiện hành của hệ thống, không theo số tiền cũ ghi trên môn học.
+- Đơn đã thanh toán mà **chưa gắn lớp** vẫn có thể hủy: tiền đã thu chuyển thành dư nợ dùng cho các khoản phí phát sinh sau của sinh viên (không hoàn về tài khoản). Đơn đã gắn lớp không hủy được.
 
 **Đi tiếp.** Failed Students, Finance Office.
 
 ## Thi lại
 
-**Dùng để làm gì.** Lập danh sách sinh viên thi lại và theo dõi kết quả.
+**Dùng để làm gì.** Lập danh sách sinh viên thi lại, theo dõi kết quả và ghi nhận sinh viên vắng thi.
 
 **Ai vào được.** Người có quyền xem thi lại.
 
@@ -127,8 +127,13 @@ source:
 
 1. Vào **Academic Operations → Course Delivery → Thi lại**.
 2. Lọc theo kỳ học, môn hoặc sinh viên.
-3. Tạo đợt thi lại và chọn sinh viên tham gia.
-4. Sau khi thi xong, cập nhật kết quả để hoàn tất đợt.
+3. Tạo đợt thi lại và chọn sinh viên tham gia. Mỗi bản ghi điểm chỉ được thi lại theo số lần quy định của môn học (mặc định 1 lần); tăng số lần trong syllabus sẽ mở lại lượt mà không cần chỉnh gì khác.
+4. Sau khi thi xong, cập nhật kết quả để hoàn tất đợt. Nếu sinh viên có lịch thi nhưng không đến, bấm **Vắng thi** và xác nhận — lượt thi bị tiêu, điểm gốc giữ nguyên.
+
+**Lưu ý**
+
+- **Vắng thi** khác **Hủy thi**: vắng thi là đã có lịch thi mà không dự thi, phí bị mất; hủy là chưa thi, xử lý phí theo lựa chọn bên dưới.
+- Khi hủy một đơn thi lại **đã thanh toán**, chọn một trong hai hệ quả: **mất phí** (phí đã thu giữ làm doanh thu) hoặc **lưu phí dùng sau** (phí chuyển thành dư nợ cho các khoản phí sau của sinh viên). Không có hoàn tiền về tài khoản trong cả hai trường hợp.
 
 **Đi tiếp.** Lịch thi lại.
 

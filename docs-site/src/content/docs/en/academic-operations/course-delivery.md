@@ -107,13 +107,14 @@ source:
 
 1. Go to **Academic Operations → Course Delivery → Retake Registration**.
 2. Filter to find the student or unit you need.
-3. Record the retake registration.
+3. Record the retake registration. The system charges the retake fee from the current pricing catalog; if the unit has no price configured yet, the system blocks and asks to configure it first.
 4. Click **Xóa bộ lọc** (Clear filters) if the list is not showing what you expect.
 
 **Notes**
 
 - The list of students eligible to retake comes from the **Failed Students** screen.
-- Retakes usually incur a fee. Check it in the **Finance Office** area.
+- The retake fee always follows the current system pricing catalog, not an old amount stored on the unit.
+- A paid registration that has **not been linked to a class yet** can still be cancelled: the money already collected becomes unapplied credit for the student's future fees (no refund to their account). A linked registration cannot be cancelled.
 
 **Next.** Failed Students, Finance Office.
 
@@ -127,8 +128,13 @@ source:
 
 1. Go to **Academic Operations → Course Delivery → Thi lại**.
 2. Filter by term, unit, or student.
-3. Create the resit round and select the students taking part.
-4. After the exam, record the results to close the round.
+3. Create the resit round and select the students taking part. Each grade record allows the number of resits defined for the unit (1 by default); raising the number in the syllabus re-opens the lane without any other change.
+4. After the exam, record the results to close the round. If a student had an exam slot but did not show up, click **Vắng thi** (No-show) and confirm — the attempt is consumed and the original grade stays unchanged.
+
+**Notes**
+
+- **No-show** is not **Cancel**: a no-show means the student had a slot and missed it, the fee is lost; cancelling happens before the exam and the fee outcome is chosen below.
+- When cancelling a **paid** resit registration, choose one of two outcomes: **forfeit** (the collected fee stays as revenue) or **keep for later** (the fee becomes unapplied credit for the student's future fees). There is no refund to the student's account in either case.
 
 **Next.** Lịch thi lại.
 
