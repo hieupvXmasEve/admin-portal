@@ -57,3 +57,7 @@ engineer/
 .claude/hooks/.log
 .claude/hooks/.logs/
 .pnpm-store
+.agentkit/
+.omp/
+.scratch/
+.ua/
