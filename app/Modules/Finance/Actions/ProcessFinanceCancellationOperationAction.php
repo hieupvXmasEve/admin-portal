@@ -41,6 +41,9 @@ class ProcessFinanceCancellationOperationAction
     /** @deprecated Use FinanceCancellationFeeDisposition::KeptPaidNoRefund */
     public const FEE_DISPOSITION_KEPT_PAID_NO_REFUND = FinanceCancellationFeeDisposition::KeptPaidNoRefund->value;
 
+    /** @deprecated Use FinanceCancellationFeeDisposition::PaidReleaseToBalance */
+    public const FEE_DISPOSITION_PAID_RELEASE_TO_BALANCE = FinanceCancellationFeeDisposition::PaidReleaseToBalance->value;
+
     private const TERMINAL_COLLECTION_STATUSES = [
         DngPaymentRequest::STATUS_CANCELLED,
         DngPaymentRequest::STATUS_CANCEL_PUSHED_TO_DNG,
@@ -130,7 +133,15 @@ class ProcessFinanceCancellationOperationAction
 
             $paid = $lockedCharge !== null && ($hasPaidDng || $lockedCharge->is_fully_paid);
 
-            if ($lockedCharge !== null && $lockedCharge->status === FinanceCharge::STATUS_ACTIVE) {
+            $feeDisposition = $this->resolveFeeDisposition($lockedCharge, $paid, (string) $locked->paid_void_reason);
+
+            // Forfeit (kept paid, no refund): the paid charge stands as revenue —
+            // no void, no release, obligation stays accepted. Any other
+            // disposition voids the active charge and voids the obligation.
+            if ($lockedCharge !== null
+                && $lockedCharge->status === FinanceCharge::STATUS_ACTIVE
+                && $feeDisposition !== FinanceCancellationFeeDisposition::KeptPaidNoRefund
+            ) {
                 $this->voidFinanceChargeAction->handle(
                     $lockedCharge->id,
                     $paid ? $locked->paid_void_reason : $locked->unpaid_void_reason,
@@ -141,7 +152,7 @@ class ProcessFinanceCancellationOperationAction
             }
 
             $obligation = $this->findObligation($locked);
-            if ($obligation !== null) {
+            if ($obligation !== null && $feeDisposition !== FinanceCancellationFeeDisposition::KeptPaidNoRefund) {
                 $obligation->update([
                     'lifecycle_status' => $lockedCharge === null
                         ? FinanceObligation::STATUS_CANCELLED
@@ -149,7 +160,6 @@ class ProcessFinanceCancellationOperationAction
                 ]);
             }
 
-            $feeDisposition = $this->resolveFeeDisposition($lockedCharge, $paid);
             $locked->update([
                 'status' => FinanceCancellationOperation::STATUS_COMPLETED,
                 'completed_at' => now(),
@@ -209,10 +219,18 @@ class ProcessFinanceCancellationOperationAction
     {
         $payload = $operation->result_payload ?? [];
         $currentDisposition = $payload['fee_disposition'] ?? null;
-        if ($currentDisposition === FinanceCancellationFeeDisposition::KeptPaidNoRefund->value) {
+
+        // Both paid outcomes are terminal — never re-process or double-release.
+        if ($currentDisposition === FinanceCancellationFeeDisposition::KeptPaidNoRefund->value
+            || $currentDisposition === FinanceCancellationFeeDisposition::PaidReleaseToBalance->value
+        ) {
             return $operation;
         }
 
+        // Forfeit ops keep paid money as revenue even when paid evidence arrives late.
+        if ($this->latePaidDisposition($operation) === FinanceCancellationFeeDisposition::KeptPaidNoRefund) {
+            return $operation;
+        }
         $charge = $this->findCharge($operation);
         if (! $charge instanceof FinanceCharge) {
             return $operation;
@@ -230,17 +248,36 @@ class ProcessFinanceCancellationOperationAction
         return DB::transaction(function () use ($operation, $charge): FinanceCancellationOperation {
             $locked = FinanceCancellationOperation::query()->lockForUpdate()->findOrFail($operation->id);
             $payload = $locked->result_payload ?? [];
-            if (($payload['fee_disposition'] ?? null) === FinanceCancellationFeeDisposition::KeptPaidNoRefund->value) {
+            $currentDisposition = $payload['fee_disposition'] ?? null;
+            if ($currentDisposition === FinanceCancellationFeeDisposition::KeptPaidNoRefund->value
+                || $currentDisposition === FinanceCancellationFeeDisposition::PaidReleaseToBalance->value
+            ) {
                 return $locked;
             }
 
+            $disposition = $this->latePaidDisposition($locked);
+
             $this->bridgePaidDngRequestsForChargeAction->handle($charge);
+
+            // Keep-for-later: void the still-active paid charge so the captured
+            // cash is released to unapplied balance. Forfeit never reaches here.
+            if ($charge->status === FinanceCharge::STATUS_ACTIVE
+                && $disposition === FinanceCancellationFeeDisposition::PaidReleaseToBalance
+            ) {
+                $this->voidFinanceChargeAction->handle(
+                    $charge->id,
+                    $locked->paid_void_reason,
+                    $locked->actor_user_id,
+                    false,
+                );
+                $charge->refresh();
+            }
 
             $locked->update([
                 'result_payload' => array_merge($payload, [
                     'is_paid' => true,
                     'finance_charge_id' => $charge->id,
-                    'fee_disposition' => FinanceCancellationFeeDisposition::KeptPaidNoRefund->value,
+                    'fee_disposition' => $disposition->value,
                     'had_unpaid_charge' => false,
                     'late_paid_disposition' => true,
                 ]),
@@ -253,6 +290,17 @@ class ProcessFinanceCancellationOperationAction
 
             return $locked->fresh() ?? $locked;
         });
+    }
+
+    /**
+     * Paid disposition chosen by the source context at cancellation time:
+     * forfeit (kept paid, no refund) or keep-for-later (release to balance).
+     */
+    private function latePaidDisposition(FinanceCancellationOperation $operation): FinanceCancellationFeeDisposition
+    {
+        return str_contains((string) $operation->paid_void_reason, 'keep_for_later')
+            ? FinanceCancellationFeeDisposition::PaidReleaseToBalance
+            : FinanceCancellationFeeDisposition::KeptPaidNoRefund;
     }
 
     private function appendCompletionOutbox(FinanceCancellationOperation $operation, string $eventKind): void
@@ -515,10 +563,14 @@ class ProcessFinanceCancellationOperationAction
         return bccomp($remaining, '0.00', 2) < 0 ? '0.00' : $remaining;
     }
 
-    private function resolveFeeDisposition(?FinanceCharge $charge, bool $paid): FinanceCancellationFeeDisposition
+    private function resolveFeeDisposition(?FinanceCharge $charge, bool $paid, string $paidVoidReason): FinanceCancellationFeeDisposition
     {
         if ($paid) {
-            return FinanceCancellationFeeDisposition::KeptPaidNoRefund;
+            // Staff chose the money outcome at cancel time via the handoff:
+            // forfeit keeps the paid charge as revenue, keep-for-later releases it.
+            return str_contains($paidVoidReason, 'keep_for_later')
+                ? FinanceCancellationFeeDisposition::PaidReleaseToBalance
+                : FinanceCancellationFeeDisposition::KeptPaidNoRefund;
         }
 
         if ($charge === null) {

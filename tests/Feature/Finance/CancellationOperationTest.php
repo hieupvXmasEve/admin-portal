@@ -17,6 +17,7 @@ use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Modules\Finance\Actions\CreateRetakeCourseChargeSimpleAction;
 use App\Modules\Finance\Actions\ProcessFinanceCancellationOperationAction;
 use App\Modules\Finance\Actions\RecoverFinanceCancellationWorkAction;
+use App\Modules\Finance\Actions\ResumeFinanceCancellationOnPaidEvidenceAction;
 use App\Modules\Finance\Actions\VoidFinanceChargeAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
@@ -32,6 +33,7 @@ use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Shared\Contracts\Finance\DTO\FinanceCancellationCompletionData;
+use App\Shared\Contracts\Finance\Enums\FinanceCancellationFeeDisposition;
 use App\Shared\Contracts\Finance\FinanceCancellationCompletionContract;
 use App\Shared\Contracts\Finance\FinanceCancellationOperationRequestContract;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -96,7 +98,7 @@ function requestCancellationOperation(
         AcademicFinanceObligationSource::courseRetakeRegistrationRef($registration),
         AcademicFinanceObligationSource::RETAKE_FEE,
         'retake_course_cancelled',
-        'retake_course_cancelled_paid_no_refund',
+        'retake_course_cancelled_paid_keep_for_later',
         null,
         array_merge(['reason' => 'Student withdrew'], $payload),
     );
@@ -482,10 +484,10 @@ it('bridges paid DNG evidence before voiding the payable charge', function () {
 
     expect($stored->status)->toBe(FinanceCancellationOperation::STATUS_COMPLETED)
         ->and($stored->result_payload['fee_disposition'] ?? null)
-        ->toBe(ProcessFinanceCancellationOperationAction::FEE_DISPOSITION_KEPT_PAID_NO_REFUND)
+        ->toBe(FinanceCancellationFeeDisposition::PaidReleaseToBalance->value)
         ->and($stored->result_payload['is_paid'] ?? null)->toBeTrue()
         ->and($charge->status)->toBe(FinanceCharge::STATUS_VOID)
-        ->and($charge->void_reason)->toBe('retake_course_cancelled_paid_no_refund')
+        ->and($charge->void_reason)->toBe('retake_course_cancelled_paid_keep_for_later')
         ->and($paidDng->status)->toBe(DngPaymentRequest::STATUS_PAID_UNINVOICED)
         ->and($paidDng->payment_id)->not->toBeNull()
         ->and($registration->fresh()->status)->toBe(CourseRetakeRegistration::STATUS_FINANCE_PENDING_CANCELLATION);
@@ -495,6 +497,60 @@ it('bridges paid DNG evidence before voiding the payable charge', function () {
         ->whereIn('invoice_line_id', $charge->invoiceLines()->pluck('id'))
         ->sum('amount'))->toBe(0.0)
         ->and((float) $payment->unapplied_amount)->toBe(500000.0);
+});
+
+it('releases paid money exactly once when paid evidence signals twice (keep-for-later)', function () {
+    Queue::fake();
+    $registration = cancellationOperationRetake();
+    $charge = FinanceCharge::query()->create([
+        'student_id' => $registration->student_id,
+        'semester_id' => $registration->semester_id,
+        'charge_type' => FinanceCharge::TYPE_RETAKE_FEE,
+        'amount' => 500000,
+        'description' => 'Retake fee',
+        'effective_at' => now(),
+        'status' => FinanceCharge::STATUS_ACTIVE,
+    ]);
+    $operation = requestCancellationOperation($registration, [
+        'expected_charge_id' => $charge->id,
+    ]);
+
+    $paidDng = DngPaymentRequest::query()->create([
+        'student_id' => $registration->student_id,
+        'campus_code' => 'TEST',
+        'student_code' => $registration->student->student_id,
+        'fee_type' => 'HL',
+        'item_id' => 'cancel-idem-'.$registration->id,
+        'amount' => $charge->amount,
+        'status' => DngPaymentRequest::STATUS_PAID_UNINVOICED,
+        'dng_payment_id' => 'DNG-IDEM-'.$registration->id,
+        'paid_at' => now(),
+    ]);
+    DngPaymentRequestCharge::query()->create([
+        'dng_payment_request_id' => $paidDng->id,
+        'finance_charge_id' => $charge->id,
+        'amount' => $charge->amount,
+    ]);
+
+    app(ProcessFinanceCancellationOperationAction::class)->handle($operation->operationId);
+    $charge->refresh();
+    expect($charge->status)->toBe(FinanceCharge::STATUS_VOID);
+
+    $payment = Payment::query()->firstOrFail();
+    $balanceAfterFirst = (float) $payment->unapplied_amount;
+    expect($balanceAfterFirst)->toBe(500000.0);
+
+    // Re-drive the completed operation (paid evidence signal arriving again).
+    app(ProcessFinanceCancellationOperationAction::class)->handle($operation->operationId);
+    app(ResumeFinanceCancellationOnPaidEvidenceAction::class)->run([
+        'finance_charge_id' => $charge->id,
+    ]);
+    if (! empty($operation->operationId)) {
+        app(ProcessFinanceCancellationOperationAction::class)->handle((int) $operation->operationId);
+    }
+
+    $payment->refresh();
+    expect((float) $payment->unapplied_amount)->toBe($balanceAfterFirst);
 });
 
 it('replaces only the remaining targets after cancelling an aggregate request', function () {
@@ -725,7 +781,7 @@ it('upgrades a completed unpaid cancellation to paid disposition when late cash 
 
     $upgraded = FinanceCancellationOperation::query()->findOrFail($operation->operationId);
     expect($upgraded->result_payload['fee_disposition'] ?? null)
-        ->toBe(ProcessFinanceCancellationOperationAction::FEE_DISPOSITION_KEPT_PAID_NO_REFUND)
+        ->toBe(FinanceCancellationFeeDisposition::PaidReleaseToBalance->value)
         ->and($upgraded->result_payload['is_paid'] ?? null)->toBeTrue()
         ->and($upgraded->result_payload['late_paid_disposition'] ?? null)->toBeTrue()
         ->and($paidDng->fresh()->payment_id)->not->toBeNull();

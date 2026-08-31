@@ -73,7 +73,9 @@ class ResumeFinanceCancellationOnPaidEvidenceAction
                 $payload = $operation->result_payload ?? [];
 
                 return ($payload['fee_disposition'] ?? null)
-                    !== FinanceCancellationFeeDisposition::KeptPaidNoRefund->value;
+                    !== FinanceCancellationFeeDisposition::KeptPaidNoRefund->value
+                    && ($payload['fee_disposition'] ?? null)
+                    !== FinanceCancellationFeeDisposition::PaidReleaseToBalance->value;
             })
             ->map(fn (FinanceCancellationOperation $operation): int => (int) $operation->id)
             ->values()

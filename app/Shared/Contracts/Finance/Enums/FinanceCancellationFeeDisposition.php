@@ -14,4 +14,5 @@ enum FinanceCancellationFeeDisposition: string
     case NoCharge = 'no_charge';
     case VoidedUnpaidCharge = 'voided_unpaid_charge';
     case KeptPaidNoRefund = 'kept_paid_no_refund';
+    case PaidReleaseToBalance = 'paid_release_to_balance';
 }
