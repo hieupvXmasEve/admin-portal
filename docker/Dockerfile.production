@@ -36,7 +36,11 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 WORKDIR /app
 
 COPY . .
-RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts
+RUN for i in 1 2 3; do \
+        composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts && exit 0; \
+        echo "composer install failed (attempt $i/3), retrying..."; \
+        sleep 10; \
+    done; exit 1
 
 RUN pnpm install --frozen-lockfile
 
