@@ -9,7 +9,10 @@ use App\Models\ExamResitAttempt;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
+use App\Modules\Academic\Support\AcademicFinanceObligationSource;
+use App\Modules\Finance\Actions\CreateExamResitChargeSimpleAction;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\PaymentApplication;
@@ -119,6 +122,46 @@ function payExamResitChargeFully(FinanceCharge $charge): void
         'entry_type' => 'application',
         'applied_at' => now(),
     ]);
+}
+function settleExamResitAttemptLedger(ExamResitAttempt $attempt): ExamResitAttempt
+{
+    $feeAmount = (float) ($attempt->fee_amount ?? 750_000);
+    if (! DB::table('finance_pricing_catalog_items')
+        ->where('obligation_type', FinanceCharge::TYPE_EXAM_RESIT_FEE)
+        ->where('is_active', true)
+        ->exists()) {
+        DB::table('finance_pricing_catalog_items')->insert([
+            'obligation_type' => FinanceCharge::TYPE_EXAM_RESIT_FEE,
+            'amount' => $feeAmount,
+            'currency' => 'VND',
+            'rule_version' => 'exam_resit_fee:v1',
+            'description' => 'Fixed resit fee',
+            'is_active' => true,
+            'effective_from' => now()->subDay(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    if ($attempt->hq_fee_status === ExamResitAttempt::HQ_FEE_PENDING) {
+        app(CreateExamResitChargeSimpleAction::class)->handle(['attempt_id' => $attempt->id]);
+        $attempt = $attempt->fresh() ?? $attempt;
+    }
+
+    $obligationId = FinanceObligation::query()
+        ->where('source_system', AcademicFinanceObligationSource::SOURCE_SYSTEM)
+        ->where('source_kind', AcademicFinanceObligationSource::EXAM_RESIT_ATTEMPT)
+        ->where('source_ref', AcademicFinanceObligationSource::examResitAttemptRef($attempt))
+        ->where('obligation_type', AcademicFinanceObligationSource::EXAM_RESIT_FEE)
+        ->value('id');
+
+    $charge = FinanceCharge::query()
+        ->where('finance_obligation_id', $obligationId)
+        ->firstOrFail();
+
+    payExamResitChargeFully($charge);
+
+    return $attempt->fresh() ?? $attempt;
 }
 
 /**

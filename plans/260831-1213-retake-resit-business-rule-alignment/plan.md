@@ -1,7 +1,7 @@
 ---
 title: "retake-resit-business-rule-alignment"
 description: "Căn chỉnh luồng học lại / thi lại với 8 quy tắc nghiệp vụ đã chốt: giá học lại theo bảng giá Finance, hủy đã trả tiền (retake chưa xếp lớp; thi lại 2 action mất phí / giữ phí dùng sau), sửa giới hạn thi lại, bổ sung ghi nhận no_show."
-status: in-progress
+status: completed
 priority: P1
 effort: "6-8d"
 created: 2026-08-31

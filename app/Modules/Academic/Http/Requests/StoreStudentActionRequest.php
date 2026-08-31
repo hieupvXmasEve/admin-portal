@@ -97,8 +97,8 @@ class StoreStudentActionRequest extends FormRequest
             ],
             // Defer Case fields
             'defer_scope_type' => ['required', 'string', 'in:FULL,COURSES'],
-            'defer_fee_policy' => ['required', 'string', 'in:PRESERVE,FORFEIT,PARTIAL'],
-            'defer_preserve_amount' => ['nullable', 'numeric', 'min:0', 'required_if:defer_fee_policy,PARTIAL'],
+            'defer_fee_policy' => ['required', 'string', 'in:PRESERVE,FORFEIT'],
+            'defer_preserve_amount' => ['nullable', 'numeric', 'min:0'],
             'defer_course_registration_ids' => ['nullable', 'array', 'required_if:defer_scope_type,COURSES'],
             'defer_egc_charge_ids' => ['nullable', 'array'],
             'defer_course_registration_ids.*' => [
@@ -130,7 +130,7 @@ class StoreStudentActionRequest extends FormRequest
                 function (string $attribute, mixed $value, \Closure $fail): void {
                     $feePolicy = $this->input('defer_fee_policy') ?? 'FORFEIT';
                     if ($feePolicy === 'FORFEIT') {
-                        $fail('Fee policy must be preserve or partial when selecting EGC levels.');
+                        $fail('Fee policy must be preserve when selecting EGC levels.');
 
                         return;
                     }
@@ -277,8 +277,7 @@ class StoreStudentActionRequest extends FormRequest
             'defer_scope_type.required' => 'Defer scope type is required.',
             'defer_scope_type.in' => 'Defer scope type must be FULL or COURSES.',
             'defer_fee_policy.required' => 'Fee policy is required.',
-            'defer_fee_policy.in' => 'Fee policy must be PRESERVE, FORFEIT, or PARTIAL.',
-            'defer_preserve_amount.required_if' => 'Preserve amount is required when fee policy is PARTIAL.',
+            'defer_fee_policy.in' => 'Fee policy must be PRESERVE or FORFEIT.',
             'defer_preserve_amount.numeric' => 'Preserve amount must be a number.',
             'defer_preserve_amount.min' => 'Preserve amount must be at least 0.',
             'defer_course_registration_ids.required_if' => 'Course selection is required when scope is COURSES.',

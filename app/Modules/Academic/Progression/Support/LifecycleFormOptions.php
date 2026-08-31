@@ -64,7 +64,6 @@ class LifecycleFormOptions
             'deferFeePolicies' => [
                 ['value' => 'PRESERVE', 'label' => 'Bảo lưu học phí (Preserve Fee)'],
                 ['value' => 'FORFEIT', 'label' => 'Mất học phí (Forfeit Fee)'],
-                ['value' => 'PARTIAL', 'label' => 'Bảo lưu một phần (Partial Preserve)'],
             ],
             'egcDeferBlocks' => [
                 ['value' => 1, 'label' => 'Block 1'],

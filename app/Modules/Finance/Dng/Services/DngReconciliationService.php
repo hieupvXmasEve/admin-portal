@@ -8,6 +8,7 @@ use App\Modules\Finance\Actions\CaptureDngProviderReceiptAction;
 use App\Modules\Finance\Actions\RegisterDngReceiptExceptionAction;
 use App\Modules\Finance\Actions\SettleInstallmentFromDngAction;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
+use App\Modules\Finance\Support\AcademicDngPaymentProjectionSync;
 use App\Modules\Finance\Support\BillingAccountProvisioner;
 use App\Modules\Finance\Support\SettlementMutationGuard;
 use Closure;
@@ -21,6 +22,7 @@ class DngReconciliationService
         protected SettleInstallmentFromDngAction $settleInstallmentAction,
         protected ?BillingAccountProvisioner $billingAccountProvisioner = null,
         protected ?SettlementMutationGuard $settlementMutationGuard = null,
+        protected ?AcademicDngPaymentProjectionSync $academicProjectionSync = null,
     ) {}
 
     /**
@@ -267,6 +269,7 @@ class DngReconciliationService
                 if ($fresh->receiptAmountMismatchReasons($txn) === []) {
                     $this->settleInstallmentAction->handle($request->fresh());
                 }
+                $this->syncAcademicPaymentProjections($request->fresh() ?? $fresh);
             }
 
             $summary['up_to_date']++;
@@ -286,6 +289,8 @@ class DngReconciliationService
             $this->settleInstallmentAction->handle($request->fresh());
         }
 
+        $this->syncAcademicPaymentProjections($request->fresh() ?? $fresh);
+
         $summary['backfilled']++;
 
         Log::info('DNG reconciliation: backfilled payment', [
@@ -293,6 +298,16 @@ class DngReconciliationService
             'dng_payment_id' => $dngPaymentId,
             'new_status' => $request->fresh()->status,
         ]);
+    }
+
+    private function syncAcademicPaymentProjections(?DngPaymentRequest $request): void
+    {
+        if ($request === null) {
+            return;
+        }
+
+        ($this->academicProjectionSync ?? app(AcademicDngPaymentProjectionSync::class))
+            ->syncForRequest($request);
     }
 
     private function guard(): SettlementMutationGuard

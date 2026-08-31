@@ -86,7 +86,10 @@ function completableExamResitAttempt(
         'failure_reason' => AcademicRecord::FAILURE_GRADE_FAILED,
     ], $recordOverrides));
 
-    return ExamResitAttempt::create(array_merge([
+    $simulatePaid = ($attemptOverrides['hq_fee_status'] ?? ExamResitAttempt::HQ_FEE_PAID) === ExamResitAttempt::HQ_FEE_PAID;
+    unset($attemptOverrides['hq_fee_status'], $attemptOverrides['paid_at']);
+
+    $attempt = ExamResitAttempt::create(array_merge([
         'student_id' => test()->student->id,
         'academic_record_id' => $record->id,
         'original_course_offering_id' => test()->courseOffering->id,
@@ -101,14 +104,24 @@ function completableExamResitAttempt(
         'request_sequence' => 1,
         'attempt_number' => null,
         'approved_at' => now(),
-        'hq_fee_status' => ExamResitAttempt::HQ_FEE_PAID,
-        'paid_at' => now(),
+        'hq_fee_status' => ExamResitAttempt::HQ_FEE_PENDING,
+        'paid_at' => null,
         'fee_amount' => 750000,
         'exam_resit_fee_snapshot' => 750000,
         'max_attempts_snapshot' => 1,
         'late_payment_grace_days_snapshot' => 14,
         'allow_unpaid_sitting_snapshot' => false,
     ], $attemptOverrides));
+
+    if ($simulatePaid) {
+        return settleExamResitAttemptLedger($attempt);
+    }
+
+    $attempt->update([
+        'hq_fee_status' => ExamResitAttempt::HQ_FEE_CHARGE_CREATED,
+    ]);
+
+    return $attempt->fresh() ?? $attempt;
 }
 
 it('applies a higher passing resit score to the academic record using the higher-score rule', function () {

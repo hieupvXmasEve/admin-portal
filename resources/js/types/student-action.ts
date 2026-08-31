@@ -186,7 +186,7 @@ export interface StoreStudentActionForm {
 
     // Defer Case fields (for ACADEMIC_DEFER)
     defer_scope_type?: 'FULL' | 'COURSES' | null;
-    defer_fee_policy?: 'PRESERVE' | 'FORFEIT' | 'PARTIAL' | null;
+    defer_fee_policy?: 'PRESERVE' | 'FORFEIT' | null;
     defer_preserve_amount?: number | null;
     defer_course_registration_ids?: number[];
     defer_egc_charge_ids?: number[];

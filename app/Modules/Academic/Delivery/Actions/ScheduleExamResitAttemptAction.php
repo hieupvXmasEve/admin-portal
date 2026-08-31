@@ -7,6 +7,7 @@ namespace App\Modules\Academic\Delivery\Actions;
 use App\Models\ExamResitAttempt;
 use App\Models\ExamResitSession;
 use App\Modules\Academic\Delivery\Support\ExamScheduleConflictChecker;
+use App\Modules\Academic\Delivery\Support\ResitFeeGate;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -28,7 +29,10 @@ use Illuminate\Validation\ValidationException;
  */
 class ScheduleExamResitAttemptAction
 {
-    public function __construct(private readonly ExamScheduleConflictChecker $conflicts) {}
+    public function __construct(
+        private readonly ExamScheduleConflictChecker $conflicts,
+        private readonly ResitFeeGate $resitFeeGate,
+    ) {}
 
     /**
      * @param  array{
@@ -68,7 +72,12 @@ class ScheduleExamResitAttemptAction
                 (int) $attempt->id,
             );
 
-            $unpaidAttributes = $this->resolvePaymentGate($attempt, $data);
+            $unpaidAttributes = $this->resitFeeGate->assertCanProceed(
+                $attempt,
+                $data,
+                'Lệ phí thi lại chưa thanh toán, không thể xếp lịch khi chính sách không cho phép.',
+                'Cần ghi rõ lý do xếp lịch thi lại khi chưa thanh toán.',
+            );
 
             $attempt->update($unpaidAttributes + [
                 'status' => ExamResitAttempt::STATUS_SCHEDULED,
@@ -142,40 +151,6 @@ class ScheduleExamResitAttemptAction
                 'exam_resit_session_id' => ['Ca thi lại chưa gắn với phòng/khung giờ thi.'],
             ]);
         }
-    }
-
-    /**
-     * Payment is a parallel HQ state. Scheduling a still-unpaid attempt is allowed
-     * only when policy permits an unpaid sitting AND a visible reason is recorded.
-     *
-     * @param  array<string, mixed>  $data
-     * @return array<string, mixed> Extra attributes to persist on the attempt.
-     */
-    private function resolvePaymentGate(ExamResitAttempt $attempt, array $data): array
-    {
-        if ($attempt->hq_fee_status === ExamResitAttempt::HQ_FEE_PAID) {
-            return [];
-        }
-
-        if (! (bool) $attempt->allow_unpaid_sitting_snapshot) {
-            throw ValidationException::withMessages([
-                'payment' => ['Lệ phí thi lại chưa thanh toán, không thể xếp lịch khi chính sách không cho phép.'],
-            ]);
-        }
-
-        $reason = trim((string) ($data['unpaid_sitting_reason'] ?? ''));
-
-        if ($reason === '') {
-            throw ValidationException::withMessages([
-                'unpaid_sitting_reason' => ['Cần ghi rõ lý do xếp lịch thi lại khi chưa thanh toán.'],
-            ]);
-        }
-
-        return [
-            'unpaid_allowed_reason' => $reason,
-            'unpaid_allowed_by_user_id' => auth()->id(),
-            'unpaid_allowed_at' => now(),
-        ];
     }
 
     private function refreshSessionCandidateCount(ExamResitSession $session): void

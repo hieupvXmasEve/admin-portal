@@ -147,6 +147,7 @@ class ListRetakeCourseRegistrationsQuery
             'operation_state' => $this->deriveOperationState($registration),
             'available_actions' => $this->deriveAvailableActions($registration),
             'exception_summary' => $this->deriveExceptionSummary($registration),
+            'cancel_context' => $this->deriveCancelContext($registration),
         ];
     }
 
@@ -274,5 +275,27 @@ class ListRetakeCourseRegistrationsQuery
         }
 
         return $this->obligationSettlement->hasRetakePaidEvidence($registration);
+    }
+
+    /**
+     * @return array{fee_state:string,requires_no_refund_acknowledgement:bool,title:string,message:string}
+     */
+    private function deriveCancelContext(CourseRetakeRegistration $registration): array
+    {
+        if ($this->hasPaidEvidence($registration)) {
+            return [
+                'fee_state' => 'paid_no_refund',
+                'requires_no_refund_acknowledgement' => true,
+                'title' => 'Hủy học lại đã thanh toán',
+                'message' => 'Sinh viên đã thanh toán phí học lại. Chọn mất phí hoặc lưu phí dùng sau. Không hoàn phí về DNG.',
+            ];
+        }
+
+        return [
+            'fee_state' => 'unpaid',
+            'requires_no_refund_acknowledgement' => false,
+            'title' => 'Hủy đăng ký học lại',
+            'message' => 'Đăng ký học lại sẽ bị hủy. Nếu đã tạo phí chưa thu, khoản phí sẽ bị hủy theo.',
+        ];
     }
 }

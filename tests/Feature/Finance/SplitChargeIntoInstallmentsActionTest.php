@@ -50,6 +50,7 @@ function createSplitTestCharge(float $gross, float $discount = 0.0): FinanceChar
             'invoice_number' => 'TEST-INV-'.uniqid(),
             'student_id' => $student->id,
             'semester_id' => $semester->id,
+            'currency' => 'VND',
             'status' => 'pending',
             'total_amount' => $gross,
             'paid_amount' => 0,

@@ -22,16 +22,17 @@ use App\Modules\Finance\Services\InvoiceGenerationService;
 use App\Modules\Finance\Services\SettlementService;
 use App\Modules\Finance\Support\BillingAccountProvisioner;
 use App\Modules\Finance\Support\SettlementMutationGuard;
+use App\Shared\Contracts\Academic\StudentLifecycleCourseRegistrationGateway;
 use App\Shared\Contracts\Academic\StudentLifecycleStatusReader;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * FIN-REV-020-01 (M1) — Defer Policy Settlement Action.
- *
- * Settles a FULL-scope PRESERVE/FORFEIT defer case using only existing ledger
- * operations — no new ledger, no new table. The defer policy applies to real
- * paid cash only:
+ * Settles a FULL- or COURSES-scope PRESERVE/FORFEIT defer case using only
+ * existing ledger operations — no new ledger, no new table. The defer policy
+ * applies to real paid cash only:
  *
  *  - PRESERVE: void the deferred obligations; released paid cash stays
  *    unapplied/available for the student. Nothing else.
@@ -39,15 +40,9 @@ use Illuminate\Support\Facades\DB;
  *    cash (capped by what was actually paid) onto a single adjustment charge.
  *    If the student paid nothing there is nothing to consume — never create
  *    unpaid forfeit debt.
- *
- * Settlement model ("void-and-release → re-consume"):
- *  1. Resolve obligations = active positive finance_charges for the student in
- *     the defer semester.
- *  2. Auto-safe gate and lifecycle collection closure:
- *       - live unpaid DNG on an obligation  → cancel locally in Swinx
- *       - discount/scholarship on any line   → skipped: discount_present
- *       - no obligations                     → noop: no_charge
- *       - scope ≠ FULL or policy unsupported → skipped: out_of_scope
+ *  - PARTIAL: rejected. Owner removed one-part preserve (2026-09-01).
+ *  - COURSES-scope: only charges linked to selected course registrations.
+ *    Semester invoices without a course link are excluded and logged for review.
  *  3. Apply inside a single transaction so a partial failure rolls back whole.
  *
  * The runtime Academic defer flow and historical defer backfill both reuse this
@@ -75,6 +70,8 @@ class ApplyDeferFinancePolicyAction
 
     public const REASON_OUT_OF_SCOPE = 'out_of_scope';
 
+    public const REASON_PARTIAL_NOT_SUPPORTED = 'partial_not_supported';
+
     public const REASON_STUDENT_LIFECYCLE_ACTIVE = 'student_lifecycle_active';
 
     private const SETTLEABLE_LIFECYCLE_STATUSES = [
@@ -100,10 +97,11 @@ class ApplyDeferFinancePolicyAction
         private readonly InvoiceGenerationService $invoiceGenerationService,
         private readonly SettlementService $settlementService,
         private readonly StudentLifecycleStatusReader $studentLifecycleStatusReader,
+        private readonly StudentLifecycleCourseRegistrationGateway $courseRegistrations,
     ) {}
 
     /**
-     * Settle a FULL-scope PRESERVE/FORFEIT defer case.
+     * Settle a FULL- or COURSES-scope PRESERVE/FORFEIT defer case.
      *
      * @return array{
      *     status: string,
@@ -124,7 +122,10 @@ class ApplyDeferFinancePolicyAction
         $actorId = $userId ?? auth()->id();
         $reviewedDiscountDispositionReason = trim((string) $reviewedDiscountDispositionReason);
 
-        // Gate 1 — eligibility. Only FULL-scope PRESERVE/FORFEIT is in scope for M1.
+        if ($case->fee_policy === DeferCase::POLICY_PARTIAL) {
+            return $this->result($case, self::STATUS_SKIPPED, self::REASON_PARTIAL_NOT_SUPPORTED);
+        }
+
         if (! $this->isInScope($case)) {
             return $this->result($case, self::STATUS_SKIPPED, self::REASON_OUT_OF_SCOPE);
         }
@@ -163,10 +164,10 @@ class ApplyDeferFinancePolicyAction
         });
     }
 
-    /** FULL-scope, PRESERVE or FORFEIT only (PARTIAL / COURSES are later slices). */
+    /** FULL or COURSES scope, PRESERVE or FORFEIT only. PARTIAL is rejected above. */
     private function isInScope(DeferCase $case): bool
     {
-        return $case->scope_type === DeferCase::SCOPE_FULL
+        return in_array($case->scope_type, [DeferCase::SCOPE_FULL, DeferCase::SCOPE_COURSES], true)
             && in_array($case->fee_policy, [DeferCase::POLICY_PRESERVE, DeferCase::POLICY_FORFEIT], true);
     }
 
@@ -187,7 +188,7 @@ class ApplyDeferFinancePolicyAction
             ->where('obligation_type', FinanceCharge::TYPE_ADJUSTMENT)
             ->pluck('id');
 
-        return FinanceCharge::query()
+        $charges = FinanceCharge::query()
             ->where('student_id', $case->student_id)
             ->where('semester_id', $case->semester_id)
             ->where('status', FinanceCharge::STATUS_ACTIVE)
@@ -199,6 +200,58 @@ class ApplyDeferFinancePolicyAction
             ->orderBy('id')
             ->lockForUpdate()
             ->get();
+
+        if ($case->scope_type !== DeferCase::SCOPE_COURSES) {
+            return $charges;
+        }
+
+        $linkedObligationIds = $this->courseLinkedObligationIds($case);
+        $linked = $charges->filter(
+            fn (FinanceCharge $charge): bool => $charge->finance_obligation_id !== null
+                && $linkedObligationIds->contains((int) $charge->finance_obligation_id),
+        );
+        $excluded = $charges->reject(
+            fn (FinanceCharge $charge): bool => $linked->contains('id', $charge->id),
+        );
+
+        if ($excluded->isNotEmpty()) {
+            Log::warning('Defer COURSES-scope excluded charges without a selected-course link', [
+                'defer_case_id' => $case->id,
+                'excluded_charge_ids' => $excluded->modelKeys(),
+            ]);
+        }
+
+        return $linked->values();
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, int>
+     */
+    private function courseLinkedObligationIds(DeferCase $case): \Illuminate\Support\Collection
+    {
+        $registrationIds = $case->items()
+            ->pluck('course_registration_id')
+            ->map(static fn (int|string $id): int => (int) $id)
+            ->all();
+        $sources = $this->courseRegistrations->financeObligationSources($registrationIds);
+        if ($sources === []) {
+            return collect();
+        }
+
+        return FinanceObligation::query()
+            ->where(function ($query) use ($sources): void {
+                foreach ($sources as $source) {
+                    $query->orWhere(function ($sourceQuery) use ($source): void {
+                        $sourceQuery
+                            ->where('source_system', $source->source_system)
+                            ->where('source_kind', $source->source_kind)
+                            ->where('source_ref', $source->source_ref)
+                            ->where('obligation_type', $source->obligation_type);
+                    });
+                }
+            })
+            ->pluck('id')
+            ->map(static fn (int|string $id): int => (int) $id);
     }
 
     /**

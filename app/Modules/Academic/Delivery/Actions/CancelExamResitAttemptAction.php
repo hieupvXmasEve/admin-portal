@@ -113,9 +113,20 @@ class CancelExamResitAttemptAction
         return $attempt->fresh() ?? $attempt;
     }
 
-    private function feeOutcome(array $data): string
+    private function feeOutcome(array $data, bool $required = false): string
     {
-        $outcome = (string) ($data['fee_outcome'] ?? self::FEE_OUTCOME_FORFEIT);
+        $raw = $data['fee_outcome'] ?? null;
+        if ($raw === null || $raw === '') {
+            if ($required) {
+                throw new RuntimeException(
+                    'fee_outcome không hợp lệ. Chỉ chấp nhận "forfeit" (mất phí) hoặc "keep_for_later" (lưu phí dùng sau).'
+                );
+            }
+
+            return self::FEE_OUTCOME_FORFEIT;
+        }
+
+        $outcome = (string) $raw;
 
         if (! in_array($outcome, [self::FEE_OUTCOME_FORFEIT, self::FEE_OUTCOME_KEEP_FOR_LATER], true)) {
             throw new RuntimeException(
@@ -146,12 +157,16 @@ class CancelExamResitAttemptAction
 
         $hasPaidEvidence = $settlement->hasExamResitPaidEvidence($attempt);
 
-        if ($hasPaidEvidence && ! (bool) ($data['acknowledge_no_refund'] ?? false)) {
-            throw new RuntimeException(
-                $this->feeOutcome($data) === self::FEE_OUTCOME_KEEP_FOR_LATER
-                    ? 'Khoản phí đã thanh toán. Vui lòng xác nhận hủy và lưu phí đã thu dùng cho phí phát sinh sau.'
-                    : 'Khoản phí đã thanh toán. Vui lòng xác nhận hủy nhưng mất phí đã thu (không hoàn phí).'
-            );
+        if ($hasPaidEvidence) {
+            $this->feeOutcome($data, required: true);
+
+            if (! (bool) ($data['acknowledge_no_refund'] ?? false)) {
+                throw new RuntimeException(
+                    $this->feeOutcome($data, required: true) === self::FEE_OUTCOME_KEEP_FOR_LATER
+                        ? 'Khoản phí đã thanh toán. Vui lòng xác nhận hủy và lưu phí đã thu dùng cho phí phát sinh sau.'
+                        : 'Khoản phí đã thanh toán. Vui lòng xác nhận hủy nhưng mất phí đã thu (không hoàn phí).'
+                );
+            }
         }
 
         if (! $hasPaidEvidence

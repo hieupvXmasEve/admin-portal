@@ -48,6 +48,13 @@ class CancelExamResitRequest extends FormRequest
                 );
             }
 
+            if ($isPaid && ! in_array($this->input('fee_outcome'), ['forfeit', 'keep_for_later'], true)) {
+                $validator->errors()->add(
+                    'fee_outcome',
+                    'Vui lòng chọn mất phí hoặc lưu phí dùng sau khi hủy thi lại đã thanh toán.'
+                );
+            }
+
             $hasUnpaidCharge = $attempt->hq_fee_status === ExamResitAttempt::HQ_FEE_CHARGE_CREATED
                 && ! $isPaid
                 && $settlement->hasUnsettledExamResitObligation($attempt);

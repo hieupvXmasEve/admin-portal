@@ -469,6 +469,7 @@ it('refreshes session candidate count from non-cancelled attempts after cancelli
 
     runCancelExamResit($attempt->id, overrides: [
         'acknowledge_no_refund' => true,
+        'fee_outcome' => CancelExamResitAttemptAction::FEE_OUTCOME_FORFEIT,
     ]);
     settleExamResitFinanceCancellation($attempt);
 

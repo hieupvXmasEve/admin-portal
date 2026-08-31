@@ -7,6 +7,7 @@ namespace App\Modules\Finance\Actions;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Services\DngPaymentService;
 use App\Modules\Finance\Models\Payment;
+use App\Modules\Finance\Support\AcademicDngPaymentProjectionSync;
 
 /**
  * Captures attributable provider cash once, separately from target allocation.
@@ -17,7 +18,10 @@ use App\Modules\Finance\Models\Payment;
  */
 class CaptureDngProviderReceiptAction
 {
-    public function __construct(private readonly DngPaymentService $dngPaymentService) {}
+    public function __construct(
+        private readonly DngPaymentService $dngPaymentService,
+        private readonly ?AcademicDngPaymentProjectionSync $academicProjectionSync = null,
+    ) {}
 
     /**
      * @param  array{request: DngPaymentRequest, receipt: array{amount: numeric-string|float|int, payload: array<string, mixed>, source: string, authenticity: array<string, mixed>, payer_correlation: array<string, mixed>, target_validation: array<string, mixed>}}  $data
@@ -63,6 +67,15 @@ class CaptureDngProviderReceiptAction
             ]);
         }
 
+        if ($payment !== null) {
+            $this->academicProjections()->syncForRequest($request->fresh() ?? $request);
+        }
+
         return $payment;
+    }
+
+    private function academicProjections(): AcademicDngPaymentProjectionSync
+    {
+        return $this->academicProjectionSync ?? app(AcademicDngPaymentProjectionSync::class);
     }
 }

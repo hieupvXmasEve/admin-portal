@@ -181,32 +181,25 @@ class DeferCaseService
      */
     public function calculatePreserveAmount(DeferCase $deferCase): float
     {
-        // For FORFEIT, nothing is preserved
         if ($deferCase->fee_policy === DeferCase::POLICY_FORFEIT) {
             return 0;
         }
 
+        if ($deferCase->fee_policy !== DeferCase::POLICY_PRESERVE) {
+            throw new \InvalidArgumentException('Unsupported defer fee policy: '.$deferCase->fee_policy);
+        }
+
         if ($deferCase->scope_type === DeferCase::SCOPE_FULL) {
-            $totalCharges = $this->grossForChargeQuery(
+            return $this->grossForChargeQuery(
                 FinanceCharge::query()
                     ->where('student_id', $deferCase->student_id)
                     ->where('semester_id', $deferCase->semester_id)
                     ->where('status', FinanceCharge::STATUS_ACTIVE)
                     ->where('amount', '>', 0),
             );
-
-            // Full semester defer - preserve based on policy percentage
-            return $deferCase->fee_policy === DeferCase::POLICY_PRESERVE
-                ? $totalCharges
-                : $totalCharges * 0.5; // 50% for PARTIAL
         }
 
-        // Course-level defer - calculate based on specific courses
-        $courseCharges = $this->calculateCourseChargesAmount($deferCase);
-
-        return $deferCase->fee_policy === DeferCase::POLICY_PRESERVE
-            ? $courseCharges
-            : $courseCharges * 0.5; // 50% for PARTIAL
+        return $this->calculateCourseChargesAmount($deferCase);
     }
 
     /**

@@ -6,6 +6,7 @@ namespace App\Modules\Finance\Actions;
 
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Models\DngReceiptException;
+use App\Modules\Finance\Support\AcademicDngPaymentProjectionSync;
 use App\Modules\Finance\Support\BillingAccountProvisioner;
 use App\Modules\Finance\Support\SettlementMutationGuard;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +16,7 @@ class ResolveDngReceiptExceptionAction
     public function __construct(
         private readonly BillingAccountProvisioner $billingAccountProvisioner,
         private readonly SettlementMutationGuard $settlementMutationGuard,
+        private readonly ?AcademicDngPaymentProjectionSync $academicProjectionSync = null,
     ) {}
 
     /** @param array{exception: DngReceiptException, user_id: int} $data */
@@ -30,7 +32,7 @@ class ResolveDngReceiptExceptionAction
             $billingAccountId = $linkedRequest->billing_account_id
                 ?? $this->billingAccountProvisioner->forStudent((int) $linkedRequest->student_id)->id;
 
-            return $this->settlementMutationGuard->handleIfChanged(
+            $resolved = $this->settlementMutationGuard->handleIfChanged(
                 (int) $billingAccountId,
                 function ($_billingAccount, \Closure $markChanged) use ($exception, $userId, $billingAccountId): DngReceiptException {
                     return DB::transaction(function () use ($exception, $userId, $markChanged, $billingAccountId): DngReceiptException {
@@ -68,6 +70,13 @@ class ResolveDngReceiptExceptionAction
                     });
                 },
             );
+
+            $request = $resolved->dngPaymentRequest ?? $linkedRequest->fresh();
+            if ($request instanceof DngPaymentRequest) {
+                $this->academicProjections()->syncForRequest($request);
+            }
+
+            return $resolved;
         }
 
         return DB::transaction(function () use ($exception, $userId): DngReceiptException {
@@ -84,5 +93,10 @@ class ResolveDngReceiptExceptionAction
 
             return $exception->fresh();
         });
+    }
+
+    private function academicProjections(): AcademicDngPaymentProjectionSync
+    {
+        return $this->academicProjectionSync ?? app(AcademicDngPaymentProjectionSync::class);
     }
 }

@@ -9,12 +9,12 @@ use App\Models\CourseRegistration;
 use App\Models\ExamResitAttempt;
 use App\Models\ExamResitSession;
 use App\Models\ExamRoomSlot;
-use App\Modules\Facilities\Models\Room;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
 use App\Models\User;
 use App\Modules\Academic\Delivery\Actions\ScheduleExamResitAttemptAction;
+use App\Modules\Facilities\Models\Room;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 
@@ -69,16 +69,29 @@ function slotWithSession(Unit $unit, array $slotOverrides = [], int $expectedCan
  */
 function approvedAttemptFor(Student $student, Unit $unit, array $overrides = []): ExamResitAttempt
 {
-    return makeApprovedExamResitAttempt(
+    $simulatePaid = ($overrides['hq_fee_status'] ?? ExamResitAttempt::HQ_FEE_PAID) === ExamResitAttempt::HQ_FEE_PAID;
+    unset($overrides['hq_fee_status'], $overrides['paid_at']);
+
+    $attempt = makeApprovedExamResitAttempt(
         $student,
         test()->campus,
         test()->semester,
         array_merge([
             'unit' => $unit,
-            'hq_fee_status' => ExamResitAttempt::HQ_FEE_PAID,
-            'paid_at' => now(),
+            'hq_fee_status' => ExamResitAttempt::HQ_FEE_PENDING,
+            'paid_at' => null,
         ], $overrides),
     );
+
+    if ($simulatePaid) {
+        return settleExamResitAttemptLedger($attempt);
+    }
+
+    $attempt->update([
+        'hq_fee_status' => ExamResitAttempt::HQ_FEE_CHARGE_CREATED,
+    ]);
+
+    return $attempt->fresh() ?? $attempt;
 }
 
 function runScheduleExamResit(int $attemptId, int $sessionId, array $extra = []): ExamResitAttempt

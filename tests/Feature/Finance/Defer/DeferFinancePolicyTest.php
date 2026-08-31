@@ -429,14 +429,33 @@ it('applies an explicitly reviewed FORFEIT disposition using released cash net o
         ->and(deferInvariantOffending())->toBe(0);
 });
 
-it('skips out_of_scope and mutates nothing for a non-FULL scope or non-PRESERVE/FORFEIT policy', function () {
+it('rejects PARTIAL policy without mutating charges', function () {
     [$student, $case] = deferPolicyCase($this->semester, $this->campus, $this->program, $this->user, 'OOS', DeferCase::POLICY_PARTIAL);
     $charge = deferObligation($student->id, $this->semester->id, 45_000_000);
 
     $result = app(ApplyDeferFinancePolicyAction::class)->handle($case, $this->user->id);
 
     expect($result['status'])->toBe('skipped')
-        ->and($result['reason'])->toBe('out_of_scope')
+        ->and($result['reason'])->toBe(ApplyDeferFinancePolicyAction::REASON_PARTIAL_NOT_SUPPORTED)
+        ->and($charge->fresh()->status)->toBe(FinanceCharge::STATUS_ACTIVE);
+});
+
+it('excludes unlinked semester charges from COURSES-scope settlement', function () {
+    [$student, $case] = deferPolicyCase(
+        $this->semester,
+        $this->campus,
+        $this->program,
+        $this->user,
+        'COURSES-EXCL',
+        DeferCase::POLICY_PRESERVE,
+        DeferCase::SCOPE_COURSES,
+    );
+    $charge = deferObligation($student->id, $this->semester->id, 45_000_000);
+
+    $result = app(ApplyDeferFinancePolicyAction::class)->handle($case, $this->user->id);
+
+    expect($result['status'])->toBe('noop')
+        ->and($result['reason'])->toBe('no_charge')
         ->and($charge->fresh()->status)->toBe(FinanceCharge::STATUS_ACTIVE);
 });
 

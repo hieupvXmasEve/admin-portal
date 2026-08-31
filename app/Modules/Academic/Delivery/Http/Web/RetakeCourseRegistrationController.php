@@ -6,13 +6,13 @@ namespace App\Modules\Academic\Delivery\Http\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\CourseRetakeRegistration;
+use App\Modules\Academic\Catalog\Queries\GetSemesterReferenceOptionsQuery;
 use App\Modules\Academic\Delivery\Actions\CancelRetakeCourseRegistrationAction;
 use App\Modules\Academic\Delivery\Actions\CreateRetakeCourseRegistrationAction;
 use App\Modules\Academic\Delivery\Actions\SyncPaidRetakeRegistrationsAction;
 use App\Modules\Academic\Delivery\Http\Requests\RetakeCourse\CancelRetakeCourseRequest;
 use App\Modules\Academic\Delivery\Http\Requests\RetakeCourse\ListRetakeCourseRequest;
 use App\Modules\Academic\Delivery\Http\Requests\RetakeCourse\StoreRetakeCourseRequest;
-use App\Modules\Academic\Catalog\Queries\GetSemesterReferenceOptionsQuery;
 use App\Modules\Academic\Delivery\Queries\ListRetakeCourseEligibleStudentsQuery;
 use App\Modules\Academic\Delivery\Queries\ListRetakeCourseRegistrationsQuery;
 use App\Shared\Contracts\Institution\CampusReferenceReader;
@@ -110,6 +110,8 @@ class RetakeCourseRegistrationController extends Controller
         CancelRetakeCourseRegistrationAction::run([
             'registration_id' => $registration->id,
             'reason' => $request->validated('reason'),
+            'fee_outcome' => $request->validated('fee_outcome'),
+            'acknowledge_no_refund' => $request->boolean('acknowledge_no_refund'),
         ]);
 
         Inertia::flash('success', 'Đã hủy đăng ký học lại.');

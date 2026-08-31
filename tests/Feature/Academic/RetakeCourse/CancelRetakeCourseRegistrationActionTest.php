@@ -274,6 +274,8 @@ it('bridges linked paid dng evidence before cancelling a payment_pending registr
     $result = CancelRetakeCourseRegistrationAction::run([
         'registration_id' => $reg->id,
         'reason' => 'Student request after DNG paid',
+        'fee_outcome' => CancelRetakeCourseRegistrationAction::FEE_OUTCOME_KEEP_FOR_LATER,
+        'acknowledge_no_refund' => true,
     ]);
 
     expect($result->status)->toBe(CourseRetakeRegistration::STATUS_FINANCE_PENDING_CANCELLATION);
@@ -315,6 +317,8 @@ it('cancels a paid unlinked registration and releases the paid fee to unapplied 
     $result = CancelRetakeCourseRegistrationAction::run([
         'registration_id' => $reg->id,
         'reason' => 'Owner rule 4: cancel paid before class link',
+        'fee_outcome' => CancelRetakeCourseRegistrationAction::FEE_OUTCOME_KEEP_FOR_LATER,
+        'acknowledge_no_refund' => true,
     ]);
 
     expect($result->status)->toBe(CourseRetakeRegistration::STATUS_FINANCE_PENDING_CANCELLATION);

@@ -9,6 +9,7 @@ use App\Modules\Finance\Dng\Models\DngPaymentRequestCharge;
 use App\Modules\Finance\Dng\Services\DngPaymentService;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\Payment;
+use App\Modules\Finance\Support\AcademicDngPaymentProjectionSync;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
@@ -22,6 +23,7 @@ class BridgePaidDngRequestsForChargeAction
 
     public function __construct(
         private readonly DngPaymentService $dngPaymentService,
+        private readonly ?AcademicDngPaymentProjectionSync $academicProjectionSync = null,
     ) {}
 
     /**
@@ -54,9 +56,21 @@ class BridgePaidDngRequestsForChargeAction
             // Resume only when there is completed unpaid-disposition work to upgrade, or
             // requested/review ops that need re-entry — always safe afterCommit job.
             ResumeFinanceCancellationOnPaidEvidenceAction::run(['finance_charge_id' => $chargeId]);
+
+            $resolved = $charge instanceof FinanceCharge
+                ? $charge
+                : FinanceCharge::query()->find($chargeId);
+            if ($resolved instanceof FinanceCharge) {
+                $this->academicProjections()->syncForCharge($resolved);
+            }
         }
 
         return $bridged;
+    }
+
+    private function academicProjections(): AcademicDngPaymentProjectionSync
+    {
+        return $this->academicProjectionSync ?? app(AcademicDngPaymentProjectionSync::class);
     }
 
     public function hasPaidDngForCharge(?FinanceCharge $charge): bool

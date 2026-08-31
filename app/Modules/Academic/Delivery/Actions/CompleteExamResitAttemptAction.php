@@ -7,6 +7,7 @@ namespace App\Modules\Academic\Delivery\Actions;
 use App\Models\AcademicRecord;
 use App\Models\ExamResitAttempt;
 use App\Modules\Academic\Delivery\Queries\ListExamResitEligibleStudentsQuery;
+use App\Modules\Academic\Delivery\Support\ResitFeeGate;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -34,7 +35,7 @@ use Illuminate\Validation\ValidationException;
  *   (`previous_result_snapshot`) and appended to `academic_records.grade_history`
  *   under `exam_resit_applications`, so a later Canvas sync / re-finalization can
  *   overwrite the score without erasing the resit audit trail.
- * - Payment gate: completion requires canonical-derived paid state, unless the
+ * - Payment gate: completion requires live Finance settlement, unless the
  *   syllabus policy allows an unpaid sitting AND a visible reason is recorded.
  * - GPA/progression recalculation is FLAGGED only (requires_gpa_recalc), not run
  *   here, per the story stop-condition that defers grade-engine recalculation.
@@ -44,6 +45,10 @@ class CompleteExamResitAttemptAction
     private const DEFAULT_GRADE_THRESHOLD = 60.0;
 
     private const EGC_GRADE_THRESHOLD = 70.0;
+
+    public function __construct(
+        private readonly ResitFeeGate $resitFeeGate,
+    ) {}
 
     /**
      * @param  array{
@@ -70,7 +75,12 @@ class CompleteExamResitAttemptAction
                 ->findOrFail($attempt->academic_record_id);
 
             $resitScore = $this->resolveResitScore($data);
-            $unpaidAttributes = $this->resolvePaymentGate($attempt, $data);
+            $unpaidAttributes = $this->resitFeeGate->assertCanProceed(
+                $attempt,
+                $data,
+                'Lệ phí thi lại chưa được thanh toán, không thể ghi nhận kết quả.',
+                'Cần ghi rõ lý do cho phép thi lại khi chưa thanh toán.',
+            );
 
             $threshold = $this->resolveGradeThreshold($attempt);
             $resitGrade = $data['resit_grade'] ?? AcademicRecord::calculateLetterGrade($resitScore);
@@ -183,41 +193,6 @@ class CompleteExamResitAttemptAction
         }
 
         return $score;
-    }
-
-    /**
-     * Completion requires canonical-derived paid state. An unpaid sitting is only
-     * allowed when the snapshotted syllabus policy permits it AND a visible reason
-     * is recorded, mirroring the design contract for unpaid-before-pay sittings.
-     *
-     * @param  array<string, mixed>  $data
-     * @return array<string, mixed> Extra attributes to persist on the attempt.
-     */
-    private function resolvePaymentGate(ExamResitAttempt $attempt, array $data): array
-    {
-        if ($attempt->hq_fee_status === ExamResitAttempt::HQ_FEE_PAID) {
-            return [];
-        }
-
-        if (! (bool) $attempt->allow_unpaid_sitting_snapshot) {
-            throw ValidationException::withMessages([
-                'payment' => ['Lệ phí thi lại chưa được thanh toán, không thể ghi nhận kết quả.'],
-            ]);
-        }
-
-        $reason = trim((string) ($data['unpaid_sitting_reason'] ?? ''));
-
-        if ($reason === '') {
-            throw ValidationException::withMessages([
-                'unpaid_sitting_reason' => ['Cần ghi rõ lý do cho phép thi lại khi chưa thanh toán.'],
-            ]);
-        }
-
-        return [
-            'unpaid_allowed_reason' => $reason,
-            'unpaid_allowed_by_user_id' => auth()->id(),
-            'unpaid_allowed_at' => now(),
-        ];
     }
 
     private function resolveGradeThreshold(ExamResitAttempt $attempt): float

@@ -19,6 +19,7 @@ use App\Shared\Contracts\Finance\Enums\FinanceCancellationFeeDisposition;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
@@ -133,7 +134,7 @@ class ProcessFinanceCancellationOperationAction
 
             $paid = $lockedCharge !== null && ($hasPaidDng || $lockedCharge->is_fully_paid);
 
-            $feeDisposition = $this->resolveFeeDisposition($lockedCharge, $paid, (string) $locked->paid_void_reason);
+            $feeDisposition = $this->resolveFeeDisposition($lockedCharge, $paid, $locked);
 
             // Forfeit (kept paid, no refund): the paid charge stands as revenue —
             // no void, no release, obligation stays accepted. Any other
@@ -298,9 +299,7 @@ class ProcessFinanceCancellationOperationAction
      */
     private function latePaidDisposition(FinanceCancellationOperation $operation): FinanceCancellationFeeDisposition
     {
-        return str_contains((string) $operation->paid_void_reason, 'keep_for_later')
-            ? FinanceCancellationFeeDisposition::PaidReleaseToBalance
-            : FinanceCancellationFeeDisposition::KeptPaidNoRefund;
+        return $this->dispositionFromHandoff($operation);
     }
 
     private function appendCompletionOutbox(FinanceCancellationOperation $operation, string $eventKind): void
@@ -563,20 +562,37 @@ class ProcessFinanceCancellationOperationAction
         return bccomp($remaining, '0.00', 2) < 0 ? '0.00' : $remaining;
     }
 
-    private function resolveFeeDisposition(?FinanceCharge $charge, bool $paid, string $paidVoidReason): FinanceCancellationFeeDisposition
+    private function resolveFeeDisposition(?FinanceCharge $charge, bool $paid, FinanceCancellationOperation $operation): FinanceCancellationFeeDisposition
     {
         if ($paid) {
-            // Staff chose the money outcome at cancel time via the handoff:
-            // forfeit keeps the paid charge as revenue, keep-for-later releases it.
-            return str_contains($paidVoidReason, 'keep_for_later')
-                ? FinanceCancellationFeeDisposition::PaidReleaseToBalance
-                : FinanceCancellationFeeDisposition::KeptPaidNoRefund;
+            return $this->dispositionFromHandoff($operation);
         }
-
         if ($charge === null) {
             return FinanceCancellationFeeDisposition::NoCharge;
         }
 
         return FinanceCancellationFeeDisposition::VoidedUnpaidCharge;
+    }
+
+    private function dispositionFromHandoff(FinanceCancellationOperation $operation): FinanceCancellationFeeDisposition
+    {
+        $typed = $operation->source_payload['fee_outcome'] ?? null;
+
+        if ($typed === 'keep_for_later') {
+            return FinanceCancellationFeeDisposition::PaidReleaseToBalance;
+        }
+
+        if ($typed === 'forfeit') {
+            return FinanceCancellationFeeDisposition::KeptPaidNoRefund;
+        }
+
+        Log::warning('Finance cancellation falling back to paid_void_reason text match', [
+            'finance_cancellation_operation_id' => $operation->id,
+            'paid_void_reason' => $operation->paid_void_reason,
+        ]);
+
+        return str_contains((string) $operation->paid_void_reason, 'keep_for_later')
+            ? FinanceCancellationFeeDisposition::PaidReleaseToBalance
+            : FinanceCancellationFeeDisposition::KeptPaidNoRefund;
     }
 }

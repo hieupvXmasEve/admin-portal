@@ -10,10 +10,12 @@ use App\Modules\Finance\Exceptions\InvalidInstallmentPlanException;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Support\BillingAccountProvisioner;
+use App\Modules\Finance\Support\ObligationType\ObligationTypeRegistry;
 use App\Modules\Finance\Support\SettlementMutationGuard;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Replace a charge's installment plan with a new N-row plan.
@@ -98,6 +100,13 @@ class SplitChargeIntoInstallmentsAction
                 "FinanceCharge #{$charge->id} has non-positive amount ({$charge->amount}). ".
                 'Credits are settled via invoice allocation and cannot be split.'
             );
+        }
+
+        if (ObligationTypeRegistry::has((string) $charge->charge_type)
+            && ! ObligationTypeRegistry::get((string) $charge->charge_type)->supportsInstallments) {
+            throw ValidationException::withMessages([
+                'charge_id' => ['Loại phí này không hỗ trợ trả góp.'],
+            ]);
         }
     }
 
