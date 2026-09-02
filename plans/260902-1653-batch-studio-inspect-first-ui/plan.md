@@ -78,11 +78,11 @@ Hub (static, no worklist query)
 ChargeGeneration / DngPush
   [Kỳ Select] [Loại phí Select]  (+ non-academic amount if needed)
   PreviewDiffTable (auto preview, debounce)
-  Commit Card under table (same page, not Dialog)
+  Commit Dialog (primary opens overlay; not inline Card)
   Result + DNG CTA after HP/EGC only (plain `dng()` link)
 ```
 
-`useBatchStudio`: drop step 1–4. Modes `inspect` | `result`. `runPreview` on scope change. Commit panel is local UI, not a wizard step.
+`useBatchStudio`: drop step 1–4. Modes `inspect` | `result`. `runPreview` on scope change. Commit panel is a Dialog, not a wizard step.
 
 ## Success Criteria
 
@@ -90,7 +90,7 @@ ChargeGeneration / DngPush
 - [x] Charge page loads preview for HP+kỳ without a 4-step wizard
 - [x] DNG page loads preview without description/due_date/estimate_time
 - [x] Changing fee type Select re-previews in place; old token discarded
-- [x] DNG create Card still validates commit fields; ack still required
+- [x] DNG create Dialog still validates commit fields; ack still required
 - [x] Charge result CTA (HP/EGC only) → `financeRoutes.batchStudio.dng()` with no query; hidden without `create_finance_payments`; hidden after non-academic
 - [x] Menu + page chrome match copy table; cutover tests updated
 - [x] docs-site VI/EN/KO/ZH finance-office updated; `source:` includes Hub, ChargeGeneration, DngPush, menu-sidebar
@@ -131,14 +131,14 @@ ChargeGeneration / DngPush
 
 4. **[Architecture]** Form gửi hiện thế nào?
    - Options: Card ngay dưới bảng | Dialog/drawer
-   - **Answer:** Card ngay dưới bảng trên cùng trang
-   - **Rationale:** Matches inspect-first, no extra overlay.
+   - **Answer (superseded 2026-09-02):** Dialog on both Charge and DNG pages
+   - **Rationale:** User override — confirm overlay instead of same-page Card.
 
 #### Confirmed Decisions
 - CTA: `financeRoutes.batchStudio.dng()` no query
 - CTA permission: `usePermission().can('create_finance_payments')`
 - CTA visibility: major/egc only
-- Commit UI: inline Card under table, not Dialog
+- Commit UI: Dialog on both job pages
 
 #### Action Items
 - [x] Drop query-string CTA and `can_dng` PHP from contract
@@ -146,7 +146,7 @@ ChargeGeneration / DngPush
 
 #### Impact on Phases
 - Phase 1: no `routes.ts` `dng()` signature change
-- Phase 2: CTA + Card + client permission; no BatchStudioController prop
+- Phase 2: CTA + Dialog + client permission; no BatchStudioController prop
 - Phase 3: docs CTA has no “kỳ này đã chọn sẵn”
 
 ### Verification Results
@@ -165,7 +165,7 @@ Verified (sample): Hub `jobs.*` (`Hub.vue`); `useBatchStudio` `step` 1–4 (2 ca
 
 ### Whole-Plan Consistency Sweep
 - Files reread: `plan.md`, `phase-01-start.md`, `phase-02-inspect-first-job-pages.md`, `phase-03-copy-menu-docs-tests.md`
-- Decision deltas checked: 4 (no-query CTA, client can, hide non-academic CTA, inline Card)
-- Reconciled stale references: query CTA, `can_dng` PHP, client fee-type map, Dialog, duplicate do-not-modify
+- Decision deltas checked: 5 (no-query CTA, client can, hide non-academic CTA, confirm Dialog)
+- Reconciled stale references: query CTA, `can_dng` PHP, client fee-type map, inline Card, duplicate do-not-modify
 - Unresolved contradictions: 0
 <!-- slug: batch-studio-inspect-first-ui -->

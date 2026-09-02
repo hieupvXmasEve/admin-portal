@@ -6,6 +6,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -61,7 +62,7 @@ const semesterSelection = computed({
 
 const defaultSetup: ChargeSetup = {
     fee_category: props.prefill?.fee_category ?? 'major',
-    semester_id: props.prefill?.semester_id ?? null,
+    semester_id: props.prefill?.semester_id ?? semesterId.value,
     scope: {
         filters: props.prefill?.scope?.filters ?? {},
         fee_type: props.prefill?.scope?.fee_type ?? props.feeTypeOptions?.[0]?.value ?? '',
@@ -103,7 +104,6 @@ const nextDisabled = computed(() => {
     if (!semesterSelection.value) return true;
     if (isNonAcademic.value && !nonAcademicReady.value) return true;
     if (!wizard.previewToken.value) return true;
-    if (confirmOpen.value && needsAck.value && !ack.value) return true;
 
     return false;
 });
@@ -115,7 +115,6 @@ const summaryText = computed(() => {
 });
 
 function requestPreview(): void {
-    wizard.setup.semester_id = wizard.setup.semester_id ?? semesterId.value;
     if (!semesterSelection.value) return;
     if (isNonAcademic.value && !nonAcademicReady.value) {
         wizard.driftMessage.value = null;
@@ -131,10 +130,11 @@ function requestPreview(): void {
 const debouncedPreview = useDebounceFn(requestPreview, 400);
 
 function onNext() {
-    if (!confirmOpen.value) {
-        confirmOpen.value = true;
-        return;
-    }
+    confirmOpen.value = true;
+}
+
+function submitConfirm() {
+    if (needsAck.value && !ack.value) return;
     wizard.commit();
 }
 
@@ -168,11 +168,6 @@ function prepareScopeForCategory(): boolean {
 function prepareNonAcademicScope(): boolean {
     if (!isNonAcademic.value) return true;
 
-    wizard.setup.scope.filters = wizard.setup.scope.filters ?? {};
-    wizard.setup.scope.fee_type = wizard.setup.scope.fee_type || props.feeTypeOptions?.[0]?.value || '';
-    wizard.setup.scope.amount = Number(wizard.setup.scope.amount ?? 0);
-    wizard.setup.scope.note = String(wizard.setup.scope.note ?? '').slice(0, 255);
-
     if (!nonAcademicReady.value) {
         wizard.driftMessage.value = 'Vui lòng chọn loại phí và số tiền.';
         return false;
@@ -195,14 +190,14 @@ watch(
     },
 );
 
-watch(semesterId, (id) => {
-    if (wizard.setup.semester_id == null && id) {
-        wizard.setup.semester_id = id;
-    }
-});
+watch(
+    () => wizard.mode.value,
+    (mode) => {
+        if (mode === 'result') confirmOpen.value = false;
+    },
+);
 
 onMounted(() => {
-    wizard.setup.semester_id = wizard.setup.semester_id ?? semesterId.value;
     requestPreview();
 });
 </script>
@@ -238,7 +233,7 @@ onMounted(() => {
             <Link v-if="showDngCta" :href="financeRoutes.batchStudio.dng()" class="text-primary inline-flex items-center gap-1.5 text-sm font-medium hover:underline"> Xem / lập lệnh thu kỳ này </Link>
         </div>
 
-        <BatchWizard v-else :summary-text="summaryText" :next-disabled="nextDisabled || wizard.previewing.value || wizard.form.processing" :can-back="confirmOpen" next-label="Sinh phí" @next="onNext" @back="confirmOpen = false">
+        <BatchWizard v-else :summary-text="summaryText" :next-disabled="nextDisabled || wizard.previewing.value || wizard.form.processing" next-label="Sinh phí" @next="onNext">
             <div class="space-y-6">
                 <Card class="border-0 shadow-none">
                     <CardHeader>
@@ -317,21 +312,27 @@ onMounted(() => {
                     @export="exportPreview"
                     @update-block-count="setBlockOverride"
                 />
-
-                <Card v-if="confirmOpen">
-                    <CardHeader>
-                        <CardTitle class="text-base">Xác nhận trước khi chạy</CardTitle>
-                        <CardDescription>{{ summaryText }}</CardDescription>
-                    </CardHeader>
-                    <CardContent class="space-y-4">
-                        <Button type="button" variant="link" class="h-auto p-0" @click="wizard.excludeWarnings()"> Loại trừ tất cả dòng 🟠 cần kiểm tra </Button>
-                        <label v-if="needsAck" class="flex items-start gap-3 text-sm leading-relaxed">
-                            <Checkbox v-model="ack" class="mt-0.5" />
-                            <span>Tôi đã rà soát danh sách và xác nhận chạy lô lớn (&gt;50 dòng).</span>
-                        </label>
-                    </CardContent>
-                </Card>
             </div>
         </BatchWizard>
+
+        <Dialog v-model:open="confirmOpen">
+            <DialogContent class="sm:max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>Xác nhận trước khi chạy</DialogTitle>
+                    <DialogDescription>{{ summaryText }}</DialogDescription>
+                </DialogHeader>
+                <div class="space-y-4">
+                    <Button type="button" variant="link" class="h-auto p-0" @click="wizard.excludeWarnings()"> Loại trừ tất cả dòng 🟠 cần kiểm tra </Button>
+                    <label v-if="needsAck" class="flex items-start gap-3 text-sm leading-relaxed">
+                        <Checkbox v-model="ack" class="mt-0.5" />
+                        <span>Tôi đã rà soát danh sách và xác nhận chạy lô lớn (&gt;50 dòng).</span>
+                    </label>
+                </div>
+                <DialogFooter>
+                    <Button type="button" variant="outline" @click="confirmOpen = false">Hủy</Button>
+                    <Button type="button" :disabled="wizard.form.processing || (needsAck && !ack)" @click="submitConfirm">Sinh phí</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     </div>
 </template>

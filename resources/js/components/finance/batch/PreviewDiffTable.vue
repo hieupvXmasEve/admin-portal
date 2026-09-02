@@ -200,17 +200,6 @@ function sortIcon(key: SortKey) {
 
 <template>
     <div class="space-y-4">
-        <Alert v-if="majorDetails && majorContext">
-            <AlertTitle>Sinh phí HP cho kỳ {{ majorContext.charge_semester_name ?? majorContext.charge_semester_code ?? majorContext.charge_semester_id }}</AlertTitle>
-            <AlertDescription>
-                <template v-if="majorContext.credit_offset_enabled">
-                    Trừ số dư tự động: <strong>bật</strong> — sinh viên có số dư ≥ {{ formatCurrency(majorContext.credit_offset_min_balance) }} sẽ được trừ ngay sau khi tạo phí (xem cột "Số dư / Dự kiến trừ"). "Số tiền" bên dưới là giá trị phí gốc,
-                    <strong>chưa</strong> trừ số dư — số dư trừ sau khi phí đã tạo, và có thể lệch nếu số dư của sinh viên thay đổi trước khi xác nhận.
-                </template>
-                <template v-else> Trừ số dư tự động: <strong>tắt</strong> — số dư hiển thị chỉ để tham khảo, sẽ không tự trừ khi tạo phí. </template>
-            </AlertDescription>
-        </Alert>
-
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <button
                 v-for="(meta, key) in BATCH_BUCKET_META"

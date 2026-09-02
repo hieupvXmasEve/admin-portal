@@ -22,7 +22,7 @@ Hub becomes a static 1→2 pipeline. Shared batch UI loses the stepper so job pa
 ## Architecture
 
 - `Hub.vue`: two cards in a row with `1.` / `2.` and an arrow. Subtitle from copy table. CTA labels «Mở sinh phí» / «Xem lệnh thu». Keep `jobs.charge_generation` / `jobs.dng_push` gates.
-- `BatchWizard.vue`: delete step `<nav>`. Keep Card slot + sticky footer (`summaryText`, primary, optional back). Props: drop `step`; keep `nextLabel` / `nextDisabled` / `canBack`.
+- `BatchWizard.vue`: delete step `<nav>`. Keep Card slot + sticky footer (`summaryText`, primary). Props: drop `step` and `canBack`; keep `nextLabel` / `nextDisabled`.
 - `useBatchStudio.ts`: `mode: 'inspect' | 'result'`. `runPreview` stays POST to existing preview URLs. On success stay inspect (do not advance a step). `commit` onSuccess → `result`. Changing setup keys used in preview must clear `previewToken` before the next preview. Keep `acknowledged` on `useForm` defaults.
 
 Do not call preview from Hub. Do not change PHP. Do not change `financeRoutes.batchStudio.dng()` arity.

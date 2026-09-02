@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import DatePicker from '@/components/ui/DatePicker.vue';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -50,6 +51,7 @@ const estimateMonth = ref(String(now.getMonth() + 1).padStart(2, '0'));
 const estimateYear = ref(String(now.getFullYear()));
 const defaultEstimateTime = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getFullYear()).slice(-2)}`;
 const confirmOpen = ref(false);
+const dialogContentRef = ref<HTMLElement | null>(null);
 
 const setupErrors = ref<Record<string, string>>({});
 
@@ -76,7 +78,7 @@ const wizard = useBatchStudio<DngSetup>({
     previewUrl: financeRoutes.batchStudio.dngPreview(),
     commitUrl: financeRoutes.batchStudio.dngCommit(),
     defaultSetup: {
-        semester_id: props.prefill?.semester_id ?? null,
+        semester_id: props.prefill?.semester_id ?? semesterId.value,
         dng_fee_type: props.prefill?.dng_fee_type ?? 'HP',
         student_ids: props.prefill?.student_ids ?? [],
         due_date: '',
@@ -132,7 +134,6 @@ const needsAck = computed(() => wizard.selected.value.size > 50 || replacementCo
 const nextDisabled = computed(() => {
     if (!semesterSelection.value) return true;
     if (!wizard.previewToken.value) return true;
-    if (confirmOpen.value && needsAck.value && !ack.value) return true;
 
     return false;
 });
@@ -146,7 +147,6 @@ const summaryText = computed(() => {
 });
 
 function requestPreview(): void {
-    wizard.setup.semester_id = wizard.setup.semester_id ?? semesterId.value;
     if (!semesterSelection.value) return;
     confirmOpen.value = false;
     void wizard.runPreview();
@@ -155,13 +155,14 @@ function requestPreview(): void {
 const debouncedPreview = useDebounceFn(requestPreview, 400);
 
 function onNext() {
-    if (!confirmOpen.value) {
-        confirmOpen.value = true;
-        return;
-    }
+    confirmOpen.value = true;
+}
+
+function submitConfirm() {
     if (!validateSetup()) {
         return;
     }
+    if (needsAck.value && !ack.value) return;
     wizard.commit();
 }
 
@@ -186,14 +187,14 @@ watch(
     },
 );
 
-watch(semesterId, (id) => {
-    if (wizard.setup.semester_id == null && id) {
-        wizard.setup.semester_id = id;
-    }
-});
+watch(
+    () => wizard.mode.value,
+    (mode) => {
+        if (mode === 'result') confirmOpen.value = false;
+    },
+);
 
 onMounted(() => {
-    wizard.setup.semester_id = wizard.setup.semester_id ?? semesterId.value;
     requestPreview();
 });
 </script>
@@ -229,7 +230,7 @@ onMounted(() => {
             <BatchResultPanel :result="wizard.result.value as BatchResult" @retry-failed="retryFailedSubset" @restart="restart" />
         </div>
 
-        <BatchWizard v-else :summary-text="summaryText" :next-disabled="nextDisabled || wizard.previewing.value || wizard.form.processing" :can-back="confirmOpen" next-label="Tạo lệnh thu" @next="onNext" @back="confirmOpen = false">
+        <BatchWizard v-else :summary-text="summaryText" :next-disabled="nextDisabled || wizard.previewing.value || wizard.form.processing" next-label="Tạo lệnh thu" @next="onNext">
             <div class="space-y-6">
                 <Card class="border-0 shadow-none">
                     <CardHeader>
@@ -278,13 +279,17 @@ onMounted(() => {
                     @select-all="(keys) => wizard.setSelection(keys, true)"
                     @deselect-all="(keys) => wizard.setSelection(keys, false)"
                 />
+            </div>
+        </BatchWizard>
 
-                <Card v-if="confirmOpen">
-                    <CardHeader>
-                        <CardTitle class="text-base">Tạo lệnh thu</CardTitle>
-                        <CardDescription>{{ summaryText }}</CardDescription>
-                    </CardHeader>
-                    <CardContent class="grid gap-5 sm:grid-cols-2">
+        <Dialog v-model:open="confirmOpen">
+            <DialogContent class="sm:max-w-2xl">
+                <div ref="dialogContentRef" class="space-y-4">
+                    <DialogHeader>
+                        <DialogTitle>Tạo lệnh thu</DialogTitle>
+                        <DialogDescription>{{ summaryText }}</DialogDescription>
+                    </DialogHeader>
+                    <div class="grid gap-5 sm:grid-cols-2">
                         <div class="space-y-2 sm:col-span-2">
                             <Label for="dng-description"> Mô tả khoản phí <span class="text-red-500">*</span> </Label>
                             <Input id="dng-description" v-model="wizard.setup.description" placeholder="VD: Học phí kỳ 1 năm học 2025-2026" :class="{ 'border-red-400': fieldError('description') }" @update:model-value="setupErrors.description = ''" />
@@ -293,7 +298,7 @@ onMounted(() => {
 
                         <div class="space-y-2">
                             <Label> Hạn thanh toán nội bộ <span class="text-red-500">*</span> </Label>
-                            <DatePicker v-model="wizard.setup.due_date" placeholder="Chọn hạn thanh toán" @update:model-value="setupErrors.due_date = ''" />
+                            <DatePicker v-model="wizard.setup.due_date" placeholder="Chọn hạn thanh toán" :portal-to="dialogContentRef ?? undefined" @update:model-value="setupErrors.due_date = ''" />
                             <p v-if="fieldError('due_date')" class="text-xs text-red-500">{{ fieldError('due_date') }}</p>
                         </div>
 
@@ -306,7 +311,7 @@ onMounted(() => {
                                         {{ wizard.setup.estimate_time || 'Chọn tháng/năm' }}
                                     </Button>
                                 </PopoverTrigger>
-                                <PopoverContent class="w-64 space-y-3 p-4" align="start">
+                                <PopoverContent class="w-64 space-y-3 p-4" align="start" :to="dialogContentRef ?? undefined">
                                     <div class="space-y-1.5">
                                         <Label>Tháng</Label>
                                         <Select v-model="estimateMonth">
@@ -348,9 +353,13 @@ onMounted(() => {
                             </label>
                             <p v-if="wizard.form.errors.acknowledged" class="text-xs text-red-500">{{ wizard.form.errors.acknowledged }}</p>
                         </div>
-                    </CardContent>
-                </Card>
-            </div>
-        </BatchWizard>
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" @click="confirmOpen = false">Hủy</Button>
+                        <Button type="button" :disabled="wizard.form.processing || (needsAck && !ack)" @click="submitConfirm">Tạo lệnh thu</Button>
+                    </DialogFooter>
+                </div>
+            </DialogContent>
+        </Dialog>
     </div>
 </template>
