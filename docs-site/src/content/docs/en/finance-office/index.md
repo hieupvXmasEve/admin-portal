@@ -7,6 +7,8 @@ source:
   - resources/js/pages/Finance/Reporting/Index.vue
   - resources/js/pages/Finance/Revenue/Index.vue
   - resources/js/pages/Finance/BatchStudio/Hub.vue
+  - resources/js/pages/Finance/BatchStudio/ChargeGeneration.vue
+  - resources/js/pages/Finance/BatchStudio/DngPush.vue
   - resources/js/pages/Finance/PricingOperations/Index.vue
   - resources/js/pages/Finance/Payments/Index.vue
   - resources/js/pages/Finance/Payments/DngPaymentRequests/Index.vue
@@ -66,31 +68,31 @@ A mistake at generation propagates through every later step. This area touches r
 
 This group creates the receivables. It carries the most risk in the area.
 
-### Batch Studio
+### Sinh phí & lệnh thu
 
 **What it is for.** Generating charges in bulk for a group of students, or creating DNG payment requests in bulk. Sending payment reminders is not here — use **DNG Due Reminders**.
 
-**Who can open it.** Anyone with permission to use Batch Studio.
+**Who can open it.** Staff assigned to generate charges or create collection requests.
 
 **Steps**
 
-1. Go to **Finance → Sinh phí → Batch Studio**.
-2. Pick the **billing semester** — choose it explicitly, don't rely on the default (the default is the current semester, which can differ from the semester a scholarship reduction decision targets).
-3. Choose the student group and the charge type.
-4. **Preview the result** before running for real.
-5. Run, and wait for it to finish.
+1. Go to **Finance → Sinh phí → Sinh phí & lệnh thu**.
+2. Choose **1. Sinh phí hàng loạt** or **2. Lập yêu cầu thanh toán DNG**.
+3. Pick the term and fee type — the list appears.
+4. Check the counts; fill due date and description only when you click **Tạo lệnh thu**.
+5. After HP/EGC charge generation: **Xem / lập lệnh thu kỳ này** opens the collection page (pick term and fee type again there).
 
-**Reading the Amount column in preview.** For HP (tuition) charges, if a student has a scholarship, the Amount cell shows:
+**Reading the Amount column.** For HP (tuition) charges, if a student has a scholarship, the Amount cell shows:
 
 - Original tuition (struck through) and the amount actually due after discount (bold).
 - 🎓 the scholarship line — name, original rate/amount, and the discount at that original rate.
 - 📉 a "Scholarship reduced" line (only shown when an active adjustment decision targets the exact semester selected) — the reduced rate and how much less is being deducted compared to the original.
 
-No scholarship line even though the student has one → check step 2, the selected semester may not match the adjustment's target semester.
+No scholarship line even though the student has one → check step 3, the selected semester may not match the adjustment's target semester.
 
 **Notes**
 
-- Always preview. Wrong charges generated in bulk have to be cancelled one by one.
+- Always read the list before running. Wrong charges generated in bulk have to be cancelled one by one.
 - Test on a small group before running a whole intake.
 - Check whether students already hold a scholarship or voucher, so charges are not generated at the wrong amount. For due-date reminders, go to **Thu & Đối soát → DNG Due Reminders**.
 
@@ -207,7 +209,7 @@ A subgroup inside **Finance** that decides how much a student actually pays. **S
 
 | Situation | Order of work |
 | --- | --- |
-| Start of term, charging a whole intake | Student Scholarships → Pricing Operations → Batch Studio (preview) → Hôm nay |
+| Start of term, charging a whole intake | Student Scholarships → Pricing Operations → Sinh phí & lệnh thu → Hôm nay |
 | Student paid but the system has not recorded it | DNG · Cần kiểm tra → DNG Webhook Events → Settlement Worklist |
 | Student overpaid | Payments (Còn dư column) → Settlement Worklist |
 | Weekly clean-up | Exceptions Queue → Lifecycle Exceptions |

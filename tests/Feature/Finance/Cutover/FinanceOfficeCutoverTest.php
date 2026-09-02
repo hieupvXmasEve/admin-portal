@@ -107,11 +107,11 @@ it('routes DNG payment-request creation entry points to Batch Studio with busine
         expect($contents)->not->toContain('Đẩy DNG hàng loạt', "Primary {$name} copy must use business naming");
     }
 
-    expect($files['menu'])->toContain('Create DNG Payment Request')
+    expect($files['menu'])->toContain('Lập yêu cầu thanh toán DNG')
         ->and($files['menu'])->toContain('financeRoutes.batchStudio.dng()')
         ->and($files['phase_shortcuts'])->toContain('financeRoutes.batchStudio.dng()')
         ->and($files['lookup_bar'])->toContain('Lập yêu cầu thanh toán DNG')
-        ->and($files['dng_wizard'])->toContain('Gửi yêu cầu sang DNG');
+        ->and($files['dng_wizard'])->toContain('Tạo lệnh thu');
 });
 
 it('routes HP and EGC generation entry points to Batch Studio charges with prefill', function () {

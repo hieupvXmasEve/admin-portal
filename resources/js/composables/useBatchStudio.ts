@@ -13,7 +13,7 @@ interface BatchStudioConfig<TSetup extends Record<string, unknown>> {
 }
 
 export function useBatchStudio<TSetup extends Record<string, unknown>>(config: BatchStudioConfig<TSetup>) {
-    const step = ref<1 | 2 | 3 | 4>(1);
+    const mode = ref<'inspect' | 'result'>('inspect');
     const setup = reactive({ ...config.defaultSetup });
     const lines = ref<BatchPreviewLineClient[]>([]);
     const summary = ref<BatchPreviewSummary>({});
@@ -25,9 +25,17 @@ export function useBatchStudio<TSetup extends Record<string, unknown>>(config: B
     const include = config.defaultInclude ?? ((l: BatchPreviewLineClient) => l.display.diff !== 'skip');
     const api = useApi();
 
+    function clearPreview(): void {
+        previewToken.value = null;
+        lines.value = [];
+        summary.value = {};
+        selected.value = new Set();
+    }
+
     async function runPreview(): Promise<void> {
         driftMessage.value = null;
         previewing.value = true;
+        clearPreview();
         try {
             const response = await api.post<BatchPreviewResponse>(config.previewUrl, { ...setup });
             const envelope = response.data?.value as ApiResponse<BatchPreviewResponse> | undefined;
@@ -40,7 +48,7 @@ export function useBatchStudio<TSetup extends Record<string, unknown>>(config: B
             summary.value = data.summary;
             previewToken.value = data.preview_token;
             selected.value = new Set(data.lines.filter(include).map((l) => l.key));
-            step.value = 2;
+            mode.value = 'inspect';
         } finally {
             previewing.value = false;
         }
@@ -69,9 +77,7 @@ export function useBatchStudio<TSetup extends Record<string, unknown>>(config: B
     }
 
     function excludeWarnings(): void {
-        selected.value = new Set(
-            [...selected.value].filter((k) => lines.value.find((l) => l.key === k)?.display.diff !== 'warning'),
-        );
+        selected.value = new Set([...selected.value].filter((k) => lines.value.find((l) => l.key === k)?.display.diff !== 'warning'));
     }
 
     // acknowledged must be a registered default: Inertia's useForm only
@@ -91,24 +97,27 @@ export function useBatchStudio<TSetup extends Record<string, unknown>>(config: B
         form.preview_token = previewToken.value ?? '';
         form.selected_keys = [...selected.value];
 
-        form
-            .transform((data) => ({
-                ...data,
-                ...extras,
-            }))
-            .post(config.commitUrl, {
-                preserveScroll: true,
-                onSuccess: () => {
-                    step.value = 4;
-                },
-                onError: (errors) => {
-                    if (errors.preview_token) {
-                        driftMessage.value = errors.preview_token;
-                        step.value = 2;
-                    }
-                    config.onCommitError?.(errors);
-                },
-            });
+        form.transform((data) => ({
+            ...data,
+            ...extras,
+        })).post(config.commitUrl, {
+            preserveScroll: true,
+            onSuccess: () => {
+                mode.value = 'result';
+            },
+            onError: (errors) => {
+                if (errors.preview_token) {
+                    driftMessage.value = errors.preview_token;
+                    mode.value = 'inspect';
+                }
+                config.onCommitError?.(errors);
+            },
+        });
+    }
+
+    function resetToInspect(): void {
+        mode.value = 'inspect';
+        form.acknowledged = false;
     }
 
     const counts = computed(() => {
@@ -126,7 +135,7 @@ export function useBatchStudio<TSetup extends Record<string, unknown>>(config: B
     });
 
     return {
-        step,
+        mode,
         setup,
         lines,
         summary,
@@ -138,9 +147,11 @@ export function useBatchStudio<TSetup extends Record<string, unknown>>(config: B
         form,
         previewing,
         runPreview,
+        clearPreview,
         toggle,
         setSelection,
         excludeWarnings,
         commit,
+        resetToInspect,
     };
 }

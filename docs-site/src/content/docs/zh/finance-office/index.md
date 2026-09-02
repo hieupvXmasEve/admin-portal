@@ -7,6 +7,8 @@ source:
   - resources/js/pages/Finance/Reporting/Index.vue
   - resources/js/pages/Finance/Revenue/Index.vue
   - resources/js/pages/Finance/BatchStudio/Hub.vue
+  - resources/js/pages/Finance/BatchStudio/ChargeGeneration.vue
+  - resources/js/pages/Finance/BatchStudio/DngPush.vue
   - resources/js/pages/Finance/PricingOperations/Index.vue
   - resources/js/pages/Finance/Payments/Index.vue
   - resources/js/pages/Finance/Payments/DngPaymentRequests/Index.vue
@@ -66,31 +68,31 @@ source:
 
 该分组负责创建应收款项，是整个区域中风险最高的环节。
 
-### Batch Studio
+### Sinh phí & lệnh thu
 
 **用途。** 为一批学生批量生成收费项，或批量创建 DNG 付款请求。发送催缴不在这里 — 请使用 **DNG Due Reminders**。
 
-**谁可以访问。** 拥有使用 Batch Studio 权限的人员。
+**谁可以访问。** 负责生成收费项或创建收款请求的工作人员。
 
 **操作步骤**
 
-1. 进入 **Finance → Sinh phí → Batch Studio**。
-2. 选择 **收费学期**——请明确选择，不要依赖默认值（默认是当前学期，可能与奖学金减免决定所针对的学期不同）。
-3. 选择学生群体和要生成的收费类型。
-4. 实际运行前先 **预览结果**。
-5. 运行并等待完成。
+1. 进入 **Finance → Sinh phí → Sinh phí & lệnh thu**。
+2. 选择 **1. Sinh phí hàng loạt** 或 **2. Lập yêu cầu thanh toán DNG**。
+3. 选择学期和费用类型 — 列表会显示出来。
+4. 核对数量；只有点击 **Tạo lệnh thu** 时才填写到期日和说明。
+5. 生成 HP/EGC 收费后：**Xem / lập lệnh thu kỳ này** 打开收款请求页（在该页重新选择学期和费用类型）。
 
-**预览中"金额"列的含义。** 对于 HP（学费）类收费，如果学生有奖学金，金额单元格会显示：
+**“金额”列的含义。** 对于 HP（学费）类收费，如果学生有奖学金，金额单元格会显示：
 
 - 原始学费（划线）和折扣后实际应收金额（加粗）。
 - 🎓 奖学金行——名称、原始比例/金额，以及按原始比例计算的折扣。
 - 📉 "奖学金被减免"行（仅当存在针对所选学期生效中的调整决定时才显示）——减免后的比例，以及相比原始比例少扣了多少。
 
-学生明明有奖学金却看不到奖学金行 → 检查第 2 步选择的学期是否与调整决定所针对的学期一致。
+学生明明有奖学金却看不到奖学金行 → 检查第 3 步选择的学期是否与调整决定所针对的学期一致。
 
 **注意事项**
 
-- 务必先预览。批量生成错误后必须逐笔取消，非常费时费力。
+- 运行前务必先看列表。批量生成错误后必须逐笔取消，非常费时费力。
 - 先在小范围群体上测试，再对整个批次运行。
 - 检查学生是否已有奖学金或优惠券，避免生成金额错误的收费项。到期催缴请到 **Thu & Đối soát → DNG Due Reminders**。
 
@@ -207,7 +209,7 @@ source:
 
 | 情况 | 处理顺序 |
 | --- | --- |
-| 学期初，为整个批次收费 | Student Scholarships → Pricing Operations → Batch Studio（预览） → Hôm nay |
+| 学期初，为整个批次收费 | Student Scholarships → Pricing Operations → Sinh phí & lệnh thu → Hôm nay |
 | 学生反馈已缴费但系统未记录 | DNG · Cần kiểm tra → DNG Webhook Events → Settlement Worklist |
 | 学生多缴 | Payments（Còn dư 列） → Settlement Worklist |
 | 每周清理 | Exceptions Queue → Lifecycle Exceptions |

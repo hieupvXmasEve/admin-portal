@@ -7,6 +7,8 @@ source:
   - resources/js/pages/Finance/Reporting/Index.vue
   - resources/js/pages/Finance/Revenue/Index.vue
   - resources/js/pages/Finance/BatchStudio/Hub.vue
+  - resources/js/pages/Finance/BatchStudio/ChargeGeneration.vue
+  - resources/js/pages/Finance/BatchStudio/DngPush.vue
   - resources/js/pages/Finance/PricingOperations/Index.vue
   - resources/js/pages/Finance/Payments/Index.vue
   - resources/js/pages/Finance/Payments/DngPaymentRequests/Index.vue
@@ -66,19 +68,19 @@ Sai ở bước sinh phí thì mọi bước sau đều sai theo. Đây là khu 
 
 Nhóm này tạo ra các khoản phải thu. Đây là bước rủi ro nhất trong toàn khu vực.
 
-### Batch Studio
+### Sinh phí & lệnh thu
 
 **Dùng để làm gì.** Sinh phí hàng loạt cho một nhóm sinh viên, hoặc lập yêu cầu thanh toán DNG hàng loạt. Gửi nhắc nợ không nằm ở đây — dùng **DNG Due Reminders**.
 
-**Ai vào được.** Người có quyền dùng Batch Studio.
+**Ai vào được.** Người được phân công sinh phí hàng loạt hoặc lập lệnh thu.
 
 **Các bước**
 
-1. Vào **Finance → Sinh phí → Batch Studio**.
-2. Chọn **học kỳ sinh phí** — chọn đúng học kỳ, không dùng mặc định (mặc định là học kỳ hiện tại, có thể khác học kỳ mà một quyết định giảm học bổng đang nhắm tới).
-3. Chọn nhóm sinh viên và loại phí cần sinh.
-4. **Xem trước kết quả** trước khi chạy thật.
-5. Chạy và đợi hoàn tất.
+1. Vào **Finance → Sinh phí → Sinh phí & lệnh thu**.
+2. Chọn **1. Sinh phí hàng loạt** hoặc **2. Lập yêu cầu thanh toán DNG**.
+3. Chọn kỳ và loại phí — danh sách hiện ra.
+4. Kiểm tra số lượng; chỉ điền hạn/mô tả khi bấm **Tạo lệnh thu**.
+5. Sau sinh học phí HP/EGC: **Xem / lập lệnh thu kỳ này** mở trang lệnh thu (chọn lại kỳ và loại phí trên trang đó).
 
 **Đọc dòng Số tiền khi xem trước.** Với phí HP (học phí), nếu sinh viên có học bổng, dòng Số tiền hiển thị:
 
@@ -86,11 +88,11 @@ Nhóm này tạo ra các khoản phải thu. Đây là bước rủi ro nhất t
 - 🎓 dòng học bổng — tên, tỉ lệ/mức gốc, số tiền được giảm theo mức gốc.
 - 📉 dòng "Bị giảm học bổng" (chỉ hiện khi có quyết định điều chỉnh đang hiệu lực cho đúng học kỳ đã chọn) — mức còn lại sau quyết định và phần bị cắt bớt so với mức gốc.
 
-Không thấy dòng học bổng dù sinh viên có học bổng → kiểm tra lại đã chọn đúng học kỳ đích của quyết định điều chỉnh chưa (bước 2).
+Không thấy dòng học bổng dù sinh viên có học bổng → kiểm tra lại đã chọn đúng học kỳ đích của quyết định điều chỉnh chưa (bước 3).
 
 **Lưu ý**
 
-- Luôn xem trước. Sinh nhầm hàng loạt phải hủy từng khoản, rất tốn công.
+- Luôn đọc danh sách trước khi chạy. Sinh nhầm hàng loạt phải hủy từng khoản, rất tốn công.
 - Chạy trên nhóm nhỏ để thử trước khi chạy toàn bộ khóa.
 - Kiểm tra sinh viên đã có học bổng hoặc voucher chưa, tránh sinh phí sai mức. Nhắc hạn đóng tiền thì vào **Thu & Đối soát → DNG Due Reminders**.
 
@@ -207,7 +209,7 @@ Nhóm con bên trong **Finance**, quyết định sinh viên phải trả bao nh
 
 | Tình huống | Thứ tự làm |
 | --- | --- |
-| Đầu kỳ, sinh phí cho toàn khóa | Student Scholarships → Pricing Operations → Batch Studio (xem trước) → Hôm nay |
+| Đầu kỳ, sinh phí cho toàn khóa | Student Scholarships → Pricing Operations → Sinh phí & lệnh thu → Hôm nay |
 | Sinh viên báo đã đóng mà hệ thống chưa ghi | DNG · Cần kiểm tra → DNG Webhook Events → Settlement Worklist |
 | Sinh viên nộp thừa | Payments (cột Còn dư) → Settlement Worklist |
 | Dọn tồn đọng hằng tuần | Exceptions Queue → Lifecycle Exceptions |

@@ -7,6 +7,8 @@ source:
   - resources/js/pages/Finance/Reporting/Index.vue
   - resources/js/pages/Finance/Revenue/Index.vue
   - resources/js/pages/Finance/BatchStudio/Hub.vue
+  - resources/js/pages/Finance/BatchStudio/ChargeGeneration.vue
+  - resources/js/pages/Finance/BatchStudio/DngPush.vue
   - resources/js/pages/Finance/PricingOperations/Index.vue
   - resources/js/pages/Finance/Payments/Index.vue
   - resources/js/pages/Finance/Payments/DngPaymentRequests/Index.vue
@@ -66,31 +68,31 @@ source:
 
 미수금을 만들어 내는 그룹으로, 이 영역에서 가장 위험이 큰 부분입니다.
 
-### Batch Studio
+### Sinh phí & lệnh thu
 
 **용도.** 학생 집단에 부과금을 일괄 생성하거나 DNG 결제 요청을 일괄 작성합니다. 납부 독촉은 여기에 없습니다 — **DNG Due Reminders**를 사용하십시오.
 
-**접근 권한.** Batch Studio 사용 권한이 있는 사용자.
+**접근 권한.** 부과금 생성 또는 수납 요청 작성을 맡은 담당자.
 
 **절차**
 
-1. **Finance → Sinh phí → Batch Studio**로 이동합니다.
-2. **청구 학기**를 선택합니다 — 기본값에 의존하지 말고 명시적으로 고르십시오(기본값은 현재 학기이며, 장학금 감면 결정이 대상으로 하는 학기와 다를 수 있습니다).
-3. 대상 학생 집단과 부과금 종류를 선택합니다.
-4. 실제 실행 전에 **결과를 미리 확인합니다.**
-5. 실행하고 완료될 때까지 기다립니다.
+1. **Finance → Sinh phí → Sinh phí & lệnh thu**로 이동합니다.
+2. **1. Sinh phí hàng loạt** 또는 **2. Lập yêu cầu thanh toán DNG**를 선택합니다.
+3. 학기와 요금 종류를 고르면 목록이 나타납니다.
+4. 건수를 확인합니다. 기한과 설명은 **Tạo lệnh thu**를 누를 때만 입력합니다.
+5. HP/EGC 부과 후 **Xem / lập lệnh thu kỳ này**가 수납 요청 화면을 엽니다(그 화면에서 학기와 요금 종류를 다시 고릅니다).
 
-**미리보기의 금액 열 읽는 법.** HP(등록금) 항목에서 학생에게 장학금이 있으면 금액 셀에 다음이 표시됩니다:
+**금액 열 읽는 법.** HP(등록금) 항목에서 학생에게 장학금이 있으면 금액 셀에 다음이 표시됩니다:
 
 - 원래 등록금(취소선)과 할인 후 실제 청구 금액(굵게).
 - 🎓 장학금 행 — 이름, 원래 비율/금액, 원래 비율 기준 할인액.
 - 📉 "장학금 감면됨" 행(선택한 학기를 정확히 대상으로 하는 유효한 조정 결정이 있을 때만 표시) — 감면 후 비율과 원래 대비 얼마나 덜 공제되는지.
 
-학생에게 장학금이 있는데도 장학금 행이 안 보이면 → 2단계에서 선택한 학기가 조정 결정의 대상 학기와 일치하는지 확인하십시오.
+학생에게 장학금이 있는데도 장학금 행이 안 보이면 → 3단계에서 선택한 학기가 조정 결정의 대상 학기와 일치하는지 확인하십시오.
 
 **유의 사항**
 
-- 반드시 미리 확인하십시오. 일괄로 잘못 생성된 부과금은 하나씩 취소해야 합니다.
+- 실행 전에 반드시 목록을 확인하십시오. 일괄로 잘못 생성된 부과금은 하나씩 취소해야 합니다.
 - 전체 학번에 적용하기 전에 소규모 집단으로 시험하십시오.
 - 학생에게 이미 장학금이나 할인 쿠폰이 있는지 확인해, 잘못된 금액이 부과되지 않도록 하십시오. 납부 기한 독촉은 **Thu & Đối soát → DNG Due Reminders**에서 보냅니다.
 
@@ -207,7 +209,7 @@ source:
 
 | 상황 | 처리 순서 |
 | --- | --- |
-| 학기 초, 전체 학번 부과 | Student Scholarships → Pricing Operations → Batch Studio(미리 확인) → Hôm nay |
+| 학기 초, 전체 학번 부과 | Student Scholarships → Pricing Operations → Sinh phí & lệnh thu → Hôm nay |
 | 학생은 냈다는데 기록이 없음 | DNG · Cần kiểm tra → DNG Webhook Events → Settlement Worklist |
 | 학생이 과납함 | Payments(Còn dư 열) → Settlement Worklist |
 | 주간 정리 | Exceptions Queue → Lifecycle Exceptions |

@@ -408,7 +408,7 @@ export const mainNavGroups: NavGroup[] = [
                 href: '#',
                 icon: DollarSign,
                 children: [
-                    { title: 'Batch Studio', href: financeRoutes.batchStudio.hub(), icon: Layers, requiredPermissions: ['view_finance_batch_studio'] },
+                    { title: 'Sinh phí & lệnh thu', href: financeRoutes.batchStudio.hub(), icon: Layers, requiredPermissions: ['view_finance_batch_studio'] },
                     {
                         title: 'Pricing Operations',
                         href: financeRoutes.pricingOperations.index(),
@@ -430,7 +430,7 @@ export const mainNavGroups: NavGroup[] = [
                 icon: Send,
                 children: [
                     { title: 'DNG Due Reminders', href: financeRoutes.collect.dueReminders(), icon: CalendarIcon, requiredPermissions: ['view_finance_operations_due_calendar'] },
-                    { title: 'Create DNG Payment Request', href: financeRoutes.batchStudio.dng(), icon: Send, requiredPermissions: ['view_finance_batch_studio', 'create_finance_payments'] },
+                    { title: 'Lập yêu cầu thanh toán DNG', href: financeRoutes.batchStudio.dng(), icon: Send, requiredPermissions: ['view_finance_batch_studio', 'create_finance_payments'] },
                     { title: 'Settlement Worklist', href: financeRoutes.collect.settlement(), icon: Sparkles, requiredPermissions: ['allocate_finance_payment'] },
                     { title: 'Payments', href: financeRoutes.collect.payments(), icon: BarChart3, requiredPermissions: ['view_finance_payments'] },
                     {
