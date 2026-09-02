@@ -7,7 +7,7 @@ interface BatchStudioConfig<TSetup extends Record<string, unknown>> {
     previewUrl: string;
     commitUrl: string;
     defaultSetup: TSetup;
-    commitExtras?: () => Record<string, unknown>;
+    commitExtras?: (setup: TSetup) => Record<string, unknown>;
     onCommitError?: (errors: Record<string, string>) => void;
     defaultInclude?: (line: BatchPreviewLineClient) => boolean;
 }
@@ -92,7 +92,7 @@ export function useBatchStudio<TSetup extends Record<string, unknown>>(config: B
     });
 
     function commit(): void {
-        const extras = config.commitExtras?.() ?? {};
+        const extras = config.commitExtras?.(setup as TSetup) ?? {};
 
         form.preview_token = previewToken.value ?? '';
         form.selected_keys = [...selected.value];

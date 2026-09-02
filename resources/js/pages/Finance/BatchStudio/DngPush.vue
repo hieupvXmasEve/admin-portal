@@ -28,6 +28,15 @@ interface DngPrefill {
     student_ids: number[];
 }
 
+interface DngSetup extends Record<string, unknown> {
+    semester_id: number | null;
+    dng_fee_type: string;
+    student_ids: number[];
+    due_date: string;
+    description: string;
+    estimate_time: string;
+}
+
 const props = defineProps<{
     dngFeeTypeOptions?: { value: string; label: string }[];
     prefill?: DngPrefill;
@@ -63,21 +72,21 @@ const semesterSelection = computed({
     },
 });
 
-const wizard = useBatchStudio({
+const wizard = useBatchStudio<DngSetup>({
     previewUrl: financeRoutes.batchStudio.dngPreview(),
     commitUrl: financeRoutes.batchStudio.dngCommit(),
     defaultSetup: {
         semester_id: props.prefill?.semester_id ?? null,
         dng_fee_type: props.prefill?.dng_fee_type ?? 'HP',
-        student_ids: props.prefill?.student_ids ?? ([] as number[]),
+        student_ids: props.prefill?.student_ids ?? [],
         due_date: '',
         description: '',
         estimate_time: defaultEstimateTime,
     },
-    commitExtras: () => ({
-        due_date: wizard.setup.due_date,
-        description: wizard.setup.description,
-        estimate_time: wizard.setup.estimate_time,
+    commitExtras: (setup) => ({
+        due_date: setup.due_date,
+        description: setup.description,
+        estimate_time: setup.estimate_time,
     }),
     // 'warning' rows (coverage unknown / replacement disabled) can never
     // commit (H14 fail-closed) — never pre-select them, so the operator has
@@ -128,7 +137,7 @@ const nextDisabled = computed(() => {
     return false;
 });
 
-const fieldError = (field: 'due_date' | 'description' | 'estimate_time'): string | undefined => setupErrors.value[field] ?? (wizard.form.errors[field] as string | undefined);
+const fieldError = (field: 'due_date' | 'description' | 'estimate_time'): string | undefined => setupErrors.value[field] ?? (wizard.form.errors as Record<string, string | undefined>)[field];
 
 const summaryText = computed(() => {
     const c = wizard.counts.value;
