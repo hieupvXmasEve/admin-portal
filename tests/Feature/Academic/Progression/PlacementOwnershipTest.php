@@ -52,6 +52,9 @@ it('records placement and English-level changes on Program Enrollment without re
 
     expect($enrollment->enrollment_status)->toBe('active')
         ->and($enrollment->study_stage)->toBe('intake_pre_uni_gc')
+        // EGC placement does not enter the major yet; the intake-major
+        // semester is only fixed when the student transitions to intake_course.
+        ->and($enrollment->intake_major_semester_id)->toBeNull()
         ->and($enrollment->egc_starting_level)->toBe(2)
         ->and($enrollment->egc_current_level)->toBe(3)
         ->and($student->fresh()->status)->toBe('pending')
@@ -88,7 +91,12 @@ it('writes an intake_course action log when IELTS meets the course threshold at 
         'created_by_user_id' => $user->id,
     ]);
 
-    expect(ProgramEnrollment::query()->sole()->study_stage)->toBe('intake_course');
+    $enrollment = ProgramEnrollment::query()->sole();
+    expect($enrollment->study_stage)->toBe('intake_course')
+        // Direct IELTS placement enters the course stage, so it must fix the
+        // intake-major semester the same way TransitionToIntakeCourseAction
+        // does; finance charge generation warns missing_intake_major otherwise.
+        ->and($enrollment->intake_major_semester_id)->toBe($semester->id);
 
     $log = StudentActionLog::query()->sole();
     expect($log->action_type)->toBe(StudentActionType::STUDENT_ENROLLMENT_NE)

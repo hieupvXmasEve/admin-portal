@@ -6,8 +6,8 @@ namespace App\Modules\Academic\Progression\Actions\Placement;
 
 use App\Enums\AcademicProgressionEventType;
 use App\Enums\ProgressionTriggerSource;
-use App\Models\AcademicProgressionEvent;
 use App\Enums\StudentActionType;
+use App\Models\AcademicProgressionEvent;
 use App\Models\IeltsCertificate;
 use App\Models\Student;
 use App\Models\StudentActionLog;
@@ -85,6 +85,13 @@ final class InitializeStudentPlacementAction
             $enrollment->update([
                 'enrollment_status' => 'active',
                 'study_stage' => $stage,
+                // Mirrors TransitionToIntakeCourseAction: entering the course
+                // stage fixes the intake-major semester, which the finance
+                // tuition timing (StudentChargeTimingResolver, batch-studio
+                // charge preview) requires to resolve the billable term.
+                'intake_major_semester_id' => $stage === 'intake_course'
+                    ? (int) $data['semester_id']
+                    : $enrollment->intake_major_semester_id,
                 'egc_starting_level' => $stage === 'intake_pre_uni_gc' ? $level : null,
                 'egc_current_level' => $stage === 'intake_pre_uni_gc' ? $level : null,
                 'egc_total_levels' => $stage === 'intake_pre_uni_gc' ? ($enrollment->egc_total_levels ?? 6) : null,
