@@ -2,9 +2,9 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { financeRoutes } from '@/utils/routes';
 import { Head, Link } from '@inertiajs/vue3';
-import { ArrowRight, Bell, GraduationCap, Layers, Lock, Send } from 'lucide-vue-next';
+import { ArrowRight, GraduationCap, Layers, Lock, Send } from 'lucide-vue-next';
 
-defineProps<{ jobs: { charge_generation: boolean; dng_push: boolean; reminder: boolean } }>();
+defineProps<{ jobs: { charge_generation: boolean; dng_push: boolean } }>();
 
 const tiles = [
     {
@@ -20,13 +20,6 @@ const tiles = [
         desc: 'Tạo yêu cầu thanh toán cho nhiều SV',
         icon: Send,
         href: financeRoutes.batchStudio.dng(),
-    },
-    {
-        key: 'reminder' as const,
-        title: 'Nhắc nợ hàng loạt',
-        desc: 'Gửi email nhắc thanh toán SV / phụ huynh',
-        icon: Bell,
-        href: financeRoutes.batchStudio.reminders(),
     },
 ];
 </script>
@@ -45,7 +38,7 @@ const tiles = [
             </div>
         </div>
 
-        <div class="grid gap-4 md:grid-cols-3">
+        <div class="grid gap-4 md:grid-cols-2">
             <component :is="jobs[tile.key] ? Link : 'div'" v-for="tile in tiles" :key="tile.key" :href="jobs[tile.key] ? tile.href : undefined" class="group block h-full">
                 <Card class="h-full transition" :class="jobs[tile.key] ? 'hover:border-primary/40 hover:shadow-md' : 'cursor-not-allowed opacity-60'">
                     <CardHeader class="space-y-3">

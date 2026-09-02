@@ -31,8 +31,19 @@ it('renders the hub with only the job tiles the operator may run', function () {
             ->component('Finance/BatchStudio/Hub', false)
             ->where('jobs.charge_generation', true)
             ->where('jobs.dng_push', false)
-            ->where('jobs.reminder', false)
+            ->missing('jobs.reminder')
         );
+});
+
+it('does not serve the retired batch-studio reminders page', function () {
+    grantFinance($this->user, [
+        'view_finance_batch_studio',
+        'view_finance_operations_due_calendar',
+    ], $this->campus);
+
+    $this->actingAs($this->user)
+        ->get('/finance/batch-studio/reminders')
+        ->assertNotFound();
 });
 
 it('renders the charge-generation wizard page for an authorized operator', function () {

@@ -340,10 +340,6 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
             ->middleware('can:view_finance_batch_studio')->name('dng');
         Route::post('/dng', [BatchStudioController::class, 'commitDng'])
             ->middleware('can:create_finance_payments')->name('dng.commit');
-        Route::get('/reminders', [BatchStudioController::class, 'reminders'])
-            ->middleware('can:view_finance_batch_studio')->name('reminders');
-        Route::post('/reminders', [BatchStudioController::class, 'commitReminders'])
-            ->middleware('can:view_finance_operations_due_calendar')->name('reminders.commit');
     });
 
     // Scholarship restoration decision loop (Phase 2). Propose is gated by the

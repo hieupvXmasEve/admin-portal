@@ -8,10 +8,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
 use App\Modules\Finance\Http\Requests\Batch\PreviewBatchChargesRequest;
 use App\Modules\Finance\Http\Requests\Batch\PreviewBatchDngRequest;
-use App\Modules\Finance\Http\Requests\Batch\PreviewBatchRemindersRequest;
 use App\Modules\Finance\Queries\Batch\AssembleBatchChargePreviewQuery;
 use App\Modules\Finance\Queries\Batch\AssembleBatchDngPreviewQuery;
-use App\Modules\Finance\Queries\Batch\AssembleBatchReminderPreviewQuery;
 use App\Modules\Finance\Services\Batch\BatchPreviewTokenService;
 use App\Modules\Finance\Support\Batch\BatchChargeCampusScope;
 use App\Modules\Finance\Support\Batch\BatchJobType;
@@ -98,35 +96,6 @@ class BatchStudioPreviewController extends Controller
             [
                 'dng_fee_type' => (string) $request->input('dng_fee_type'),
                 'semester_id' => (int) $request->input('semester_id'),
-            ],
-            $result['lines'],
-        );
-
-        return ApiResponse::success([
-            'preview_token' => $token,
-            'lines' => array_map(fn ($line) => $line->toClientArray(), $result['lines']),
-            'summary' => $result['summary'],
-        ]);
-    }
-
-    public function previewReminders(
-        PreviewBatchRemindersRequest $request,
-        AssembleBatchReminderPreviewQuery $assembler,
-    ): JsonResponse {
-        $campusId = $request->user()?->can('view_finance_all_campus') ? null : (int) session('current_campus_id');
-
-        $result = $assembler->handle(
-            (string) $request->input('recipient'),
-            $request->filled('semester_id') ? (int) $request->input('semester_id') : null,
-            $campusId,
-        );
-
-        $token = $this->tokens->issue(
-            (int) $request->user()->id,
-            BatchJobType::Reminder,
-            [
-                'recipient' => (string) $request->input('recipient'),
-                'semester_id' => $request->filled('semester_id') ? (int) $request->input('semester_id') : null,
             ],
             $result['lines'],
         );

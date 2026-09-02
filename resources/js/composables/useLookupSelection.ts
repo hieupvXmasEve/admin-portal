@@ -1,6 +1,6 @@
+import { financeRoutes } from '@/utils/routes';
 import { router } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
-import { financeRoutes } from '@/utils/routes';
 
 export interface LookupSelectableRow {
     key: number | string;
@@ -43,14 +43,13 @@ export function useLookupSelection() {
     const count = computed(() => selected.value.size);
     const studentIds = computed(() => [...new Set([...selected.value.values()])]);
 
-    function sendToBatch(job: 'dng' | 'reminders'): void {
+    function sendToBatch(): void {
         const ids = studentIds.value;
         if (ids.length === 0) {
             return;
         }
 
-        const url = job === 'dng' ? financeRoutes.batchStudio.dng() : financeRoutes.batchStudio.reminders();
-        router.get(url, { student_ids: ids }, { preserveScroll: false });
+        router.get(financeRoutes.batchStudio.dng(), { student_ids: ids }, { preserveScroll: false });
     }
 
     return { selected, toggle, toggleAll, isSelected, clear, count, studentIds, sendToBatch };

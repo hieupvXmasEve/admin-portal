@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { Button } from '@/components/ui/button';
-import { Bell, Send, X } from 'lucide-vue-next';
+import { Send, X } from 'lucide-vue-next';
 
-defineProps<{ count: number; canDng?: boolean; canRemind?: boolean }>();
-const emit = defineEmits<{ (e: 'dng'): void; (e: 'reminders'): void; (e: 'clear'): void }>();
+defineProps<{ count: number; canDng?: boolean }>();
+const emit = defineEmits<{ (e: 'dng'): void; (e: 'clear'): void }>();
 </script>
 
 <template>
@@ -13,10 +13,6 @@ const emit = defineEmits<{ (e: 'dng'): void; (e: 'reminders'): void; (e: 'clear'
             <Button v-if="canDng" size="sm" variant="outline" @click="emit('dng')">
                 <Send class="mr-1 h-4 w-4" />
                 Lập yêu cầu thanh toán DNG
-            </Button>
-            <Button v-if="canRemind" size="sm" variant="outline" @click="emit('reminders')">
-                <Bell class="mr-1 h-4 w-4" />
-                Nhắc nợ hàng loạt
             </Button>
             <Button size="sm" variant="ghost" @click="emit('clear')">
                 <X class="h-4 w-4" />

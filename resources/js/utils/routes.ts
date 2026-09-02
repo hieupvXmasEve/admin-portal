@@ -520,9 +520,6 @@ export const financeRoutes = {
         dng: () => route(FINANCE_ROUTE_NAMES.BATCH_STUDIO_DNG),
         dngPreview: () => route(FINANCE_ROUTE_NAMES.BATCH_STUDIO_DNG_PREVIEW),
         dngCommit: () => route(FINANCE_ROUTE_NAMES.BATCH_STUDIO_DNG_COMMIT),
-        reminders: () => route(FINANCE_ROUTE_NAMES.BATCH_STUDIO_REMINDERS),
-        remindersPreview: () => route(FINANCE_ROUTE_NAMES.BATCH_STUDIO_REMINDERS_PREVIEW),
-        remindersCommit: () => route(FINANCE_ROUTE_NAMES.BATCH_STUDIO_REMINDERS_COMMIT),
     },
     collect: {
         updateDngCampusMapping: () => route(FINANCE_ROUTE_NAMES.DNG_CAMPUS_MAPPING_UPDATE),

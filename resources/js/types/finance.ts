@@ -500,7 +500,7 @@ export interface BatchPreviewResponse {
     summary: BatchPreviewSummary;
 }
 
-export type BatchJobKind = 'charge_generation' | 'dng_push' | 'reminder';
+export type BatchJobKind = 'charge_generation' | 'dng_push';
 
 export interface BatchResult {
     job: BatchJobKind;

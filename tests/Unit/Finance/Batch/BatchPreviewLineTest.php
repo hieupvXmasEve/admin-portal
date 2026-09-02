@@ -30,6 +30,5 @@ it('maps a list of lines into a key=>hash token payload', function () {
 
 it('lists job types with their required action permissions', function () {
     expect(BatchJobType::ChargeGeneration->value)->toBe('charge_generation')
-        ->and(BatchJobType::DngPush->value)->toBe('dng_push')
-        ->and(BatchJobType::Reminder->value)->toBe('reminder');
+        ->and(BatchJobType::DngPush->value)->toBe('dng_push');
 });

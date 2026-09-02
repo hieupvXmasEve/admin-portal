@@ -8,7 +8,6 @@ enum BatchJobType: string
 {
     case ChargeGeneration = 'charge_generation';
     case DngPush = 'dng_push';
-    case Reminder = 'reminder';
 
     /**
      * Cache-key namespace for issued preview tokens.

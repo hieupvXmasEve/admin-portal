@@ -82,7 +82,6 @@ const { filters, setFilter, handleSearch, handleSortChange, handlePaginationNavi
 });
 
 const canDng = computed(() => permission.can('create_finance_payments'));
-const canRemind = computed(() => permission.can('view_finance_operations_due_calendar'));
 
 const allRows = computed(() => props.charges.data.filter((charge) => charge.student_id).map((charge) => ({ key: charge.id, studentId: charge.student_id })));
 
@@ -199,6 +198,6 @@ function openStudent(row: ChargeRow): void {
         </div>
 
         <DataPagination :pagination-data="charges" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
-        <SendToBatchBar :count="sel.count.value" :can-dng="canDng" :can-remind="canRemind" @dng="sel.sendToBatch('dng')" @reminders="sel.sendToBatch('reminders')" @clear="sel.clear" />
+        <SendToBatchBar :count="sel.count.value" :can-dng="canDng" @dng="sel.sendToBatch()" @clear="sel.clear" />
     </div>
 </template>

@@ -80,7 +80,6 @@ const { filters, handleSearch, setFilter, handleSortChange, handlePaginationNavi
 });
 
 const canDng = computed(() => permission.can('create_finance_payments'));
-const canRemind = computed(() => permission.can('view_finance_operations_due_calendar'));
 
 const allRows = computed(() => props.items.data.filter((payment) => payment.student?.id).map((payment) => ({ key: payment.id, studentId: payment.student!.id })));
 
@@ -276,6 +275,6 @@ const sortableHeaders: Array<{ key: NonNullable<PaymentFilters['sort']>; label: 
         </div>
 
         <DataPagination :pagination-data="items" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
-        <SendToBatchBar :count="sel.count.value" :can-dng="canDng" :can-remind="canRemind" @dng="sel.sendToBatch('dng')" @reminders="sel.sendToBatch('reminders')" @clear="sel.clear" />
+        <SendToBatchBar :count="sel.count.value" :can-dng="canDng" @dng="sel.sendToBatch()" @clear="sel.clear" />
     </div>
 </template>

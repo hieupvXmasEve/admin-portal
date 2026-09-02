@@ -44,7 +44,4 @@ Route::prefix('api/v1/finance/batch-studio')
         Route::post('/dng/preview', [BatchStudioPreviewController::class, 'previewDng'])
             ->middleware('can:create_finance_payments')
             ->name('dng.preview');
-        Route::post('/reminders/preview', [BatchStudioPreviewController::class, 'previewReminders'])
-            ->middleware('can:view_finance_operations_due_calendar')
-            ->name('reminders.preview');
     });

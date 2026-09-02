@@ -9,18 +9,14 @@ use App\Modules\Finance\Actions\CreateBatchDngFromChargesAction;
 use App\Modules\Finance\Actions\Egc\GenerateEgcChargesAction;
 use App\Modules\Finance\Actions\Major\GenerateMajorChargesAction;
 use App\Modules\Finance\Actions\Operations\GenerateNonAcademicChargesAction;
-use App\Modules\Finance\Actions\Operations\SendDueItemParentRemindersAction;
-use App\Modules\Finance\Actions\Operations\SendDueItemRemindersAction;
 use App\Modules\Finance\Dng\Support\DngFeeTypeOptions;
 use App\Modules\Finance\Enums\NonAcademicChargeTypeEnum;
 use App\Modules\Finance\Exports\BatchChargePreviewExport;
 use App\Modules\Finance\Http\Requests\Batch\CommitBatchChargesRequest;
 use App\Modules\Finance\Http\Requests\Batch\CommitBatchDngRequest;
-use App\Modules\Finance\Http\Requests\Batch\CommitBatchRemindersRequest;
 use App\Modules\Finance\Http\Requests\Batch\ExportBatchChargesRequest;
 use App\Modules\Finance\Queries\Batch\AssembleBatchChargePreviewQuery;
 use App\Modules\Finance\Queries\Batch\AssembleBatchDngPreviewQuery;
-use App\Modules\Finance\Queries\Batch\AssembleBatchReminderPreviewQuery;
 use App\Modules\Finance\Services\Batch\BatchPreviewTokenService;
 use App\Modules\Finance\Support\Batch\BatchChargeCampusScope;
 use App\Modules\Finance\Support\Batch\BatchJobType;
@@ -49,7 +45,6 @@ class BatchStudioController extends Controller
                 'charge_generation' => (bool) ($user?->can('create_finance_charges')
                     || $user?->can('generate_egc_finance_charges')),
                 'dng_push' => (bool) $user?->can('create_finance_payments'),
-                'reminder' => (bool) $user?->can('view_finance_operations_due_calendar'),
             ],
         ]);
     }
@@ -98,11 +93,6 @@ class BatchStudioController extends Controller
             'dngFeeTypeOptions' => DngFeeTypeOptions::all(),
             'prefill' => $this->dngPrefill($request),
         ]);
-    }
-
-    public function reminders(Request $request): Response
-    {
-        return Inertia::render('Finance/BatchStudio/Reminders');
     }
 
     public function commitCharges(
@@ -237,43 +227,6 @@ class BatchStudioController extends Controller
             'job' => 'dng_push',
             'summary' => $result,
         ])->back();
-    }
-
-    public function commitReminders(
-        CommitBatchRemindersRequest $request,
-        BatchPreviewTokenService $tokens,
-        AssembleBatchReminderPreviewQuery $assembler,
-    ): RedirectResponse {
-        $userId = (int) $request->user()->id;
-        $token = (string) $request->input('preview_token');
-        $selectedKeys = (array) $request->input('selected_keys');
-
-        $scope = $tokens->scope($userId, $token, BatchJobType::Reminder);
-        if ($scope === null) {
-            throw ValidationException::withMessages([
-                'preview_token' => 'Phiên xem trước đã hết hạn hoặc đã dùng. Vui lòng xem trước lại.',
-            ]);
-        }
-
-        $recipient = (string) ($scope['recipient'] ?? 'student');
-        $semesterId = isset($scope['semester_id']) ? (int) $scope['semester_id'] : null;
-        $campusId = $request->user()?->can('view_finance_all_campus') ? null : (int) session('current_campus_id');
-
-        $this->recomputeOrFail(
-            $userId, $token, BatchJobType::Reminder, $selectedKeys, $tokens,
-            fn () => collect($assembler->handle($recipient, $semesterId, $campusId)['lines'])
-                ->keyBy(fn (BatchPreviewLine $line) => $line->key)->all(),
-        );
-
-        $itemIds = collect($selectedKeys)
-            ->map(fn (string $key) => str_replace('reminder:', '', $key))
-            ->values()->all();
-
-        $result = $recipient === 'parent'
-            ? SendDueItemParentRemindersAction::run(['item_ids' => $itemIds])
-            : SendDueItemRemindersAction::run(['item_ids' => $itemIds]);
-
-        return Inertia::flash('batch_result', ['job' => 'reminder', 'summary' => $result])->back();
     }
 
     /**

@@ -82,7 +82,6 @@ const { filters, setFilter, handleSearch, handleSortChange, handlePaginationNavi
 const semesterOptions = computed(() => semesterContext.value?.options ?? []);
 
 const canDng = computed(() => permission.can('create_finance_payments'));
-const canRemind = computed(() => permission.can('view_finance_operations_due_calendar'));
 
 const allRows = computed(() => props.invoices.data.map((invoice) => ({ key: invoice.id, studentId: invoice.student_id })));
 
@@ -230,6 +229,6 @@ function getStatusBadgeVariant(status: string): 'default' | 'destructive' | 'out
             </CardContent>
         </Card>
 
-        <SendToBatchBar :count="sel.count.value" :can-dng="canDng" :can-remind="canRemind" @dng="sel.sendToBatch('dng')" @reminders="sel.sendToBatch('reminders')" @clear="sel.clear" />
+        <SendToBatchBar :count="sel.count.value" :can-dng="canDng" @dng="sel.sendToBatch()" @clear="sel.clear" />
     </div>
 </template>

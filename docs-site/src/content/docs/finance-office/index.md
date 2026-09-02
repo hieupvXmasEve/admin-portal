@@ -68,7 +68,7 @@ Nhóm này tạo ra các khoản phải thu. Đây là bước rủi ro nhất t
 
 ### Batch Studio
 
-**Dùng để làm gì.** Sinh phí hàng loạt cho một nhóm sinh viên.
+**Dùng để làm gì.** Sinh phí hàng loạt cho một nhóm sinh viên, hoặc lập yêu cầu thanh toán DNG hàng loạt. Gửi nhắc nợ không nằm ở đây — dùng **DNG Due Reminders**.
 
 **Ai vào được.** Người có quyền dùng Batch Studio.
 
@@ -92,7 +92,7 @@ Không thấy dòng học bổng dù sinh viên có học bổng → kiểm tra 
 
 - Luôn xem trước. Sinh nhầm hàng loạt phải hủy từng khoản, rất tốn công.
 - Chạy trên nhóm nhỏ để thử trước khi chạy toàn bộ khóa.
-- Kiểm tra sinh viên đã có học bổng hoặc voucher chưa, tránh sinh phí sai mức.
+- Kiểm tra sinh viên đã có học bổng hoặc voucher chưa, tránh sinh phí sai mức. Nhắc hạn đóng tiền thì vào **Thu & Đối soát → DNG Due Reminders**.
 
 ### Pricing Operations
 

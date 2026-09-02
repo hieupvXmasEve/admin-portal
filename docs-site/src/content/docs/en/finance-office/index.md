@@ -68,7 +68,7 @@ This group creates the receivables. It carries the most risk in the area.
 
 ### Batch Studio
 
-**What it is for.** Generating charges in bulk for a group of students.
+**What it is for.** Generating charges in bulk for a group of students, or creating DNG payment requests in bulk. Sending payment reminders is not here — use **DNG Due Reminders**.
 
 **Who can open it.** Anyone with permission to use Batch Studio.
 
@@ -92,7 +92,7 @@ No scholarship line even though the student has one → check step 2, the select
 
 - Always preview. Wrong charges generated in bulk have to be cancelled one by one.
 - Test on a small group before running a whole intake.
-- Check whether students already hold a scholarship or voucher, so charges are not generated at the wrong amount.
+- Check whether students already hold a scholarship or voucher, so charges are not generated at the wrong amount. For due-date reminders, go to **Thu & Đối soát → DNG Due Reminders**.
 
 ### Pricing Operations
 
