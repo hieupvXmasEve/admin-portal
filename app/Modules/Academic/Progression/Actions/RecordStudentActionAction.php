@@ -52,7 +52,7 @@ class RecordStudentActionAction
             $previousStatus = $transition->previousStatus;
             $targetStatus = $transition->newStatus;
             $previousCampusId = $student->campus_id;
-            $isEgcDefer = $transition->previousStudyStage === 'intake_pre_uni_gc';
+            $isEgcDefer = $transition->previousStatus === 'intake_pre_uni_gc';
 
             // 1. Create action log
             $actionLog = StudentActionLog::create([

@@ -126,6 +126,104 @@ it('requires an egc defer block for egc students', function () {
     ]);
 })->throws(InvalidProgressionState::class, 'EGC defer from block is required for EGC students.');
 
+it('does not require an egc defer block for additional defer while already deferred', function () {
+    ['campus' => $campus, 'program' => $program, 'spring' => $spring, 'fall' => $fall, 'user' => $user] = studentActionEgcFixture();
+    $egcStudent = studentActionStudent($campus, $program, $spring, 'EGC100013', 'intake_pre_uni_gc');
+
+    RecordStudentActionAction::run([
+        'student_id' => $egcStudent->id,
+        'action_type' => StudentActionType::ACADEMIC_DEFER->value,
+        'reason' => 'Initial EGC defer',
+        'changed_by_user_id' => $user->id,
+        'from_semester_id' => $spring->id,
+        'return_semester_id' => $fall->id,
+        'egc_defer_from_block_number' => 1,
+        'defer_scope_type' => 'FULL',
+        'defer_fee_policy' => 'FORFEIT',
+    ]);
+
+    $followOn = RecordStudentActionAction::run([
+        'student_id' => $egcStudent->id,
+        'action_type' => StudentActionType::ACADEMIC_DEFER->value,
+        'reason' => 'Additional defer',
+        'changed_by_user_id' => $user->id,
+        'from_semester_id' => $fall->id,
+        'return_semester_id' => $fall->id,
+        'defer_scope_type' => 'FULL',
+        'defer_fee_policy' => 'FORFEIT',
+    ]);
+
+    expect($followOn->fresh()->egc_defer_from_block_number)->toBeNull();
+});
+
+it('rejects store of egc defer without block while currently in egc and allows additional defer without block', function () {
+    ['campus' => $campus, 'program' => $program, 'spring' => $spring, 'fall' => $fall, 'user' => $user] = studentActionEgcFixture();
+    $activeEgc = studentActionStudent($campus, $program, $spring, 'EGC100014', 'intake_pre_uni_gc');
+    $deferredEgc = studentActionStudent($campus, $program, $spring, 'EGC100015', 'intake_pre_uni_gc');
+
+    RecordStudentActionAction::run([
+        'student_id' => $deferredEgc->id,
+        'action_type' => StudentActionType::ACADEMIC_DEFER->value,
+        'reason' => 'Initial EGC defer',
+        'changed_by_user_id' => $user->id,
+        'from_semester_id' => $spring->id,
+        'return_semester_id' => $fall->id,
+        'egc_defer_from_block_number' => 1,
+        'defer_scope_type' => 'FULL',
+        'defer_fee_policy' => 'FORFEIT',
+    ]);
+
+    session([
+        '_token' => 'student-action-egc-block-csrf',
+        'current_campus_id' => $campus->id,
+    ]);
+
+    $permissionService = Mockery::mock(CampusPermissionReader::class);
+    $permissionService->shouldReceive('permissionCodesForUserId')
+        ->andReturn(['view_student_action', 'change_student_status']);
+    app()->singleton(CampusPermissionReader::class, fn () => $permissionService);
+
+    $academicPeriodReader = Mockery::mock(AcademicPeriodReader::class);
+    $academicPeriodReader->shouldReceive('current')->andReturn(new AcademicPeriodReference(
+        id: $spring->id,
+        code: $spring->code,
+        name: $spring->name,
+        start_date: CarbonImmutable::parse($spring->start_date),
+        end_date: CarbonImmutable::parse($spring->end_date),
+        registration_start_date: null,
+        registration_end_date: null,
+        is_current: true,
+    ));
+    app()->instance(AcademicPeriodReader::class, $academicPeriodReader);
+
+    actingAs($user)
+        ->post(route('students.actions.store', ['student' => $activeEgc->id]), [
+            '_token' => 'student-action-egc-block-csrf',
+            'student_id' => $activeEgc->id,
+            'action_type' => StudentActionType::ACADEMIC_DEFER->value,
+            'reason' => 'Missing block',
+            'from_semester_id' => $spring->id,
+            'return_semester_id' => $fall->id,
+            'defer_scope_type' => 'FULL',
+            'defer_fee_policy' => 'FORFEIT',
+        ])
+        ->assertSessionHasErrors(['egc_defer_from_block_number']);
+
+    actingAs($user)
+        ->post(route('students.actions.store', ['student' => $deferredEgc->id]), [
+            '_token' => 'student-action-egc-block-csrf',
+            'student_id' => $deferredEgc->id,
+            'action_type' => StudentActionType::ACADEMIC_DEFER->value,
+            'reason' => 'Additional defer',
+            'from_semester_id' => $fall->id,
+            'return_semester_id' => $fall->id,
+            'defer_scope_type' => 'FULL',
+            'defer_fee_policy' => 'FORFEIT',
+        ])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect();
+});
+
 it('filters student action reports by from semester and egc block', function () {
     ['campus' => $campus, 'program' => $program, 'spring' => $spring, 'fall' => $fall, 'user' => $user] = studentActionEgcFixture();
     $student = studentActionStudent($campus, $program, $spring, 'EGC100003', 'intake_pre_uni_gc');

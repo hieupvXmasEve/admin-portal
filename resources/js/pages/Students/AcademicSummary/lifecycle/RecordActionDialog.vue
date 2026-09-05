@@ -141,6 +141,7 @@ const filteredEgcCharges = computed(() => {
 
     return charges.filter((charge) => charge.semester_id === form.from_semester_id);
 });
+const canPreserveFee = computed(() => (actionOptions.value.deferFeePolicies ?? []).some((policy) => policy.value === 'PRESERVE'));
 
 const hasUnpaidEgcCharges = computed(() => {
     if (!isEgcStudent.value || filteredEgcCharges.value.length === 0) {
@@ -198,13 +199,13 @@ watch(
 );
 
 watch(
-    () => [hasUnpaidEgcCharges.value, selectedActionType.value],
+    () => [hasUnpaidEgcCharges.value, selectedActionType.value, canPreserveFee.value],
     () => {
-        if (selectedActionType.value !== StudentActionType.ACADEMIC_DEFER || !isEgcStudent.value) {
+        if (selectedActionType.value !== StudentActionType.ACADEMIC_DEFER) {
             return;
         }
 
-        if (hasUnpaidEgcCharges.value) {
+        if (!canPreserveFee.value || (isEgcStudent.value && hasUnpaidEgcCharges.value)) {
             form.defer_fee_policy = 'FORFEIT';
         }
     },
@@ -342,7 +343,7 @@ const handleSubmit = (): void => {
 
                             <div class="space-y-2">
                                 <Label for="defer_fee_policy">Chính sách học phí *</Label>
-                                <Select v-model="form.defer_fee_policy" :disabled="isEgcStudent && hasUnpaidEgcCharges">
+                                <Select v-if="canPreserveFee" v-model="form.defer_fee_policy" :disabled="isEgcStudent && hasUnpaidEgcCharges">
                                     <SelectTrigger id="defer_fee_policy">
                                         <SelectValue placeholder="Chọn chính sách" />
                                     </SelectTrigger>
@@ -352,7 +353,9 @@ const handleSubmit = (): void => {
                                         </SelectItem>
                                     </SelectContent>
                                 </Select>
+                                <Input v-else value="Mất học phí (Forfeit Fee)" disabled />
                                 <p v-if="form.errors.defer_fee_policy" class="text-sm text-red-500">{{ form.errors.defer_fee_policy }}</p>
+                                <p v-else-if="!canPreserveFee" class="text-sm text-amber-600">Không có học phí đã thanh toán trong kỳ này nên không thể bảo lưu học phí.</p>
                                 <p v-else-if="isEgcStudent && hasUnpaidEgcCharges" class="text-sm text-amber-600">Chưa có thanh toán cho học phí EGC, mặc định mất học phí.</p>
                             </div>
                         </div>

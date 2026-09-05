@@ -161,6 +161,16 @@ class FinanceChargeService
             ->exists();
     }
 
+    public function paidCashForSemester(int $studentId, int $semesterId): float
+    {
+        return (float) FinanceCharge::query()
+            ->where('student_id', $studentId)
+            ->where('semester_id', $semesterId)
+            ->where('status', FinanceCharge::STATUS_ACTIVE)
+            ->get()
+            ->sum(static fn (FinanceCharge $charge): float => (float) $charge->paid_amount);
+    }
+
     /**
      * Active EGC level fee charges for Academic lifecycle form options (read DTOs only).
      *

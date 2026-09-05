@@ -4,7 +4,7 @@ title: "Store the EGC defer start block as audit metadata"
 status: accepted
 date: 2026-05-31
 owner: Platform Team
-last_verified: 2026-07-25
+last_verified: 2026-09-05
 scope: architecture-decision
 ---
 
@@ -22,8 +22,12 @@ finance/progression data and permit values beyond two.
 Store nullable `egc_defer_from_block_number` on `student_action_logs`.
 
 - Valid values are `1` and `2`.
-- It applies only to EGC `ACADEMIC_DEFER` actions.
-- New web-recorded EGC defer actions require an explicit value.
+- It applies only to EGC `ACADEMIC_DEFER` actions whose current lifecycle
+  status is `intake_pre_uni_gc` (`legacyCompatibleStatus()`: active enrollment
+  with EGC study stage). Do not compare `enrollment_status` to
+  `intake_pre_uni_gc`; that column is `active`/`deferred`/`withdrawn`/`graduated`.
+- New web-recorded EGC defer actions in that current status require an
+  explicit value. Additional defer while already deferred does not.
 - Existing EGC defer actions backfill to Block 1 as a deterministic default and
   may be corrected individually.
 - Major-program defer actions keep the field null.
@@ -34,4 +38,6 @@ Store nullable `egc_defer_from_block_number` on `student_action_logs`.
 
 Reports can filter by source semester and source block without coupling audit
 history to mutable runtime records. The historical default is intentionally
-approximate until staff corrections are made.
+approximate until staff corrections are made. Additional defer while already
+deferred stores a null block, so those rows do not match the Student Actions
+audit "EGC Block" filter; the original EGC defer row still does.

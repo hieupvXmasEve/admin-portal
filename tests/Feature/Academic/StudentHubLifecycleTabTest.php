@@ -13,9 +13,12 @@ use App\Models\User;
 use App\Modules\Academic\Progression\Actions\RecordStudentActionAction;
 use App\Modules\Academic\Progression\Exceptions\InvalidProgressionState;
 use App\Modules\Academic\Progression\Models\ProgramEnrollment;
+use App\Shared\Contracts\Academic\AcademicPeriodReader;
+use App\Shared\Contracts\Academic\DTO\AcademicPeriodReference;
 use App\Shared\Contracts\Finance\DTO\StudentLifecycleDeferData;
 use App\Shared\Contracts\Finance\StudentLifecycleFinanceCommand;
 use App\Shared\Contracts\Identity\CampusPermissionReader;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia;
 
@@ -287,4 +290,44 @@ it('backfills a decision onto a transition through the Lifecycle tab endpoint', 
 
     expect($action->fresh()->decision_id)->toBe($decision->id)
         ->and($decision->students()->whereKey($this->student->id)->exists())->toBeTrue();
+});
+
+it('hides preserve fee when the current semester has no paid tuition', function () {
+    actingAs($this->user)
+        ->get(route('students.academic-summary.lifecycle', $this->student->id))
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('options.action.deferFeePolicies', [
+                ['value' => 'FORFEIT', 'label' => 'Mất học phí (Forfeit Fee)'],
+            ])
+        );
+});
+
+it('rejects store of preserve defer when the from semester has no paid tuition', function () {
+    $academicPeriodReader = Mockery::mock(AcademicPeriodReader::class);
+    $academicPeriodReader->shouldReceive('current')->andReturn(new AcademicPeriodReference(
+        id: $this->semester->id,
+        code: $this->semester->code,
+        name: $this->semester->name,
+        start_date: CarbonImmutable::parse($this->semester->start_date),
+        end_date: CarbonImmutable::parse($this->semester->end_date),
+        registration_start_date: null,
+        registration_end_date: null,
+        is_current: true,
+    ));
+    app()->instance(AcademicPeriodReader::class, $academicPeriodReader);
+
+    actingAs($this->user)
+        ->post(route('students.actions.store', ['student' => $this->student->id]), [
+            '_token' => HUB_LIFECYCLE_CSRF,
+            'student_id' => $this->student->id,
+            'action_type' => StudentActionType::ACADEMIC_DEFER->value,
+            'reason' => 'Preserve without paid tuition',
+            'from_semester_id' => $this->semester->id,
+            'return_semester_id' => $this->semester->id,
+            'defer_scope_type' => 'FULL',
+            'defer_fee_policy' => 'PRESERVE',
+            'egc_defer_from_block_number' => 1,
+        ])
+        ->assertSessionHasErrors(['defer_fee_policy']);
 });

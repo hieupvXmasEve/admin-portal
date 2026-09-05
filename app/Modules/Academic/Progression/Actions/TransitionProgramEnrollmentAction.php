@@ -154,30 +154,31 @@ final class TransitionProgramEnrollmentAction
         }
 
         if ($actionType === StudentActionType::ACADEMIC_DEFER) {
-            self::validateDefer($studyStage, $data);
+            self::validateDefer($currentStatus, $studyStage, $data);
         }
     }
 
     /** @param array<string, mixed> $data */
-    private static function validateDefer(?string $studyStage, array $data): void
+    private static function validateDefer(string $currentStatus, ?string $studyStage, array $data): void
     {
         $scopeType = $data['defer_scope_type'] ?? 'FULL';
         $block = $data['egc_defer_from_block_number'] ?? null;
         $hasBlock = $block !== null && $block !== '';
+        $isCurrentlyEgc = $currentStatus === 'intake_pre_uni_gc';
 
         if ($studyStage === 'intake_pre_uni_gc' && $scopeType !== 'FULL') {
             throw new InvalidProgressionState('defer_scope_type', 'EGC defer must be full semester.');
         }
 
-        if ($studyStage === 'intake_pre_uni_gc' && ! $hasBlock) {
+        if ($isCurrentlyEgc && ! $hasBlock) {
             throw new InvalidProgressionState('egc_defer_from_block_number', 'EGC defer from block is required for EGC students.');
         }
 
-        if ($studyStage === 'intake_pre_uni_gc' && ! in_array((int) $block, [1, 2], true)) {
+        if ($isCurrentlyEgc && ! in_array((int) $block, [1, 2], true)) {
             throw new InvalidProgressionState('egc_defer_from_block_number', 'EGC defer from block must be 1 or 2.');
         }
 
-        if ($studyStage !== 'intake_pre_uni_gc' && $hasBlock) {
+        if (! $isCurrentlyEgc && $hasBlock) {
             throw new InvalidProgressionState('egc_defer_from_block_number', 'EGC defer from block is only available for EGC students.');
         }
 

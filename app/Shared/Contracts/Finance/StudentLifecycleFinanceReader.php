@@ -22,4 +22,6 @@ interface StudentLifecycleFinanceReader
 
     /** @return list<int> */
     public function deferredCourseRegistrationIds(int $studentId, int $semesterId): array;
+
+    public function paidCashForSemester(int $studentId, int $semesterId): float;
 }

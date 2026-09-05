@@ -80,4 +80,9 @@ final class StudentLifecycleFinanceQuery implements StudentLifecycleFinanceReade
             ->map(static fn (int|string $id): int => (int) $id)
             ->all();
     }
+
+    public function paidCashForSemester(int $studentId, int $semesterId): float
+    {
+        return $this->financeCharges->paidCashForSemester($studentId, $semesterId);
+    }
 }

@@ -78,26 +78,45 @@ class StoreStudentActionRequest extends FormRequest
                 Rule::in([1, 2]),
                 function (string $attribute, mixed $value, \Closure $fail): void {
                     $studentId = (int) $this->input('student_id');
-                    $studyStage = $studentId > 0
-                        ? app(ProgramEnrollmentReader::class)->forStudentId($studentId)->studyStage
+                    $lifecycleStatus = $studentId > 0
+                        ? app(ProgramEnrollmentReader::class)->forStudentId($studentId)->legacyCompatibleStatus()
                         : null;
 
                     $isBlank = $value === null || $value === '';
 
-                    if ($studyStage === 'intake_pre_uni_gc' && $isBlank) {
+                    if ($lifecycleStatus === 'intake_pre_uni_gc' && $isBlank) {
                         $fail('EGC defer from block is required for EGC students.');
 
                         return;
                     }
 
-                    if ($studentId > 0 && $studyStage !== 'intake_pre_uni_gc' && ! $isBlank) {
+                    if ($studentId > 0 && $lifecycleStatus !== 'intake_pre_uni_gc' && ! $isBlank) {
                         $fail('EGC defer from block is only available for EGC students.');
                     }
                 },
             ],
             // Defer Case fields
             'defer_scope_type' => ['required', 'string', 'in:FULL,COURSES'],
-            'defer_fee_policy' => ['required', 'string', 'in:PRESERVE,FORFEIT'],
+            'defer_fee_policy' => [
+                'required',
+                'string',
+                'in:PRESERVE,FORFEIT',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if ($value !== 'PRESERVE') {
+                        return;
+                    }
+
+                    $studentId = (int) $this->input('student_id');
+                    $semesterId = (int) $this->input('from_semester_id');
+                    if ($studentId <= 0 || $semesterId <= 0) {
+                        return;
+                    }
+
+                    if (app(StudentLifecycleFinanceReader::class)->paidCashForSemester($studentId, $semesterId) <= 0) {
+                        $fail('Fee preserve is only available when the from semester has paid tuition.');
+                    }
+                },
+            ],
             'defer_preserve_amount' => ['nullable', 'numeric', 'min:0'],
             'defer_course_registration_ids' => ['nullable', 'array', 'required_if:defer_scope_type,COURSES'],
             'defer_egc_charge_ids' => ['nullable', 'array'],

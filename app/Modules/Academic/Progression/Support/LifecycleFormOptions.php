@@ -93,6 +93,16 @@ class LifecycleFormOptions
                 static fn ($charge): array => $charge->toArray(),
                 $this->finance->activeEgcCharges((int) $student->id, $activeSemesterId),
             );
+
+            $paidCash = $activeSemesterId
+                ? $this->finance->paidCashForSemester((int) $student->id, $activeSemesterId)
+                : 0.0;
+            if ($paidCash <= 0) {
+                $options['deferFeePolicies'] = array_values(array_filter(
+                    $options['deferFeePolicies'],
+                    static fn (array $policy): bool => $policy['value'] !== 'PRESERVE',
+                ));
+            }
         }
 
         return $options;
