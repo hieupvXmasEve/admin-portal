@@ -39,7 +39,7 @@ class ListUnclassifiedStudentsQuery
                     ->whereRaw('program_enrollments.id = '.StudentLifecycleProjection::primaryEnrollmentIdSubquery());
             })
             ->whereNull('program_enrollments.study_stage')
-            ->whereNotIn('program_enrollments.enrollment_status', ['withdrawn', 'graduated'])
+            ->whereNotIn('program_enrollments.enrollment_status', ['withdrawn', 'dropout', 'dropout_transfer', 'graduated'])
             ->where('students.campus_id', $campusId)
             ->when($filters['search'] ?? null, function (Builder $query, string $search): void {
                 $query->where(function (Builder $subQuery) use ($search): void {

@@ -25,7 +25,7 @@ Store nullable `egc_defer_from_block_number` on `student_action_logs`.
 - It applies only to EGC `ACADEMIC_DEFER` actions whose current lifecycle
   status is `intake_pre_uni_gc` (`legacyCompatibleStatus()`: active enrollment
   with EGC study stage). Do not compare `enrollment_status` to
-  `intake_pre_uni_gc`; that column is `active`/`deferred`/`withdrawn`/`graduated`.
+  `intake_pre_uni_gc`; that column is `active`/`deferred`/`dropout`/`dropout_transfer`/`withdrawn`/`graduated`.
 - New web-recorded EGC defer actions in that current status require an
   explicit value. Additional defer while already deferred does not.
 - Existing EGC defer actions backfill to Block 1 as a deterministic default and

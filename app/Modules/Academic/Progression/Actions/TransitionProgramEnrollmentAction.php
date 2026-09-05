@@ -122,8 +122,8 @@ final class TransitionProgramEnrollmentAction
         }
 
         if ($currentStatus === 'deferred'
-            && ! in_array($actionType, [StudentActionType::ACADEMIC_RESUME, StudentActionType::ACADEMIC_DEFER], true)) {
-            throw new InvalidProgressionState('action_type', 'When status is deferred, only "Quay lại học" or "Bảo lưu tiếp" are allowed on this page.');
+            && ! in_array($actionType, [StudentActionType::ACADEMIC_RESUME, StudentActionType::ACADEMIC_DEFER, StudentActionType::ACADEMIC_DROPOUT], true)) {
+            throw new InvalidProgressionState('action_type', 'When status is deferred, only "Quay lại học", "Bảo lưu tiếp", or "Bỏ học" are allowed on this page.');
         }
 
         if ($currentStatus === 'pending_course_opening'
@@ -269,7 +269,8 @@ final class TransitionProgramEnrollmentAction
         return [
             'enrollment_status' => match ($targetStatus) {
                 'deferred', 'admission_deferred' => 'deferred',
-                'dropout', 'dropout_transfer' => 'withdrawn',
+                'dropout' => 'dropout',
+                'dropout_transfer' => 'dropout_transfer',
                 'graduated' => 'graduated',
                 'pending' => 'pending',
                 default => 'active',

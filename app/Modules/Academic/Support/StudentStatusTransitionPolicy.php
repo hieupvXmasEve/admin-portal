@@ -57,6 +57,7 @@ class StudentStatusTransitionPolicy
             'deferred' => [
                 StudentActionType::ACADEMIC_RESUME,
                 StudentActionType::ACADEMIC_DEFER,
+                StudentActionType::ACADEMIC_DROPOUT,
             ],
             // Terminal statuses and statuses this surface does not act on expose
             // no selectable actions.

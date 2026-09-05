@@ -78,7 +78,7 @@ final class EloquentStudentLifecycleMatcher implements StudentLifecycleMatcher
         if ($withdrawnStatuses !== []) {
             $method = $hasCondition ? 'orWhere' : 'where';
             $query->{$method}(function (Builder $withdrawn) use ($withdrawnStatuses): void {
-                $withdrawn->where('enrollment_status', 'withdrawn')
+                $withdrawn->whereIn('enrollment_status', ['withdrawn', 'dropout', 'dropout_transfer'])
                     ->whereRaw($this->legacyDiscriminatorSql().' in ('.implode(', ', array_fill(0, count($withdrawnStatuses), '?')).')', $withdrawnStatuses);
             });
             $hasCondition = true;

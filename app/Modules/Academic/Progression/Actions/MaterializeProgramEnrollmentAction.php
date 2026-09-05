@@ -87,10 +87,13 @@ final class MaterializeProgramEnrollmentAction
     {
         return match ($student->status) {
             'deferred', 'admission_deferred' => 'deferred',
-            'dropout', 'dropout_transfer' => 'withdrawn',
+            'dropout' => 'dropout',
+            'dropout_transfer' => 'dropout_transfer',
             'graduated' => 'graduated',
             'pending' => 'pending',
-            default => $student->academic_status ?? 'active',
+            default => $student->academic_status === 'withdrawn'
+                ? 'dropout'
+                : ($student->academic_status ?? 'active'),
         };
     }
 

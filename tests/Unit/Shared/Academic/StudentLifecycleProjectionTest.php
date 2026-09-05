@@ -95,6 +95,18 @@ it('collapses a withdrawn enrollment to dropout, never dropout_transfer', functi
     expect($matches)->toBeTrue();
 });
 
+it('projects a stored dropout enrollment as dropout', function (): void {
+    $student = makeEnrolledStudent($this, 'PRJ003B', 'intake_course');
+    makePrimaryEnrollment($student, 'dropout');
+
+    $matches = Student::query()
+        ->whereKey($student->id)
+        ->whereRaw(StudentLifecycleProjection::caseExpression().' = ?', ['dropout'])
+        ->exists();
+
+    expect($matches)->toBeTrue();
+});
+
 it('binding A2 decision: among multiple is_primary rows, the highest id wins', function (): void {
     $student = makeEnrolledStudent($this, 'PRJ004', 'intake_course');
     $earlier = makePrimaryEnrollment($student, 'deferred');

@@ -32,10 +32,11 @@ it('never offers resume to an active study stage (the illogical case)', function
         ->not->toContain(StudentActionType::ACADEMIC_RESUME);
 });
 
-it('offers resume only from deferred and pending_course_opening', function () {
+it('offers resume, additional defer and dropout from deferred', function () {
     expect(StudentStatusTransitionPolicy::selectableActions('deferred'))->toBe([
         StudentActionType::ACADEMIC_RESUME,
         StudentActionType::ACADEMIC_DEFER,
+        StudentActionType::ACADEMIC_DROPOUT,
     ])->and(StudentStatusTransitionPolicy::selectableActions('pending_course_opening'))->toBe([
         StudentActionType::ACADEMIC_RESUME,
         StudentActionType::ACADEMIC_DEFER,
@@ -53,5 +54,6 @@ it('exposes selectable action values as enum strings for the FE payload', functi
     expect(StudentStatusTransitionPolicy::selectableActionValues('deferred'))->toBe([
         StudentActionType::ACADEMIC_RESUME->value,
         StudentActionType::ACADEMIC_DEFER->value,
+        StudentActionType::ACADEMIC_DROPOUT->value,
     ]);
 });

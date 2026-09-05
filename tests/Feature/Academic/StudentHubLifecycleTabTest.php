@@ -221,10 +221,51 @@ it('withdraws Program Enrollment without mutating Student identity or account st
 
     $enrollment = ProgramEnrollment::query()->sole();
 
-    expect($enrollment->enrollment_status)->toBe('withdrawn')
+    expect($enrollment->enrollment_status)->toBe('dropout')
         ->and($enrollment->study_stage)->toBe('intake_pre_uni_gc')
         ->and($this->student->fresh()->status)->toBe('intake_pre_uni_gc')
         ->and($this->student->fresh()->user?->status)->toBe($accountStatus);
+});
+
+it('allows dropout from deferred and offers it in the record-action list', function () {
+    RecordStudentActionAction::run([
+        'student_id' => $this->student->id,
+        'action_type' => StudentActionType::ACADEMIC_DEFER->value,
+        'reason' => 'Leave of absence',
+        'from_semester_id' => $this->semester->id,
+        'return_semester_id' => $this->semester->id,
+        'defer_scope_type' => 'FULL',
+        'defer_fee_policy' => 'FORFEIT',
+        'egc_defer_from_block_number' => 1,
+        'changed_by_user_id' => $this->user->id,
+    ]);
+
+    actingAs($this->user)
+        ->get(route('students.academic-summary.lifecycle', $this->student->id))
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('student.status', 'deferred')
+            ->where('options.action.allowedActionTypes', [
+                StudentActionType::ACADEMIC_RESUME->value,
+                StudentActionType::ACADEMIC_DEFER->value,
+                StudentActionType::ACADEMIC_DROPOUT->value,
+            ])
+        );
+
+    $dropoutLog = RecordStudentActionAction::run([
+        'student_id' => $this->student->id,
+        'action_type' => StudentActionType::ACADEMIC_DROPOUT->value,
+        'reason' => 'Will not return',
+        'dropout_semester_id' => $this->semester->id,
+        'changed_by_user_id' => $this->user->id,
+    ]);
+
+    $enrollment = ProgramEnrollment::query()->where('student_id', $this->student->id)->sole();
+
+    expect($enrollment->enrollment_status)->toBe('dropout')
+        ->and($dropoutLog->previous_status)->toBe('deferred')
+        ->and($dropoutLog->new_status)->toBe('dropout')
+        ->and($dropoutLog->dropout_semester_id)->toBe($this->semester->id);
 });
 
 it('rolls back the lifecycle transition and audit log when the Finance handoff fails', function () {

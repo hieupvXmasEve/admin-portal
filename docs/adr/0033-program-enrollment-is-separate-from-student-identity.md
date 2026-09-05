@@ -3,7 +3,7 @@ id: ADR-0033
 title: "Program Enrollment is separate from Student Identity"
 status: accepted
 owner: Platform Team
-last_verified: 2026-08-17
+last_verified: 2026-09-05
 scope: architecture-decision
 ---
 
@@ -16,8 +16,10 @@ Program, Curriculum Version, Intake Academic Period, and their lifecycle history
 `students.status` is write-dead: set once at student creation, never synced
 back by any Program Enrollment transition. The canonical current lifecycle
 status is the student's primary (`is_primary = 1`) `program_enrollments` row —
-`enrollment_status` + `study_stage`, collapsing `withdrawn` to `dropout` and
-`active` (no `study_stage`) to `active`. `students.status` remains the
+`enrollment_status` + `study_stage`. `ACADEMIC_DROPOUT` stores
+`enrollment_status = dropout` (`dropout_transfer` stores `dropout_transfer`).
+Leftover `withdrawn` rows still project to `dropout`. `active` with no
+`study_stage` projects to `active`. `students.status` remains the
 fallback for a student with no materialized primary enrollment, and the
 deliberate historical source for three EGC rules that specifically want
 stage-at-admission (`ListEgcRetakeAdjustmentsQuery`,
