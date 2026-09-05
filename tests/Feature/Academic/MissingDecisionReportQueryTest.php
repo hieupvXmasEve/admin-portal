@@ -66,17 +66,16 @@ function missingDecisionEvent(Student $student, User $user, Semester $semester, 
 it('lists requires-decision status actions that lack a decision', function () {
     $student = missingDecisionStudent($this->campus, $this->program, $this->semester, 'SE700001');
 
-    $defer = missingDecisionAction($student, $this->user, StudentActionType::ACADEMIC_DEFER);
     $dropout = missingDecisionAction($student, $this->user, StudentActionType::ACADEMIC_DROPOUT);
     $transfer = missingDecisionAction($student, $this->user, StudentActionType::CAMPUS_TRANSFER);
-    // Resume never requires a Decision — the original defer already carries it.
+    missingDecisionAction($student, $this->user, StudentActionType::ACADEMIC_DEFER);
     missingDecisionAction($student, $this->user, StudentActionType::ACADEMIC_RESUME);
 
     $result = (new GetMissingDecisionReportQuery)->handle([], $this->campus->id);
 
     $keys = collect($result->items())->pluck('id')->sort()->values()->all();
 
-    expect($keys)->toBe(collect([$defer, $dropout, $transfer])
+    expect($keys)->toBe(collect([$dropout, $transfer])
         ->map(fn (StudentActionLog $log): string => 'action-'.$log->id)
         ->sort()
         ->values()
@@ -95,9 +94,10 @@ it('never lists progression transitions (placement / stage change no longer requ
     expect((new GetMissingDecisionReportQuery)->handle([], $this->campus->id)->total())->toBe(0);
 });
 
-it('never lists admission deferral, waiting, or pure progression records', function () {
+it('never lists academic defer, admission deferral, waiting, or pure progression records', function () {
     $student = missingDecisionStudent($this->campus, $this->program, $this->semester, 'SE700003', 'intake_pre_uni_gc');
 
+    missingDecisionAction($student, $this->user, StudentActionType::ACADEMIC_DEFER);
     missingDecisionAction($student, $this->user, StudentActionType::ADMISSION_DEFERRAL);
     missingDecisionAction($student, $this->user, StudentActionType::WAITING_COURSE_OPENING);
     missingDecisionEvent($student, $this->user, $this->semester, AcademicProgressionEventType::ENGLISH_LEVEL_CHANGED);

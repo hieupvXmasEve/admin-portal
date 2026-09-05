@@ -18,9 +18,10 @@ use Illuminate\Support\Facades\DB;
  * Decision. Attaching a Decision (setting decision_id) removes the row.
  *
  * Mirrors the missing-documents report under academic-progression: a single
- * campus-scoped, searchable, paginated list. admission_deferral and pure
- * progression records (English-level change, IELTS) never appear here because
- * they are excluded by the requires-decision classification on the enums.
+ * campus-scoped, searchable, paginated list. Academic defer, admission
+ * deferral, waiting-for-course, and pure progression records (English-level
+ * change, IELTS) never appear here because they are excluded by the
+ * requires-decision classification on the enums.
  */
 class GetMissingDecisionReportQuery
 {

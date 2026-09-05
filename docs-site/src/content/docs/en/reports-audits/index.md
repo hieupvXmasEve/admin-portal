@@ -96,7 +96,7 @@ Two groups: **Lifecycle & Decisions** and **Academic Performance**.
 2. Read the **Transitions Missing a Decision** table.
 3. Attach the missing decision to each case.
 
-**Note.** A missing decision is a gap in the formal record, not just missing data. Treat it as a priority.
+**Note.** A missing decision is a gap in the formal record, not just missing data. Treat it as a priority. **Defer** is not on this list — it does not need an attached decision.
 
 ### Student Decisions
 

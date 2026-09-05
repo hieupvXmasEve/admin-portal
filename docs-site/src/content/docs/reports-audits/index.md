@@ -96,7 +96,7 @@ Hai nhóm: **Lifecycle & Decisions** (vòng đời và quyết định) và **Ac
 2. Xem bảng **Transitions Missing a Decision**.
 3. Bổ sung quyết định cho từng trường hợp.
 
-**Lưu ý.** Thiếu quyết định là lỗi hồ sơ pháp lý, không chỉ là dữ liệu thiếu. Ưu tiên xử lý.
+**Lưu ý.** Thiếu quyết định là lỗi hồ sơ pháp lý, không chỉ là dữ liệu thiếu. Ưu tiên xử lý. **Bảo lưu (Defer)** không nằm trong danh sách này — không cần quyết định kèm theo.
 
 ### Student Decisions — Quyết định sinh viên
 

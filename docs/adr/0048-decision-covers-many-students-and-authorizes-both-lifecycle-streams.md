@@ -3,7 +3,7 @@ id: ADR-0048
 title: "Decision covers many students and authorizes both lifecycle streams"
 status: accepted
 owner: Platform Team
-last_verified: 2026-07-25
+last_verified: 2026-09-05
 scope: architecture-decision
 ---
 
@@ -27,3 +27,5 @@ scope: architecture-decision
 **Revision (2026-06).** The requires-decision set lives **entirely on the status actions**: `{academic defer, resume, dropout, campus transfer, NE enrolment (→ intake_pre_uni_gc), major enrolment (→ intake_course)}`. The two enrolment transitions into the study stages are governed and keep the requirement, but it is carried by the **action** (`STUDENT_ENROLLMENT_NE`, `STUDENT_MAJOR_ENROLLMENT`), not by the matching **progression event**.
 
 The EGC progression events (`PLACEMENT_INITIALIZED`, `COURSE_STAGE_CHANGED`) are a *secondary record* of those same transitions, so requiring a Decision on both would double-count — a stage move is stored as both a `STUDENT_MAJOR_ENROLLMENT` action and a `COURSE_STAGE_CHANGED` event. `AcademicProgressionEventType::requiresDecision()` therefore returns `false` for **every** case: no progression event appears in the missing-decision report or is flagged "Decision missing" on the Lifecycle timeline. A Decision may still be *attached* to a progression event for record-keeping; it is simply never *required*. The `AcademicProgressionEvent.decision_id` column and the roster are retained.
+
+**Revision (2026-09-05).** Academic defer (`ACADEMIC_DEFER`) no longer requires an authorizing Decision. Resume already did not. A Decision may still be attached to a defer for the record; it is not required, and defer rows do not appear on the missing-decision report or as "Decision missing" on the Lifecycle timeline. The remaining requires-decision set is `{dropout, campus transfer, NE enrolment, major enrolment}`.
