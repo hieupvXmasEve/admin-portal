@@ -9,12 +9,16 @@ use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
+use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Queries\Dng\ListDngWorklistQuery;
+use App\Modules\Finance\Services\InvoiceGenerationService;
 use App\Modules\Finance\Support\SettlementMutationGuard;
 use App\Shared\Contracts\Academic\AcademicFinanceChargeSourceGateway;
 use App\Shared\Contracts\Academic\AcademicFinanceSourceKeys;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
+use Carbon\Carbon;
 use Closure;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -186,6 +190,8 @@ class CreateBatchDngFromChargesAction
         if ($lines->isEmpty()) {
             throw new \RuntimeException('Settlement Position has no supported payable lines for this DNG fee type.');
         }
+
+        $this->applyStaffChosenDueDateToLines($lines, $dueDate);
         $installments = FinanceChargeInstallment::query()
             ->whereIn('finance_charge_id', $lines->pluck('charge_id'))
             ->where('status', FinanceChargeInstallment::STATUS_PENDING)
@@ -213,6 +219,24 @@ class CreateBatchDngFromChargesAction
         $this->linkInstallmentsToReservation($reservation);
 
         return $reservation;
+    }
+
+    /**
+     * @param  Collection<int, InvoiceLine>  $lines
+     */
+    private function applyStaffChosenDueDateToLines($lines, string $dueDate): void
+    {
+        $due = Carbon::parse($dueDate);
+        $invoiceIds = $lines->pluck('invoice_id')->unique()->filter()->all();
+        if ($invoiceIds === []) {
+            return;
+        }
+
+        $invoices = StudentInvoice::query()->whereIn('id', $invoiceIds)->get();
+        $invoiceService = app(InvoiceGenerationService::class);
+        foreach ($invoices as $invoice) {
+            $invoiceService->applyStaffChosenDueDate($invoice, $due);
+        }
     }
 
     private function linkInstallmentsToReservation(DngPaymentRequest $reservation): void

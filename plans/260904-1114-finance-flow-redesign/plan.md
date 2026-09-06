@@ -107,7 +107,7 @@ phạm vi khác hẳn: **một ngày hạn nộp**, không phải thực thể �
 | 1 | [Phase 1: Toàn vẹn ưu tiên phân bổ tiền](./phase-01-start.md) | Completed |
 | 3 | [Phase 3: Thu tay một thao tác + phiếu thu nội bộ](./phase-03-manual-payment-single-action.md) | Completed |
 | 4 | [Phase 4: Trạng thái khoản thu hợp nhất](./phase-04-unified-money-item-status.md) | Completed |
-| 5 | [Phase 5: Một ngày hạn nộp duy nhất](./phase-05-single-due-date.md) | Pending |
+| 5 | [Phase 5: Một ngày hạn nộp duy nhất](./phase-05-single-due-date.md) | Completed |
 | 6 | [Phase 6: Thông báo học phí](./phase-06-tuition-notice.md) | Pending |
 | 7 | [Phase 7: Vòng đời số dư](./phase-07-surplus-lifecycle.md) | Pending |
 | 8 | [Phase 8: Finance Inbox, ADR & tài liệu](./phase-08-finance-inbox-and-docs.md) | Pending |
@@ -118,7 +118,7 @@ phạm vi khác hẳn: **một ngày hạn nộp**, không phải thực thể �
 - [x] `priority_order` từ mọi đường vào chỉ nhận giá trị thuộc enum loại phí và phủ đủ 8 loại debit; giá trị lạ bị từ chối chứ không xếp cuối im lặng — Phase 1.
 - [x] Kế toán ghi một khoản tiền mặt/CK: tiền được phân bổ theo đúng ưu tiên, phiếu thu in được, và trạng thái Academic (retake/resit) đồng bộ ngay — Phase 3.
 - [x] Một khoản thu có **một** trạng thái hiển thị; portal và mọi trang staff đọc cùng nguồn; không còn map nhãn trùng trong `resources/js` — Phase 4.
-- [ ] Mọi charge/invoice sinh ra mang **ngày hạn nộp do người chọn**; `grep -rn "addDays(30)" app/Modules/Finance` trả 0 — Phase 5.
+- [x] Mọi charge/invoice sinh ra mang **ngày hạn nộp do người chọn**; `grep -rn "addDays(30)" app/Modules/Finance` trả 0 — Phase 5. (Sinh phí Batch Studio không bịa ngày; ngày staff chọn tại DNG commit được ghi lên invoice, kể cả invoice tái dùng.)
 - [ ] Thông báo học phí gửi được cho SV + PH, in được, số tiền khớp Settlement Position lúc phát; campus thiếu template ⇒ **fail rõ ràng**, không gửi boilerplate — Phase 6.
 - [ ] Lối hoàn tiền bị chặn; SV tốt nghiệp/thôi học còn dư sinh việc trong Finance Inbox — Phase 7.
 - [ ] Tám loại việc hiện trong Cockpit **có gate permission per-source** (user chỉ có permission X thấy đúng dòng của X); 2 ADR accept; `check-docs.sh` + `check-docs-freshness.sh` xanh — Phase 8.

@@ -16,20 +16,21 @@ use App\Modules\Finance\Support\VoucherDiscountAmountResolver;
 use App\Shared\Contracts\Academic\PendingScholarshipAdjustmentReader;
 use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
-use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class GenerateMajorChargesAction
 {
     /**
-     * @param  array{semester_id: int, due_date: string, student_ids: array<int, int>}  $data
+     * @param  array{semester_id: int, due_date?: string, student_ids: array<int, int>}  $data
      * @return array{created: int, skipped: int, failed: int, errors: array<int, string>, deferred_scholarship_review: array<int, int>, deferred_scholarship_restoration_pending: array<int, int>}
      */
     public static function run(array $data): array
     {
         $semesterId = (int) $data['semester_id'];
-        $dueDate = Carbon::parse($data['due_date']);
+        $dueDate = isset($data['due_date']) && is_string($data['due_date']) && $data['due_date'] !== ''
+            ? $data['due_date']
+            : null;
         $studentIds = collect($data['student_ids'] ?? [])
             ->filter(fn ($id) => (int) $id > 0)
             ->map(fn ($id) => (int) $id)
@@ -118,10 +119,13 @@ class GenerateMajorChargesAction
                         continue;
                     }
 
-                    $result = $submitTuition->handle((int) $studentId, $semesterId, [
+                    $options = [
                         'source_kind' => SubmitTuitionTermDebitAction::SOURCE_KIND_BATCH_STUDIO,
-                        'due_date' => $dueDate->toDateString(),
-                    ]);
+                    ];
+                    if ($dueDate !== null) {
+                        $options['due_date'] = $dueDate;
+                    }
+                    $result = $submitTuition->handle((int) $studentId, $semesterId, $options);
 
                     $charge = FinanceCharge::query()->find($result->finance_charge_id);
                     $line = InvoiceLine::query()->with('invoice')->find($result->invoice_line_id);

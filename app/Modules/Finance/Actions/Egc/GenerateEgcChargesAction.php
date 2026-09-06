@@ -32,7 +32,9 @@ class GenerateEgcChargesAction
     public static function run(array $data): array
     {
         $semesterId = (int) $data['semester_id'];
-        $dueDate = (string) ($data['due_date'] ?? now()->addDays(30)->toDateString());
+        $dueDate = isset($data['due_date']) && is_string($data['due_date']) && $data['due_date'] !== ''
+            ? $data['due_date']
+            : null;
         $results = ['created' => 0, 'skipped' => 0, 'errors' => []];
 
         foreach ($data['students'] as $studentData) {
@@ -117,7 +119,7 @@ class GenerateEgcChargesAction
     private static function reissueExistingBlocks(
         int $studentId,
         int $semesterId,
-        string $dueDate,
+        ?string $dueDate,
         int $blockCount,
         int $totalLevels,
         EgcBlockGenerationState $blockState,
@@ -162,7 +164,7 @@ class GenerateEgcChargesAction
     private static function generateForStudent(
         int $studentId,
         int $semesterId,
-        string $dueDate,
+        ?string $dueDate,
         int $blockCount,
         int $currentLevel,
         int $totalLevels,
@@ -291,26 +293,30 @@ class GenerateEgcChargesAction
     private static function createChargeViaIntake(
         int $studentId,
         int $semesterId,
-        string $dueDate,
+        ?string $dueDate,
         int $levelNumber,
         array $options,
         ?AcademicEgcBlockData $block = null,
     ): FinanceCharge {
+        $intakeOptions = [
+            'source_kind' => $block === null
+                ? SubmitEgcLevelFeeDebitAction::SOURCE_KIND_BATCH_STUDIO
+                : SubmitEgcLevelFeeDebitAction::SOURCE_KIND_EGC_BLOCK,
+            'description' => "EGC Level {$levelNumber} Fee",
+            'generation_mode' => $options['generation_mode'],
+            'block_number' => $options['block_number'] ?? null,
+            'is_retake' => (bool) ($options['is_retake'] ?? false),
+            'source_ref' => $block === null ? null : app(EgcBlockFinanceResolver::class)->sourceRef($block),
+        ];
+        if ($dueDate !== null) {
+            $intakeOptions['due_date'] = $dueDate;
+        }
+
         $result = app(SubmitEgcLevelFeeDebitAction::class)->handle(
             $studentId,
             $semesterId,
             $levelNumber,
-            [
-                'source_kind' => $block === null
-                    ? SubmitEgcLevelFeeDebitAction::SOURCE_KIND_BATCH_STUDIO
-                    : SubmitEgcLevelFeeDebitAction::SOURCE_KIND_EGC_BLOCK,
-                'due_date' => $dueDate,
-                'description' => "EGC Level {$levelNumber} Fee",
-                'generation_mode' => $options['generation_mode'],
-                'block_number' => $options['block_number'] ?? null,
-                'is_retake' => (bool) ($options['is_retake'] ?? false),
-                'source_ref' => $block === null ? null : app(EgcBlockFinanceResolver::class)->sourceRef($block),
-            ],
+            $intakeOptions,
         );
 
         $charge = FinanceCharge::query()->find($result->finance_charge_id);

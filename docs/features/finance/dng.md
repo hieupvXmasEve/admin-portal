@@ -3,7 +3,7 @@ title: DNG Payment Operations
 status: current
 type: runbook
 scope: DNG payment collection and reconciliation operations
-last_verified: "2026-07-25"
+last_verified: "2026-09-06"
 owner: Finance Module
 audience:
   - finance operators
@@ -48,8 +48,14 @@ New staff collection work uses Finance Batch Studio:
 1. open the DNG job;
 2. select the eligible Finance obligations;
 3. preview the exact rows;
-4. confirm the preview token and selected row keys;
+4. confirm the preview token, selected row keys, and the payment due date;
 5. review the per-row result.
+
+The due date chosen at DNG commit is the single authoritative due date. It is
+written onto `student_invoices.due_date` for the invoices being collected,
+including invoices that already existed from an earlier charge batch. Charge
+generation does not invent a date. A missing due date is never overdue.
+Portal, aging buckets, and payment reminders all read that invoice date.
 
 The page, preview, and commit routes are owned by:
 

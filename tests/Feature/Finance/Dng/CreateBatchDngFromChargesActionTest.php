@@ -207,3 +207,21 @@ it('does not report an older held reservation as the outcome of a later failed b
     expect($result)->toMatchArray(['created' => 0, 'needs_review' => 0, 'failed' => 1, 'outcomes' => []])
         ->and($existing->fresh()->status)->toBe(DngPaymentRequest::STATUS_NEEDS_REVIEW);
 });
+
+it('writes the staff-chosen due date onto an existing invoice', function (): void {
+    $student = batchDngStudent($this->campus, $this->semester);
+    $line = batchCanonicalLine($student, $this->semester, FinanceCharge::TYPE_TUITION_TERM, '5000000.00');
+    $invoice = StudentInvoice::query()->findOrFail($line->invoice_id);
+    $originalDueDate = $invoice->due_date?->toDateString();
+    $chosenDueDate = now()->addDays(21)->toDateString();
+
+    expect($originalDueDate)->not->toBe($chosenDueDate);
+
+    $payload = batchDngPayload($student, $this->semester);
+    $payload['due_date'] = $chosenDueDate;
+
+    $result = app(CreateBatchDngFromChargesAction::class)->handle($payload);
+
+    expect($result)->toMatchArray(['created' => 1, 'failed' => 0])
+        ->and($invoice->fresh()->due_date?->toDateString())->toBe($chosenDueDate);
+});

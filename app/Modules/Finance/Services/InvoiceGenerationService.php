@@ -44,7 +44,11 @@ class InvoiceGenerationService
             if (! $invoice->exists) {
                 $invoice->invoice_number = $this->generateInvoiceNumber($studentId, $semesterId);
                 $invoice->status = 'draft';
-                $invoice->due_date = $dueDate ?? now()->addDays(30);
+                $invoice->due_date = $dueDate;
+                $invoice->save();
+                $markChanged();
+            } elseif ($dueDate !== null && $invoice->due_date?->toDateString() !== $dueDate->toDateString()) {
+                $invoice->due_date = $dueDate;
                 $invoice->save();
                 $markChanged();
             }
@@ -55,6 +59,32 @@ class InvoiceGenerationService
         });
 
         return $invoice->fresh();
+    }
+
+    /**
+     * Write a staff-chosen due date onto an existing invoice.
+     * Null/missing dates are never invented here.
+     */
+    public function applyStaffChosenDueDate(StudentInvoice $invoice, Carbon $dueDate): void
+    {
+        $normalized = $dueDate->copy()->startOfDay();
+        $billingAccountId = (int) $this->billingAccountProvisioner
+            ->forStudent((int) $invoice->student_id)
+            ->id;
+
+        $this->settlementMutationGuard->handleIfChanged(
+            $billingAccountId,
+            function ($_billingAccount, \Closure $markChanged) use ($invoice, $normalized): void {
+                $invoice->refresh();
+                if ($invoice->due_date?->toDateString() === $normalized->toDateString()) {
+                    return;
+                }
+
+                $invoice->due_date = $normalized;
+                $invoice->save();
+                $markChanged();
+            },
+        );
     }
 
     /**

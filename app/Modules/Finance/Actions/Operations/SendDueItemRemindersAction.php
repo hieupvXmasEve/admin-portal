@@ -10,6 +10,7 @@ use App\Modules\Finance\Services\SettlementService;
 use App\Modules\Finance\Support\DngInstallmentContextResolver;
 use App\Modules\Finance\Support\ExamResitDngLinkResolver;
 use App\Modules\Finance\Support\LifecycleDueItemPredicate;
+use App\Modules\Finance\Support\StaffChosenDueDate;
 use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use App\Shared\Contracts\Notification\EmailContentResolver;
 use Illuminate\Support\Facades\DB;
@@ -46,7 +47,9 @@ class SendDueItemRemindersAction
 
             if ($type === 'dng_request') {
                 // Handle DNG Payment Request
-                $dngRequest = DngPaymentRequest::find($id);
+                $dngRequest = DngPaymentRequest::query()
+                    ->with(['reservationTargets.invoiceLine.invoice'])
+                    ->find($id);
                 if (! $dngRequest || $dngRequest->status !== 'pushed_to_dng') {
                     $failedCount++;
 
@@ -128,7 +131,7 @@ class SendDueItemRemindersAction
                     'semester_code' => $dngRequest->semester?->code ?? '',
                     'invoice_code' => 'DNG-'.$dngRequest->id,
                     'balance_formatted' => number_format($balance, 0, ',', '.'),
-                    'due_date' => $dngRequest->due_date?->format('d/m/Y') ?? '',
+                    'due_date' => StaffChosenDueDate::labelForDngRequest($dngRequest),
                 ];
 
                 if ($useInstallment && $installmentContext !== null) {
@@ -206,7 +209,7 @@ class SendDueItemRemindersAction
                     'semester_code' => $invoice->semester?->code ?? '',
                     'invoice_code' => $invoice->invoice_number,
                     'balance_formatted' => number_format($balance, 0, ',', '.'),
-                    'due_date' => $invoice->due_date?->format('d/m/Y') ?? '',
+                    'due_date' => StaffChosenDueDate::label($invoice->due_date),
                 ];
 
                 try {

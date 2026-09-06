@@ -130,14 +130,11 @@ class BatchStudioController extends Controller
             ->filter()->values()->all();
 
         $chargeScope = (array) ($scope['scope'] ?? []);
-        // DNG owns the real payment due date. Legacy invoice rows still require a non-null date.
-        $internalInvoiceDueDate = now()->addDays(30)->toDateString();
 
         $summary = $this->runGeneration(
             $feeCategory,
             $semesterId,
             $studentIds,
-            $internalInvoiceDueDate,
             $currentByKey,
             $chargeScope,
             (array) $request->input('block_overrides', []),
@@ -275,7 +272,6 @@ class BatchStudioController extends Controller
         string $feeCategory,
         int $semesterId,
         array $studentIds,
-        string $internalInvoiceDueDate,
         array $currentByKey,
         array $scope,
         array $blockOverrides = [],
@@ -283,12 +279,10 @@ class BatchStudioController extends Controller
         return match ($feeCategory) {
             'major' => GenerateMajorChargesAction::run([
                 'semester_id' => $semesterId,
-                'due_date' => $internalInvoiceDueDate,
                 'student_ids' => $studentIds,
             ]),
             'egc' => GenerateEgcChargesAction::run([
                 'semester_id' => $semesterId,
-                'due_date' => $internalInvoiceDueDate,
                 'students' => collect($studentIds)->map(function (int $id) use ($currentByKey, $feeCategory, $semesterId, $blockOverrides) {
                     $key = sprintf('charge:%s:student:%d:semester:%d', $feeCategory, $id, $semesterId);
                     $line = $currentByKey[$key] ?? null;
@@ -301,7 +295,7 @@ class BatchStudioController extends Controller
                     ];
                 })->all(),
             ]),
-            'non_academic' => $this->runNonAcademicGeneration($semesterId, $studentIds, $internalInvoiceDueDate, $scope),
+            'non_academic' => $this->runNonAcademicGeneration($semesterId, $studentIds, $scope),
             default => [],
         };
     }
@@ -311,13 +305,12 @@ class BatchStudioController extends Controller
      * @param  array<string, mixed>  $scope
      * @return array<string, mixed>
      */
-    private function runNonAcademicGeneration(int $semesterId, array $studentIds, string $internalInvoiceDueDate, array $scope): array
+    private function runNonAcademicGeneration(int $semesterId, array $studentIds, array $scope): array
     {
         $result = GenerateNonAcademicChargesAction::run([
             'fee_type' => (string) ($scope['fee_type'] ?? ''),
             'semester_id' => $semesterId,
             'amount' => (float) ($scope['amount'] ?? 0),
-            'due_date' => $internalInvoiceDueDate,
             'note' => (string) ($scope['note'] ?? ''),
             'student_codes' => $this->studentCodesForIds($studentIds),
         ]);

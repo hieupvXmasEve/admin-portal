@@ -37,7 +37,7 @@ class GenerateNonAcademicChargesAction
      *     fee_type: string,
      *     semester_id: int,
      *     amount: string|float,
-     *     due_date: string,
+     *     due_date?: string,
      *     note: string,
      *     student_codes: array<string>,
      * }  $data
@@ -52,7 +52,7 @@ class GenerateNonAcademicChargesAction
         $feeType = $data['fee_type'];
         $semesterId = (int) $data['semester_id'];
         $amount = (float) $data['amount'];
-        $dueDate = $data['due_date'];
+        $dueDate = $data['due_date'] ?? null;
         $note = $data['note'] ?? '';
         $studentCodes = $data['student_codes'];
 
@@ -138,6 +138,16 @@ class GenerateNonAcademicChargesAction
 
                     // Finance-owned intake: mint source_ref, price via GeneratorAmount,
                     // materialize charge + invoice line (no direct FinanceCharge::create).
+                    $facts = [
+                        'student_id' => $student->id,
+                        'semester_id' => $semesterId,
+                        'amount' => $amount,
+                        'description' => $description,
+                    ];
+                    if (is_string($dueDate) && $dueDate !== '') {
+                        $facts['due_date'] = $dueDate;
+                    }
+
                     $result = $intake->request(new FinanceIntakeData(
                         source_system: FinanceOwnedObligationSource::SOURCE_SYSTEM,
                         source_kind: FinanceOwnedObligationSource::NON_ACADEMIC_BATCH,
@@ -148,13 +158,7 @@ class GenerateNonAcademicChargesAction
                         ),
                         financial_effect: FinancialEffect::Debit,
                         obligation_type: $feeType,
-                        facts: [
-                            'student_id' => $student->id,
-                            'semester_id' => $semesterId,
-                            'amount' => $amount,
-                            'description' => $description,
-                            'due_date' => $dueDate,
-                        ],
+                        facts: $facts,
                     ));
 
                     $created[] = [

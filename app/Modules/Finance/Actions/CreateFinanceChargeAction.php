@@ -284,7 +284,6 @@ class CreateFinanceChargeAction
      */
     protected function getInvoiceForCharge(FinanceCharge $charge, ?int $invoiceId = null, ?Carbon $dueDate = null): StudentInvoice
     {
-        // If user selected an invoice, use it (but verify it's draft and matches student/semester)
         if ($invoiceId) {
             $invoice = StudentInvoice::where('id', $invoiceId)
                 ->where('student_id', $charge->student_id)
@@ -293,11 +292,12 @@ class CreateFinanceChargeAction
                 ->first();
 
             if ($invoice) {
+                $this->applyChosenDueDate($invoice, $dueDate);
+
                 return $invoice;
             }
         }
 
-        // No valid invoice selected, find existing draft or create new one
         return $this->findOrCreateInvoiceForCharge($charge, $dueDate);
     }
 
@@ -313,6 +313,8 @@ class CreateFinanceChargeAction
             ->first();
 
         if ($invoice) {
+            $this->applyChosenDueDate($invoice, $dueDate);
+
             return $invoice;
         }
 
@@ -329,11 +331,9 @@ class CreateFinanceChargeAction
         // the DB level. Two invoices created in the same second for the same
         // student can collide and the insert throws. Retry on the unique
         // violation with a freshly generated number instead of bubbling a 500.
-        $due = $dueDate ?? now()->addDays(30);
-
         $billingAccountId = (int) $this->billingAccountProvisioner->forStudent($studentId)->id;
 
-        return $this->settlementMutationGuard->handle($billingAccountId, function () use ($studentId, $semesterId, $due): StudentInvoice {
+        return $this->settlementMutationGuard->handle($billingAccountId, function () use ($studentId, $semesterId, $dueDate): StudentInvoice {
             for ($attempt = 1; ; $attempt++) {
                 try {
                     return StudentInvoice::create([
@@ -342,7 +342,7 @@ class CreateFinanceChargeAction
                         'semester_id' => $semesterId,
                         'billing_cycle_id' => null,
                         'status' => 'draft',
-                        'due_date' => $due,
+                        'due_date' => $dueDate,
                     ]);
                 } catch (QueryException $e) {
                     if (! $this->isInvoiceNumberCollision($e) || $attempt >= self::INVOICE_NUMBER_MAX_ATTEMPTS) {
@@ -351,6 +351,15 @@ class CreateFinanceChargeAction
                 }
             }
         });
+    }
+
+    private function applyChosenDueDate(StudentInvoice $invoice, ?Carbon $dueDate): void
+    {
+        if ($dueDate === null) {
+            return;
+        }
+
+        $this->invoiceService->applyStaffChosenDueDate($invoice, $dueDate);
     }
 
     /**

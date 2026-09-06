@@ -38,7 +38,9 @@ class GenerateBatchChargesAction
     {
         $semesterId = (int) $data['semester_id'];
         $chargeTypes = $data['charge_types'];
-        $dueDate = isset($data['due_date']) ? Carbon::parse($data['due_date']) : now()->addDays(30);
+        $dueDate = isset($data['due_date']) && $data['due_date'] !== ''
+            ? Carbon::parse($data['due_date'])
+            : null;
 
         // 1. Strict Scope: Only specific statuses and current campus
         $query = BillingScopeHelper::getEligibleStudentsQuery(
@@ -211,7 +213,9 @@ class GenerateBatchChargesAction
                         continue;
                     }
 
-                    // 1. Resolve target invoice. Finalized invoices must never block newly generated charges.
+                    if ($reusableInvoice !== null && $dueDate !== null) {
+                        $invoiceService->applyStaffChosenDueDate($reusableInvoice, $dueDate);
+                    }
                     $invoice = $reusableInvoice ?? self::createDraftInvoice($student, $semesterId, $dueDate);
 
                     $chargesToLink = [];
@@ -271,7 +275,7 @@ class GenerateBatchChargesAction
                                                 (int) $level,
                                                 [
                                                     'source_kind' => SubmitEgcLevelFeeDebitAction::SOURCE_KIND_EGC_BATCH,
-                                                    'due_date' => $dueDate->toDateString(),
+                                                    ...($dueDate !== null ? ['due_date' => $dueDate->toDateString()] : []),
                                                     'invoice_id' => $invoice->id,
                                                     'description' => $levelDescription,
                                                     'generation_mode' => SubmitEgcLevelFeeDebitAction::GENERATION_MODE_BATCH,
@@ -312,7 +316,7 @@ class GenerateBatchChargesAction
                                 } else {
                                     $intakeResult = $submitTuition->handle($student, $semesterId, [
                                         'source_kind' => SubmitTuitionTermDebitAction::SOURCE_KIND_LEGACY_TUITION,
-                                        'due_date' => $dueDate->toDateString(),
+                                        ...($dueDate !== null ? ['due_date' => $dueDate->toDateString()] : []),
                                         'invoice_id' => $invoice->id,
                                         'description' => "Major Tuition (Installment {$termIdx})",
                                     ]);
@@ -464,7 +468,7 @@ class GenerateBatchChargesAction
             ->first();
     }
 
-    private static function createDraftInvoice(Student $student, int $semesterId, Carbon $dueDate): StudentInvoice
+    private static function createDraftInvoice(Student $student, int $semesterId, ?Carbon $dueDate): StudentInvoice
     {
         $billingAccountId = (int) app(BillingAccountProvisioner::class)->forStudent((int) $student->id)->id;
 
