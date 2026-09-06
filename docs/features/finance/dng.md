@@ -53,9 +53,11 @@ New staff collection work uses Finance Batch Studio:
 
 The due date chosen at DNG commit is the single authoritative due date. It is
 written onto `student_invoices.due_date` for the invoices being collected,
-including invoices that already existed from an earlier charge batch. Charge
-generation does not invent a date. A missing due date is never overdue.
-Portal, aging buckets, and payment reminders all read that invoice date.
+including invoices that already existed from an earlier charge batch. One
+invoice has one due date: a later DNG commit that includes a line on that
+invoice overwrites the date (last commit wins). Charge generation does not
+invent a date. A missing due date is never overdue. Portal, aging buckets,
+and payment reminders all read that invoice date.
 
 The page, preview, and commit routes are owned by:
 

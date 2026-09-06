@@ -225,3 +225,51 @@ it('writes the staff-chosen due date onto an existing invoice', function (): voi
     expect($result)->toMatchArray(['created' => 1, 'failed' => 0])
         ->and($invoice->fresh()->due_date?->toDateString())->toBe($chosenDueDate);
 });
+
+it('lets the latest DNG commit win when two fee types share one invoice', function (): void {
+    $student = batchDngStudent($this->campus, $this->semester);
+    $tuition = batchCanonicalLine($student, $this->semester, FinanceCharge::TYPE_TUITION_TERM, '5000000.00');
+    $invoice = StudentInvoice::query()->findOrFail($tuition->invoice_id);
+    $bhytCharge = FinanceCharge::query()->create([
+        'finance_obligation_id' => FinanceObligation::query()->create([
+            'billing_account_id' => BillingAccount::query()->where('student_id', $student->id)->sole()->id,
+            'source_system' => 'finance-test',
+            'source_kind' => 'batch_dng',
+            'source_ref' => uniqid('batch:', true),
+            'obligation_type' => FinanceCharge::TYPE_BHYT,
+            'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+            'amount' => '564000.00',
+            'currency' => 'VND',
+            'pricing_rule_version' => 'test',
+            'pricing_snapshot' => [],
+            'accepted_at' => now(),
+        ])->id,
+        'student_id' => $student->id,
+        'semester_id' => $this->semester->id,
+        'charge_type' => FinanceCharge::TYPE_BHYT,
+        'amount' => '564000.00',
+        'description' => 'BHYT on shared invoice',
+        'effective_at' => now(),
+        'status' => FinanceCharge::STATUS_ACTIVE,
+    ]);
+    InvoiceLine::query()->create([
+        'invoice_id' => $invoice->id,
+        'charge_id' => $bhytCharge->id,
+        'amount_snapshot' => '564000.00',
+        'description_snapshot' => 'BHYT on shared invoice',
+        'status' => 'active',
+    ]);
+
+    $hpDate = now()->addDays(14)->toDateString();
+    $bhytDate = now()->addDays(28)->toDateString();
+
+    $hp = batchDngPayload($student, $this->semester, 'HP');
+    $hp['due_date'] = $hpDate;
+    expect(app(CreateBatchDngFromChargesAction::class)->handle($hp))->toMatchArray(['created' => 1, 'failed' => 0])
+        ->and($invoice->fresh()->due_date?->toDateString())->toBe($hpDate);
+
+    $bhyt = batchDngPayload($student, $this->semester, 'BHYT');
+    $bhyt['due_date'] = $bhytDate;
+    expect(app(CreateBatchDngFromChargesAction::class)->handle($bhyt))->toMatchArray(['created' => 1, 'failed' => 0])
+        ->and($invoice->fresh()->due_date?->toDateString())->toBe($bhytDate);
+});

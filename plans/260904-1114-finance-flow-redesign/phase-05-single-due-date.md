@@ -121,12 +121,18 @@ báo học phí). Không có phase này, hai phase kia dựng trên ngày không
 ## Risk Assessment
 
 - **Cao:** đổi ngày trên invoice **đang tồn tại** đổi trạng thái `overdue` của dữ
-  liệu thật ngay khi land. Trước khi land phải đếm: bao nhiêu invoice sẽ đổi từ
-  overdue → open và ngược lại. Nếu số lớn, cần thông báo vận hành trước.
+  liệu thật. **Land count:** migration + code **không** rewrite `due_date` hiện
+  có — 0 invoice tự lật overdue↔open lúc deploy. Lật chỉ xảy ra khi staff
+  commit DNG với ngày mới lên invoice đó.
 - **Trung bình:** `due_date` null là trạng thái mới với mọi consumer; phải duyệt
   từng consumer, không giả định `?->` đã phủ hết.
 - **Trung bình:** `InvoiceGenerationService` nằm trong `SettlementMutationGuard`;
   ghi `due_date` phải gọi `markChanged()` đúng, nếu không settlement version lệch.
+- **Collision:** một invoice (thường student+semester) có **một** `due_date`.
+  DNG commit ghi ngày lên mọi invoice chứa line đang đẩy. Hai loại phí chung
+  invoice → **commit sau thắng** (cùng quy tắc "commit lần 2 mang ngày mới").
+  `applyStaffChosenDueDate` đóng guard trước `ReserveAndPushSingleFeeDngAction`
+  — không bọc chung với push.
 
 ## Security Considerations
 
