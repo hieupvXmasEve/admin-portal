@@ -11,6 +11,7 @@ source:
   - resources/js/pages/Finance/BatchStudio/DngPush.vue
   - resources/js/pages/Finance/PricingOperations/Index.vue
   - resources/js/pages/Finance/Payments/Index.vue
+  - resources/js/pages/Finance/Operations/DueCalendar.vue
   - resources/js/pages/Finance/Payments/DngPaymentRequests/Index.vue
   - resources/js/pages/Finance/Invoices/Index.vue
   - resources/js/pages/TuitionPlans/Index.vue
@@ -120,7 +121,7 @@ source:
 
 | 화면 | 용도 |
 | --- | --- |
-| DNG Due Reminders | 납부 기한 안내 일정 |
+| DNG Due Reminders | 납부 기한 안내. **Phát thông báo học phí** 버튼으로 학생과 학부모에게 등록금 안내를 발송합니다 |
 | DNG Campus Mapping | 캠퍼스별 수납 계정 지정 |
 | Lập yêu cầu thanh toán DNG | DNG 결제 게이트웨이로 보낼 납부 요청 생성 |
 | Settlement Worklist | 수동으로 맞춰야 하는 건 목록 |

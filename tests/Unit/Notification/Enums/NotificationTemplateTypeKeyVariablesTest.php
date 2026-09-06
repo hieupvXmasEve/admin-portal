@@ -50,6 +50,30 @@ dataset('notification_template_type_keys', [
             'paid_at',
         ],
     ],
+    'tuition_notice' => [
+        NotificationTemplateTypeKey::TuitionNotice,
+        [
+            'student_code',
+            'student_name',
+            'semester_name',
+            'due_date',
+            'total_due',
+            'items_summary',
+            'payment_instruction',
+        ],
+    ],
+    'parent_tuition_notice' => [
+        NotificationTemplateTypeKey::ParentTuitionNotice,
+        [
+            'student_code',
+            'student_name',
+            'semester_name',
+            'due_date',
+            'total_due',
+            'items_summary',
+            'payment_instruction',
+        ],
+    ],
 ]);
 
 it('exposes the documented variable allow-list per case', function (NotificationTemplateTypeKey $case, array $expectedKeys) {

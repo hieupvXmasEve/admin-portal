@@ -11,6 +11,7 @@ source:
   - resources/js/pages/Finance/BatchStudio/DngPush.vue
   - resources/js/pages/Finance/PricingOperations/Index.vue
   - resources/js/pages/Finance/Payments/Index.vue
+  - resources/js/pages/Finance/Operations/DueCalendar.vue
   - resources/js/pages/Finance/Payments/DngPaymentRequests/Index.vue
   - resources/js/pages/Finance/Invoices/Index.vue
   - resources/js/pages/TuitionPlans/Index.vue
@@ -120,7 +121,7 @@ This group records money in and matches it to receivables.
 
 | Page | What it is for |
 | --- | --- |
-| DNG Due Reminders | The payment due-date reminder schedule |
+| DNG Due Reminders | Payment due-date reminders. Includes **Phát thông báo học phí** to the student and parent |
 | DNG Campus Mapping | Which campus maps to which collection account |
 | Lập yêu cầu thanh toán DNG | Creating payment requests sent to the DNG gateway |
 | Settlement Worklist | Amounts that need matching by hand |

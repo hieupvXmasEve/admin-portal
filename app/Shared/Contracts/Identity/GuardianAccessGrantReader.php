@@ -26,6 +26,12 @@ interface GuardianAccessGrantReader
     /** @return list<GuardianAccessAccount> */
     public function accountsForStudent(int $studentId): array;
 
+    /**
+     * @param  list<int>  $studentIds
+     * @return array<int, list<GuardianAccessAccount>>
+     */
+    public function accountsForStudents(array $studentIds): array;
+
     /** @param list<int> $studentIds @return list<int> */
     public function studentIdsWithAccounts(array $studentIds): array;
 

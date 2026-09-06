@@ -27,6 +27,7 @@ use App\Modules\Finance\Http\Web\Admin\MajorChargeGenerationController;
 use App\Modules\Finance\Http\Web\Admin\PaymentController;
 use App\Modules\Finance\Http\Web\Admin\PricingOperationsController;
 use App\Modules\Finance\Http\Web\Admin\ScholarshipRestorationController;
+use App\Modules\Finance\Http\Web\Admin\TuitionNoticeController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(function () {
@@ -185,6 +186,8 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
         ->name('students.payments.preview');
     Route::get('/payments/{payment}/receipt', [FinanceStudentPaymentController::class, 'receipt'])
         ->name('payments.receipt');
+    Route::get('/students/{student}/tuition-notices/{messageId}', [TuitionNoticeController::class, 'print'])
+        ->name('students.tuition-notices.print');
 
     // Global finance search (JSON) for the ⌘K palette
     Route::get('/search', [FinanceGlobalSearchController::class, 'search'])

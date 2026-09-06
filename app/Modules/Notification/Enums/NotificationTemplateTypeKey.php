@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Notification\Enums;
 
 /**
- * Closed enum of the four notification email types stored in
+ * Closed enum of notification email types stored in
  * `notification_email_templates` and bound through
  * App\Modules\Notification\EmailContent\EmailContentRegistry.
  *
@@ -32,6 +32,10 @@ enum NotificationTemplateTypeKey: string
     case ScholarshipAdjustmentConfirmationRequested = 'scholarship_adjustment_confirmation_requested';
 
     case ScholarshipAdjustmentTuitionDeferred = 'scholarship_adjustment_tuition_deferred';
+
+    case TuitionNotice = 'tuition_notice';
+
+    case ParentTuitionNotice = 'parent_tuition_notice';
 
     /**
      * Per-case variable allow-list consumed by the FormRequest validator,
@@ -123,6 +127,15 @@ enum NotificationTemplateTypeKey: string
                 'scholarship_name' => ['label' => 'Scholarship under review', 'sample' => 'Asia Pioneer'],
                 'deferral_reason' => ['label' => 'Reason for the hold', 'sample' => 'Đang chờ xét duyệt điều chỉnh học bổng cho học kỳ này.'],
                 'action_url' => ['label' => 'Portal link to the review', 'sample' => '/scholarship-review/12'],
+            ],
+            self::TuitionNotice, self::ParentTuitionNotice => [
+                'student_code' => ['label' => 'Student code', 'sample' => 'SE12345'],
+                'student_name' => ['label' => 'Student name', 'sample' => 'Nguyễn Văn A'],
+                'semester_name' => ['label' => 'Semester name', 'sample' => 'Học kỳ hè 2026'],
+                'due_date' => ['label' => 'Payment deadline', 'sample' => '15/06/2026'],
+                'total_due' => ['label' => 'Total amount due (formatted)', 'sample' => '12.500.000'],
+                'items_summary' => ['label' => 'Outstanding items (plain text)', 'sample' => "Học phí theo kế hoạch: 10.000.000 ₫\nBHYT: 2.500.000 ₫"],
+                'payment_instruction' => ['label' => 'How to pay', 'sample' => 'Sinh viên thanh toán bằng cách quét QR trên cổng thông tin. Phụ huynh có thể thanh toán hộ. Kế toán ghi nhận tiền mặt hoặc chuyển khoản tại văn phòng tài chính.'],
             ],
         };
     }

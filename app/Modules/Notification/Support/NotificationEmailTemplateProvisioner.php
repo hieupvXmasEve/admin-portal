@@ -467,6 +467,64 @@ class NotificationEmailTemplateProvisioner
                 </html>
                 HTML,
             ],
+            NotificationTemplateTypeKey::TuitionNotice->value => [
+                'subject' => '[Asia Việt Nam] Thông báo học phí {{semester_name}}',
+                'body_html' => <<<'HTML'
+                <!DOCTYPE html>
+                <html lang="vi">
+                <head>
+                    <meta charset="UTF-8">
+                </head>
+                <body style="font-family: Arial, sans-serif; color: #222; font-size: 14px; line-height: 1.6; max-width: 680px; margin: 0 auto; padding: 24px;">
+                    <p>Thân gửi <strong>{{student_name}} {{student_code}}</strong>,</p>
+                    <p>Nhà trường thông báo các khoản còn phải thu cho <strong>{{semester_name}}</strong>.</p>
+                    <p><strong>Tổng phải thu:</strong> {{total_due}} ₫</p>
+                    <p><strong>Hạn nộp:</strong> {{due_date}}</p>
+                    <p><strong>Chi tiết khoản thu:</strong></p>
+                    <p style="white-space: pre-line;">{{items_summary}}</p>
+                    <p>{{payment_instruction}}</p>
+                    <p>Số liệu trên là tại thời điểm phát hành thông báo.</p>
+                    <p>Trân trọng.</p>
+                    <hr style="border: none; border-top: 1px solid #ccc; margin: 24px 0;">
+                    <p>Dear <strong>{{student_name}} {{student_code}}</strong>,</p>
+                    <p>This is your tuition notice for <strong>{{semester_name}}</strong>.</p>
+                    <p><strong>Total due:</strong> {{total_due}} VND</p>
+                    <p><strong>Due date:</strong> {{due_date}}</p>
+                    <p style="white-space: pre-line;">{{items_summary}}</p>
+                    <p>{{payment_instruction}}</p>
+                </body>
+                </html>
+                HTML,
+            ],
+            NotificationTemplateTypeKey::ParentTuitionNotice->value => [
+                'subject' => '[Asia Việt Nam] Thông báo học phí {{student_name}} — {{semester_name}}',
+                'body_html' => <<<'HTML'
+                <!DOCTYPE html>
+                <html lang="vi">
+                <head>
+                    <meta charset="UTF-8">
+                </head>
+                <body style="font-family: Arial, sans-serif; color: #222; font-size: 14px; line-height: 1.6; max-width: 680px; margin: 0 auto; padding: 24px;">
+                    <p>Thân gửi Quý Phụ huynh của <strong>{{student_name}} {{student_code}}</strong>,</p>
+                    <p>Nhà trường thông báo các khoản còn phải thu cho <strong>{{semester_name}}</strong>.</p>
+                    <p><strong>Tổng phải thu:</strong> {{total_due}} ₫</p>
+                    <p><strong>Hạn nộp:</strong> {{due_date}}</p>
+                    <p><strong>Chi tiết khoản thu:</strong></p>
+                    <p style="white-space: pre-line;">{{items_summary}}</p>
+                    <p>{{payment_instruction}}</p>
+                    <p>Số liệu trên là tại thời điểm phát hành thông báo.</p>
+                    <p>Trân trọng.</p>
+                    <hr style="border: none; border-top: 1px solid #ccc; margin: 24px 0;">
+                    <p>Dear Parent/Guardian of <strong>{{student_name}} {{student_code}}</strong>,</p>
+                    <p>This is the tuition notice for <strong>{{semester_name}}</strong>.</p>
+                    <p><strong>Total due:</strong> {{total_due}} VND</p>
+                    <p><strong>Due date:</strong> {{due_date}}</p>
+                    <p style="white-space: pre-line;">{{items_summary}}</p>
+                    <p>{{payment_instruction}}</p>
+                </body>
+                </html>
+                HTML,
+            ],
         ];
     }
 }

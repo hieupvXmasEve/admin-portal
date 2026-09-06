@@ -11,6 +11,7 @@ source:
   - resources/js/pages/Finance/BatchStudio/DngPush.vue
   - resources/js/pages/Finance/PricingOperations/Index.vue
   - resources/js/pages/Finance/Payments/Index.vue
+  - resources/js/pages/Finance/Operations/DueCalendar.vue
   - resources/js/pages/Finance/Payments/DngPaymentRequests/Index.vue
   - resources/js/pages/Finance/Invoices/Index.vue
   - resources/js/pages/TuitionPlans/Index.vue
@@ -120,7 +121,7 @@ Nhóm này ghi nhận tiền vào và khớp với khoản phải thu.
 
 | Trang | Dùng để làm gì |
 | --- | --- |
-| DNG Due Reminders | Lịch nhắc hạn đóng tiền |
+| DNG Due Reminders | Lịch nhắc hạn đóng tiền. Có nút **Phát thông báo học phí** gửi cho sinh viên và phụ huynh |
 | DNG Campus Mapping | Khai báo cơ sở nào ứng với tài khoản thu nào |
 | Lập yêu cầu thanh toán DNG | Tạo yêu cầu thanh toán gửi sang cổng DNG |
 | Settlement Worklist | Danh sách khoản cần khớp tay |

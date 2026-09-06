@@ -12,7 +12,7 @@ import type { PaginatedResponse } from '@/types';
 import { formatCurrency } from '@/types/finance';
 import { formatDateTime } from '@/utils/date';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { AlertTriangle, ArrowRight, Bell, Calendar, CalendarClock, CalendarDays, CalendarX2, Clock, Download, ExternalLink, GraduationCap, Mail, Search } from 'lucide-vue-next';
+import { AlertTriangle, ArrowRight, Bell, Calendar, CalendarClock, CalendarDays, CalendarX2, Clock, Download, ExternalLink, FileText, GraduationCap, Mail, Search } from 'lucide-vue-next';
 import { ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -243,6 +243,7 @@ const toggleInvoice = (id: number) => {
 // Bulk actions
 const isSendingStudentReminders = ref(false);
 const isSendingParentReminders = ref(false);
+const isSendingTuitionNotices = ref(false);
 const isExporting = ref(false);
 
 const sendStudentReminders = () => {
@@ -334,6 +335,65 @@ const runSendParentReminders = () => {
             },
             onError: () => {
                 toast.error('Lỗi khi gửi thông báo cho phụ huynh');
+            },
+        },
+    );
+};
+
+const selectedStudentIds = (): number[] => {
+    const ids = new Set<number>();
+    for (const row of props.invoices.data) {
+        if (selectedInvoices.value.includes(row.id)) {
+            ids.add(row.student_id);
+        }
+    }
+    return [...ids];
+};
+
+const sendTuitionNotices = () => {
+    if (selectedInvoices.value.length === 0) {
+        toast.error('Vui lòng chọn ít nhất một mục');
+        return;
+    }
+
+    const studentIds = selectedStudentIds();
+    if (studentIds.length === 0) {
+        toast.error('Vui lòng chọn ít nhất một sinh viên');
+        return;
+    }
+
+    showConfirmDialog(
+        {
+            title: 'Phát thông báo học phí',
+            message: `Phát thông báo học phí cho ${studentIds.length} sinh viên đã chọn (sinh viên và phụ huynh)? Email đã gửi không thể thu hồi.`,
+            confirmText: 'Phát thông báo',
+            cancelText: 'Huỷ bỏ',
+        },
+        {
+            onConfirm: () => runSendTuitionNotices(studentIds),
+        },
+    );
+};
+
+const runSendTuitionNotices = (studentIds: number[]) => {
+    router.post(
+        route('api.finance.operations.send-tuition-notices'),
+        {
+            student_ids: studentIds,
+        },
+        {
+            preserveScroll: true,
+            onStart: () => {
+                isSendingTuitionNotices.value = true;
+            },
+            onFinish: () => {
+                isSendingTuitionNotices.value = false;
+            },
+            onSuccess: () => {
+                selectedInvoices.value = [];
+            },
+            onError: () => {
+                toast.error('Lỗi khi phát thông báo học phí');
             },
         },
     );
@@ -491,13 +551,17 @@ defineOptions({
                             <Download class="mr-2 h-4 w-4" />
                             Export Excel
                         </Button>
-                        <Button :disabled="selectedInvoices.length === 0 || isSendingStudentReminders || isSendingParentReminders" @click="sendStudentReminders">
+                        <Button :disabled="selectedInvoices.length === 0 || isSendingStudentReminders || isSendingParentReminders || isSendingTuitionNotices" @click="sendStudentReminders">
                             <Mail class="mr-2 h-4 w-4" />
                             {{ isSendingStudentReminders ? 'Đang gửi...' : `Gửi nhắc sinh viên (${selectedInvoices.length})` }}
                         </Button>
-                        <Button :disabled="selectedInvoices.length === 0 || isSendingStudentReminders || isSendingParentReminders" @click="sendParentReminders">
+                        <Button :disabled="selectedInvoices.length === 0 || isSendingStudentReminders || isSendingParentReminders || isSendingTuitionNotices" @click="sendParentReminders">
                             <Mail class="mr-2 h-4 w-4" />
                             {{ isSendingParentReminders ? 'Đang gửi...' : `Gửi thông báo phụ huynh (${selectedInvoices.length})` }}
+                        </Button>
+                        <Button :disabled="selectedInvoices.length === 0 || isSendingStudentReminders || isSendingParentReminders || isSendingTuitionNotices" @click="sendTuitionNotices">
+                            <FileText class="mr-2 h-4 w-4" />
+                            {{ isSendingTuitionNotices ? 'Đang phát...' : 'Phát thông báo học phí' }}
                         </Button>
                     </div>
                 </div>

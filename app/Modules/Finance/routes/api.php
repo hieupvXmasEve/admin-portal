@@ -33,6 +33,9 @@ Route::prefix('api/v1/finance/operations')
         Route::post('/send-parent-reminders', [BillingOperationsController::class, 'sendParentReminders'])->name('send-parent-reminders');
         Route::post('/send-due-item-reminders', [BillingOperationsController::class, 'sendDueItemReminders'])->name('send-due-item-reminders');
         Route::post('/send-due-item-parent-reminders', [BillingOperationsController::class, 'sendDueItemParentReminders'])->name('send-due-item-parent-reminders');
+        Route::post('/send-tuition-notices', [BillingOperationsController::class, 'sendTuitionNotices'])
+            ->middleware('can:view_finance_operations_due_calendar')
+            ->name('send-tuition-notices');
     });
 
 Route::prefix('api/v1/finance/batch-studio')

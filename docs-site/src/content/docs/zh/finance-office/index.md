@@ -11,6 +11,7 @@ source:
   - resources/js/pages/Finance/BatchStudio/DngPush.vue
   - resources/js/pages/Finance/PricingOperations/Index.vue
   - resources/js/pages/Finance/Payments/Index.vue
+  - resources/js/pages/Finance/Operations/DueCalendar.vue
   - resources/js/pages/Finance/Payments/DngPaymentRequests/Index.vue
   - resources/js/pages/Finance/Invoices/Index.vue
   - resources/js/pages/TuitionPlans/Index.vue
@@ -120,7 +121,7 @@ source:
 
 | 页面 | 用途 |
 | --- | --- |
-| DNG Due Reminders | 缴费到期提醒日程 |
+| DNG Due Reminders | 缴费到期提醒。含 **Phát thông báo học phí**，向学生和家长发送学费通知 |
 | DNG Campus Mapping | 登记各校区对应的收款账户 |
 | Lập yêu cầu thanh toán DNG | 创建发送至 DNG 网关的付款请求 |
 | Settlement Worklist | 需要人工核对匹配的款项列表 |

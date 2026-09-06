@@ -82,20 +82,57 @@ final class EloquentGuardianAccessGrantReader implements GuardianAccessGrantRead
 
     public function accountsForStudent(int $studentId): array
     {
-        return GuardianAccessGrant::query()
+        return $this->accountsForStudents([$studentId])[$studentId] ?? [];
+    }
+
+    public function accountsForStudents(array $studentIds): array
+    {
+        $grouped = [];
+        foreach ($studentIds as $studentId) {
+            $grouped[(int) $studentId] = [];
+        }
+
+        if ($studentIds === []) {
+            return $grouped;
+        }
+
+        $rows = GuardianAccessGrant::query()
             ->join('parents', 'parents.id', '=', 'guardian_access_grants.parent_id')
             ->join('users', 'users.id', '=', 'parents.user_id')
-            ->where('guardian_access_grants.student_id', $studentId)
+            ->whereIn('guardian_access_grants.student_id', $studentIds)
             ->where('guardian_access_grants.status', GuardianAccessGrant::STATUS_ACTIVE)
             ->where('users.type', UserType::PARENT->value)
             ->where('users.status', 'active')
             ->orderBy('guardian_access_grants.id')
-            ->get(['users.id', 'users.name', 'users.email'])
-            ->filter(static fn (object $account): bool => is_string($account->email) && trim($account->email) !== '')
-            ->map(fn (object $account): GuardianAccessAccount => $this->toAccountDto($account))
-            ->unique(static fn (GuardianAccessAccount $account): string => strtolower($account->email))
-            ->values()
-            ->all();
+            ->get([
+                'guardian_access_grants.student_id as grant_student_id',
+                'users.id',
+                'users.name',
+                'users.email',
+            ]);
+
+        foreach ($rows as $row) {
+            if (! is_string($row->email) || trim($row->email) === '') {
+                continue;
+            }
+
+            $studentId = (int) $row->grant_student_id;
+            $account = $this->toAccountDto($row);
+            $email = strtolower($account->email);
+            $already = false;
+            foreach ($grouped[$studentId] ?? [] as $existing) {
+                if (strtolower($existing->email) === $email) {
+                    $already = true;
+                    break;
+                }
+            }
+            if ($already) {
+                continue;
+            }
+            $grouped[$studentId][] = $account;
+        }
+
+        return $grouped;
     }
 
     public function studentIdsWithAccounts(array $studentIds): array

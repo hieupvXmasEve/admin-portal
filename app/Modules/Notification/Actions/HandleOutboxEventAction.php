@@ -8,6 +8,7 @@ use App\Modules\Notification\Domain\Contracts\DomainEventEnvelope;
 use App\Modules\Notification\Domain\Contracts\NotificationIntent;
 use App\Modules\Notification\EmailContent\EmailContentRegistry;
 use App\Modules\Notification\Enums\NotificationOutboxStatus;
+use App\Modules\Notification\Enums\NotificationTemplateTypeKey;
 use App\Modules\Notification\Jobs\SendNotificationDeliveryJob;
 use App\Modules\Notification\Models\NotificationEventOutbox;
 use App\Modules\Notification\Policies\PolicyResolver;
@@ -165,6 +166,10 @@ class HandleOutboxEventAction
         }
 
         if (! $this->emailContentRegistry->has($intent->typeKey)) {
+            if (self::mustRenderTemplate($intent->typeKey)) {
+                throw new \RuntimeException("Missing email content provider for type_key {$intent->typeKey}");
+            }
+
             return [];
         }
 
@@ -178,6 +183,10 @@ class HandleOutboxEventAction
                 'rendered_text' => $provider->textBody($data),
             ];
         } catch (\Throwable $e) {
+            if (self::mustRenderTemplate($intent->typeKey)) {
+                throw $e;
+            }
+
             Log::warning('Failed to render email content, falling back to old path', [
                 'type_key' => $intent->typeKey,
                 'event_name' => $envelope->eventName,
@@ -226,5 +235,13 @@ class HandleOutboxEventAction
             'last_error' => null,
             'next_retry_at' => null,
         ])->save();
+    }
+
+    private static function mustRenderTemplate(string $typeKey): bool
+    {
+        return in_array($typeKey, [
+            NotificationTemplateTypeKey::TuitionNotice->value,
+            NotificationTemplateTypeKey::ParentTuitionNotice->value,
+        ], true);
     }
 }

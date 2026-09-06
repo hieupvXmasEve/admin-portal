@@ -12,7 +12,9 @@ use App\Modules\Finance\Actions\Operations\SendDueItemParentRemindersAction;
 use App\Modules\Finance\Actions\Operations\SendDueItemRemindersAction;
 use App\Modules\Finance\Actions\Operations\SendParentPaymentRemindersAction;
 use App\Modules\Finance\Actions\Operations\SendPaymentRemindersAction;
+use App\Modules\Finance\Actions\Operations\SendTuitionNoticeAction;
 use App\Modules\Finance\Http\Requests\GenerateNonAcademicChargesRequest;
+use App\Modules\Finance\Http\Requests\Operations\SendTuitionNoticeRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -159,6 +161,19 @@ class BillingOperationsController extends Controller
         ]);
 
         $result = SendDueItemParentRemindersAction::run($validated);
+
+        if ($result['sent_count'] > 0) {
+            Inertia::flash('success', $result['message']);
+        } else {
+            Inertia::flash('warning', $result['message']);
+        }
+
+        return back();
+    }
+
+    public function sendTuitionNotices(SendTuitionNoticeRequest $request)
+    {
+        $result = SendTuitionNoticeAction::run($request->validated());
 
         if ($result['sent_count'] > 0) {
             Inertia::flash('success', $result['message']);
