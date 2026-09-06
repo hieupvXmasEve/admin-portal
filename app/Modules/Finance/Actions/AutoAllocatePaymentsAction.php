@@ -14,6 +14,9 @@ use App\Modules\Finance\Support\BillingAccountProvisioner;
 use App\Modules\Finance\Support\SettlementMutationGuard;
 use App\Shared\Contracts\Academic\ExamResitAttemptPaymentSyncer;
 use App\Shared\Contracts\Academic\RetakeRegistrationPaymentSyncer;
+use App\Shared\Contracts\Identity\CampusPermissionReader;
+use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 
 class AutoAllocatePaymentsAction
@@ -21,12 +24,18 @@ class AutoAllocatePaymentsAction
     public const DEFAULT_PRIORITY_ORDER = [
         FinanceCharge::TYPE_TUITION_TERM,
         FinanceCharge::TYPE_EGC_LEVEL_FEE,
+        FinanceCharge::TYPE_BHYT,
+        FinanceCharge::TYPE_EXAM_RESIT_FEE,
         FinanceCharge::TYPE_RETAKE_FEE,
+        FinanceCharge::TYPE_ADMISSION_FEE,
         FinanceCharge::TYPE_MANUAL_FEE,
+        FinanceCharge::TYPE_ADJUSTMENT,
     ];
 
     public function __construct(
         protected SettlementService $settlementService,
+        private readonly StudentReferenceReader $studentReferences,
+        private readonly CampusPermissionReader $permissions,
     ) {}
 
     /**
@@ -77,6 +86,8 @@ class AutoAllocatePaymentsAction
         if ($studentIds === []) {
             return $stats;
         }
+
+        $this->assertStudentsInCampusScope($studentIds, $userId);
 
         DB::transaction(function () use ($studentIds, $priorityOrder, $userId, &$stats, &$studentsWithAllocations) {
 
@@ -192,6 +203,40 @@ class AutoAllocatePaymentsAction
         }
 
         return $stats;
+    }
+
+    /**
+     * @param  list<int>  $studentIds
+     */
+    private function assertStudentsInCampusScope(array $studentIds, ?int $userId): void
+    {
+        $campusId = app()->bound('campus') ? app('campus')?->id : null;
+        $campusId = $campusId !== null ? (int) $campusId : null;
+
+        if ($userId !== null && $this->canViewAllCampuses($userId, $campusId)) {
+            return;
+        }
+
+        if ($campusId === null) {
+            return;
+        }
+
+        $allowed = array_flip($this->studentReferences->idsForCampus($campusId));
+
+        foreach ($studentIds as $studentId) {
+            if (! isset($allowed[$studentId])) {
+                throw new AuthorizationException('Students outside campus scope.');
+            }
+        }
+    }
+
+    private function canViewAllCampuses(int $userId, ?int $campusId): bool
+    {
+        return in_array(
+            'view_finance_all_campus',
+            $this->permissions->permissionCodesForUserId($userId, $campusId),
+            true,
+        );
     }
 
     /**

@@ -10,6 +10,7 @@ import { toast } from 'vue-sonner';
 
 const props = defineProps<{
     open: boolean;
+    allocation_priority_options?: { id: string; label: string }[];
 }>();
 
 const emit = defineEmits<{
@@ -21,14 +22,7 @@ const { showConfirmDialog } = useGlobalConfirmDialog();
 
 const isLoading = ref(false);
 
-const defaultPriorities = [
-    { id: 'tuition_term', label: 'Tuition Term' },
-    { id: 'egc_level_fee', label: 'EGC Level Fee' },
-    { id: 'retake_fee', label: 'Retake Fee' },
-    { id: 'manual_fee', label: 'Manual Adjustment' },
-];
-
-const priorities = ref([...defaultPriorities]);
+const priorities = ref([...(props.allocation_priority_options ?? [])]);
 
 const moveUp = (index: number) => {
     if (index === 0) return;
@@ -84,8 +78,7 @@ watch(
     () => props.open,
     (val) => {
         if (val) {
-            // Reset to default or keep last used? Resetting for now to ensure consistency with "Default"
-            priorities.value = [...defaultPriorities];
+            priorities.value = [...(props.allocation_priority_options ?? [])];
         }
     },
 );
@@ -118,7 +111,7 @@ watch(
 
             <DialogFooter>
                 <Button variant="outline" @click="$emit('update:open', false)"> Cancel </Button>
-                <Button @click="handleAllocate" :disabled="isLoading">
+                <Button @click="handleAllocate" :disabled="isLoading || priorities.length === 0">
                     <Loader2 v-if="isLoading" class="mr-2 h-4 w-4 animate-spin" />
                     <Sparkles v-else class="mr-2 h-4 w-4" />
                     Start Allocation

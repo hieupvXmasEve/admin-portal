@@ -11,6 +11,7 @@ use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\PaymentApplication;
 use App\Modules\Finance\Queries\GetStudentBalanceQuery;
 use App\Modules\Finance\Support\BillingAccountProvisioner;
+use App\Modules\Finance\Support\ObligationType\ObligationTypeRegistry;
 use App\Modules\Finance\Support\SettlementMutationGuard;
 use App\Shared\Contracts\DomainEvents\DomainEvent;
 use App\Shared\Contracts\DomainEvents\DomainEventPublisher;
@@ -22,18 +23,6 @@ use Illuminate\Support\Facades\DB;
 
 class PaymentService
 {
-    /**
-     * Canonical charge-type priority for line allocation. Mirrors
-     * AutoAllocatePaymentsAction::DEFAULT_PRIORITY_ORDER; the sort itself is
-     * applied by SettlementService::getOutstandingLinesForStudent.
-     */
-    private const CANONICAL_PRIORITY_ORDER = [
-        FinanceCharge::TYPE_TUITION_TERM,
-        FinanceCharge::TYPE_EGC_LEVEL_FEE,
-        FinanceCharge::TYPE_RETAKE_FEE,
-        FinanceCharge::TYPE_MANUAL_FEE,
-    ];
-
     public function __construct(
         protected GetStudentBalanceQuery $getStudentBalanceQuery,
         protected DomainEventPublisher $domainEventPublisher,
@@ -229,7 +218,7 @@ class PaymentService
 
         $lines = $this->settlementService->getOutstandingLinesForStudent(
             $payment->student_id,
-            self::CANONICAL_PRIORITY_ORDER,
+            ObligationTypeRegistry::allocationPriorityOrder(),
         );
 
         if ($strategy !== 'oldest_first') {

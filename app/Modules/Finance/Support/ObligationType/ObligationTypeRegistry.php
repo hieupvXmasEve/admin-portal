@@ -81,6 +81,42 @@ final class ObligationTypeRegistry
     }
 
     /**
+     * Staff-facing allocation rank for debit charge types.
+     *
+     * Academic-gate and mandatory insurance fees rank above staff-supplied
+     * fees. This is policy, not a stored billing cycle.
+     *
+     * @return list<string>
+     */
+    public static function allocationPriorityOrder(): array
+    {
+        return [
+            FinanceCharge::TYPE_TUITION_TERM,
+            FinanceCharge::TYPE_EGC_LEVEL_FEE,
+            FinanceCharge::TYPE_BHYT,
+            FinanceCharge::TYPE_EXAM_RESIT_FEE,
+            FinanceCharge::TYPE_RETAKE_FEE,
+            FinanceCharge::TYPE_ADMISSION_FEE,
+            FinanceCharge::TYPE_MANUAL_FEE,
+            FinanceCharge::TYPE_ADJUSTMENT,
+        ];
+    }
+
+    /**
+     * @return list<array{id: string, label: string}>
+     */
+    public static function allocationPriorityOptions(): array
+    {
+        return array_map(
+            static fn (string $type): array => [
+                'id' => $type,
+                'label' => self::get($type)->label,
+            ],
+            self::allocationPriorityOrder(),
+        );
+    }
+
+    /**
      * @return list<ObligationTypeDefinition>
      */
     public static function byFinancialEffect(FinancialEffect $effect): array

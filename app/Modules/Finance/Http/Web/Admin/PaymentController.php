@@ -17,6 +17,7 @@ use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Queries\GetPaymentDetailsQuery;
 use App\Modules\Finance\Queries\ListPaymentsQuery;
 use App\Modules\Finance\Queries\Operations\PreviewAutoAllocateQuery;
+use App\Rules\AllocationPriorityOrder;
 use App\Shared\Contracts\StudentRegistry\DTO\StudentReference;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
 use Illuminate\Http\Request;
@@ -224,8 +225,8 @@ class PaymentController extends Controller
     public function previewAutoAllocate(Request $request, PreviewAutoAllocateQuery $query)
     {
         $request->validate([
-            'priority_order' => 'required|array',
-            'priority_order.*' => 'string',
+            'priority_order' => ['required', 'array', new AllocationPriorityOrder],
+            'priority_order.*' => ['string'],
         ]);
 
         $preview = $query->handle($request->input('priority_order'));
@@ -236,8 +237,8 @@ class PaymentController extends Controller
     public function autoAllocate(Request $request, AutoAllocatePaymentsAction $action)
     {
         $request->validate([
-            'priority_order' => 'required|array',
-            'priority_order.*' => 'string',
+            'priority_order' => ['required', 'array', new AllocationPriorityOrder],
+            'priority_order.*' => ['string'],
         ]);
 
         $stats = $action->run($request->input('priority_order'), $request->user()->id);

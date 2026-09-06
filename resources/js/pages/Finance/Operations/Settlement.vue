@@ -79,6 +79,11 @@ interface SettlementFilters {
     direction: 'asc' | 'desc' | null;
 }
 
+interface AllocationPriorityOption {
+    id: string;
+    label: string;
+}
+
 interface Props {
     students: PaginatedResponse<SettlementStudent>;
     summary: {
@@ -88,6 +93,7 @@ interface Props {
         total_unapplied_balance: number;
         needs_review_students: number;
     };
+    allocation_priority_options?: AllocationPriorityOption[];
     filters?: {
         search?: string;
         readiness?: string;
@@ -130,7 +136,7 @@ const { filters, setFilter, clearAllFilters, handleSearch, handleSortChange, han
         sort: 'active_due',
         direction: 'desc',
     },
-    only: ['students', 'summary', 'filters'],
+    only: ['students', 'summary', 'filters', 'allocation_priority_options'],
     debounce: 300,
     fieldDebounce: { search: 400 },
     immediateFields: ['readiness'],
@@ -169,7 +175,7 @@ const runSettlement = (studentIds: number[]) => {
     router.post(
         route('finance.operations.settlement.apply'),
         {
-            priority_order: ['tuition_term', 'egc_level_fee', 'retake_fee', 'manual_fee'],
+            priority_order: (props.allocation_priority_options ?? []).map((option) => option.id),
             student_ids: studentIds,
         },
         {
@@ -320,7 +326,7 @@ defineOptions({
                 </div>
             </div>
             <div class="flex gap-2">
-                <Button @click="applySettlement(selectedStudentIds)" :disabled="isApplying || selectedStudentIds.length === 0">
+                <Button @click="applySettlement(selectedStudentIds)" :disabled="isApplying || selectedStudentIds.length === 0 || (props.allocation_priority_options ?? []).length === 0">
                     <Zap class="mr-2 h-4 w-4" />
                     Apply selected
                 </Button>

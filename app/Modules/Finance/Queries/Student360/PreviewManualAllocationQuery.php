@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Finance\Queries\Student360;
 
-use App\Modules\Finance\Actions\AutoAllocatePaymentsAction;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Services\SettlementService;
+use App\Modules\Finance\Support\ObligationType\ObligationTypeRegistry;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionIssue;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionScope;
@@ -104,10 +104,7 @@ class PreviewManualAllocationQuery
     /** @return Collection<int, InvoiceLine> */
     private function orderedCandidateLines(int $studentId): Collection
     {
-        $priorityRank = array_flip(AutoAllocatePaymentsAction::DEFAULT_PRIORITY_ORDER);
-        $fallbackRank = count($priorityRank);
-
-        return InvoiceLine::query()
+        $lines = InvoiceLine::query()
             ->with(['invoice', 'charge'])
             ->where('status', 'active')
             ->where('amount_snapshot', '>', 0)
@@ -115,21 +112,12 @@ class PreviewManualAllocationQuery
             ->whereHas('charge', fn ($query) => $query
                 ->where('status', 'active')
                 ->where('amount', '>', 0))
-            ->get()
-            ->sortBy(function (InvoiceLine $line) use ($priorityRank, $fallbackRank): array {
-                $invoice = $line->invoice;
-                $chargeType = $line->charge?->charge_type ?? '';
+            ->get();
 
-                return [
-                    $priorityRank[$chargeType] ?? $fallbackRank,
-                    $invoice?->due_date?->getTimestamp() ?? PHP_INT_MAX,
-                    $invoice?->created_at?->getTimestamp() ?? 0,
-                    $invoice?->id ?? 0,
-                    $line->created_at?->getTimestamp() ?? 0,
-                    $line->id,
-                ];
-            })
-            ->values();
+        return $this->settlement->sortLinesByAllocationPriority(
+            $lines,
+            ObligationTypeRegistry::allocationPriorityOrder(),
+        );
     }
 
     /** @return array<string, mixed> */

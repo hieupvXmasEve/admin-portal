@@ -50,19 +50,21 @@ interface PreviewData {
     summary: PreviewSummary;
 }
 
+interface AllocationPriorityOption {
+    id: string;
+    label: string;
+}
+
+const props = defineProps<{
+    allocation_priority_options?: AllocationPriorityOption[];
+}>();
+
 const currentStep = ref<'priority' | 'preview' | 'complete'>('priority');
 const isLoading = ref(false);
 const isExecuting = ref(false);
 const previewData = ref<PreviewData | null>(null);
 
-const defaultPriorities = [
-    { id: 'tuition_term', label: 'Học phí kỳ' },
-    { id: 'egc_level_fee', label: 'Phí EGC Level' },
-    { id: 'retake_fee', label: 'Phí thi lại' },
-    { id: 'manual_fee', label: 'Điều chỉnh thủ công' },
-];
-
-const priorities = ref([...defaultPriorities]);
+const priorities = ref<AllocationPriorityOption[]>([...(props.allocation_priority_options ?? [])]);
 
 const moveUp = (index: number) => {
     if (index === 0) return;
@@ -200,7 +202,7 @@ const toggleStudent = (studentId: number) => {
                 </div>
 
                 <div class="mt-6 flex justify-end">
-                    <Button @click="handlePreview" :disabled="isLoading">
+                    <Button @click="handlePreview" :disabled="isLoading || priorities.length === 0">
                         <Loader2 v-if="isLoading" class="mr-2 h-4 w-4 animate-spin" />
                         <Sparkles v-else class="mr-2 h-4 w-4" />
                         Xem trước phân bổ

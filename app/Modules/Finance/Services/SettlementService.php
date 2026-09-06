@@ -688,8 +688,19 @@ class SettlementService
                 $query->where('status', 'active')
                     ->where('amount', '>', 0);
             })
-            ->get();
+            ->get()
+            ->filter(fn (InvoiceLine $line) => $this->getLineOutstandingAmount($line) > 0);
 
+        return $this->sortLinesByAllocationPriority($lines, $priorityOrder);
+    }
+
+    /**
+     * @param  Collection<int, InvoiceLine>  $lines
+     * @param  array<int, string>  $priorityOrder
+     * @return Collection<int, InvoiceLine>
+     */
+    public function sortLinesByAllocationPriority(Collection $lines, array $priorityOrder): Collection
+    {
         $priorityRank = [];
         foreach (array_values($priorityOrder) as $index => $chargeType) {
             $priorityRank[$chargeType] = $index;
@@ -697,7 +708,6 @@ class SettlementService
         $fallbackRank = count($priorityRank);
 
         return $lines
-            ->filter(fn (InvoiceLine $line) => $this->getLineOutstandingAmount($line) > 0)
             ->sortBy(function (InvoiceLine $line) use ($priorityRank, $fallbackRank) {
                 $invoice = $line->invoice;
                 $chargeType = $line->charge?->charge_type ?? '';

@@ -8,6 +8,7 @@ use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Support\DngFeeTypeOptions;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\StudentInvoice;
+use App\Modules\Finance\Support\ObligationType\ObligationTypeRegistry;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionWorklistPresenter;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionWorklistReader;
@@ -270,6 +271,7 @@ final class ListSettlementWorklistQuery
             'students' => $this->paginateCollection($students, $perPage, $page, $request->url(), $request->query()),
             'exceptions' => $exceptions->all(),
             'summary' => $summary,
+            'allocation_priority_options' => ObligationTypeRegistry::allocationPriorityOptions(),
             'filters' => [
                 'search' => $search,
                 'readiness' => $readiness,
