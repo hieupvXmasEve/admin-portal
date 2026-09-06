@@ -116,6 +116,17 @@ export const CHARGE_TYPE_LABELS: Record<ChargeType, string> = {
     bhyt: 'BHYT',
 };
 
+export type MoneyItemStatusCode = 'reviewing' | 'adjusted' | 'completed' | 'processing' | 'overdue' | 'awaiting_payment';
+
+export const MONEY_ITEM_STATUS_LABELS: Record<MoneyItemStatusCode, string> = {
+    reviewing: 'Đang rà soát',
+    adjusted: 'Đã điều chỉnh',
+    completed: 'Đã hoàn tất',
+    processing: 'Đang xử lý thanh toán',
+    overdue: 'Quá hạn',
+    awaiting_payment: 'Chờ thanh toán',
+};
+
 export const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {
     draft: 'Nháp',
     pending: 'Chờ thanh toán',

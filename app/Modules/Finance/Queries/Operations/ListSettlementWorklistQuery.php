@@ -6,9 +6,13 @@ namespace App\Modules\Finance\Queries\Operations;
 
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Dng\Support\DngFeeTypeOptions;
+use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Support\ObligationType\ObligationTypeRegistry;
+use App\Modules\Finance\Support\SettlementPosition\DngLineHoldingIndex;
+use App\Modules\Finance\Support\SettlementPosition\MoneyItemStatusContext;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionWorklistPresenter;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionWorklistReader;
@@ -34,6 +38,7 @@ final class ListSettlementWorklistQuery
         private readonly SettlementPositionWorklistPresenter $positionPresenter,
         private readonly StudentReferenceReader $studentReferences,
         private readonly ProgramEnrollmentReader $programEnrollments,
+        private readonly DngLineHoldingIndex $dngLineHolding,
     ) {}
 
     /** @return array<string,mixed> */
@@ -111,6 +116,7 @@ final class ListSettlementWorklistQuery
         $positionsByStudent = $this->positionReader->forLineGroups($lineIdsByStudent);
         $positionsByInvoice = $this->positionReader->forLineGroups($lineIdsByInvoice);
         $positionsByStudentFeeType = $this->positionReader->forLineGroups($lineIdsByStudentFeeType);
+        $dngHolding = $this->dngLineHolding->forLineIds(array_merge(...array_values($lineIdsByInvoice) ?: [[]]));
         $studentIds = collect(array_keys($lineIdsByStudent))->map(fn ($id): int => (int) $id)->values();
 
         $paymentsByStudent = Payment::query()
@@ -148,6 +154,7 @@ final class ListSettlementWorklistQuery
                 $activeDngByStudentAndFeeType,
                 $studentReferences,
                 $enrollments,
+                $dngHolding,
             ): array {
                 $studentId = (int) $studentId;
                 $student = $studentReferences[$studentId] ?? null;
@@ -178,6 +185,7 @@ final class ListSettlementWorklistQuery
                     'needs_review' => ! $positionSummary['valid'],
                     'settlement_state' => $positionSummary['settlement_state'],
                     'settlement_label' => $positionSummary['settlement_label'],
+                    'money_item_status' => $positionSummary['money_item_status'],
                     'settlement_issues' => $positionSummary['issues'],
                     'gross' => $positionSummary['gross'],
                     'discount' => $positionSummary['discount'],
@@ -195,10 +203,14 @@ final class ListSettlementWorklistQuery
                         $positionsByStudentFeeType,
                         $activeDngByStudentAndFeeType->get($studentId, collect()),
                     ),
-                    'invoices' => $studentInvoices->map(function (StudentInvoice $invoice) use ($positionsByInvoice): array {
+                    'invoices' => $studentInvoices->map(function (StudentInvoice $invoice) use ($positionsByInvoice, $dngHolding): array {
                         $invoicePosition = $positionsByInvoice[(int) $invoice->id] ?? null;
                         $summary = $invoicePosition instanceof SettlementPosition
-                            ? $this->positionPresenter->summarize($invoicePosition)
+                            ? $this->positionPresenter->summarize(
+                                $invoicePosition,
+                                false,
+                                $this->moneyItemContext($invoice, $invoicePosition, $dngHolding),
+                            )
                             : $this->missingSummary();
 
                         return [
@@ -209,6 +221,7 @@ final class ListSettlementWorklistQuery
                             'status' => $summary['valid'] && $summary['remaining'] !== null && $summary['remaining'] <= 0 ? 'paid' : ($summary['valid'] ? $invoice->status : 'needs_review'),
                             'settlement_state' => $summary['settlement_state'],
                             'settlement_label' => $summary['settlement_label'],
+                            'money_item_status' => $summary['money_item_status'],
                             'settlement_issues' => $summary['issues'],
                             'due_date' => $invoice->due_date?->toDateString(),
                             'total_amount' => $summary['net'],
@@ -292,6 +305,12 @@ final class ListSettlementWorklistQuery
             'valid' => false,
             'settlement_state' => SettlementPosition::STATE_MISSING,
             'settlement_label' => 'Cần kiểm tra',
+            'money_item_status' => [
+                'code' => MoneyItemStatusContext::REVIEWING,
+                'label_staff' => 'Đang rà soát',
+                'label_student' => 'Khoản này đang được nhà trường kiểm tra. Vui lòng quay lại sau.',
+                'hide_amounts' => true,
+            ],
             'gross' => null,
             'discount' => null,
             'cash' => null,
@@ -344,6 +363,39 @@ final class ListSettlementWorklistQuery
         }
 
         return $result;
+    }
+
+    /**
+     * @param  array<int, array{holding: bool, needs_review: bool}>  $dngHolding
+     */
+    private function moneyItemContext(StudentInvoice $invoice, SettlementPosition $position, array $dngHolding): MoneyItemStatusContext
+    {
+        $holding = false;
+        $needsReview = false;
+        foreach ($invoice->invoiceLines as $line) {
+            $flags = $dngHolding[(int) $line->id] ?? ['holding' => false, 'needs_review' => false];
+            $holding = $holding || $flags['holding'];
+            $needsReview = $needsReview || $flags['needs_review'];
+        }
+
+        $chargeVoid = $invoice->invoiceLines->isNotEmpty()
+            && $invoice->invoiceLines->every(static fn ($line): bool => ($line->status ?? 'active') !== 'active'
+                || $line->charge?->status === FinanceCharge::STATUS_VOID);
+        $obligationCancelled = $invoice->status === 'cancelled'
+            || $invoice->invoiceLines->contains(static fn ($line): bool => in_array(
+                (string) ($line->charge?->financeObligation?->lifecycle_status ?? ''),
+                [FinanceObligation::STATUS_CANCELLED, FinanceObligation::STATUS_VOIDED, FinanceObligation::STATUS_SUPERSEDED],
+                true,
+            ));
+
+        return new MoneyItemStatusContext(
+            position: $position,
+            dngHoldingThisItem: $holding,
+            dngNeedsReview: $needsReview,
+            obligationCancelled: $obligationCancelled,
+            chargeVoid: $chargeVoid,
+            dueDate: $invoice->due_date,
+        );
     }
 
     private function paginateCollection(Collection $items, int $perPage, int $page, string $path, array $query): LengthAwarePaginator

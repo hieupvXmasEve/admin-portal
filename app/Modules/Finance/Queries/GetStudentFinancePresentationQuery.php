@@ -9,8 +9,11 @@ use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\FinanceCharge;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\StudentInvoice;
+use App\Modules\Finance\Support\SettlementPosition\DngLineHoldingIndex;
+use App\Modules\Finance\Support\SettlementPosition\MoneyItemStatusContext;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionScope;
+use App\Modules\Finance\Support\SettlementPosition\SettlementPositionWorklistPresenter;
 use App\Modules\Finance\Support\StudentFinanceSettlementPositionReader;
 use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use App\Shared\Contracts\Academic\DTO\AcademicPeriodReference;
@@ -30,6 +33,8 @@ final class GetStudentFinancePresentationQuery
         private readonly StudentFinanceSettlementPositionReader $positionReader,
         private readonly SettlementPositionReader $settlementPositionReader,
         private readonly AcademicPeriodReader $academicPeriods,
+        private readonly SettlementPositionWorklistPresenter $positionPresenter,
+        private readonly DngLineHoldingIndex $dngLineHolding,
     ) {}
 
     /** @return array<string, mixed> */
@@ -154,7 +159,6 @@ final class GetStudentFinancePresentationQuery
         ];
     }
 
-    /** @return array<string, mixed>|null */
     public function invoice(int $studentId, int $invoiceId): ?array
     {
         $invoice = StudentInvoice::query()
@@ -173,7 +177,12 @@ final class GetStudentFinancePresentationQuery
 
         $semester = $this->academicPeriods->find((int) $invoice->semester_id);
         $position = $this->settlementPositionReader->forInvoice((int) $invoice->id);
-        $valid = $position->isValid() && $position->amounts !== null;
+        $holding = $this->dngLineHolding->forLineIds(
+            $invoice->invoiceLines->pluck('id')->map(static fn (mixed $id): int => (int) $id)->all(),
+        );
+        $invoiceContext = $this->invoiceMoneyItemContext($invoice, $position, $holding);
+        $meta = $this->settlementMetadata($position, $invoiceContext);
+        $hideAmounts = $meta['money_item_status']['hide_amounts'] ?? false;
         $linePositions = collect($position->payable_line_breakdown)
             ->keyBy(static fn (SettlementPosition $linePosition): int => (int) $linePosition->payable_line_id);
 
@@ -184,13 +193,28 @@ final class GetStudentFinancePresentationQuery
                 'id' => $semester->id,
                 'name' => $semester->name,
             ],
-            ...$this->invoiceAmounts($position),
+            ...($hideAmounts ? [
+                'subtotal' => null,
+                'discount_total' => null,
+                'total_amount' => null,
+                'paid_amount' => null,
+                'credit_amount' => null,
+                'remaining' => null,
+            ] : $this->invoiceAmounts($position)),
             'status' => $this->invoiceStatus($invoice, $position),
             'due_date' => $invoice->due_date?->toDateString(),
-            'paid_at' => $valid ? $invoice->paid_at?->toIso8601String() : null,
-            'lines' => $invoice->invoiceLines->map(function ($line) use ($linePositions, $valid): array {
+            'paid_at' => $hideAmounts ? null : ($position->isValid() ? $invoice->paid_at?->toIso8601String() : null),
+            'lines' => $invoice->invoiceLines->map(function ($line) use ($linePositions, $holding, $invoice): array {
                 $linePosition = $linePositions->get((int) $line->id);
-                $lineValid = $valid && $linePosition?->isValid() && $linePosition->amounts !== null;
+                $lineMeta = $this->settlementMetadata(
+                    $linePosition,
+                    $linePosition instanceof SettlementPosition
+                        ? $this->lineMoneyItemContext($line, $linePosition, $holding, $invoice->due_date)
+                        : null,
+                );
+                $lineValid = ! ($lineMeta['money_item_status']['hide_amounts'] ?? false)
+                    && $linePosition?->isValid()
+                    && $linePosition->amounts !== null;
                 $amounts = $linePosition?->amounts;
 
                 return [
@@ -211,17 +235,17 @@ final class GetStudentFinancePresentationQuery
                             'paid_at' => $application->payment?->paid_at?->toIso8601String(),
                         ])
                         : [],
-                    'settlement_position' => $this->settlementMetadata($linePosition),
+                    'settlement_position' => $lineMeta,
                 ];
             }),
-            'discounts' => $valid
-                ? $invoice->discounts->map(static fn ($discount): array => [
+            'discounts' => $hideAmounts
+                ? []
+                : $invoice->discounts->map(static fn ($discount): array => [
                     'id' => (int) $discount->id,
                     'description' => (string) $discount->description,
                     'amount' => (float) $discount->amount,
-                ])
-                : [],
-            'settlement_position' => $this->settlementMetadata($position),
+                ]),
+            'settlement_position' => $meta,
         ];
     }
 
@@ -243,6 +267,7 @@ final class GetStudentFinancePresentationQuery
         $invoices = StudentInvoice::query()
             ->where('student_id', $studentId)
             ->when($semesterId !== null, fn ($query) => $query->where('semester_id', $semesterId))
+            ->with(['invoiceLines.charge.financeObligation'])
             ->withCount('invoiceLines')
             ->orderByDesc('created_at')
             ->get();
@@ -261,10 +286,17 @@ final class GetStudentFinancePresentationQuery
                 ->all(),
         );
 
+        $holding = $this->dngLineHolding->forLineIds(
+            $invoices->flatMap(static fn (StudentInvoice $invoice) => $invoice->invoiceLines->pluck('id'))
+                ->map(static fn (mixed $id): int => (int) $id)
+                ->all(),
+        );
+
         return $invoices->values()->map(fn (StudentInvoice $invoice, int $index): array => $this->invoiceRow(
             $invoice,
             $positions[$index] ?? null,
             $periods[(int) $invoice->semester_id] ?? null,
+            $holding,
         ));
     }
 
@@ -324,10 +356,13 @@ final class GetStudentFinancePresentationQuery
         ];
     }
 
-    /** @param array<string, mixed> $position */
     private function summaryMetadata(array $position): array
     {
         $valid = (bool) $position['valid'];
+        $remaining = $valid ? (float) $position['remaining_collectible'] : null;
+        $code = ! $valid
+            ? MoneyItemStatusContext::REVIEWING
+            : ($remaining !== null && $remaining <= 0 ? MoneyItemStatusContext::COMPLETED : MoneyItemStatusContext::AWAITING_PAYMENT);
 
         return [
             'valid' => $valid,
@@ -335,6 +370,20 @@ final class GetStudentFinancePresentationQuery
             'state' => $position['settlement_state'],
             'message' => $valid ? null : StudentFinanceSettlementPositionReader::STUDENT_UNAVAILABLE_MESSAGE,
             'issues' => $position['issues'],
+            'money_item_status' => [
+                'code' => $code,
+                'label_staff' => match ($code) {
+                    MoneyItemStatusContext::REVIEWING => 'Đang rà soát',
+                    MoneyItemStatusContext::COMPLETED => 'Đã hoàn tất',
+                    default => 'Chờ thanh toán',
+                },
+                'label_student' => match ($code) {
+                    MoneyItemStatusContext::REVIEWING => StudentFinanceSettlementPositionReader::STUDENT_UNAVAILABLE_MESSAGE,
+                    MoneyItemStatusContext::COMPLETED => 'Khoản này đã hoàn tất.',
+                    default => 'Khoản này đang chờ thanh toán.',
+                },
+                'hide_amounts' => $code === MoneyItemStatusContext::REVIEWING,
+            ],
         ];
     }
 
@@ -351,11 +400,19 @@ final class GetStudentFinancePresentationQuery
                 $lineIds->map(static fn (int $id): SettlementPositionScope => SettlementPositionScope::payableLine($id))->all(),
             );
         $positionsByLine = collect($positions)->keyBy(static fn (SettlementPosition $position): int => (int) $position->payable_line_id);
+        $holding = $this->dngLineHolding->forLineIds($lineIds->all());
 
-        return $charges->map(function (FinanceCharge $charge) use ($positionsByLine): array {
+        return $charges->map(function (FinanceCharge $charge) use ($positionsByLine, $holding): array {
             $linePositions = $charge->invoiceLines
                 ->map(fn ($line) => $positionsByLine->get((int) $line->id));
-            $valid = $linePositions->isNotEmpty()
+            $firstLine = $charge->invoiceLines->first();
+            $firstPosition = $firstLine ? $positionsByLine->get((int) $firstLine->id) : null;
+            $meta = $firstPosition instanceof SettlementPosition && $firstLine
+                ? $this->settlementMetadata($firstPosition, $this->lineMoneyItemContext($firstLine, $firstPosition, $holding, null))
+                : $this->invalidChargeMetadata($linePositions);
+            $hideAmounts = $meta['money_item_status']['hide_amounts'] ?? false;
+            $valid = ! $hideAmounts
+                && $linePositions->isNotEmpty()
                 && $linePositions->every(static fn (?SettlementPosition $position): bool => $position?->isValid() && $position->amounts !== null);
 
             return [
@@ -371,14 +428,11 @@ final class GetStudentFinancePresentationQuery
                 'balance' => $valid ? (float) $linePositions->sum(static fn (SettlementPosition $position): float => (float) $position->amounts->remaining->amount) : null,
                 'is_fully_paid' => $valid && $linePositions->every(static fn (SettlementPosition $position): bool => $position->amounts->remaining->isZero()),
                 'installments' => $charge->installments,
-                'settlement_position' => $valid
-                    ? $this->settlementMetadata($linePositions->first())
-                    : $this->invalidChargeMetadata($linePositions),
+                'settlement_position' => $meta,
             ];
         })->values();
     }
 
-    /** @param Collection<int, SettlementPosition|null> $positions */
     private function invalidChargeMetadata(Collection $positions): array
     {
         $invalidPosition = $positions->first(static fn (?SettlementPosition $position): bool => ! $position?->isValid());
@@ -386,12 +440,31 @@ final class GetStudentFinancePresentationQuery
         return $this->settlementMetadata($invalidPosition);
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * @param  array<int, array{holding: bool, needs_review: bool}>  $holding
+     * @return array<string, mixed>
+     */
     private function invoiceRow(
         StudentInvoice $invoice,
         ?SettlementPosition $position,
         ?AcademicPeriodReference $semester,
+        array $holding = [],
     ): array {
+        $context = $position instanceof SettlementPosition
+            ? $this->invoiceMoneyItemContext($invoice, $position, $holding)
+            : null;
+        $meta = $this->settlementMetadata($position, $context);
+        $amounts = ($meta['money_item_status']['hide_amounts'] ?? false)
+            ? [
+                'subtotal' => null,
+                'discount_total' => null,
+                'total_amount' => null,
+                'paid_amount' => null,
+                'credit_amount' => null,
+                'remaining' => null,
+            ]
+            : $this->invoiceAmounts($position);
+
         return [
             'id' => (int) $invoice->id,
             'invoice_number' => (string) $invoice->invoice_number,
@@ -399,12 +472,12 @@ final class GetStudentFinancePresentationQuery
                 'id' => $semester->id,
                 'name' => $semester->name,
             ],
-            ...$this->invoiceAmounts($position),
+            ...$amounts,
             'status' => $this->invoiceStatus($invoice, $position),
             'due_date' => $invoice->due_date?->toDateString(),
-            'paid_at' => $position?->isValid() ? $invoice->paid_at?->toIso8601String() : null,
+            'paid_at' => ($meta['money_item_status']['hide_amounts'] ?? false) ? null : ($position?->isValid() ? $invoice->paid_at?->toIso8601String() : null),
             'line_count' => (int) $invoice->invoice_lines_count,
-            'settlement_position' => $this->settlementMetadata($position),
+            'settlement_position' => $meta,
         ];
     }
 
@@ -446,32 +519,86 @@ final class GetStudentFinancePresentationQuery
     }
 
     /** @return array{valid: bool, mode: string, state: string, message: string|null, issues: list<array<string, mixed>>} */
-    private function settlementMetadata(?SettlementPosition $position): array
+    private function settlementMetadata(?SettlementPosition $position, ?MoneyItemStatusContext $context = null): array
     {
         if ($position === null) {
+            $moneyItemStatus = [
+                'code' => MoneyItemStatusContext::REVIEWING,
+                'label_staff' => 'Đang rà soát',
+                'label_student' => StudentFinanceSettlementPositionReader::STUDENT_UNAVAILABLE_MESSAGE,
+                'hide_amounts' => true,
+            ];
+
             return [
                 'valid' => false,
                 'mode' => SettlementPosition::MODE_CURRENT,
                 'state' => SettlementPosition::STATE_MISSING,
-                'message' => StudentFinanceSettlementPositionReader::STUDENT_UNAVAILABLE_MESSAGE,
+                'message' => $moneyItemStatus['label_student'],
                 'issues' => [[
                     'code' => 'settlement_position.missing',
                     'blocking' => true,
                     'evidence' => [],
                 ]],
+                'money_item_status' => $moneyItemStatus,
             ];
         }
+
+        $moneyItemStatus = $this->positionPresenter->moneyItemStatus(
+            $context ?? new MoneyItemStatusContext($position),
+        );
 
         return [
             'valid' => $position->isValid(),
             'mode' => $position->position_mode,
             'state' => $position->settlement_state,
-            'message' => $position->isValid() ? null : StudentFinanceSettlementPositionReader::STUDENT_UNAVAILABLE_MESSAGE,
+            'message' => $moneyItemStatus['hide_amounts'] ? $moneyItemStatus['label_student'] : null,
             'issues' => array_map(static fn ($issue): array => [
                 'code' => $issue->code,
                 'blocking' => $issue->blocking,
                 'evidence' => $issue->evidence,
             ], $position->issues),
+            'money_item_status' => $moneyItemStatus,
         ];
+    }
+
+    /**
+     * @param  array<int, array{holding: bool, needs_review: bool}>  $holding
+     */
+    private function invoiceMoneyItemContext(StudentInvoice $invoice, SettlementPosition $position, array $holding): MoneyItemStatusContext
+    {
+        $holdingAny = false;
+        $reviewAny = false;
+        foreach ($invoice->invoiceLines as $line) {
+            $flags = $holding[(int) $line->id] ?? ['holding' => false, 'needs_review' => false];
+            $holdingAny = $holdingAny || $flags['holding'];
+            $reviewAny = $reviewAny || $flags['needs_review'];
+        }
+
+        return new MoneyItemStatusContext(
+            position: $position,
+            dngHoldingThisItem: $holdingAny,
+            dngNeedsReview: $reviewAny,
+            obligationCancelled: $invoice->status === 'cancelled',
+            chargeVoid: $invoice->invoiceLines->isNotEmpty()
+                && $invoice->invoiceLines->every(static fn ($line): bool => ($line->status ?? 'active') !== 'active'
+                    || $line->charge?->status === FinanceCharge::STATUS_VOID),
+            dueDate: $invoice->due_date,
+        );
+    }
+
+    /**
+     * @param  array<int, array{holding: bool, needs_review: bool}>  $holding
+     */
+    private function lineMoneyItemContext(mixed $line, SettlementPosition $position, array $holding, mixed $dueDate): MoneyItemStatusContext
+    {
+        $flags = $holding[(int) $line->id] ?? ['holding' => false, 'needs_review' => false];
+
+        return new MoneyItemStatusContext(
+            position: $position,
+            dngHoldingThisItem: $flags['holding'],
+            dngNeedsReview: $flags['needs_review'],
+            chargeVoid: ($line->status ?? 'active') !== 'active' || $line->charge?->status === FinanceCharge::STATUS_VOID,
+            dueDate: $dueDate,
+        );
     }
 }

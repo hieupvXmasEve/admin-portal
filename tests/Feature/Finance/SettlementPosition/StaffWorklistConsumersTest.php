@@ -99,6 +99,7 @@ it('uses one canonical position for staff settlement rows and keeps cash separat
         ->and($row['credit'])->toBe(0.0)
         ->and($row['active_due'])->toBe(7000000.0)
         ->and($row['settlement_label'])->toBe('Còn phải thu')
+        ->and($row['money_item_status']['code'])->toBe('awaiting_payment')
         ->and($row['actionable'])->toBeFalse();
 });
 

@@ -15,10 +15,13 @@ use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Queries\Lookup\ListStudentInvoicesQuery;
 use App\Modules\Finance\Queries\Student360\GetStudentFinancePaymentHistoryQuery;
 use App\Modules\Finance\Support\FinanceSemesterContextResolver;
+use App\Modules\Finance\Support\SettlementPosition\DngLineHoldingIndex;
 use App\Modules\Finance\Support\SettlementPosition\Money;
+use App\Modules\Finance\Support\SettlementPosition\MoneyItemStatusContext;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionAmounts;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionIssue;
+use App\Modules\Finance\Support\SettlementPosition\SettlementPositionWorklistPresenter;
 use App\Shared\Contracts\Academic\ProgramEnrollmentReader;
 use App\Shared\Contracts\Finance\SettlementPositionReader;
 use App\Shared\Contracts\StudentRegistry\StudentReferenceReader;
@@ -31,7 +34,7 @@ use Inertia\Inertia;
  * @phpstan-type AmountsPayload array{gross:MoneyPayload,discount:MoneyPayload,cash:MoneyPayload,credit:MoneyPayload,remaining:MoneyPayload}
  * @phpstan-type IssuePayload array{code:string,severity:string,blocking:bool,evidence:array<string,int|string>,finance_invariant_code:?string}
  * @phpstan-type RawEvidencePayload array{gross:MoneyPayload,discount:MoneyPayload,cash:MoneyPayload,credit:MoneyPayload,remaining:MoneyPayload,reversed_discount_residue:MoneyPayload,inactive_credit_residue:MoneyPayload}
- * @phpstan-type PositionPayload array{scope_type:string,scope_id:int,payable_line_id:?int,finance_obligation_id:?int,invoice_id:?int,billing_account_id:?int,fee_type:?string,position_mode:string,captured_at:string,snapshot_version:string,settlement_state:string,valid:bool,amounts:?AmountsPayload,raw_evidence:RawEvidencePayload,issues:list<IssuePayload>,payable_line_breakdown:list<PositionPayload>,breakdown_reconciliation:array{status:string,rounding_remainder:MoneyPayload}}
+ * @phpstan-type PositionPayload array{scope_type:string,scope_id:int,payable_line_id:?int,finance_obligation_id:?int,invoice_id:?int,billing_account_id:?int,fee_type:?string,position_mode:string,captured_at:string,snapshot_version:string,settlement_state:string,valid:bool,amounts:?AmountsPayload,raw_evidence:RawEvidencePayload,issues:list<IssuePayload>,payable_line_breakdown:list<PositionPayload>,breakdown_reconciliation:array{status:string,rounding_remainder:MoneyPayload},money_item_status:array{code:string,label_staff:string,label_student:string,hide_amounts:bool}}
  */
 class BillingInvoiceController extends Controller
 {
@@ -40,6 +43,8 @@ class BillingInvoiceController extends Controller
         private readonly GetStudentFinancePaymentHistoryQuery $paymentHistoryQuery,
         private readonly StudentReferenceReader $studentReferences,
         private readonly ProgramEnrollmentReader $programEnrollments,
+        private readonly SettlementPositionWorklistPresenter $positionPresenter,
+        private readonly DngLineHoldingIndex $dngLineHolding,
     ) {}
 
     public function index(
@@ -60,7 +65,6 @@ class BillingInvoiceController extends Controller
         $student = $this->studentReferences->find((int) $invoice->student_id);
         abort_if($student === null, 404);
 
-        // Ensure campus check
         if ($campusId = app('campus')?->id) {
             if ($student->campusId !== (int) $campusId) {
                 abort(403, 'This invoice does not belong to your campus.');
@@ -80,6 +84,9 @@ class BillingInvoiceController extends Controller
         $lines = $invoice->invoiceLines->values();
         $settlementPosition = $this->settlementPositionReader->forInvoice((int) $invoice->id);
         $paymentHistory = collect($this->paymentHistoryQuery->handle((int) $invoice->student_id))->keyBy('id');
+        $holding = $this->dngLineHolding->forLineIds(
+            $lines->pluck('id')->map(static fn (mixed $id): int => (int) $id)->all(),
+        );
 
         return Inertia::render('Finance/Invoices/Show', [
             'invoice' => [
@@ -104,20 +111,23 @@ class BillingInvoiceController extends Controller
                 'due_date' => $invoice->due_date?->toIso8601String(),
                 'created_at' => $invoice->created_at?->toIso8601String(),
                 'status' => $invoice->status,
-                'settlement_position' => $this->mapPosition($settlementPosition),
-                'charges' => $this->mapCharges($lines, $settlementPosition),
+                'settlement_position' => $this->mapPosition($settlementPosition, $invoice, $holding),
+                'charges' => $this->mapCharges($lines, $settlementPosition, $invoice, $holding),
                 'settlement_entries' => $this->mapSettlementEntries($lines, $paymentHistory),
             ],
         ]);
     }
 
-    private function mapCharges(Collection $lines, SettlementPosition $invoicePosition): array
+    /**
+     * @param  array<int, array{holding: bool, needs_review: bool}>  $holding
+     */
+    private function mapCharges(Collection $lines, SettlementPosition $invoicePosition, StudentInvoice $invoice, array $holding): array
     {
         $linePositions = collect($invoicePosition->payable_line_breakdown)
             ->keyBy(fn (SettlementPosition $position): int => (int) $position->payable_line_id);
 
         return $lines
-            ->map(function (InvoiceLine $line) use ($linePositions): array {
+            ->map(function (InvoiceLine $line) use ($linePositions, $invoice, $holding): array {
                 $position = $linePositions->get((int) $line->id);
 
                 return [
@@ -128,6 +138,9 @@ class BillingInvoiceController extends Controller
                     'amounts' => $position?->amounts ? $this->mapAmounts($position->amounts) : null,
                     'valid' => $position?->isValid() ?? false,
                     'settlement_state' => $position?->settlement_state,
+                    'money_item_status' => $position
+                        ? $this->positionPresenter->summarize($position, false, $this->lineContext($position, $line, $invoice, $holding))['money_item_status']
+                        : null,
                     'issues' => $position === null ? [] : $this->mapIssues($position->issues),
                     'effective_at' => $line->charge?->effective_at?->toIso8601String(),
                     'source_type' => $line->charge?->charge_type === FinanceCharge::TYPE_MANUAL_FEE
@@ -206,9 +219,17 @@ class BillingInvoiceController extends Controller
             ->all();
     }
 
-    /** @return PositionPayload */
-    private function mapPosition(SettlementPosition $position): array
+    /**
+     * @param  array<int, array{holding: bool, needs_review: bool}>  $holding
+     * @return PositionPayload
+     */
+    private function mapPosition(SettlementPosition $position, StudentInvoice $invoice, array $holding, ?InvoiceLine $line = null): array
     {
+        $context = $line instanceof InvoiceLine
+            ? $this->lineContext($position, $line, $invoice, $holding)
+            : $this->invoiceContext($position, $invoice, $holding);
+        $summary = $this->positionPresenter->summarize($position, false, $context);
+
         return [
             'scope_type' => $position->scope_type,
             'scope_id' => $position->scope_id,
@@ -225,15 +246,62 @@ class BillingInvoiceController extends Controller
             'amounts' => $position->amounts ? $this->mapAmounts($position->amounts) : null,
             'raw_evidence' => $this->mapRawEvidence($position),
             'issues' => $this->mapIssues($position->issues),
+            'money_item_status' => $summary['money_item_status'],
             'breakdown_reconciliation' => [
                 'status' => $position->isValid() ? 'exact' : 'invalid',
                 'rounding_remainder' => $this->mapMoney(Money::zero()),
             ],
             'payable_line_breakdown' => array_map(
-                fn (SettlementPosition $linePosition): array => $this->mapPosition($linePosition),
+                function (SettlementPosition $linePosition) use ($invoice, $holding): array {
+                    $line = $invoice->invoiceLines->first(
+                        static fn (InvoiceLine $invoiceLine): bool => (int) $invoiceLine->id === (int) $linePosition->payable_line_id,
+                    );
+
+                    return $this->mapPosition($linePosition, $invoice, $holding, $line instanceof InvoiceLine ? $line : null);
+                },
                 $position->payable_line_breakdown,
             ),
         ];
+    }
+
+    /**
+     * @param  array<int, array{holding: bool, needs_review: bool}>  $holding
+     */
+    private function invoiceContext(SettlementPosition $position, StudentInvoice $invoice, array $holding): MoneyItemStatusContext
+    {
+        $holdingAny = false;
+        $reviewAny = false;
+        foreach ($invoice->invoiceLines as $line) {
+            $flags = $holding[(int) $line->id] ?? ['holding' => false, 'needs_review' => false];
+            $holdingAny = $holdingAny || $flags['holding'];
+            $reviewAny = $reviewAny || $flags['needs_review'];
+        }
+
+        return new MoneyItemStatusContext(
+            position: $position,
+            dngHoldingThisItem: $holdingAny,
+            dngNeedsReview: $reviewAny,
+            chargeVoid: $invoice->invoiceLines->isNotEmpty()
+                && $invoice->invoiceLines->every(static fn (InvoiceLine $line): bool => ($line->status ?? 'active') !== 'active'
+                    || $line->charge?->status === FinanceCharge::STATUS_VOID),
+            dueDate: $invoice->due_date,
+        );
+    }
+
+    /**
+     * @param  array<int, array{holding: bool, needs_review: bool}>  $holding
+     */
+    private function lineContext(SettlementPosition $position, InvoiceLine $line, StudentInvoice $invoice, array $holding): MoneyItemStatusContext
+    {
+        $flags = $holding[(int) $line->id] ?? ['holding' => false, 'needs_review' => false];
+
+        return new MoneyItemStatusContext(
+            position: $position,
+            dngHoldingThisItem: $flags['holding'],
+            dngNeedsReview: $flags['needs_review'],
+            chargeVoid: ($line->status ?? 'active') !== 'active' || $line->charge?->status === FinanceCharge::STATUS_VOID,
+            dueDate: $invoice->due_date,
+        );
     }
 
     /** @return AmountsPayload */

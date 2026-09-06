@@ -32,6 +32,13 @@ interface SettlementIssue {
     finance_invariant_code: string | null;
 }
 
+interface MoneyItemStatus {
+    code: string;
+    label_staff: string;
+    label_student: string;
+    hide_amounts: boolean;
+}
+
 interface SettlementPosition {
     scope_type: string;
     scope_id: number;
@@ -48,6 +55,7 @@ interface SettlementPosition {
     amounts: SettlementAmounts | null;
     raw_evidence: Record<string, Money>;
     issues: SettlementIssue[];
+    money_item_status?: MoneyItemStatus;
     payable_line_breakdown: SettlementPosition[];
     breakdown_reconciliation: {
         status: string;
@@ -63,6 +71,7 @@ interface Charge {
     amounts: SettlementAmounts | null;
     valid: boolean;
     settlement_state: string | null;
+    money_item_status?: MoneyItemStatus;
     issues: SettlementIssue[];
     effective_at: string | null;
     source_type: string | null;
@@ -120,20 +129,12 @@ interface Invoice {
 
 const props = defineProps<{ invoice: Invoice }>();
 
-const statusLabel = (state: string): string =>
-    ({
-        unpaid: 'Chưa thu',
-        partially_settled: 'Đang thu',
-        settled_by_cash: 'Đã thu',
-        settled_by_reduction: 'Đã giảm trừ',
-        surplus: 'Còn dư',
-        invalid: 'Cần kiểm tra',
-        missing: 'Cần kiểm tra',
-    })[state] ?? state;
+const statusLabel = (item: { money_item_status?: MoneyItemStatus; settlement_state?: string | null }): string =>
+    item.money_item_status?.label_staff ?? item.settlement_state ?? 'Chờ thanh toán';
 
-const getStatusBadgeVariant = (state: string) => {
-    if (state === 'invalid' || state === 'missing') return 'destructive';
-    if (state === 'settled_by_cash' || state === 'settled_by_reduction') return 'success';
+const getStatusBadgeVariant = (code: string | undefined) => {
+    if (code === 'reviewing' || code === 'overdue') return 'destructive';
+    if (code === 'completed' || code === 'adjusted') return 'success';
     return 'outline';
 };
 
@@ -190,8 +191,8 @@ const formatEvidence = (evidence: SettlementIssue['evidence']): string =>
             <div>
                 <h2 class="flex items-center gap-2 text-3xl font-bold tracking-tight">
                     Invoice {{ props.invoice.invoice_number }}
-                    <Badge :variant="getStatusBadgeVariant(props.invoice.settlement_position.settlement_state)">
-                        {{ statusLabel(props.invoice.settlement_position.settlement_state) }}
+                    <Badge :variant="getStatusBadgeVariant(props.invoice.settlement_position.money_item_status?.code)">
+                        {{ statusLabel(props.invoice.settlement_position) }}
                     </Badge>
                     <span v-if="props.invoice.status === 'overdue'" class="text-destructive flex items-center gap-1 text-xs"> <AlertCircle class="h-3 w-3" /> Overdue </span>
                 </h2>
@@ -290,7 +291,7 @@ const formatEvidence = (evidence: SettlementIssue['evidence']): string =>
                                 <TableCell class="text-right text-sky-600">{{ formatCurrency(charge.amounts.credit.amount) }}</TableCell>
                                 <TableCell class="text-right font-medium">{{ formatCurrency(charge.amounts.remaining.amount) }}</TableCell>
                                 <TableCell
-                                    ><Badge variant="outline">{{ statusLabel(charge.settlement_state || 'invalid') }}</Badge></TableCell
+                                    ><Badge variant="outline">{{ statusLabel(charge) }}</Badge></TableCell
                                 >
                             </template>
                             <template v-else>

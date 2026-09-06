@@ -6,7 +6,7 @@ audience:
     - Finance maintainers
 status: current
 owner: Finance Team
-last_verified: 2026-07-25
+last_verified: 2026-09-06
 scope: student-finance-api
 source_of_truth:
     - routes/api/v1/student.php
@@ -51,9 +51,15 @@ Finance Settlement Position. Cached invoice status is not authoritative for
 payment state.
 
 Responses can include `settlement_position` with `valid`, `mode`, `state`,
-`message`, and `issues`. If `valid` is false, clients must show the supplied
-message and preserve nullable derived monetary fields. They must not substitute
-zero or infer a paid state.
+`message`, `issues`, and `money_item_status`. If `valid` is false or
+`money_item_status.hide_amounts` is true, clients must show
+`money_item_status.label_student` (or `message`) and preserve nullable derived
+monetary fields. They must not substitute zero or infer a paid state.
+
+`money_item_status` is derived, never stored. Codes: `reviewing`, `adjusted`,
+`completed`, `processing`, `overdue`, `awaiting_payment`. Overdue requires a
+staff-chosen due date; a missing due date is never overdue. `processing` applies
+only to a payable line targeted by an active DNG reservation.
 
 Monetary terms:
 
