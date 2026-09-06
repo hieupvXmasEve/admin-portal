@@ -105,7 +105,7 @@ phạm vi khác hẳn: **một ngày hạn nộp**, không phải thực thể �
 | # | Phase | Status |
 |---|-------|--------|
 | 1 | [Phase 1: Toàn vẹn ưu tiên phân bổ tiền](./phase-01-start.md) | Completed |
-| 3 | [Phase 3: Thu tay một thao tác + phiếu thu nội bộ](./phase-03-manual-payment-single-action.md) | Pending |
+| 3 | [Phase 3: Thu tay một thao tác + phiếu thu nội bộ](./phase-03-manual-payment-single-action.md) | Completed |
 | 4 | [Phase 4: Trạng thái khoản thu hợp nhất](./phase-04-unified-money-item-status.md) | Pending |
 | 5 | [Phase 5: Một ngày hạn nộp duy nhất](./phase-05-single-due-date.md) | Pending |
 | 6 | [Phase 6: Thông báo học phí](./phase-06-tuition-notice.md) | Pending |
@@ -116,7 +116,7 @@ phạm vi khác hẳn: **một ngày hạn nộp**, không phải thực thể �
 ## Success Criteria
 
 - [x] `priority_order` từ mọi đường vào chỉ nhận giá trị thuộc enum loại phí và phủ đủ 8 loại debit; giá trị lạ bị từ chối chứ không xếp cuối im lặng — Phase 1.
-- [ ] Kế toán ghi một khoản tiền mặt/CK: tiền được phân bổ theo đúng ưu tiên, phiếu thu in được, và trạng thái Academic (retake/resit) đồng bộ ngay — Phase 3.
+- [x] Kế toán ghi một khoản tiền mặt/CK: tiền được phân bổ theo đúng ưu tiên, phiếu thu in được, và trạng thái Academic (retake/resit) đồng bộ ngay — Phase 3.
 - [ ] Một khoản thu có **một** trạng thái hiển thị; portal và mọi trang staff đọc cùng nguồn; không còn map nhãn trùng trong `resources/js` — Phase 4.
 - [ ] Mọi charge/invoice sinh ra mang **ngày hạn nộp do người chọn**; `grep -rn "addDays(30)" app/Modules/Finance` trả 0 — Phase 5.
 - [ ] Thông báo học phí gửi được cho SV + PH, in được, số tiền khớp Settlement Position lúc phát; campus thiếu template ⇒ **fail rõ ràng**, không gửi boilerplate — Phase 6.

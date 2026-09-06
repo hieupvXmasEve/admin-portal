@@ -6,6 +6,7 @@ namespace App\Modules\Finance\Services;
 
 use App\Modules\Finance\Dng\Models\DngPaymentRequestReservationTarget;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinancePaymentVoucher;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\PaymentApplication;
@@ -53,6 +54,7 @@ class PaymentService
                 'received_by_user_id' => $data['received_by_user_id'] ?? $this->currentUserId(),
                 'raw_payload' => $data['raw_payload'] ?? null,
                 'notes' => $data['notes'] ?? null,
+                'idempotency_key' => $data['idempotency_key'] ?? null,
             ]);
 
             $this->publishInvoicePaidDomainEvent($payment);
@@ -109,8 +111,8 @@ class PaymentService
     /**
      * Allocate a payment to specific charges.
      *
-     * @param  array  $allocations  Array of ['charge_id' => amount]
-     * @return Collection<PaymentApplication>
+     * @param  array<int, float>  $allocations  Array of ['charge_id' => amount]
+     * @return Collection<int, PaymentApplication>
      */
     public function allocatePayment(
         int $paymentId,
@@ -118,29 +120,41 @@ class PaymentService
         ?int $userId = null,
         bool $allowHeldTargets = false,
     ): Collection {
+        return $this->allocatePaymentWithReport($paymentId, $allocations, $userId, $allowHeldTargets)['applications'];
+    }
+
+    /**
+     * @param  array<int, float>  $allocations
+     * @return array{applications: Collection<int, PaymentApplication>, skipped: list<array{charge_id: int, reason: string}>}
+     */
+    public function allocatePaymentWithReport(
+        int $paymentId,
+        array $allocations,
+        ?int $userId = null,
+        bool $allowHeldTargets = false,
+    ): array {
         $payment = Payment::findOrFail($paymentId);
         $createdAllocations = collect();
+        $skipped = [];
         $billingAccountId = (int) $this->billingAccountProvisioner
             ->forStudent((int) $payment->student_id)
             ->id;
 
-        $this->settlementMutationGuard->handle($billingAccountId, function () use ($payment, $allocations, $userId, $allowHeldTargets, &$createdAllocations): void {
-            DB::transaction(function () use ($payment, $allocations, $userId, $allowHeldTargets, &$createdAllocations): void {
-                // FIN-11/DB-09: lock the payment row and recompute the unapplied
-                // amount inside the transaction. Concurrent allocators (DNG webhook
-                // bridge + batch auto-allocate) serialize on this lock, so the same
-                // payment can never be applied beyond its unapplied balance.
+        $this->settlementMutationGuard->handle($billingAccountId, function () use ($payment, $allocations, $userId, $allowHeldTargets, &$createdAllocations, &$skipped): void {
+            DB::transaction(function () use ($payment, $allocations, $userId, $allowHeldTargets, &$createdAllocations, &$skipped): void {
                 $lockedPayment = Payment::query()->lockForUpdate()->findOrFail($payment->id);
                 $remainingUnapplied = $this->settlementService->getPaymentUnappliedAmount($lockedPayment);
 
                 foreach ($allocations as $chargeId => $amount) {
-                    if ($amount <= 0 || $remainingUnapplied <= 0) {
+                    if ($amount <= 0) {
+                        continue;
+                    }
+                    if ($remainingUnapplied <= 0) {
+                        $skipped[] = ['charge_id' => (int) $chargeId, 'reason' => FinancePaymentVoucher::SKIP_CAPPED];
+
                         continue;
                     }
 
-                    // FIN-11/DB-09: lock the target line too. Concurrent allocators
-                    // racing onto the same line serialize here and re-read its
-                    // outstanding, so a line can never be applied beyond its balance.
                     $line = InvoiceLine::query()
                         ->where('charge_id', (int) $chargeId)
                         ->where('status', 'active')
@@ -150,6 +164,8 @@ class PaymentService
                         ->first();
 
                     if (! $line) {
+                        $skipped[] = ['charge_id' => (int) $chargeId, 'reason' => FinancePaymentVoucher::SKIP_NO_ACTIVE_LINE];
+
                         continue;
                     }
 
@@ -158,26 +174,29 @@ class PaymentService
                         ->whereHas('dngPaymentRequest', fn ($query) => $query->holdingCollection())
                         ->lockForUpdate()
                         ->exists()) {
+                        $skipped[] = ['charge_id' => (int) $chargeId, 'reason' => FinancePaymentVoucher::SKIP_DNG_HELD];
+
                         continue;
                     }
 
-                    // Never apply one student's payment onto another student's line.
                     $lineStudentId = $line->invoice?->student_id;
                     if ($lineStudentId !== null && (int) $lineStudentId !== (int) $lockedPayment->student_id) {
+                        $skipped[] = ['charge_id' => (int) $chargeId, 'reason' => FinancePaymentVoucher::SKIP_STUDENT_MISMATCH];
+
                         continue;
                     }
 
-                    // Cap by BOTH the payment's remaining unapplied amount AND the
-                    // line's outstanding balance — a too-large requested amount
-                    // (e.g. DNG pivot rounding) becomes unapplied credit, never line overpay.
-                    $applyAmount = min(
-                        (float) $amount,
-                        $remainingUnapplied,
-                        $this->settlementService->getLineOutstandingAmount($line),
-                    );
+                    $outstanding = $this->settlementService->getLineOutstandingAmount($line);
+                    $applyAmount = min((float) $amount, $remainingUnapplied, $outstanding);
 
                     if ($applyAmount <= 0) {
+                        $skipped[] = ['charge_id' => (int) $chargeId, 'reason' => FinancePaymentVoucher::SKIP_CAPPED];
+
                         continue;
+                    }
+
+                    if ($applyAmount < (float) $amount) {
+                        $skipped[] = ['charge_id' => (int) $chargeId, 'reason' => FinancePaymentVoucher::SKIP_CAPPED];
                     }
 
                     $allocation = $this->settlementService->createPaymentApplication(
@@ -196,7 +215,10 @@ class PaymentService
             });
         });
 
-        return $createdAllocations;
+        return [
+            'applications' => $createdAllocations,
+            'skipped' => $skipped,
+        ];
     }
 
     /**

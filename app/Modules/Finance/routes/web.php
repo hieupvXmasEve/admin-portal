@@ -180,6 +180,11 @@ Route::middleware(['auth', 'web'])->prefix('finance')->name('finance.')->group(f
     Route::post('/students/{student}/payments', [FinanceStudentPaymentController::class, 'store'])
         ->middleware('can:create_finance_payments')
         ->name('students.payments.store');
+    Route::post('/students/{student}/payments/preview', [FinanceStudentPaymentController::class, 'proposedAllocatePreview'])
+        ->middleware('can:create_finance_payments')
+        ->name('students.payments.preview');
+    Route::get('/payments/{payment}/receipt', [FinanceStudentPaymentController::class, 'receipt'])
+        ->name('payments.receipt');
 
     // Global finance search (JSON) for the ⌘K palette
     Route::get('/search', [FinanceGlobalSearchController::class, 'search'])

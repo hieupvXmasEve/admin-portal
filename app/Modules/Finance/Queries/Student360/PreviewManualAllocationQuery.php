@@ -31,10 +31,25 @@ class PreviewManualAllocationQuery
     /** @return array<string,mixed> */
     public function handle(Payment $payment): array
     {
-        $unapplied = $this->settlement->getPaymentUnappliedAmount($payment);
+        return $this->preview(
+            (int) $payment->student_id,
+            $this->settlement->getPaymentUnappliedAmount($payment),
+            (int) $payment->id,
+        );
+    }
+
+    /** @return array<string,mixed> */
+    public function handleProposed(int $studentId, float $amount): array
+    {
+        return $this->preview($studentId, $amount, null);
+    }
+
+    /** @return array<string,mixed> */
+    private function preview(int $studentId, float $unapplied, ?int $paymentId): array
+    {
         $remaining = $unapplied;
 
-        $lines = $this->orderedCandidateLines((int) $payment->student_id);
+        $lines = $this->orderedCandidateLines($studentId);
         $positions = $this->settlementPositionReader->batch(
             $lines->map(static fn (InvoiceLine $line): SettlementPositionScope => SettlementPositionScope::payableLine((int) $line->id))->all(),
         );
@@ -46,7 +61,7 @@ class PreviewManualAllocationQuery
         );
         if ($missingLine instanceof InvoiceLine) {
             return [
-                'payment_id' => (int) $payment->id,
+                'payment_id' => $paymentId,
                 'unapplied' => $unapplied,
                 'candidates' => [],
                 'settlement_position' => $this->batchCardinalityMismatch((int) $missingLine->id),
@@ -58,7 +73,7 @@ class PreviewManualAllocationQuery
 
         if ($invalidPosition instanceof SettlementPosition) {
             return [
-                'payment_id' => (int) $payment->id,
+                'payment_id' => $paymentId,
                 'unapplied' => $unapplied,
                 'candidates' => [],
                 'settlement_position' => $this->positionPresenter->summarize($invalidPosition),
@@ -91,9 +106,10 @@ class PreviewManualAllocationQuery
             ->all();
 
         return [
-            'payment_id' => (int) $payment->id,
+            'payment_id' => $paymentId,
             'unapplied' => $unapplied,
             'candidates' => $candidates,
+            'leftover' => max(0.0, $remaining),
             'settlement_position' => [
                 'valid' => true,
                 'issues' => [],

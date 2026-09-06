@@ -6,7 +6,6 @@ namespace App\Modules\Finance\Models;
 
 use App\Models\Student;
 use App\Models\User;
-
 use App\Modules\Finance\Services\SettlementService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -25,6 +24,7 @@ class Payment extends Model
         'received_by_user_id',
         'raw_payload',
         'notes',
+        'idempotency_key',
     ];
 
     protected $casts = [
@@ -89,6 +89,11 @@ class Payment extends Model
     public function applications(): HasMany
     {
         return $this->hasMany(PaymentApplication::class);
+    }
+
+    public function vouchers(): HasMany
+    {
+        return $this->hasMany(FinancePaymentVoucher::class);
     }
 
     // =====================

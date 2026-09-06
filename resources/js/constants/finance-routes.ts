@@ -50,6 +50,8 @@ export const FINANCE_ROUTE_NAMES = {
     PAYMENT_SURPLUS_DISPOSE: 'finance.payments.surplus-dispositions.store',
     PAYMENT_ALLOCATE: 'finance.payments.allocate',
     STUDENT_PAYMENT_STORE: 'finance.students.payments.store',
+    STUDENT_PAYMENT_PREVIEW: 'finance.students.payments.preview',
+    PAYMENT_RECEIPT: 'finance.payments.receipt',
     DNG_CANCEL_IMPACT: 'finance.dng.payment-requests.cancel-impact',
     DNG_CANCEL_REVIEWED: 'finance.dng.payment-requests.cancel-reviewed',
     INSTALLMENT_RETRY_PUSH: 'finance.charges.installments.retry-push',
