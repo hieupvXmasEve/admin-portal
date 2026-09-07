@@ -400,7 +400,6 @@ export interface Student360StatusCards {
 export interface Student360Actions {
     can_record_payment: boolean;
     can_allocate: boolean;
-    can_refund_surplus: boolean;
     can_forfeit_surplus: boolean;
     can_cancel_dng: boolean;
     can_void_charges: boolean;

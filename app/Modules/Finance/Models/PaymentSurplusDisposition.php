@@ -12,9 +12,12 @@ class PaymentSurplusDisposition extends Model
 {
     public const TYPE_REALLOCATE = 'reallocate';
 
+    /** Historical enum value. New writes are rejected by policy. */
     public const TYPE_REFUND = 'refund';
 
     public const TYPE_RETAIN_FORFEIT = 'retain_forfeit';
+
+    public const REFUND_BLOCKED_MESSAGE = 'chính sách hiện tại không hoàn tiền';
 
     protected $fillable = [
         'payment_id', 'idempotency_key', 'type', 'amount', 'payment_application_id',

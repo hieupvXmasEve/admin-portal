@@ -61,7 +61,8 @@ it('reports action permission flags from the user permissions', function () {
             ->where('actions.can_record_payment', true)
             ->where('actions.can_cancel_dng', true)
             ->where('actions.can_void_charges', false)
-            ->where('actions.can_allocate', false));
+            ->where('actions.can_allocate', false)
+            ->missing('actions.can_refund_surplus'));
 });
 
 it('surfaces the latest unapplied payment id on the balance card', function () {

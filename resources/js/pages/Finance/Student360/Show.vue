@@ -49,7 +49,7 @@ const cancelDngId = ref<number | null>(null);
 const dispositionOpen = ref(false);
 const dispositionPaymentId = ref<number | null>(null);
 const dispositionAmount = ref(0);
-const dispositionType = ref<'refund' | 'retain_forfeit'>('refund');
+const dispositionType = ref<'retain_forfeit'>('retain_forfeit');
 const tuitionKpis = computed<Array<StudentFinanceOverviewKpi & { key: string; tone: string }>>(() => [
     {
         ...props.tuition_overview.kpis.collectible_due,
@@ -89,10 +89,10 @@ const openAllocatePayment = (paymentId: number): void => {
     allocateOpen.value = true;
 };
 
-const openDisposition = (row: StudentFinancePaymentHistoryRow, type: 'refund' | 'retain_forfeit'): void => {
+const openDisposition = (row: StudentFinancePaymentHistoryRow): void => {
     dispositionPaymentId.value = row.id;
     dispositionAmount.value = row.surplus_amount;
-    dispositionType.value = type;
+    dispositionType.value = 'retain_forfeit';
     dispositionOpen.value = true;
 };
 
@@ -282,8 +282,7 @@ onMounted(() => {
                                 <td class="px-4 py-3 text-right">
                                     <div v-if="row.surplus_amount > 0" class="flex justify-end gap-1">
                                         <Button v-if="row.action.can_allocate && props.actions.can_allocate" size="sm" variant="outline" @click="openAllocatePayment(row.id)">Phân bổ</Button>
-                                        <Button v-if="props.actions.can_refund_surplus" size="sm" variant="outline" @click="openDisposition(row, 'refund')">Hoàn tiền</Button>
-                                        <Button v-if="props.actions.can_forfeit_surplus" size="sm" variant="outline" @click="openDisposition(row, 'retain_forfeit')">Giữ lại</Button>
+                                        <Button v-if="props.actions.can_forfeit_surplus" size="sm" variant="outline" @click="openDisposition(row)">Giữ lại</Button>
                                     </div>
                                     <p v-else-if="row.action.message" class="text-muted-foreground ml-auto max-w-[220px] text-xs">
                                         {{ row.action.message }}

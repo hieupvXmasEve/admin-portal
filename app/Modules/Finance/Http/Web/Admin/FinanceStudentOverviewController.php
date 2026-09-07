@@ -89,7 +89,6 @@ class FinanceStudentOverviewController extends Controller
         $props['actions'] = [
             'can_record_payment' => $request->user()?->can('create_finance_payments') ?? false,
             'can_allocate' => $request->user()?->can('allocate_finance_payment') ?? false,
-            'can_refund_surplus' => $request->user()?->can('refund_finance_payment') ?? false,
             'can_forfeit_surplus' => $request->user()?->can('forfeit_finance_payment_surplus') ?? false,
             'can_cancel_dng' => $request->user()?->can('create_finance_payments') ?? false,
             'can_void_charges' => $request->user()?->can('void_finance_charges') ?? false,
