@@ -9,6 +9,8 @@ use App\Models\CourseOffering;
 use App\Models\CourseRetakeRegistration;
 use App\Models\ExamResitAttempt;
 use App\Models\Unit;
+use App\Modules\Academic\Delivery\Support\NonCancelledRetakeRegistration;
+use App\Modules\Academic\Delivery\Support\OccupiedExamResitAttempt;
 use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Services\V1\Student\PrerequisiteValidationService;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
@@ -73,65 +75,42 @@ class CreateRetakeCourseRegistrationAction
                 ]);
             }
 
-            // Validate academic record exists and student did not pass
-            // Uses is_passed field (not completion_status which indicates finalization state)
             $academicRecord = AcademicRecord::where('id', $data['original_academic_record_id'])
                 ->where('student_id', $data['student_id'])
                 ->where('unit_id', $data['unit_id'])
-                ->where('is_passed', false)
-                ->where('completion_status', '!=', 'in_progress')
-                ->where(fn ($q) => $q->where('override_pass', false)->orWhereNull('override_pass'))
+                ->lockForUpdate()
                 ->firstOrFail();
 
-            // Failure-routing gate (ACAD-RET-001 Slice 2). Block the explicit
-            // grade-only reason UNLESS the record already sat a completed exam-resit
-            // attempt and is still failing — the resit path is exhausted, so it falls
-            // back into the retake lane (mirrors ListRetakeCourseEligibleStudentsQuery).
-            // Attendance/both/manual stay eligible, and legacy un-backfilled records
-            // (failure_reason = null) keep their historical eligibility. NOTE: the
-            // exam-resit lane (Delivery\Actions\CreateExamResitAttemptAction) no longer
-            // excludes attendance/both/manual/null on failure_reason, so a non-grade-only
-            // failure can now be registered in both lanes — the in-flight-resit guard
-            // below only blocks while a sitting is pending, not after both are used.
-            if ($academicRecord->failure_reason === AcademicRecord::FAILURE_GRADE_FAILED) {
-                // Owner rule #8: a completed OR no-show resit sitting exhausts
-                // the resit path — the record then falls into the retake lane.
-                $hasConsumedResit = ExamResitAttempt::query()
-                    ->where('academic_record_id', $academicRecord->id)
-                    ->whereIn('status', [ExamResitAttempt::STATUS_COMPLETED, ExamResitAttempt::STATUS_NO_SHOW])
-                    ->exists();
-
-                if (! $hasConsumedResit) {
-                    throw ValidationException::withMessages([
-                        'failure_reason' => ['Sinh viên fail do điểm phải đi luồng thi lại, không đủ điều kiện học lại.'],
-                    ]);
-                }
-            }
-
-            // Cross-lane guard: block while a resit sitting is still pending on this
-            // record — the resit path isn't exhausted yet.
-            $hasInFlightResit = ExamResitAttempt::query()
-                ->where('academic_record_id', $academicRecord->id)
-                ->whereIn('status', ExamResitAttempt::IN_FLIGHT_STATUSES)
-                ->exists();
-
-            if ($hasInFlightResit) {
+            if ((bool) $academicRecord->is_passed || (bool) $academicRecord->override_pass) {
                 throw ValidationException::withMessages([
-                    'failure_reason' => ['Sinh viên đang có lượt thi lại chưa hoàn tất cho môn này, không thể đăng ký học lại.'],
+                    'unit_id' => ['Sinh viên đã pass môn này, không thể đăng ký học lại.'],
                 ]);
             }
 
-            // Check for existing non-terminal registration (soft unique constraint)
-            $existingActive = CourseRetakeRegistration::query()
-                ->where('student_id', $data['student_id'])
-                ->where('unit_id', $data['unit_id'])
-                ->where('semester_id', $data['semester_id'])
-                ->nonTerminal()
-                ->exists();
+            if ($academicRecord->completion_status === 'in_progress' || $academicRecord->grade_status !== 'final') {
+                throw ValidationException::withMessages([
+                    'original_academic_record_id' => ['Bản ghi học tập chưa chốt, chưa thể đăng ký học lại.'],
+                ]);
+            }
+
+            $hasOccupiedResit = OccupiedExamResitAttempt::constrain(
+                ExamResitAttempt::query()->where('academic_record_id', $academicRecord->id)
+            )->exists();
+
+            if ($hasOccupiedResit) {
+                throw ValidationException::withMessages([
+                    'failure_reason' => ['Bản ghi này đang có lượt thi lại chưa hoàn tất, không thể đăng ký học lại.'],
+                ]);
+            }
+
+            $existingActive = NonCancelledRetakeRegistration::constrain(
+                CourseRetakeRegistration::query()
+                    ->where('original_academic_record_id', $academicRecord->id)
+            )->exists();
 
             if ($existingActive) {
                 throw ValidationException::withMessages([
-                    'student_id' => ['Sinh viên đã có đăng ký học lại đang xử lý cho môn này trong kỳ này.'],
+                    'student_id' => ['Sinh viên đã có đăng ký học lại cho bản ghi này.'],
                 ]);
             }
 

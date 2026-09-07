@@ -9,6 +9,8 @@ use App\Models\CourseOffering;
 use App\Models\CourseRetakeRegistration;
 use App\Models\ExamResitAttempt;
 use App\Models\Student;
+use App\Modules\Academic\Delivery\Support\NonCancelledRetakeRegistration;
+use App\Modules\Academic\Delivery\Support\OccupiedExamResitAttempt;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -21,15 +23,12 @@ class ListRetakeCourseEligibleStudentsQuery
      * Eligibility:
      * 1. Student.status = 'intake_course'
      * 2. Has AcademicRecord with is_passed = false, completion_status finalized (not in_progress),
-     *    and override_pass = false (not overridden to pass)
-     * 3. failure_reason routes to the course-retake lane (ACAD-RET-001 Slice 2): grade-only
-     *    failures (`grade_failed`) go to exam resit (`thi lại`) instead — UNLESS the record
-     *    already has a completed exam-resit attempt and is still failing, meaning the resit
-     *    path is exhausted and the record falls back to course retake. Attendance/both/manual
-     *    and legacy null failure_reason stay eligible (forward-only).
-     * 4. No existing non-terminal course_retake_registrations for same student+unit+semester.
-     * 5. No in-flight (not yet completed) exam-resit attempt for the record (cross-lane guard):
-     *    while a resit sitting is pending, the record isn't retake-eligible yet.
+     *    grade_status = final, and override_pass = false
+     * 3. Any failure_reason (including grade_failed). Staff choose thi lại or học lại.
+     * 4. No non-cancelled course_retake_registration for the same original academic record
+     *    (including enrolled). Cancelled retakes reopen both lists.
+     * 5. No occupied exam-resit for the record (requested/approved/scheduled/
+     *    finance_pending_cancellation). Cancelled/completed/no-show do not hide.
      * 6. Open CourseOfferings are attached when available, but are not required at source creation.
      *
      * `semester_id` scopes the *operation* semester (course-offering/registration matching for
@@ -71,8 +70,8 @@ class ListRetakeCourseEligibleStudentsQuery
             ->whereHas('academicRecords', function (Builder $q) use ($unitId, $failedSemesterId): void {
                 $q->where('is_passed', false)
                     ->where('completion_status', '!=', 'in_progress')
-                    ->where(fn (Builder $q) => $q->where('override_pass', false)->orWhereNull('override_pass'))
-                    ->where(fn (Builder $q) => $this->scopeToRetakeLane($q));
+                    ->where('grade_status', 'final')
+                    ->where(fn (Builder $q) => $q->where('override_pass', false)->orWhereNull('override_pass'));
                 if ($unitId) {
                     $q->where('unit_id', $unitId);
                 }
@@ -111,28 +110,21 @@ class ListRetakeCourseEligibleStudentsQuery
             ->whereIn('student_id', $studentIds)
             ->where('is_passed', false)
             ->where('completion_status', '!=', 'in_progress')
+            ->where('grade_status', 'final')
             ->where(fn (Builder $q) => $q->where('override_pass', false)->orWhereNull('override_pass'))
-            ->where(fn (Builder $q) => $this->scopeToRetakeLane($q))
             ->when($unitId, fn (Builder $q, int $id) => $q->where('unit_id', $id))
             ->when($failedSemesterId, fn (Builder $q, int $id) => $q->where('semester_id', $id))
             ->with(['unit', 'semester'])
             ->get()
             ->groupBy('student_id');
 
-        // Records currently mid-resit (not yet completed) — blocked from retake lane.
-        $inFlightResitRecordIds = ExamResitAttempt::query()
-            ->whereIn('student_id', $studentIds)
-            ->whereIn('status', ExamResitAttempt::IN_FLIGHT_STATUSES)
-            ->pluck('academic_record_id');
+        $occupiedResitRecordIds = OccupiedExamResitAttempt::constrain(
+            ExamResitAttempt::query()->whereIn('student_id', $studentIds)
+        )->pluck('academic_record_id');
 
-        // Existing non-terminal retake registrations — one query, matched in memory.
-        $activeRegistrations = CourseRetakeRegistration::query()
-            ->whereIn('student_id', $studentIds)
-            ->when($semesterId, fn (Builder $q, int $id) => $q->where('semester_id', $id))
-            ->nonTerminal()
-            ->get(['student_id', 'unit_id'])
-            ->map(fn ($row) => "{$row->student_id}:{$row->unit_id}")
-            ->flip();
+        $occupiedRetakeRecordIds = NonCancelledRetakeRegistration::constrain(
+            CourseRetakeRegistration::query()->whereIn('student_id', $studentIds)
+        )->pluck('original_academic_record_id');
 
         // All units that could still need an offering, fetched once and grouped.
         $offeringsByUnit = CourseOffering::query()
@@ -161,11 +153,11 @@ class ListRetakeCourseEligibleStudentsQuery
                     continue;
                 }
 
-                if ($inFlightResitRecordIds->contains($record->id)) {
+                if ($occupiedResitRecordIds->contains($record->id)) {
                     continue;
                 }
 
-                if ($activeRegistrations->has("{$student->id}:{$record->unit_id}")) {
+                if ($occupiedRetakeRecordIds->contains($record->id)) {
                     continue;
                 }
 
@@ -179,27 +171,5 @@ class ListRetakeCourseEligibleStudentsQuery
         }
 
         return $results;
-    }
-
-    /**
-     * Constrain an AcademicRecord query to failures that belong to the course-retake
-     * lane. Grade-only failures (`grade_failed`) are excluded — everything else
-     * (attendance/both/manual failures, legacy un-backfilled `null` records) remains
-     * eligible — EXCEPT a `grade_failed` record that already sat a completed exam-resit
-     * attempt: the resit path is exhausted and still failing, so it falls back into the
-     * retake lane. Exam resit no longer excludes these on `failure_reason`
-     * (see {@see \App\Modules\Academic\Delivery\Queries\ListExamResitEligibleStudentsQuery}),
-     * so a non-grade-only failure can be eligible in both lanes at once; the in-flight-resit
-     * guard in {@see handle()} prevents concurrent registration while a resit is pending.
-     *
-     * @param  Builder<AcademicRecord>  $query
-     */
-    private function scopeToRetakeLane(Builder $query): void
-    {
-        $query->where('failure_reason', '!=', AcademicRecord::FAILURE_GRADE_FAILED)
-            ->orWhereNull('failure_reason')
-            ->orWhereHas('examResitAttempts', function (Builder $q): void {
-                $q->where('status', ExamResitAttempt::STATUS_COMPLETED);
-            });
     }
 }

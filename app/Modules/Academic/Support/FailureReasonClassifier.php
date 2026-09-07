@@ -8,18 +8,17 @@ use App\Shared\Support\Academic\CourseGradeScale;
 
 /**
  * Pure classifier that decides, at course finalization, whether a student passed
- * and — when they did not — the explicit `failure_reason` that routes them to the
- * correct remediation lane (ACAD-RET-001).
+ * and — when they did not — the explicit `failure_reason` label.
  *
  * Policy (locked decisions):
  * - Grade failure  → `grade_failed`.
  * - Attendance failure (or both) → `attendance_failed` / `both_failed`.
- *   NOTE: `failure_reason` no longer determines exam-resit vs course-retake
- *   routing by itself — exam resit ({@see \App\Modules\Academic\Delivery\Queries\ListExamResitEligibleStudentsQuery})
- *   accepts every reason, and course retake ({@see \App\Modules\Academic\Delivery\Queries\ListRetakeCourseEligibleStudentsQuery})
- *   still excludes only `grade_failed`. Non-grade-only failures are eligible in
- *   both lanes; staff decide. This classifier only labels the reason, it does
- *   not gate anything.
+ *   NOTE: `failure_reason` labels the fail; it does not route remediation.
+ *   Exam resit and course retake both accept every reason. Staff choose.
+ *   An occupied source on one lane hides that AcademicRecord on the other
+ *   (occupied thi lại hides học lại; non-cancelled học lại, including enrolled,
+ *   hides thi lại). This classifier only labels the reason, it does not gate
+ *   anything.
  * - Attendance %   = (present + late) / (present + late + absent) × 100.
  *                   Excused and not-recorded sessions are EXCLUDED from the
  *                   denominator (story policy), so they never penalise a student.

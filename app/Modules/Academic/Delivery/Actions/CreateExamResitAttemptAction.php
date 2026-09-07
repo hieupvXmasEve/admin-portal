@@ -8,6 +8,8 @@ use App\Models\AcademicRecord;
 use App\Models\CourseRetakeRegistration;
 use App\Models\ExamResitAttempt;
 use App\Models\SyllabusTemplate;
+use App\Modules\Academic\Delivery\Support\NonCancelledRetakeRegistration;
+use App\Modules\Academic\Delivery\Support\OccupiedExamResitAttempt;
 use App\Modules\Academic\Support\AcademicFinanceObligationSource;
 use App\Shared\Contracts\Finance\DTO\FinanceIntakeData;
 use App\Shared\Contracts\Finance\Enums\FinancialEffect;
@@ -147,27 +149,24 @@ class CreateExamResitAttemptAction
             ]);
         }
 
-        $hasInFlightAttempt = ExamResitAttempt::query()
-            ->where('academic_record_id', $record->id)
-            ->whereIn('status', ExamResitAttempt::IN_FLIGHT_STATUSES)
-            ->exists();
+        $hasOccupiedResit = OccupiedExamResitAttempt::constrain(
+            ExamResitAttempt::query()->where('academic_record_id', $record->id)
+        )->exists();
 
-        if ($hasInFlightAttempt) {
+        if ($hasOccupiedResit) {
             throw ValidationException::withMessages([
                 'academic_record_id' => ['Bản ghi này đã có đăng ký thi lại đang xử lý.'],
             ]);
         }
 
-        // Cross-lane guard: a record already being handled in the retake lane must
-        // not also be registered for exam-resit.
-        $hasActiveRetake = CourseRetakeRegistration::query()
-            ->where('original_academic_record_id', $record->id)
-            ->nonTerminal()
-            ->exists();
+        $hasActiveRetake = NonCancelledRetakeRegistration::constrain(
+            CourseRetakeRegistration::query()
+                ->where('original_academic_record_id', $record->id)
+        )->exists();
 
         if ($hasActiveRetake) {
             throw ValidationException::withMessages([
-                'academic_record_id' => ['Bản ghi này đã có đăng ký học lại đang xử lý.'],
+                'academic_record_id' => ['Bản ghi này đã có đăng ký học lại.'],
             ]);
         }
     }

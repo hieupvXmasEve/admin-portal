@@ -8,6 +8,7 @@ use App\Models\AcademicRecord;
 use App\Models\ExamResitAttempt;
 use App\Models\Student;
 use App\Modules\Academic\Delivery\Actions\CreateExamResitAttemptAction;
+use App\Modules\Academic\Delivery\Support\OccupiedExamResitAttempt;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
@@ -89,14 +90,14 @@ class ListExamResitBlockedStudentsQuery
                     $attempts = $attemptsByRecord->where('academic_record_id', $record->id);
                     $consumed = $attempts->filter(fn ($a) => $a->attempt_number !== null)->count();
 
-                    return $attempts->contains(fn ($a) => in_array($a->status, ExamResitAttempt::IN_FLIGHT_STATUSES, true))
+                    return $attempts->contains(fn ($a) => in_array($a->status, OccupiedExamResitAttempt::STATUSES, true))
                         || ($consumed > 0 && $consumed >= CreateExamResitAttemptAction::liveMaxAttemptsFor($record));
                 });
 
             foreach ($resitBlocked as $record) {
                 $hasInFlight = $attemptsByRecord
                     ->where('academic_record_id', $record->id)
-                    ->contains(fn ($a) => in_array($a->status, ExamResitAttempt::IN_FLIGHT_STATUSES, true));
+                    ->contains(fn ($a) => in_array($a->status, OccupiedExamResitAttempt::STATUSES, true));
 
                 $results->push([
                     'student' => $student,

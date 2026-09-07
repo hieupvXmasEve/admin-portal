@@ -9,6 +9,8 @@ use App\Models\CourseRetakeRegistration;
 use App\Models\ExamResitAttempt;
 use App\Models\Student;
 use App\Modules\Academic\Delivery\Actions\CreateExamResitAttemptAction;
+use App\Modules\Academic\Delivery\Support\NonCancelledRetakeRegistration;
+use App\Modules\Academic\Delivery\Support\OccupiedExamResitAttempt;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
@@ -23,9 +25,8 @@ use Illuminate\Support\Collection;
  * No curriculum-membership join is needed: a finalized failed academic record
  * already proves the student took the unit.
  *
- * Cross-lane guard: a record with an active (non-terminal) course-retake
- * registration is excluded too — it's already being handled in the retake lane,
- * see {@see ListRetakeCourseEligibleStudentsQuery}.
+ * Cross-lane: a non-cancelled course-retake (including enrolled) hides thi lại.
+ * Unfinished thi lại hides học lại. Otherwise both lists may show the same record.
  *
  * Mirrors the gate in {@see CreateExamResitAttemptAction}.
  */
@@ -67,16 +68,15 @@ class ListExamResitEligibleStudentsQuery
                 ->where('student_id', $student->id)
                 ->get(['academic_record_id', 'status', 'attempt_number']);
 
-            $activeRetakeUnitIds = CourseRetakeRegistration::query()
-                ->where('student_id', $student->id)
-                ->nonTerminal()
-                ->pluck('unit_id');
+            $activeRetakeRecordIds = NonCancelledRetakeRegistration::constrain(
+                CourseRetakeRegistration::query()->where('student_id', $student->id)
+            )->pluck('original_academic_record_id');
 
             $records = AcademicRecord::query()
                 ->where('student_id', $student->id)
                 ->where(fn (Builder $q) => $this->scopeEligibleRecords($q, $unitId, $semesterId))
                 ->whereNotIn('unit_id', $passedUnitIds)
-                ->whereNotIn('unit_id', $activeRetakeUnitIds)
+                ->whereNotIn('id', $activeRetakeRecordIds)
                 ->with(['unit', 'courseOffering.syllabusTemplate'])
                 ->get()
                 ->reject(function (AcademicRecord $record) use ($attemptsByRecord): bool {
@@ -84,7 +84,7 @@ class ListExamResitEligibleStudentsQuery
                     // A record is blocked while a resit source is in flight or
                     // when consumed attempts reached the live syllabus policy.
                     $attempts = $attemptsByRecord->where('academic_record_id', $record->id);
-                    if ($attempts->contains(fn ($a) => in_array($a->status, ExamResitAttempt::IN_FLIGHT_STATUSES, true))) {
+                    if ($attempts->contains(fn ($a) => in_array($a->status, OccupiedExamResitAttempt::STATUSES, true))) {
                         return true;
                     }
 

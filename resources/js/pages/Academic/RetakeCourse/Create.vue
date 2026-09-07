@@ -47,7 +47,11 @@ interface ListFilters {
 
 const NO_LIST_SEMESTER_VALUE = '__all_semesters__';
 
-const { filters: listFilters, setFilter: setListFilter, handleSearch: handleListSearch } = useDataTable<ListFilters>({
+const {
+    filters: listFilters,
+    setFilter: setListFilter,
+    handleSearch: handleListSearch,
+} = useDataTable<ListFilters>({
     baseUrl: route('academic.retake-course.create'),
     initialFilters: {
         search: typeof props.filters?.search === 'string' ? props.filters.search : '',
@@ -121,7 +125,6 @@ const selectedOffering = computed(() => {
 
 const selectedOfferingValue = computed(() => selectedOfferingId.value?.toString() ?? NO_OFFERING_VALUE);
 
-
 const submit = () => {
     form.post(route('academic.retake-course.store'), {
         preserveScroll: true,
@@ -141,7 +144,7 @@ const submit = () => {
         </Button>
         <div>
             <h2 class="text-xl leading-tight font-semibold text-gray-800 dark:text-gray-200">Đăng ký học lại</h2>
-            <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Chọn sinh viên đủ điều kiện để tạo nguồn học lại.</p>
+            <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Chọn bản ghi rớt đã chốt. Đang thi lại chưa xong thì bản ghi đó không hiện ở đây.</p>
         </div>
     </div>
 
@@ -156,7 +159,7 @@ const submit = () => {
         <Card>
             <CardHeader>
                 <CardTitle>Sinh viên đủ điều kiện</CardTitle>
-                <CardDescription>Danh sách SV fail có thể tạo nguồn học lại.</CardDescription>
+                <CardDescription>Bản ghi fail đã chốt, chưa có thi lại đang xử lý. Staff chọn học lại hoặc thi lại.</CardDescription>
                 <div class="mt-3 flex gap-2">
                     <DebouncedInput :model-value="listFilters.search" @update:model-value="handleListSearch" placeholder="Tìm SV, MSSV..." class="flex-1" />
                     <Select :model-value="listFilters.failed_semester_id?.toString() ?? NO_LIST_SEMESTER_VALUE" @update:model-value="(v) => setListFilter('failed_semester_id', v && v !== NO_LIST_SEMESTER_VALUE ? Number(v) : null)">
@@ -179,7 +182,7 @@ const submit = () => {
                         v-for="entry in eligible_students"
                         :key="`${entry.student.id}-${entry.unit.id}`"
                         class="hover:bg-muted/50 cursor-pointer rounded-lg border p-3 transition-colors"
-                        :class="{ 'border-primary bg-primary/5 ring-1 ring-primary/30': selectedEntry?.student.id === entry.student.id && selectedEntry?.unit.id === entry.unit.id }"
+                        :class="{ 'border-primary bg-primary/5 ring-primary/30 ring-1': selectedEntry?.student.id === entry.student.id && selectedEntry?.unit.id === entry.unit.id }"
                         @click="selectEntry(entry)"
                     >
                         <div class="flex items-start justify-between">
@@ -231,9 +234,7 @@ const submit = () => {
                     <!-- Retake Fee -->
                     <div>
                         <Label>Phí học lại (VNĐ)</Label>
-                        <p class="text-muted-foreground text-xs">
-                            Phí học lại được tính theo bảng giá Finance (Pricing Operations) khi đăng ký. Nếu môn chưa có giá trong bảng giá, hệ thống sẽ chặn đăng ký.
-                        </p>
+                        <p class="text-muted-foreground text-xs">Phí học lại được tính theo bảng giá Finance (Pricing Operations) khi đăng ký. Nếu môn chưa có giá trong bảng giá, hệ thống sẽ chặn đăng ký.</p>
                     </div>
 
                     <!-- Operation Semester -->

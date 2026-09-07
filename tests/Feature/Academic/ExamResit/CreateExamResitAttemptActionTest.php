@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\AcademicRecord;
 use App\Models\Campus;
 use App\Models\CourseOffering;
+use App\Models\CourseRetakeRegistration;
 use App\Models\ExamResitAttempt;
 use App\Models\Semester;
 use App\Models\Student;
@@ -161,6 +162,90 @@ it('rejects registering a second exam-resit attempt while one is already in flig
     ]))->toThrow(ValidationException::class);
 
     expect(ExamResitAttempt::where('academic_record_id', $record->id)->count())->toBe(1);
+});
+
+it('rejects exam-resit when the academic record already has an enrolled course retake', function () {
+    $record = examResitRecordFor(AcademicRecord::FAILURE_GRADE_FAILED);
+
+    CourseRetakeRegistration::create([
+        'student_id' => $this->student->id,
+        'unit_id' => $this->unit->id,
+        'original_academic_record_id' => $record->id,
+        'semester_id' => $this->semester->id,
+        'campus_id' => $this->campus->id,
+        'original_semester_id' => $this->semester->id,
+        'operation_semester_id' => $this->semester->id,
+        'charge_semester_id' => $this->semester->id,
+        'status' => CourseRetakeRegistration::STATUS_ENROLLED,
+        'request_origin' => CourseRetakeRegistration::REQUEST_ORIGIN_STAFF,
+        'attempt_number' => 1,
+        'retake_fee' => 500000,
+        'hq_fee_status' => CourseRetakeRegistration::HQ_FEE_PAID,
+        'enrolled_at' => now(),
+    ]);
+
+    expect(fn () => app(CreateExamResitAttemptAction::class)->run([
+        'student_id' => $this->student->id,
+        'academic_record_id' => $record->id,
+        'operation_semester_id' => $this->semester->id,
+        'charge_semester_id' => $this->semester->id,
+        'campus_id' => $this->campus->id,
+    ]))->toThrow(ValidationException::class);
+
+    expect(ExamResitAttempt::query()->count())->toBe(0);
+});
+
+it('allows exam-resit on a later failed record of the same unit when only the earlier record has a retake', function () {
+    $first = examResitRecordFor(AcademicRecord::FAILURE_GRADE_FAILED);
+    $laterOffering = CourseOffering::factory()->create([
+        'semester_id' => $this->semester->id,
+        'unit_id' => $this->unit->id,
+        'campus_id' => $this->campus->id,
+        'syllabus_template_id' => $this->syllabus->id,
+    ]);
+    $second = AcademicRecord::factory()->create([
+        'student_id' => $this->student->id,
+        'campus_id' => $this->campus->id,
+        'semester_id' => $this->semester->id,
+        'unit_id' => $this->unit->id,
+        'course_offering_id' => $laterOffering->id,
+        'completion_status' => 'failed',
+        'grade_status' => 'final',
+        'is_passed' => false,
+        'override_pass' => false,
+        'final_percentage' => 48,
+        'attendance_percentage' => 95,
+        'meets_attendance_requirement' => true,
+        'failure_reason' => AcademicRecord::FAILURE_GRADE_FAILED,
+    ]);
+
+    CourseRetakeRegistration::create([
+        'student_id' => $this->student->id,
+        'unit_id' => $this->unit->id,
+        'original_academic_record_id' => $first->id,
+        'semester_id' => $this->semester->id,
+        'campus_id' => $this->campus->id,
+        'original_semester_id' => $this->semester->id,
+        'operation_semester_id' => $this->semester->id,
+        'charge_semester_id' => $this->semester->id,
+        'status' => CourseRetakeRegistration::STATUS_ENROLLED,
+        'request_origin' => CourseRetakeRegistration::REQUEST_ORIGIN_STAFF,
+        'attempt_number' => 1,
+        'retake_fee' => 500000,
+        'hq_fee_status' => CourseRetakeRegistration::HQ_FEE_PAID,
+        'enrolled_at' => now(),
+    ]);
+
+    $attempt = app(CreateExamResitAttemptAction::class)->run([
+        'student_id' => $this->student->id,
+        'academic_record_id' => $second->id,
+        'operation_semester_id' => $this->semester->id,
+        'charge_semester_id' => $this->semester->id,
+        'campus_id' => $this->campus->id,
+    ]);
+
+    expect($attempt)->toBeInstanceOf(ExamResitAttempt::class)
+        ->and($attempt->academic_record_id)->toBe($second->id);
 });
 
 it('rolls back the exam resit source and propagates unrelated finance intake failures untranslated', function () {

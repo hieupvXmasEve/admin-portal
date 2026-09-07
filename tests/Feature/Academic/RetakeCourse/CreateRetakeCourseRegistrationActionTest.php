@@ -404,11 +404,10 @@ it('rejects retake when student has not passed prerequisite unit', function () {
     ]);
 })->throws(ValidationException::class);
 
-it('rejects retake when academic record failed by grade only', function () {
-    // ACAD-RET-001 Slice 2: grade-only failures route to exam resit, not course retake.
+it('allows retake when academic record failed by grade only', function () {
     $this->academicRecord->update(['failure_reason' => AcademicRecord::FAILURE_GRADE_FAILED]);
 
-    CreateRetakeCourseRegistrationAction::run([
+    $result = CreateRetakeCourseRegistrationAction::run([
         'student_id' => $this->student->id,
         'unit_id' => $this->courseOffering->unit_id,
         'original_academic_record_id' => $this->academicRecord->id,
@@ -416,7 +415,9 @@ it('rejects retake when academic record failed by grade only', function () {
         'semester_id' => $this->semester->id,
         'campus_id' => $this->campus->id,
     ]);
-})->throws(ValidationException::class);
+
+    expect($result)->toBeInstanceOf(CourseRetakeRegistration::class);
+});
 
 it('allows retake when academic record failed by grade only but its exam-resit attempt is completed and still failing', function () {
     $this->academicRecord->update(['failure_reason' => AcademicRecord::FAILURE_GRADE_FAILED]);
@@ -507,6 +508,38 @@ it('rejects retake while an exam-resit attempt is still in flight (cross-lane gu
     ]);
 })->throws(ValidationException::class);
 
+it('rejects retake while exam-resit cancellation is still pending finance', function () {
+    ExamResitAttempt::create([
+        'student_id' => $this->student->id,
+        'academic_record_id' => $this->academicRecord->id,
+        'unit_id' => $this->courseOffering->unit_id,
+        'campus_id' => $this->campus->id,
+        'original_semester_id' => $this->semester->id,
+        'operation_semester_id' => $this->semester->id,
+        'charge_semester_id' => $this->semester->id,
+        'request_origin' => ExamResitAttempt::REQUEST_ORIGIN_STAFF,
+        'status' => ExamResitAttempt::STATUS_FINANCE_PENDING_CANCELLATION,
+        'request_sequence' => 1,
+        'hq_fee_status' => ExamResitAttempt::HQ_FEE_PENDING,
+    ]);
+
+    expect(fn () => CreateRetakeCourseRegistrationAction::run([
+        'student_id' => $this->student->id,
+        'unit_id' => $this->courseOffering->unit_id,
+        'original_academic_record_id' => $this->academicRecord->id,
+        'course_offering_id' => $this->courseOffering->id,
+        'semester_id' => $this->semester->id,
+        'campus_id' => $this->campus->id,
+    ]))->toThrow(ValidationException::class);
+
+    $results = app(ListRetakeCourseEligibleStudentsQuery::class)->handle([
+        'campus_id' => $this->campus->id,
+        'semester_id' => $this->semester->id,
+    ]);
+
+    expect($results)->toHaveCount(0);
+});
+
 it('accepts a null registration date without crashing the insert (form sends "" for unset dates)', function () {
     $created = CreateRetakeCourseRegistrationAction::run([
         'student_id' => $this->student->id,
@@ -570,7 +603,6 @@ it('allows retake when academic record failed manually', function () {
 });
 
 it('allows retake for legacy failed record with null failure_reason', function () {
-    // Forward-only: un-backfilled historical failures stay eligible (no broken staff workflow).
     expect($this->academicRecord->failure_reason)->toBeNull();
 
     $result = CreateRetakeCourseRegistrationAction::run([
@@ -585,8 +617,8 @@ it('allows retake for legacy failed record with null failure_reason', function (
     expect($result->status)->toBe(CourseRetakeRegistration::STATUS_PAYMENT_PENDING);
 });
 
-it('excludes grade-only failures from the retake eligibility list', function () {
-    $this->academicRecord->update(['failure_reason' => AcademicRecord::FAILURE_GRADE_FAILED]);
+it('excludes a non-final failed record from the retake eligibility list', function () {
+    $this->academicRecord->update(['grade_status' => 'provisional']);
 
     $results = app(ListRetakeCourseEligibleStudentsQuery::class)->handle([
         'campus_id' => $this->campus->id,
@@ -594,6 +626,112 @@ it('excludes grade-only failures from the retake eligibility list', function () 
     ]);
 
     expect($results)->toHaveCount(0);
+});
+
+it('rejects retake when the academic record is not final', function () {
+    $this->academicRecord->update(['grade_status' => 'provisional']);
+
+    expect(fn () => CreateRetakeCourseRegistrationAction::run([
+        'student_id' => $this->student->id,
+        'unit_id' => $this->courseOffering->unit_id,
+        'original_academic_record_id' => $this->academicRecord->id,
+        'course_offering_id' => $this->courseOffering->id,
+        'semester_id' => $this->semester->id,
+        'campus_id' => $this->campus->id,
+    ]))->toThrow(ValidationException::class);
+});
+
+it('includes grade-only failures in the retake eligibility list', function () {
+    $this->academicRecord->update(['failure_reason' => AcademicRecord::FAILURE_GRADE_FAILED]);
+
+    $results = app(ListRetakeCourseEligibleStudentsQuery::class)->handle([
+        'campus_id' => $this->campus->id,
+        'semester_id' => $this->semester->id,
+    ]);
+
+    expect($results)->toHaveCount(1);
+    expect($results->first()['student']->is($this->student))->toBeTrue();
+});
+
+it('excludes an enrolled retake source from the retake eligibility list', function () {
+    CourseRetakeRegistration::create([
+        'student_id' => $this->student->id,
+        'unit_id' => $this->courseOffering->unit_id,
+        'original_academic_record_id' => $this->academicRecord->id,
+        'semester_id' => $this->semester->id,
+        'campus_id' => $this->campus->id,
+        'original_semester_id' => $this->semester->id,
+        'operation_semester_id' => $this->semester->id,
+        'charge_semester_id' => $this->semester->id,
+        'status' => CourseRetakeRegistration::STATUS_ENROLLED,
+        'request_origin' => CourseRetakeRegistration::REQUEST_ORIGIN_STAFF,
+        'attempt_number' => 1,
+        'retake_fee' => 500000,
+        'hq_fee_status' => CourseRetakeRegistration::HQ_FEE_PAID,
+        'enrolled_at' => now(),
+    ]);
+
+    $results = app(ListRetakeCourseEligibleStudentsQuery::class)->handle([
+        'campus_id' => $this->campus->id,
+        'semester_id' => $this->semester->id,
+    ]);
+
+    expect($results)->toHaveCount(0);
+});
+
+it('rejects a second retake for an already enrolled original academic record', function () {
+    CourseRetakeRegistration::create([
+        'student_id' => $this->student->id,
+        'unit_id' => $this->courseOffering->unit_id,
+        'original_academic_record_id' => $this->academicRecord->id,
+        'semester_id' => $this->semester->id,
+        'campus_id' => $this->campus->id,
+        'original_semester_id' => $this->semester->id,
+        'operation_semester_id' => $this->semester->id,
+        'charge_semester_id' => $this->semester->id,
+        'status' => CourseRetakeRegistration::STATUS_ENROLLED,
+        'request_origin' => CourseRetakeRegistration::REQUEST_ORIGIN_STAFF,
+        'attempt_number' => 1,
+        'retake_fee' => 500000,
+        'hq_fee_status' => CourseRetakeRegistration::HQ_FEE_PAID,
+        'enrolled_at' => now(),
+    ]);
+
+    CreateRetakeCourseRegistrationAction::run([
+        'student_id' => $this->student->id,
+        'unit_id' => $this->courseOffering->unit_id,
+        'original_academic_record_id' => $this->academicRecord->id,
+        'course_offering_id' => $this->courseOffering->id,
+        'semester_id' => $this->semester->id,
+        'campus_id' => $this->campus->id,
+    ]);
+})->throws(ValidationException::class);
+
+it('returns a cancelled retake source to the retake eligibility list', function () {
+    CourseRetakeRegistration::create([
+        'student_id' => $this->student->id,
+        'unit_id' => $this->courseOffering->unit_id,
+        'original_academic_record_id' => $this->academicRecord->id,
+        'semester_id' => $this->semester->id,
+        'campus_id' => $this->campus->id,
+        'original_semester_id' => $this->semester->id,
+        'operation_semester_id' => $this->semester->id,
+        'charge_semester_id' => $this->semester->id,
+        'status' => CourseRetakeRegistration::STATUS_CANCELLED,
+        'request_origin' => CourseRetakeRegistration::REQUEST_ORIGIN_STAFF,
+        'attempt_number' => 1,
+        'retake_fee' => 500000,
+        'hq_fee_status' => CourseRetakeRegistration::HQ_FEE_CANCELLED,
+        'cancelled_at' => now(),
+    ]);
+
+    $results = app(ListRetakeCourseEligibleStudentsQuery::class)->handle([
+        'campus_id' => $this->campus->id,
+        'semester_id' => $this->semester->id,
+    ]);
+
+    expect($results)->toHaveCount(1);
+    expect($results->first()['student']->is($this->student))->toBeTrue();
 });
 
 it('includes a grade-only failure once its exam-resit attempt is completed and still failing', function () {
