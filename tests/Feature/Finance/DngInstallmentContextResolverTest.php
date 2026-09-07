@@ -107,6 +107,8 @@ it('uses the canonical settlement position for an installment reminder balance',
     expect($context)->toMatchArray([
         'installment_no' => 1,
         'installment_total' => 2,
+        'installments_total' => 2,
+        'due_date' => now()->addWeek()->toDateString(),
         'installment_amount_formatted' => '500.000',
         'remaining_balance_formatted' => '600.000',
     ])

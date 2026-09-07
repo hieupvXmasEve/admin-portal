@@ -5,23 +5,42 @@ declare(strict_types=1);
 namespace App\Modules\Finance\Queries\Cockpit;
 
 use App\Modules\Finance\Dng\Models\DngWebhookEvent;
+use App\Modules\Finance\Models\FinanceCancellationOperation;
 use App\Modules\Finance\Queries\Operations\GetBillingDashboardStatsQuery;
 use App\Modules\Finance\Queries\Operations\GetBillingExceptionCountsQuery;
 use App\Modules\Finance\Queries\Operations\GetDueItemsSummaryQuery;
 use App\Modules\Finance\Queries\Operations\GetInstallmentPushFailureCountQuery;
 use App\Modules\Finance\Queries\Operations\GetLifecycleDueExceptionSummaryQuery;
 use App\Modules\Finance\Queries\Operations\ListSettlementWorklistQuery;
+use App\Modules\Finance\Queries\Operations\ListUnresolvedSurplusQuery;
 use App\Modules\Finance\Support\FinanceCollectionPhase;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 /**
- * Light cockpit overview: KPI ribbon + the six "Cần xử lý" queue counts + phase.
+ * Light cockpit overview: KPI ribbon + "Cần xử lý" queue counts + phase.
  * Reuses existing campus-scoped summary queries; computes no money. Semester-bound
  * queues honor $semesterId; campus-wide ones (webhook/unallocated) ignore it so an
  * urgent item is never hidden by a semester change (§3.1).
+ *
+ * Permission is gated here: a queue is omitted when the user cannot($permission).
+ * Route middleware only checks view_finance_cockpit.
  */
 class GetFinanceCockpitOverviewQuery
 {
+    /** @var array<string, string> */
+    public const QUEUE_PERMISSIONS = [
+        'webhook_errors' => 'view_finance_dng_webhook_events',
+        'settlement_exceptions' => 'view_finance_operations_exceptions',
+        'unallocated' => 'allocate_finance_payment',
+        'dng_due' => 'view_finance_operations_due_calendar',
+        'lifecycle' => 'view_finance_operations_due_calendar',
+        'charge_errors' => 'view_finance_operations_exceptions',
+        'installment_failures' => 'create_finance_payments',
+        'cancellations' => 'create_finance_payments',
+        'unresolved_surplus' => 'view_finance_student_overview',
+    ];
+
     public function __construct(
         private GetBillingDashboardStatsQuery $dashboardStats,
         private GetDueItemsSummaryQuery $dueSummary,
@@ -29,6 +48,7 @@ class GetFinanceCockpitOverviewQuery
         private GetBillingExceptionCountsQuery $exceptionCounts,
         private GetInstallmentPushFailureCountQuery $installmentFailures,
         private ListSettlementWorklistQuery $settlementWorklist,
+        private ListUnresolvedSurplusQuery $unresolvedSurplus,
     ) {}
 
     /** @return array<string,mixed> */
@@ -60,43 +80,171 @@ class GetFinanceCockpitOverviewQuery
     /** @return list<array<string,mixed>> */
     private function queues(?int $semesterId, array $stats): array
     {
-        $webhook = DngWebhookEvent::query()
-            ->whereIn('processing_status', [
-                DngWebhookEvent::STATUS_FAILED_RETRYABLE,
-                DngWebhookEvent::STATUS_FAILED_TERMINAL,
-                DngWebhookEvent::STATUS_MISMATCH,
-                DngWebhookEvent::STATUS_SKIPPED,
-            ]);
-        $webhookCount = (clone $webhook)->count();
-
+        $user = Auth::user();
         $settlement = $this->settlementWorklist->handle(Request::create(
             route('finance.operations.settlement.index'),
             'GET',
             ['readiness' => 'ready', 'per_page' => 1],
         ));
         $readySettlementCount = (int) $settlement['summary']['ready_students'];
+        $out = [];
 
-        $due = $this->dueSummary->handle($semesterId);
-        $lifecycle = $this->lifecycleSummary->handle($semesterId);
-        $exceptions = $this->exceptionCounts->handle($semesterId);
-        $installments = $this->installmentFailures->handle(null);
+        foreach ($this->queueSpecs($semesterId, $stats, $readySettlementCount) as $spec) {
+            if ($user === null || $user->cannot($spec['permission'])) {
+                continue;
+            }
 
+            $count = ($spec['count'])();
+            $out[] = $this->queue(
+                $spec['key'],
+                $spec['label'],
+                $count,
+                $spec['obeys_semester'],
+                $spec['scope_badge'],
+                $spec['permission'],
+                $spec['action_url'],
+                ($spec['severity'])($count),
+            );
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return list<array{
+     *   key: string,
+     *   label: string,
+     *   permission: string,
+     *   obeys_semester: bool,
+     *   scope_badge: string,
+     *   action_url: string,
+     *   count: callable(): int,
+     *   severity: callable(int): string
+     * }>
+     */
+    private function queueSpecs(?int $semesterId, array $stats, int $readySettlementCount): array
+    {
         return [
-            $this->queue('webhook_errors', 'Webhook DNG lỗi', $webhookCount, false, 'campus',
-                'view_finance_dng_webhook_events', route('finance.dng.webhook-events.index'), $webhookCount > 0 ? 'critical' : 'normal'),
-            $this->queue('settlement_exceptions', 'Settlement cần kiểm tra', (int) $stats['needs_review_count'], true, 'semester',
-                'view_finance_operations_exceptions', route('finance.operations.exceptions'), (int) $stats['needs_review_count'] > 0 ? 'critical' : 'normal'),
-            $this->queue('unallocated', 'Tiền chờ phân bổ', $readySettlementCount, false, 'campus',
-                'allocate_finance_payment', route('finance.operations.settlement.index', ['readiness' => 'ready']), $readySettlementCount > 0 ? 'action' : 'normal'),
-            $this->queue('dng_due', 'DNG đến hạn', (int) $due['overdue_count'] + (int) $due['due_today_count'], true, 'semester',
-                'view_finance_operations_due_calendar', route('finance.operations.due-calendar'), (int) $due['overdue_count'] > 0 ? 'action' : 'normal'),
-            $this->queue('lifecycle', 'Ngoại lệ lifecycle chờ review', (int) $lifecycle['total_count'], true, 'semester',
-                'view_finance_operations_due_calendar', route('finance.operations.lifecycle-exceptions'), 'action'),
-            $this->queue('charge_errors', 'Sai sót sinh phí', (int) array_sum($exceptions), true, 'semester',
-                'view_finance_operations_exceptions', route('finance.operations.exceptions'), 'action'),
-            $this->queue('installment_failures', 'Installment đẩy thất bại', (int) $installments['count'], false, 'campus',
-                'create_finance_payments', route('finance.batch-studio.dng'), (int) $installments['count'] > 0 ? 'action' : 'normal'),
+            [
+                'key' => 'webhook_errors',
+                'label' => 'Webhook DNG lỗi',
+                'permission' => self::QUEUE_PERMISSIONS['webhook_errors'],
+                'obeys_semester' => false,
+                'scope_badge' => 'campus',
+                'action_url' => route('finance.dng.webhook-events.index'),
+                'count' => fn (): int => DngWebhookEvent::query()
+                    ->whereIn('processing_status', [
+                        DngWebhookEvent::STATUS_FAILED_RETRYABLE,
+                        DngWebhookEvent::STATUS_FAILED_TERMINAL,
+                        DngWebhookEvent::STATUS_MISMATCH,
+                        DngWebhookEvent::STATUS_SKIPPED,
+                    ])
+                    ->count(),
+                'severity' => fn (int $count): string => $count > 0 ? 'critical' : 'normal',
+            ],
+            [
+                'key' => 'settlement_exceptions',
+                'label' => 'Settlement cần kiểm tra',
+                'permission' => self::QUEUE_PERMISSIONS['settlement_exceptions'],
+                'obeys_semester' => true,
+                'scope_badge' => 'semester',
+                'action_url' => route('finance.operations.exceptions'),
+                'count' => fn (): int => (int) $stats['needs_review_count'],
+                'severity' => fn (int $count): string => $count > 0 ? 'critical' : 'normal',
+            ],
+            [
+                'key' => 'unallocated',
+                'label' => 'Tiền chờ phân bổ',
+                'permission' => self::QUEUE_PERMISSIONS['unallocated'],
+                'obeys_semester' => false,
+                'scope_badge' => 'campus',
+                'action_url' => route('finance.operations.settlement.index', ['readiness' => 'ready']),
+                'count' => fn (): int => $readySettlementCount,
+                'severity' => fn (int $count): string => $count > 0 ? 'action' : 'normal',
+            ],
+            [
+                'key' => 'dng_due',
+                'label' => 'DNG đến hạn',
+                'permission' => self::QUEUE_PERMISSIONS['dng_due'],
+                'obeys_semester' => true,
+                'scope_badge' => 'semester',
+                'action_url' => route('finance.operations.due-calendar'),
+                'count' => function () use ($semesterId): int {
+                    $due = $this->dueSummary->handle($semesterId);
+
+                    return (int) $due['overdue_count'] + (int) $due['due_today_count'];
+                },
+                'severity' => fn (int $count): string => $count > 0 ? 'action' : 'normal',
+            ],
+            [
+                'key' => 'lifecycle',
+                'label' => 'Ngoại lệ lifecycle chờ review',
+                'permission' => self::QUEUE_PERMISSIONS['lifecycle'],
+                'obeys_semester' => true,
+                'scope_badge' => 'semester',
+                'action_url' => route('finance.operations.lifecycle-exceptions'),
+                'count' => fn (): int => (int) $this->lifecycleSummary->handle($semesterId)['total_count'],
+                'severity' => fn (int $count): string => $count > 0 ? 'action' : 'normal',
+            ],
+            [
+                'key' => 'charge_errors',
+                'label' => 'Sai sót sinh phí',
+                'permission' => self::QUEUE_PERMISSIONS['charge_errors'],
+                'obeys_semester' => true,
+                'scope_badge' => 'semester',
+                'action_url' => route('finance.operations.exceptions'),
+                'count' => fn (): int => (int) array_sum($this->exceptionCounts->handle($semesterId)),
+                'severity' => fn (int $count): string => $count > 0 ? 'action' : 'normal',
+            ],
+            [
+                'key' => 'installment_failures',
+                'label' => 'Installment đẩy thất bại',
+                'permission' => self::QUEUE_PERMISSIONS['installment_failures'],
+                'obeys_semester' => false,
+                'scope_badge' => 'campus',
+                'action_url' => route('finance.batch-studio.dng'),
+                'count' => fn (): int => (int) $this->installmentFailures->handle(null)['count'],
+                'severity' => fn (int $count): string => $count > 0 ? 'action' : 'normal',
+            ],
+            [
+                'key' => 'cancellations',
+                'label' => 'Huỷ đang chờ',
+                'permission' => self::QUEUE_PERMISSIONS['cancellations'],
+                'obeys_semester' => false,
+                'scope_badge' => 'campus',
+                'action_url' => route('finance.search'),
+                'count' => fn (): int => FinanceCancellationOperation::query()
+                    ->where('status', FinanceCancellationOperation::STATUS_REQUIRES_REVIEW)
+                    ->count(),
+                'severity' => fn (int $count): string => $count > 0 ? 'action' : 'normal',
+            ],
+            [
+                'key' => 'unresolved_surplus',
+                'label' => 'Số dư cần quyết',
+                'permission' => self::QUEUE_PERMISSIONS['unresolved_surplus'],
+                'obeys_semester' => false,
+                'scope_badge' => 'campus',
+                'action_url' => route('finance.search'),
+                'count' => fn (): int => count($this->surplusRows()),
+                'severity' => fn (int $count): string => $count > 0 ? 'action' : 'normal',
+            ],
         ];
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function surplusRows(): array
+    {
+        $campusId = app()->bound('campus') ? app('campus')?->id : null;
+        $canViewAll = Auth::user()?->can('view_finance_all_campus') ?? false;
+
+        if ($campusId === null && ! $canViewAll) {
+            return [];
+        }
+
+        return $this->unresolvedSurplus->handle(
+            $campusId === null ? null : (int) $campusId,
+            $canViewAll,
+        );
     }
 
     /** @return array<string,mixed> */

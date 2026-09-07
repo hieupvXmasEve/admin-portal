@@ -250,3 +250,11 @@ it('does not authorize a dng request belonging to another student', function () 
     $this->postJson("/api/v1/student/finance/dng-requests/{$request->id}/qr")
         ->assertNotFound();
 });
+
+it('returns 429 when student payment access exceeds the rate limit', function () {
+    for ($i = 0; $i < 10; $i++) {
+        $this->postJson('/api/v1/student/finance/dng/qr')->assertStatus(422);
+    }
+
+    $this->postJson('/api/v1/student/finance/dng/qr')->assertTooManyRequests();
+});

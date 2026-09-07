@@ -7,6 +7,7 @@ namespace App\Modules\Finance\Queries;
 use App\Modules\Finance\Dng\Models\DngPaymentRequest;
 use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\StudentInvoice;
 use App\Modules\Finance\Support\SettlementPosition\DngLineHoldingIndex;
@@ -14,6 +15,7 @@ use App\Modules\Finance\Support\SettlementPosition\MoneyItemStatusContext;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPosition;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionScope;
 use App\Modules\Finance\Support\SettlementPosition\SettlementPositionWorklistPresenter;
+use App\Modules\Finance\Support\StudentFinanceLearnerVocabulary;
 use App\Modules\Finance\Support\StudentFinanceSettlementPositionReader;
 use App\Shared\Contracts\Academic\AcademicPeriodReader;
 use App\Shared\Contracts\Academic\DTO\AcademicPeriodReference;
@@ -222,6 +224,10 @@ final class GetStudentFinancePresentationQuery
                     'description' => (string) $line->description_snapshot,
                     'amount' => $lineValid ? (float) $amounts->gross->amount : null,
                     'charge_type' => $line->charge?->charge_type,
+                    'learner_label' => StudentFinanceLearnerVocabulary::chargeLabel(
+                        (string) ($line->charge?->charge_type ?? ''),
+                        (string) $line->description_snapshot,
+                    ),
                     'discount_amount' => $lineValid ? (float) $amounts->discount->amount : null,
                     'paid_amount' => $lineValid ? (float) $amounts->cash->amount : null,
                     'credit_amount' => $lineValid ? (float) $amounts->credit->amount : null,
@@ -315,6 +321,7 @@ final class GetStudentFinancePresentationQuery
             'balance' => $valid ? $position['remaining_collectible'] : null,
             'unapplied_credit' => $valid ? $position['unapplied_cash'] : null,
             'status' => $valid ? $position['status'] : SettlementPosition::STATE_INVALID,
+            'learner_terms' => StudentFinanceLearnerVocabulary::balanceTerms(),
             'settlement_position' => [
                 'valid' => $valid,
                 'mode' => $position['position_mode'],
@@ -419,6 +426,10 @@ final class GetStudentFinancePresentationQuery
                 'id' => (int) $charge->id,
                 'description' => (string) $charge->description,
                 'charge_type' => (string) $charge->charge_type,
+                'learner_label' => StudentFinanceLearnerVocabulary::chargeLabel(
+                    (string) $charge->charge_type,
+                    (string) $charge->description,
+                ),
                 'amount' => $valid ? (float) $linePositions->sum(static fn (SettlementPosition $position): float => (float) $position->amounts->gross->amount) : null,
                 'is_charge' => (bool) $charge->is_charge,
                 'is_credit' => (bool) $charge->is_credit,
@@ -428,6 +439,7 @@ final class GetStudentFinancePresentationQuery
                 'balance' => $valid ? (float) $linePositions->sum(static fn (SettlementPosition $position): float => (float) $position->amounts->remaining->amount) : null,
                 'is_fully_paid' => $valid && $linePositions->every(static fn (SettlementPosition $position): bool => $position->amounts->remaining->isZero()),
                 'installments' => $charge->installments,
+                ...$this->chargeInstallmentContext($charge),
                 'settlement_position' => $meta,
             ];
         })->values();
@@ -600,5 +612,22 @@ final class GetStudentFinancePresentationQuery
             chargeVoid: ($line->status ?? 'active') !== 'active' || $line->charge?->status === FinanceCharge::STATUS_VOID,
             dueDate: $dueDate,
         );
+    }
+
+    /**
+     * @return array{installment_no: ?int, installments_total: ?int, due_date: ?string}
+     */
+    private function chargeInstallmentContext(FinanceCharge $charge): array
+    {
+        $installments = $charge->installments ?? collect();
+        $total = $installments->count();
+        $current = $installments->firstWhere('status', FinanceChargeInstallment::STATUS_AWAITING_PAYMENT)
+            ?? $installments->firstWhere('status', FinanceChargeInstallment::STATUS_PENDING);
+
+        return [
+            'installment_no' => $current === null ? null : (int) $current->installment_no,
+            'installments_total' => $total > 0 ? $total : null,
+            'due_date' => $current?->due_date?->toDateString(),
+        ];
     }
 }

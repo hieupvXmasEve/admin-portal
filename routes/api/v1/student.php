@@ -215,10 +215,18 @@ Route::middleware([
             Route::get('/dng-requests', [StudentFinanceController::class, 'dngRequests'])->name('dng-requests');
             Route::get('/dng-requests/all', [StudentFinanceController::class, 'dngRequestsAll'])->name('dng-requests.all');
             Route::get('/dng-requests/{dngRequestId}', [StudentFinanceController::class, 'dngRequestDetail'])->name('dng-requests.show');
-            Route::post('/dng-requests/{dngRequestId}/qr', [StudentFinanceController::class, 'dngRequestQr'])->name('dng-requests.qr');
-            Route::post('/dng-requests/{dngRequestId}/installment', [StudentFinanceController::class, 'dngRequestInstallment'])->name('dng-requests.installment');
-            Route::post('/dng/qr', [StudentFinanceController::class, 'dngQr'])->name('dng.qr');
-            Route::post('/dng/installment', [StudentFinanceController::class, 'dngInstallment'])->name('dng.installment');
+            Route::post('/dng-requests/{dngRequestId}/qr', [StudentFinanceController::class, 'dngRequestQr'])
+                ->middleware('throttle:student-payment-access')
+                ->name('dng-requests.qr');
+            Route::post('/dng-requests/{dngRequestId}/installment', [StudentFinanceController::class, 'dngRequestInstallment'])
+                ->middleware('throttle:student-payment-access')
+                ->name('dng-requests.installment');
+            Route::post('/dng/qr', [StudentFinanceController::class, 'dngQr'])
+                ->middleware('throttle:student-payment-access')
+                ->name('dng.qr');
+            Route::post('/dng/installment', [StudentFinanceController::class, 'dngInstallment'])
+                ->middleware('throttle:student-payment-access')
+                ->name('dng.installment');
             Route::get('/invoices', [StudentFinanceController::class, 'invoices'])->name('invoices');
             Route::get('/invoices/{invoiceId}', [StudentFinanceController::class, 'invoiceDetail'])->name('invoices.show');
             Route::get('/overview', [StudentFinanceController::class, 'overview'])->name('overview');

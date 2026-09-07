@@ -27,13 +27,12 @@ watch(
     async (queue) => {
         if (!queue) return;
 
-        const hasPanelRows = ['webhook_errors', 'installment_failures'].includes(queue.key);
+        const hasPanelRows = ['webhook_errors', 'installment_failures', 'settlement_exceptions', 'unallocated', 'dng_due', 'lifecycle', 'cancellations', 'unresolved_surplus'].includes(queue.key);
         if (!hasPanelRows) {
             router.visit(queue.action_url);
             emit('close');
             return;
         }
-
         loading.value = true;
         try {
             const res = await get<{ queue: string; rows: CockpitQueueRow[] }>(financeRoutes.cockpit.queueRows(queue.key));
@@ -46,20 +45,31 @@ watch(
 );
 
 const runAction = (row: CockpitQueueRow): void => {
-    router.post(row.primary_action.url, {}, {
-        preserveScroll: true,
-        only: ['kpi', 'queues'],
-        onSuccess: () => {
-            rows.value = rows.value.filter((r) => r.id !== row.id);
-        },
-    });
+    if (row.primary_action.kind.startsWith('retry_')) {
+        router.post(
+            row.primary_action.url,
+            {},
+            {
+                preserveScroll: true,
+                only: ['kpi', 'queues'],
+                onSuccess: () => {
+                    rows.value = rows.value.filter((r) => r.id !== row.id);
+                },
+            },
+        );
+        return;
+    }
+
+    router.visit(row.primary_action.url);
 };
 </script>
 
 <template>
     <Sheet v-model:open="open">
         <SheetContent side="right" class="w-full overflow-y-auto p-4 sm:max-w-lg">
-            <SheetHeader><SheetTitle>{{ queue?.label }}</SheetTitle></SheetHeader>
+            <SheetHeader
+                ><SheetTitle>{{ queue?.label }}</SheetTitle></SheetHeader
+            >
             <Skeleton v-if="loading" class="mt-4 h-32 w-full" />
             <div v-else class="mt-4 space-y-2">
                 <div v-for="row in rows" :key="row.id" class="rounded-md border p-2 text-sm">
@@ -68,9 +78,7 @@ const runAction = (row: CockpitQueueRow): void => {
                     <div class="mt-2 flex items-center gap-2">
                         <Button size="sm" variant="outline" @click="runAction(row)">{{ row.primary_action.label }}</Button>
                         <Button v-if="row.student_id" as-child size="sm" variant="ghost">
-                            <Link :href="financeRoutes.students.overview(row.student_id)">
-                                <ExternalLink class="mr-1 size-4" /> Mở hồ sơ SV
-                            </Link>
+                            <Link :href="financeRoutes.students.overview(row.student_id)"> <ExternalLink class="mr-1 size-4" /> Mở hồ sơ SV </Link>
                         </Button>
                     </div>
                 </div>

@@ -6,7 +6,9 @@ use App\Models\Campus;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\User;
+use App\Modules\Finance\Models\BillingAccount;
 use App\Modules\Finance\Models\FinanceCharge;
+use App\Modules\Finance\Models\FinanceObligation;
 use App\Modules\Finance\Models\InvoiceLine;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Models\StudentInvoice;
@@ -41,6 +43,10 @@ if (! function_exists('seedCockpitSettlementCandidate')) {
             ])
             ->create();
 
+        $account = BillingAccount::query()
+            ->where('student_id', $student->id)
+            ->firstOrFail();
+
         $invoice = StudentInvoice::query()->create([
             'invoice_number' => 'INV-'.$studentCode,
             'student_id' => $student->id,
@@ -54,7 +60,22 @@ if (! function_exists('seedCockpitSettlementCandidate')) {
             'paid_amount' => 0,
         ]);
 
+        $obligation = FinanceObligation::query()->create([
+            'billing_account_id' => $account->id,
+            'source_system' => 'test',
+            'source_kind' => 'cockpit_settlement',
+            'source_ref' => 'cockpit:'.$studentCode,
+            'obligation_type' => FinanceCharge::TYPE_EGC_LEVEL_FEE,
+            'lifecycle_status' => FinanceObligation::STATUS_ACCEPTED,
+            'amount' => 15000000,
+            'currency' => 'VND',
+            'pricing_rule_version' => 'test',
+            'pricing_snapshot' => [],
+            'accepted_at' => now(),
+        ]);
+
         $charge = FinanceCharge::query()->create([
+            'finance_obligation_id' => $obligation->id,
             'student_id' => $student->id,
             'semester_id' => $semester->id,
             'billing_cycle_id' => null,
@@ -100,11 +121,7 @@ it('renders the cockpit with kpi, queues and phase', function () {
             ->has('kpi.total_receivable')
             ->has('kpi.collected_pct')
             ->has('queues')
-            ->has('phase.key')
-            ->where('queues.0.key', 'webhook_errors')
-            ->has('queues.0.count')
-            ->has('queues.0.obeys_semester')
-            ->has('queues.0.scope_badge'));
+            ->has('phase.key'));
 });
 
 it('denies the cockpit without view_finance_cockpit', function () {
@@ -113,7 +130,12 @@ it('denies the cockpit without view_finance_cockpit', function () {
 });
 
 it('marks webhook/unallocated queues as semester-agnostic and due/lifecycle as semester-bound', function () {
-    $user = grantCockpit(['view_finance_cockpit']);
+    $user = grantCockpit([
+        'view_finance_cockpit',
+        'view_finance_dng_webhook_events',
+        'allocate_finance_payment',
+        'view_finance_operations_due_calendar',
+    ]);
 
     actingAs($user)->get('/finance/cockpit')
         ->assertInertia(function ($page) {
@@ -154,7 +176,6 @@ it('uses the current-campus settlement ready count for the unallocated queue', f
     seedCockpitSettlementCandidate($otherCampus, $this->semester, 'AUS-OTHER');
 
     $user = grantCockpit(['view_finance_cockpit', 'allocate_finance_payment']);
-
     actingAs($user)->get('/finance/cockpit')
         ->assertInertia(function ($page) {
             $queues = collect($page->toArray()['props']['queues']);
@@ -172,4 +193,46 @@ it('labels cockpit campus queues as the current campus scope', function () {
     expect($card)
         ->toContain("campus: 'Campus hiện tại'")
         ->not->toContain("campus: 'Toàn campus'");
+});
+
+it('omits queues the user cannot view', function () {
+    $user = grantCockpit(['view_finance_cockpit', 'view_finance_operations_due_calendar']);
+
+    actingAs($user)->get('/finance/cockpit')
+        ->assertInertia(function ($page) {
+            $keys = collect($page->toArray()['props']['queues'])->pluck('key')->all();
+            expect($keys)->toBe(['dng_due', 'lifecycle'])
+                ->and($keys)->not->toContain('webhook_errors')
+                ->and($keys)->not->toContain('unallocated')
+                ->and($keys)->not->toContain('cancellations')
+                ->and($keys)->not->toContain('unresolved_surplus');
+        });
+});
+
+it('exposes the eight work types plus charge errors when the user has every source permission', function () {
+    $user = grantCockpit([
+        'view_finance_cockpit',
+        'view_finance_dng_webhook_events',
+        'view_finance_operations_exceptions',
+        'allocate_finance_payment',
+        'view_finance_operations_due_calendar',
+        'create_finance_payments',
+        'view_finance_student_overview',
+    ]);
+
+    actingAs($user)->get('/finance/cockpit')
+        ->assertInertia(function ($page) {
+            $keys = collect($page->toArray()['props']['queues'])->pluck('key')->all();
+            expect($keys)->toBe([
+                'webhook_errors',
+                'settlement_exceptions',
+                'unallocated',
+                'dng_due',
+                'lifecycle',
+                'charge_errors',
+                'installment_failures',
+                'cancellations',
+                'unresolved_surplus',
+            ]);
+        });
 });

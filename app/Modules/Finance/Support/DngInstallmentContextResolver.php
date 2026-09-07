@@ -26,6 +26,8 @@ class DngInstallmentContextResolver
      * @return array{
      *   installment_no: int,
      *   installment_total: int,
+     *   installments_total: int,
+     *   due_date: ?string,
      *   installment_amount_formatted: string,
      *   remaining_balance_formatted: string,
      * }|null
@@ -64,6 +66,8 @@ class DngInstallmentContextResolver
         return [
             'installment_no' => (int) $installment->installment_no,
             'installment_total' => $totalInstallments,
+            'installments_total' => $totalInstallments,
+            'due_date' => $installment->due_date?->toDateString(),
             'installment_amount_formatted' => number_format((float) $installment->amount, 0, ',', '.'),
             'remaining_balance_formatted' => number_format((float) $position->amounts->remaining->amount, 0, ',', '.'),
         ];

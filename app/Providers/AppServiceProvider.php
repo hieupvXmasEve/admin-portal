@@ -276,6 +276,19 @@ class AppServiceProvider extends ServiceProvider
         // dedicated limiter rather than relying on a global default.
         RateLimiter::for('merchandise-checkout', fn (Request $r) => Limit::perMinute(10)->by($r->user()?->id ?: $r->ip()));
 
+        // Portal QR/Foxpay access (Phase 8): each call POSTs outbound to DNG
+        // without an idempotency key. Key by student id (parent proxy resolves
+        // to the student after parent_or_student). Abuse control, not payer auth.
+        RateLimiter::for('student-payment-access', function (Request $r) {
+            $actor = $r->user();
+            $studentId = $actor instanceof Student ? $actor->id : null;
+            $key = $studentId !== null
+                ? 'student-payment-access:student:'.$studentId
+                : 'student-payment-access:ip:'.$r->ip();
+
+            return Limit::perMinute(10)->by($key);
+        });
+
         // Admissions CRM ingestion (ADR-0004): per-caller throttle, tunable via
         // config so the limit can be hardened per environment (and exercised in
         // tests). The throttle middleware reads this each request.

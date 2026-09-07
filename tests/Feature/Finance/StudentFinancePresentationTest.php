@@ -139,6 +139,9 @@ it('uses the same canonical partial cash and credit amounts across student reads
         ->assertJsonPath('data.charges.0.paid_amount', 4_000_000)
         ->assertJsonPath('data.charges.0.credit_amount', 2_000_000)
         ->assertJsonPath('data.charges.0.balance', 4_000_000)
+        ->assertJsonPath('data.charges.0.learner_label', 'Học phí kỳ')
+        ->assertJsonPath('data.charges.0.installment_no', null)
+        ->assertJsonPath('data.charges.0.installments_total', null)
         ->assertJsonPath('data.summary.remaining_amount', 4_000_000);
     $this->getJson("/api/v1/student/finance/invoices/{$invoice->id}")
         ->assertOk()
@@ -227,4 +230,15 @@ it('validates student-finance filters through dedicated requests', function (): 
 
     $this->getJson('/api/v1/student/finance/charges?unpaid=not-a-boolean')->assertUnprocessable();
     $this->getJson('/api/v1/student/finance/invoices?status=unknown')->assertUnprocessable();
+});
+
+it('exposes learner terms on the student balance payload', function (): void {
+    ['student' => $student] = studentFinancePresentationFixture();
+    Sanctum::actingAs($student);
+
+    $this->getJson('/api/v1/student/finance/balance')
+        ->assertOk()
+        ->assertJsonPath('data.balance.learner_terms.unapplied_cash', 'Số dư của bạn')
+        ->assertJsonPath('data.balance.learner_terms.cash', 'Bạn đã nộp')
+        ->assertJsonPath('data.balance.learner_terms.credit', 'Nhà trường đã giảm');
 });

@@ -17,6 +17,7 @@ use App\Modules\Finance\Http\Requests\StudentFinance\ListStudentFinanceInvoicesR
 use App\Modules\Finance\Http\Requests\StudentFinance\StudentFinanceBalanceRequest;
 use App\Modules\Finance\Http\Requests\StudentFinance\StudentFinanceOverviewRequest;
 use App\Modules\Finance\Models\BillingAccount;
+use App\Modules\Finance\Models\FinanceChargeInstallment;
 use App\Modules\Finance\Models\Payment;
 use App\Modules\Finance\Queries\GetStudentFinancePresentationQuery;
 use App\Modules\Finance\Services\PaymentService;
@@ -268,27 +269,35 @@ class StudentFinanceController extends Controller
 
         $pendingItems = $requests->filter(fn ($r) => in_array($r->status, $pendingStatuses, true));
         $paidItems = $requests->filter(fn ($r) => in_array($r->status, $paidStatuses, true));
+        $contexts = $this->dngInstallmentContexts($requests);
 
         return ApiResponse::success([
-            'dng_requests' => $requests->map(fn ($r) => [
-                'id' => $r->id,
-                'dng_payment_id' => $r->dng_payment_id,
-                'amount' => (float) $r->amount,
-                'fee_type' => $r->fee_type,
-                'description' => $r->description,
-                'item_id' => $r->item_id,
-                'status' => $r->status,
-                'paid_at' => $r->paid_at?->toIso8601String(),
-                'invoice_serial_number' => $r->invoice_serial_number,
-                'invoice_date' => $r->invoice_date?->toDateString(),
-                'created_at' => $r->created_at?->toIso8601String(),
-                'payment_access' => [
-                    'status' => $this->hasSafeStudentDngAccessMetadata($r, (int) $student->id)
-                        && $r->status === DngPaymentRequest::STATUS_PUSHED_TO_DNG
-                        ? 'available'
-                        : 'unavailable',
-                ],
-            ]),
+            'dng_requests' => $requests->map(function ($r) use ($student, $contexts) {
+                return [
+                    'id' => $r->id,
+                    'dng_payment_id' => $r->dng_payment_id,
+                    'amount' => (float) $r->amount,
+                    'fee_type' => $r->fee_type,
+                    'description' => $r->description,
+                    'item_id' => $r->item_id,
+                    'status' => $r->status,
+                    'paid_at' => $r->paid_at?->toIso8601String(),
+                    'invoice_serial_number' => $r->invoice_serial_number,
+                    'invoice_date' => $r->invoice_date?->toDateString(),
+                    'created_at' => $r->created_at?->toIso8601String(),
+                    'payment_access' => [
+                        'status' => $this->hasSafeStudentDngAccessMetadata($r, (int) $student->id)
+                            && $r->status === DngPaymentRequest::STATUS_PUSHED_TO_DNG
+                            ? 'available'
+                            : 'unavailable',
+                    ],
+                    ...($contexts[(int) $r->id] ?? [
+                        'installment_no' => null,
+                        'installments_total' => null,
+                        'due_date' => $r->due_date?->toDateString(),
+                    ]),
+                ];
+            }),
             'summary' => [
                 'total_pending' => (float) $pendingItems->sum('amount'),
                 'total_paid' => (float) $paidItems->sum('amount'),
@@ -440,6 +449,7 @@ class StudentFinanceController extends Controller
             'invoice_date' => $dngRequest->invoice_date?->toDateString(),
             'created_at' => $dngRequest->created_at?->toIso8601String(),
             'updated_at' => $dngRequest->updated_at?->toIso8601String(),
+            ...$this->dngInstallmentContext($dngRequest),
         ]);
     }
 
@@ -654,5 +664,59 @@ class StudentFinanceController extends Controller
             'is_fully_allocated' => $payment->is_fully_allocated,
             'allocations' => $payment->getRelation('allocations') ?? collect(),
         ];
+    }
+
+    /**
+     * @return array{installment_no: ?int, installments_total: ?int, due_date: ?string}
+     */
+    private function dngInstallmentContext(DngPaymentRequest $request): array
+    {
+        return $this->dngInstallmentContexts(collect([$request]))[(int) $request->id];
+    }
+
+    /**
+     * @param  Collection<int, DngPaymentRequest>  $requests
+     * @return array<int, array{installment_no: ?int, installments_total: ?int, due_date: ?string}>
+     */
+    private function dngInstallmentContexts(Collection $requests): array
+    {
+        if ($requests->isEmpty()) {
+            return [];
+        }
+
+        $installments = FinanceChargeInstallment::query()
+            ->whereIn('dng_payment_request_id', $requests->pluck('id')->all())
+            ->get()
+            ->keyBy(fn (FinanceChargeInstallment $row): int => (int) $row->dng_payment_request_id);
+
+        $chargeIds = $installments
+            ->pluck('finance_charge_id')
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+        $totals = $chargeIds === []
+            ? []
+            : FinanceChargeInstallment::query()
+                ->whereIn('finance_charge_id', $chargeIds)
+                ->selectRaw('finance_charge_id, COUNT(*) as aggregate_total')
+                ->groupBy('finance_charge_id')
+                ->pluck('aggregate_total', 'finance_charge_id')
+                ->all();
+
+        $out = [];
+        foreach ($requests as $request) {
+            $installment = $installments->get((int) $request->id);
+            $out[(int) $request->id] = [
+                'installment_no' => $installment === null ? null : (int) $installment->installment_no,
+                'installments_total' => $installment === null
+                    ? null
+                    : (int) ($totals[$installment->finance_charge_id] ?? 0),
+                'due_date' => $installment?->due_date?->toDateString()
+                    ?? $request->due_date?->toDateString(),
+            ];
+        }
+
+        return $out;
     }
 }
