@@ -6,7 +6,7 @@ audience:
     - Finance maintainers
 status: current
 owner: Finance Team
-last_verified: 2026-09-06
+last_verified: 2026-09-07
 scope: student-finance-api
 source_of_truth:
     - routes/api/v1/student.php
@@ -72,6 +72,17 @@ Monetary terms:
 `total_credits` combines discounts and applied credit for compatibility; use
 the separate fields when displaying how the balance was settled.
 
+Charge and invoice-line payloads include `learner_label` (Vietnamese student
+wording: học phí kỳ, học phí chương trình dự bị, phí học lại môn, phí thi lại,
+bảo hiểm y tế, or khoản thu khác plus description). Balance payloads include
+`learner_terms` for `unapplied_cash` (Số dư của bạn), `cash` (Bạn đã nộp), and
+`credit` (Nhà trường đã giảm). Portal UI rendering is a separate contract.
+
+When a charge is split, charge and DNG-request payloads include
+`installment_no`, `installments_total`, and `due_date`. Full-term DNG requests
+send `installment_no` / `installments_total` as null and still expose the
+staff-chosen `due_date`.
+
 ## DNG payment requests
 
 | Method | Path                                       |
@@ -83,6 +94,11 @@ the separate fields when displaying how the balance was settled.
 | `POST` | `/dng-requests/{dngRequestId}/installment` |
 | `POST` | `/dng/qr`                                  |
 | `POST` | `/dng/installment`                         |
+
+The four POST payment-access routes are throttled (`student-payment-access`,
+10/minute, keyed by student id). Both student and parent tokens may call them;
+the limiter is abuse control, not payer authorization. Each call is an outbound
+POST to DNG/Foxpay without an idempotency key.
 
 Request fields and DNG response mapping are owned by
 `StudentFinanceController` and the actions it invokes. A portal must treat

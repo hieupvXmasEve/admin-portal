@@ -4,6 +4,8 @@ description: Generating charges, collecting and reconciling payments, handling e
 source:
   - resources/js/constants/menu-sidebar.ts
   - resources/js/pages/Finance/Cockpit/Index.vue
+  - resources/js/components/finance/cockpit/ActionPanel.vue
+  - app/Modules/Finance/Queries/Cockpit/GetFinanceCockpitOverviewQuery.php
   - resources/js/pages/Finance/Reporting/Index.vue
   - resources/js/pages/Finance/Revenue/Index.vue
   - resources/js/pages/Finance/BatchStudio/Hub.vue
@@ -37,17 +39,28 @@ A mistake at generation propagates through every later step. This area touches r
 **What it is for.** The screen to open each morning: what still needs doing.
 
 **Who can open it.** Anyone with permission to view the finance dashboard.
+Each work type appears only when that person has the matching source
+permission — DNG webhook evidence is hidden without the webhook permission.
 
 **On screen**
 
 - **Tổng phải thu** — total receivable.
 - **Đã thu** — collected so far.
 - **SV chưa sinh phí** — students with no charge generated yet; usually the most urgent item.
-- **Cần xử lý** — outstanding work.
+- **Cần xử lý** — outstanding work. Open a type for the first few rows, then the existing handling page.
+  - **Webhook DNG lỗi** — failed DNG webhooks
+  - **Settlement cần kiểm tra** — invalid settlement positions
+  - **Tiền chờ phân bổ** — cash waiting to allocate
+  - **DNG đến hạn** — due today or overdue
+  - **Ngoại lệ lifecycle chờ review** — lifecycle exceptions
+  - **Sai sót sinh phí** — charge-generation errors
+  - **Installment đẩy thất bại** — failed installment push
+  - **Huỷ đang chờ** — cancellations waiting review
+  - **Số dư cần quyết** — leftover cash to decide
 
 **Steps.** Go to **Finance → Hôm nay**. Click **Làm mới** (Refresh) for current figures.
 
-**Note.** A non-zero **SV chưa sinh phí** mid-term means students are studying without being charged. Handle it early; recovery gets harder with time.
+**Note.** A non-zero **SV chưa sinh phí** mid-term means students are studying without being charged. Handle it early; recovery gets harder with time. Leftover cash to decide is only for students who have left school — there is no refund while they are still enrolled.
 
 ## Finance Reporting
 

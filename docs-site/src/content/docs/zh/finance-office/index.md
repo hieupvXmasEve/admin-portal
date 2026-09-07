@@ -4,6 +4,8 @@ description: 生成收费、收款与对账、处理异常情况，以及奖学�
 source:
   - resources/js/constants/menu-sidebar.ts
   - resources/js/pages/Finance/Cockpit/Index.vue
+  - resources/js/components/finance/cockpit/ActionPanel.vue
+  - app/Modules/Finance/Queries/Cockpit/GetFinanceCockpitOverviewQuery.php
   - resources/js/pages/Finance/Reporting/Index.vue
   - resources/js/pages/Finance/Revenue/Index.vue
   - resources/js/pages/Finance/BatchStudio/Hub.vue
@@ -36,18 +38,28 @@ source:
 
 **用途。** 每天打开的第一个界面：今天还有什么待办事项。
 
-**谁可以访问。** 拥有查看财务看板权限的人员。
+**谁可以访问。** 拥有查看财务看板权限的人员。每种待办只在该人员拥有对应来源
+权限时显示——没有 webhook 权限就看不到 DNG webhook 证据。
 
 **界面内容**
 
 - **Tổng phải thu** — 应收总额。
 - **Đã thu** — 已收金额。
 - **SV chưa sinh phí** — 尚未生成任何收费项的学生；这通常是最紧急要处理的事项。
-- **Cần xử lý** — 待处理事项列表。
+- **Cần xử lý** — 待办。点开一类先看前几行，再进入已有处理页。
+  - **Webhook DNG lỗi** — 失败的 DNG webhook
+  - **Settlement cần kiểm tra** — 需核对的结算
+  - **Tiền chờ phân bổ** — 待分配款项
+  - **DNG đến hạn** — 今日到期或逾期
+  - **Ngoại lệ lifecycle chờ review** — 学籍变动例外
+  - **Sai sót sinh phí** — 收费生成错误
+  - **Installment đẩy thất bại** — 分期推送失败
+  - **Huỷ đang chờ** — 待审核取消
+  - **Số dư cần quyết** — 待决定余额
 
 **操作步骤。** 进入 **Finance → Hôm nay**。点击 **Làm mới**（刷新）获取最新数据。
 
-**注意事项。** 学期进行到一半时 **SV chưa sinh phí** 不为零，意味着有学生在读却未被收费。应尽早处理，拖得越久越难追收。
+**注意事项。** 学期进行到一半时 **SV chưa sinh phí** 不为零，意味着有学生在读却未被收费。应尽早处理，拖得越久越难追收。待决定余额仅针对已离校仍有余款的学生——在读期间不办理退款。
 
 ## Finance Reporting — 财务报表
 

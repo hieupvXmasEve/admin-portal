@@ -4,6 +4,8 @@ description: 등록금 부과, 수납과 대사, 예외 처리, 그리고 장학
 source:
   - resources/js/constants/menu-sidebar.ts
   - resources/js/pages/Finance/Cockpit/Index.vue
+  - resources/js/components/finance/cockpit/ActionPanel.vue
+  - app/Modules/Finance/Queries/Cockpit/GetFinanceCockpitOverviewQuery.php
   - resources/js/pages/Finance/Reporting/Index.vue
   - resources/js/pages/Finance/Revenue/Index.vue
   - resources/js/pages/Finance/BatchStudio/Hub.vue
@@ -36,18 +38,29 @@ source:
 
 **용도.** 매일 아침 처음 여는 화면으로, 오늘 처리할 일을 확인합니다.
 
-**접근 권한.** 재무 현황판 조회 권한이 있는 사용자.
+**접근 권한.** 재무 현황판 조회 권한이 있는 사용자. 각 작업 유형은 해당 원천
+권한이 있는 사람에게만 보입니다. 웹훅 권한이 없으면 DNG 웹훅 증거가 보이지
+않습니다.
 
 **화면 내용**
 
 - **Tổng phải thu** — 총 미수 금액.
 - **Đã thu** — 수납 완료 금액.
 - **SV chưa sinh phí** — 부과금이 아직 생성되지 않은 학생. 보통 가장 급한 항목입니다.
-- **Cần xử lý** — 처리 대기 목록.
+- **Cần xử lý** — 처리 대기. 유형을 누르면 앞줄 몇 건을 본 뒤 기존 처리 화면으로 이동합니다.
+  - **Webhook DNG lỗi** — 실패한 DNG 웹훅
+  - **Settlement cần kiểm tra** — 검증되지 않은 정산
+  - **Tiền chờ phân bổ** — 배정 대기 현금
+  - **DNG đến hạn** — 오늘 마감 또는 연체
+  - **Ngoại lệ lifecycle chờ review** — 학적 변동 예외
+  - **Sai sót sinh phí** — 부과 생성 오류
+  - **Installment đẩy thất bại** — 분할 납부 푸시 실패
+  - **Huỷ đang chờ** — 검토 대기 취소
+  - **Số dư cần quyết** — 결정할 잔액
 
 **절차.** **Finance → Hôm nay**로 이동합니다. **Làm mới**(새로 고침)를 누르면 최신 수치를 가져옵니다.
 
-**유의 사항.** 학기 중간에 **SV chưa sinh phí**가 0이 아니라면, 수업을 듣고 있으나 등록금이 부과되지 않은 학생이 있다는 뜻입니다. 시간이 지날수록 회수가 어려우니 조기에 처리하십시오.
+**유의 사항.** 학기 중간에 **SV chưa sinh phí**가 0이 아니라면, 수업을 듣고 있으나 등록금이 부과되지 않은 학생이 있다는 뜻입니다. 시간이 지날수록 회수가 어려우니 조기에 처리하십시오. 잔액 결정은 학교를 떠난 학생의 남은 돈만 해당하며, 재학 중에는 환불하지 않습니다.
 
 ## Finance Reporting — 재무 보고
 

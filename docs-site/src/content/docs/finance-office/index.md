@@ -4,6 +4,8 @@ description: Sinh phí, thu tiền, đối soát, xử lý ngoại lệ, cùng h
 source:
   - resources/js/constants/menu-sidebar.ts
   - resources/js/pages/Finance/Cockpit/Index.vue
+  - resources/js/components/finance/cockpit/ActionPanel.vue
+  - app/Modules/Finance/Queries/Cockpit/GetFinanceCockpitOverviewQuery.php
   - resources/js/pages/Finance/Reporting/Index.vue
   - resources/js/pages/Finance/Revenue/Index.vue
   - resources/js/pages/Finance/BatchStudio/Hub.vue
@@ -36,18 +38,20 @@ Sai ở bước sinh phí thì mọi bước sau đều sai theo. Đây là khu 
 
 **Dùng để làm gì.** Màn hình mở đầu mỗi ngày: hôm nay còn việc gì.
 
-**Ai vào được.** Người có quyền xem bảng điều hành tài chính.
+**Ai vào được.** Người có quyền xem bảng điều hành tài chính. Từng loại việc
+chỉ hiện khi người đó có đúng quyền của nguồn đó — không thấy bằng chứng
+webhook DNG nếu thiếu quyền webhook.
 
 **Nội dung màn hình**
 
 - **Tổng phải thu** — tổng số tiền còn phải thu.
 - **Đã thu** — số đã thu được.
 - **SV chưa sinh phí** — sinh viên chưa được sinh khoản phí nào; đây thường là việc cần làm ngay.
-- **Cần xử lý** — danh sách việc tồn đọng.
+- **Cần xử lý** — **Webhook DNG lỗi**, **Settlement cần kiểm tra**, **Tiền chờ phân bổ**, **DNG đến hạn**, **Ngoại lệ lifecycle chờ review**, **Sai sót sinh phí**, **Installment đẩy thất bại**, **Huỷ đang chờ**, **Số dư cần quyết**. Bấm một loại để xem vài dòng đầu, rồi sang trang xử lý sẵn có.
 
 **Các bước.** Vào **Finance → Hôm nay**. Bấm **Làm mới** để lấy số liệu mới nhất.
 
-**Lưu ý.** Con số **SV chưa sinh phí** khác 0 vào giữa kỳ nghĩa là có sinh viên đang học mà chưa bị tính tiền. Xử lý sớm, để lâu càng khó truy thu.
+**Lưu ý.** Con số **SV chưa sinh phí** khác 0 vào giữa kỳ nghĩa là có sinh viên đang học mà chưa bị tính tiền. Xử lý sớm, để lâu càng khó truy thu. Số dư cần quyết chỉ gồm sinh viên đã rời trường còn tiền dư — không hoàn tiền khi còn học.
 
 ## Finance Reporting
 
