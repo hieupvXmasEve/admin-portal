@@ -111,7 +111,7 @@ phạm vi khác hẳn: **một ngày hạn nộp**, không phải thực thể �
 | 6 | [Phase 6: Thông báo học phí](./phase-06-tuition-notice.md) | Completed |
 | 7 | [Phase 7: Vòng đời số dư](./phase-07-surplus-lifecycle.md) | Completed |
 | 8 | [Phase 8: Finance Inbox, ADR & tài liệu](./phase-08-finance-inbox-and-docs.md) | Completed |
-| 9 | [Phase 9: Bề mặt portal sinh viên](./phase-09-student-portal-surface.md) | Pending |
+| 9 | [Phase 9: Bề mặt portal sinh viên](./phase-09-student-portal-surface.md) | Completed |
 
 ## Success Criteria
 
@@ -122,7 +122,7 @@ phạm vi khác hẳn: **một ngày hạn nộp**, không phải thực thể �
 - [x] Thông báo học phí gửi được cho SV + PH, in được, số tiền khớp Settlement Position lúc phát; campus thiếu template ⇒ **fail rõ ràng**, không gửi boilerplate — Phase 6.
 - [x] Lối hoàn tiền bị chặn; SV tốt nghiệp/thôi học còn dư có hàng đợi suy dẫn (`ListUnresolvedSurplusQuery`). Thẻ Inbox là Phase 8 — Phase 7.
 - [x] Tám loại việc hiện trong Cockpit **có gate permission per-source** (user chỉ có permission X thấy đúng dòng của X); 2 ADR accept; `check-docs-freshness.sh` xanh — Phase 8. `check-docs.sh` đỏ sẵn trên docs academic, không phải ADR Phase 8.
-- [ ] Portal (`FE/student-nuxt`) hiển thị "Đợt 1/3 · Hạn …" và không còn `snake_case` thô — Phase 9.
+- [x] Portal (`FE/student-nuxt`) hiển thị "Đợt 1/3 · Hạn …" và không còn `snake_case` thô — Phase 9.
 - [ ] Regression: `./scripts/dev.sh artisan test --compact --filter=Finance|Settlement|Dng|Payment|Invoice` xanh; `composer exec pint -- --dirty --format agent`.
 
 ## Scope decisions (chủ động không làm)
