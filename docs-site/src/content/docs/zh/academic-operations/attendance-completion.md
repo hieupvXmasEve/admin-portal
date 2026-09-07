@@ -40,21 +40,21 @@ source:
 
 1. 进入 **Academic Operations → Attendance → Failed Students**。
 2. 使用 **Filters** 按学期、培养方案或课程筛选。
-3. 核对名单后转到 **Retake Registration** 开启重修。
+3. 核对名单后转到 **Retake Registration** 或 **Thi lại**。
 4. 点击 **Clear Filters** 恢复查看完整名单。
 
 **界面内容**
 
-- 顶部四张卡片：**Total Failed Students**（不及格学生数）、**Total Failed Courses**（不及格课程门次数）、**Avg Attendance**（平均出勤率）、**Retake Eligible**（符合重修条件人数）。
+- 顶部四张卡片：**Total Failed Students**（不及格学生数）、**Total Failed Courses**（不及格课程门次数）、**Avg Attendance**（平均出勤率）、**Retake Eligible**（第 1 或第 2 次不及格的记录数——不是重修报名名单）。
 - **Fail Reason Distribution** — 按不及格原因的占比分布。
 - **Top 10 Failed Units** — 不及格人数最多的十门课程。
 
 **注意事项**
 
-- 只有属于 **Retake Eligible** 的学生才应开启重修登记。其余情况须按规定单独处理。
+- **Retake Eligible** 卡片不是开启重修的条件。从 **Retake Registration** 和 **Thi lại** 开启重修或补考：两份名单都会显示已结课不及格的成绩记录，除非该记录在另一路径已有未完成的登记。
 - **Top 10 Failed Units** 是排查教学质量的线索，建议在每学期末查看。
 
-**接下来。** Retake Registration、Finance Office。
+**接下来。** Retake Registration、Thi lại、Finance Office。
 
 ## 常见问题
 

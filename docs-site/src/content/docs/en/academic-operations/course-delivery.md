@@ -7,7 +7,9 @@ source:
   - resources/js/pages/ClassSchedule/Index.vue
   - resources/js/pages/CourseRegistrations/Index.vue
   - resources/js/pages/Academic/RetakeCourse/Index.vue
+  - resources/js/pages/Academic/RetakeCourse/Create.vue
   - resources/js/pages/Academic/ExamResit/Index.vue
+  - resources/js/pages/Academic/ExamResit/Create.vue
   - resources/js/pages/Academic/ExamResit/Schedule/Index.vue
   - resources/js/pages/CourseStatistics/Index.vue
   - resources/js/pages/Admin/Canvas/Courses/Index.vue
@@ -112,7 +114,7 @@ source:
 
 **Notes**
 
-- The list of students eligible to retake comes from the **Failed Students** screen.
+- The retake and resit create lists both show finalized failed records. An unfinished resit hides that record from retake; a retake registration (including already in class) hides that record from resit. A cancelled registration puts that record back on both lists.
 - The retake fee always follows the current system pricing catalog, not an old amount stored on the unit.
 - A paid registration that has **not been linked to a class yet** can still be cancelled: the money already collected becomes unapplied credit for the student's future fees (no refund to their account). A linked registration cannot be cancelled.
 

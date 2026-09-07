@@ -40,21 +40,21 @@ source:
 
 1. Go to **Academic Operations → Attendance → Failed Students**.
 2. Use **Filters** to narrow by term, program, or unit.
-3. Check the list, then move to **Retake Registration** to open retakes.
+3. Check the list, then go to **Retake Registration** or **Thi lại**.
 4. Click **Clear Filters** to see the whole list again.
 
 **On screen**
 
-- Four cards at the top: **Total Failed Students**, **Total Failed Courses**, **Avg Attendance**, **Retake Eligible**.
+- Four cards at the top: **Total Failed Students**, **Total Failed Courses**, **Avg Attendance**, **Retake Eligible** (failed records on attempt 1 or 2 — not the retake registration list).
 - **Fail Reason Distribution** — the breakdown by reason.
 - **Top 10 Failed Units** — the ten units with the most failures.
 
 **Notes**
 
-- Only students in **Retake Eligible** should be opened for a retake. Other cases follow academic regulations separately.
+- The **Retake Eligible** card is not the gate for opening a retake. Open a retake or resit from **Retake Registration** and **Thi lại**: both lists show finalized failed records unless that record already has an unfinished registration on the other path.
 - **Top 10 Failed Units** is the starting point for a teaching quality review. Read it at the end of each term.
 
-**Next.** Retake Registration, Finance Office.
+**Next.** Retake Registration, Thi lại, Finance Office.
 
 ## Common questions
 

@@ -7,7 +7,9 @@ source:
   - resources/js/pages/ClassSchedule/Index.vue
   - resources/js/pages/CourseRegistrations/Index.vue
   - resources/js/pages/Academic/RetakeCourse/Index.vue
+  - resources/js/pages/Academic/RetakeCourse/Create.vue
   - resources/js/pages/Academic/ExamResit/Index.vue
+  - resources/js/pages/Academic/ExamResit/Create.vue
   - resources/js/pages/Academic/ExamResit/Schedule/Index.vue
   - resources/js/pages/CourseStatistics/Index.vue
   - resources/js/pages/Admin/Canvas/Courses/Index.vue
@@ -112,7 +114,7 @@ source:
 
 **유의 사항**
 
-- 재수강 대상 학생 명단은 **Failed Students** 화면에서 가져옵니다.
+- 재수강과 재시험 명단은 확정된 미이수 성적 기록을 함께 보여 줍니다. 재시험 신청이 아직 끝나지 않은 기록은 재수강 명단에서 숨기고, 재수강 신청이 있는 기록(반 배정 포함)은 재시험 명단에서 숨깁니다. 취소된 신청은 해당 기록이 두 명단에 다시 나타납니다.
 - 재수강 수수료는 항상 시스템의 현재 가격 카탈로그를 따르며, 교과목에 저장된 옛 금액을 따르지 않습니다.
 - 결제 완료 후 아직 **반에 배정되지 않은** 신청도 취소할 수 있습니다: 이미 낸 돈은 미적용 잔액이 되어 이후 발생하는 수수료에 사용됩니다(계좌로 환불되지 않음). 반에 배정된 신청은 취소할 수 없습니다.
 

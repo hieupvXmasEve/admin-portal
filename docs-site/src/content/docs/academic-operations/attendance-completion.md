@@ -40,21 +40,21 @@ source:
 
 1. Vào **Academic Operations → Attendance → Failed Students**.
 2. Dùng khung **Filters** để lọc theo kỳ, chương trình hoặc môn học.
-3. Đối chiếu danh sách rồi chuyển sang **Retake Registration** để mở học lại.
+3. Đối chiếu danh sách rồi chuyển sang **Retake Registration** hoặc **Thi lại**.
 4. Bấm **Clear Filters** để xem lại toàn bộ danh sách.
 
 **Nội dung màn hình**
 
-- Bốn thẻ đầu trang: **Total Failed Students** (số sinh viên rớt), **Total Failed Courses** (số lượt rớt môn), **Avg Attendance** (tỉ lệ chuyên cần trung bình), **Retake Eligible** (số sinh viên đủ điều kiện học lại).
+- Bốn thẻ đầu trang: **Total Failed Students** (số sinh viên rớt), **Total Failed Courses** (số lượt rớt môn), **Avg Attendance** (tỉ lệ chuyên cần trung bình), **Retake Eligible** (số lượt rớt ở lần 1 hoặc lần 2 — không phải danh sách đăng ký học lại).
 - **Fail Reason Distribution** — tỉ lệ theo lý do rớt.
 - **Top 10 Failed Units** — 10 môn có nhiều sinh viên rớt nhất.
 
 **Lưu ý**
 
-- Chỉ sinh viên thuộc nhóm **Retake Eligible** mới nên mở đăng ký học lại. Các trường hợp còn lại cần xử lý riêng theo quy chế.
+- Thẻ **Retake Eligible** không phải điều kiện mở học lại. Mở học lại hoặc thi lại từ **Retake Registration** và **Thi lại**: hai danh sách cùng hiện bản ghi rớt đã chốt, trừ khi bản ghi đó đã có đăng ký ở luồng kia chưa xong.
 - **Top 10 Failed Units** là đầu mối rà soát chất lượng giảng dạy, nên xem lại vào cuối mỗi kỳ.
 
-**Đi tiếp.** Retake Registration, Finance Office.
+**Đi tiếp.** Retake Registration, Thi lại, Finance Office.
 
 ## Câu hỏi thường gặp
 

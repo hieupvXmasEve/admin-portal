@@ -40,21 +40,21 @@ source:
 
 1. **Academic Operations → Attendance → Failed Students**로 이동합니다.
 2. **Filters** 영역에서 학기, 학위과정, 교과목으로 좁힙니다.
-3. 명단을 확인한 뒤 **Retake Registration**으로 이동해 재수강을 엽니다.
+3. 명단을 확인한 뒤 **Retake Registration** 또는 **Thi lại**로 이동합니다.
 4. **Clear Filters**를 누르면 전체 명단이 다시 표시됩니다.
 
 **화면 내용**
 
-- 상단 카드 네 개: **Total Failed Students**(미이수 학생 수), **Total Failed Courses**(미이수 건수), **Avg Attendance**(평균 출석률), **Retake Eligible**(재수강 가능 인원).
+- 상단 카드 네 개: **Total Failed Students**(미이수 학생 수), **Total Failed Courses**(미이수 건수), **Avg Attendance**(평균 출석률), **Retake Eligible**(1·2회차 미이수 건수 — 재수강 신청 명단이 아님).
 - **Fail Reason Distribution** — 사유별 비율.
 - **Top 10 Failed Units** — 미이수자가 가장 많은 교과목 열 개.
 
 **유의 사항**
 
-- **Retake Eligible**에 해당하는 학생만 재수강을 열어야 합니다. 나머지는 학칙에 따라 별도로 처리합니다.
+- **Retake Eligible** 카드는 재수강을 여는 조건이 아닙니다. **Retake Registration**과 **Thi lại**에서 재수강 또는 재시험을 엽니다. 두 명단은 확정된 미이수 기록을 함께 보여 주며, 해당 기록에 다른 경로의 미완료 신청이 있으면 숨깁니다.
 - **Top 10 Failed Units**는 교육 품질 점검의 출발점입니다. 매 학기 말에 확인하십시오.
 
-**다음 화면.** Retake Registration, Finance Office.
+**다음 화면.** Retake Registration, Thi lại, Finance Office.
 
 ## 자주 묻는 질문
 

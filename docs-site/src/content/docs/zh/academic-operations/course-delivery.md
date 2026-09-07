@@ -7,7 +7,9 @@ source:
   - resources/js/pages/ClassSchedule/Index.vue
   - resources/js/pages/CourseRegistrations/Index.vue
   - resources/js/pages/Academic/RetakeCourse/Index.vue
+  - resources/js/pages/Academic/RetakeCourse/Create.vue
   - resources/js/pages/Academic/ExamResit/Index.vue
+  - resources/js/pages/Academic/ExamResit/Create.vue
   - resources/js/pages/Academic/ExamResit/Schedule/Index.vue
   - resources/js/pages/CourseStatistics/Index.vue
   - resources/js/pages/Admin/Canvas/Courses/Index.vue
@@ -112,7 +114,7 @@ source:
 
 **注意事项**
 
-- 符合重修条件的学生名单来自 **Failed Students** 界面。
+- 重修与补考名单都会显示已结课不及格的成绩记录。该记录的补考尚未考完则不出现在重修名单；该记录已有重修登记（含已进班）则不出现在补考名单。已取消的登记会使该记录重新出现在两个名单中。
 - 重修学费始终按系统当前价格目录计算，不使用课程上保存的旧金额。
 - 已付款但**尚未绑定班级**的登记仍可取消：已收取的款项转为未用余额，用于该学生后续产生的费用（不退款至账户）。已绑定班级的登记无法取消。
 

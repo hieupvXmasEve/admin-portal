@@ -7,11 +7,13 @@ source:
   - resources/js/pages/ClassSchedule/Index.vue
   - resources/js/pages/CourseRegistrations/Index.vue
   - resources/js/pages/Academic/RetakeCourse/Index.vue
+  - resources/js/pages/Academic/RetakeCourse/Create.vue
   - resources/js/pages/Academic/ExamResit/Index.vue
+  - resources/js/pages/Academic/ExamResit/Create.vue
   - resources/js/pages/Academic/ExamResit/Schedule/Index.vue
   - resources/js/pages/CourseStatistics/Index.vue
   - resources/js/pages/Admin/Canvas/Courses/Index.vue
-
+---
 <!-- docs-freshness: reviewed against Retake/ExamResit pages (retake pricing from Finance catalog, paid cancel with balance release, resit no-show + two paid-cancel outcomes, plans/260831-1213-retake-resit-business-rule-alignment/). -->
 
 **Course Delivery** là phần việc chính đầu mỗi kỳ: mở lớp, xếp lịch, đăng ký sinh viên, xử lý học lại và thi lại.
@@ -111,7 +113,7 @@ source:
 
 **Lưu ý**
 
-- Danh sách sinh viên đủ điều kiện học lại lấy từ màn hình **Failed Students**.
+- Danh sách học lại và thi lại cùng hiện bản ghi rớt đã chốt. Bản ghi đang thi lại chưa xong thì ẩn khỏi học lại; bản ghi đã có đăng ký học lại (kể cả đã vào lớp) thì ẩn khỏi thi lại. Đơn đã hủy thì bản ghi đó hiện lại cả hai danh sách.
 - Học phí học lại luôn theo bảng giá hiện hành của hệ thống, không theo số tiền cũ ghi trên môn học.
 - Đơn đã thanh toán mà **chưa gắn lớp** vẫn có thể hủy: tiền đã thu chuyển thành dư nợ dùng cho các khoản phí phát sinh sau của sinh viên (không hoàn về tài khoản). Đơn đã gắn lớp không hủy được.
 

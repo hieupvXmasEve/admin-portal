@@ -3,7 +3,7 @@ id: ADR-0052
 title: "Retake/resit business-rule alignment: Finance-catalog pricing, paid-cancellation outcomes, no-show, live attempt policy"
 status: accepted
 owner: Academic Platform Team
-last_verified: 2026-08-31
+last_verified: 2026-09-07
 scope: architecture-decision
 ---
 
@@ -54,6 +54,15 @@ records the decisions that changed money or state-machine behavior.
    `IN_FLIGHT_OR_CONSUMED_STATUSES` was removed; display lists derive blocking
    from the same consumed definition. Raising the syllabus max re-opens the
    lane without code changes.
+6. **Failure reason does not choose a remediation lane.** Both create lists
+   accept any finalized failed AcademicRecord (`grade_status = final`, not
+   in progress). An occupied source on one lane hides **that record** on the
+   other: occupied thi lại (`requested`/`approved`/`scheduled`/
+   `finance_pending_cancellation`) hides học lại; a non-cancelled học lại
+   (including `enrolled`) hides thi lại. Cancelled sources reopen both lists.
+   A later failed attempt of the same unit is a new AcademicRecord and may
+   enter both lists. Staff choose the lane; there is no sequential
+   grade_failed → resit → retake path.
 
 **Consequences.** Money mutations stay inside Finance
 (`ProcessFinanceCancellationOperationAction` + `SettlementMutationGuard`);
